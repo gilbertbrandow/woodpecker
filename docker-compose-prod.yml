@@ -1,0 +1,29 @@
+services:
+  backend:
+    command: ["bash", "-lc", "gunicorn -b 0.0.0.0:8000 'app:create_app()' --workers 2 --threads 4 --timeout 60"]
+    expose:
+      - "8000"
+    environment:
+      FLASK_ENV: production
+      SESSION_COOKIE_SECURE: "1"
+      # set APP_ORIGIN to your real domain in .env.prod
+      APP_ORIGIN: ${APP_ORIGIN:?set APP_ORIGIN}
+
+  frontend:
+    build:
+      context: ./frontend
+      target: prod
+    expose:
+      - "80"
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
