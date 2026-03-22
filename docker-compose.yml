@@ -18,7 +18,7 @@ services:
     build:
       context: ./backend
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-woodpecker}:${POSTGRES_PASSWORD:-woodpecker}@db:5432/${POSTGRES_DB:-woodpecker}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-woodpecker}:${POSTGRES_PASSWORD:-woodpecker}@db:5432/${POSTGRES_DB:-woodpecker}
       SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY}
       LICHESS_CLIENT_ID: ${LICHESS_CLIENT_ID:?set LICHESS_CLIENT_ID}
       LICHESS_REDIRECT_URI: ${LICHESS_REDIRECT_URI:?set LICHESS_REDIRECT_URI}

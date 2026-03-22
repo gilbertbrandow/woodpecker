@@ -21,6 +21,90 @@ These rules apply to every file in this repository, regardless of the feature or
 - Prefer `dataclasses` or `TypedDict` over plain dicts for structured data.
 - Use `|` union syntax (Python 3.10+), not `Union[]` or `Optional[]`.
 
+## Backend Structure
+
+The backend follows a strict layered structure. Every feature maps to the same layout.
+
+```text
+backend/
+├── app/
+│   ├── __init__.py        # create_app() factory only
+│   ├── extensions.py      # Flask extension instances (db, cors) — no logic
+│   ├── models/            # SQLAlchemy model classes — no business logic
+│   ├── routes/            # Flask Blueprints — one file per domain
+│   └── services/          # Business logic — one file per domain
+└── app.py                 # Entrypoint: imports and calls create_app()
+```
+
+**Models** (`app/models/`) — SQLAlchemy model classes only. No methods containing business logic. No imports from `routes` or `services`.
+
+**Routes** (`app/routes/`) — Flask Blueprints. One blueprint per domain (e.g. `auth.py`, `puzzles.py`). Handlers must be thin: parse the request, call a service function, return a response. No business logic inline.
+
+**Services** (`app/services/`) — All business logic lives here. Service functions are plain Python functions. They must not import from `flask` (no `request`, `session`, `g`). Data flows in via arguments, out via return values.
+
+**Extensions** (`app/extensions.py`) — Instantiate Flask extensions here (`db = SQLAlchemy()`, `cors = CORS()`). Import from here everywhere else to avoid circular imports. Extensions are initialized against the app inside `create_app()`.
+
+**Rules:**
+
+- Routes call services. Services call models. Models know nothing above them.
+- No business logic in route handlers. No Flask context in service functions.
+- Blueprints are registered in `create_app()`, not imported at module level.
+
+---
+
+## Frontend Architecture
+
+### Routing — TanStack Router
+
+- TanStack Router is the sole routing solution. No React Router.
+- All routes are file-based under `frontend/src/routes/`.
+- Route params and search params are fully typed — never cast or use `as`.
+- Protected routes are enforced via a `beforeLoad` guard that checks auth state and redirects to `/` if unauthenticated.
+
+### API Client
+
+- All backend communication goes through `frontend/src/lib/api.ts`. No `fetch` calls outside this file.
+- `api.ts` exposes typed async functions per endpoint. It handles base URL (from `VITE_API_BASE_URL`), JSON serialisation, and maps HTTP error responses to thrown errors.
+- As error handling evolves, `api.ts` is the single place to add retry logic, auth error interception, or response normalisation.
+
+### Notifications — Sonner
+
+- Sonner is the sole notification system. No `alert()`, no custom toast state.
+- Import `toast` from `sonner` wherever a user-facing notification is needed.
+- `<Toaster />` is mounted once at the app root.
+- Use `toast.success`, `toast.error`, and `toast.info` consistently. Reserve `toast.error` for failures the user must act on or be aware of.
+
+---
+
+## Visual Design
+
+- **Neutral palette only.** No accent colours. Use shadcn/ui's default neutral (zinc/slate) scale exclusively. Raw palette values are forbidden (see Dark/Light Mode rules).
+- The chessboard is rendered by an external package (react-chessground) with its own visual language. The surrounding UI must not compete with it — whitespace and neutrals are the design.
+- **Plain by default.** No decorative elements, gradients, shadows, or rounded corners beyond what shadcn/ui applies by default.
+- Typography does the visual work. Hierarchy is expressed through size and weight, not colour.
+- The `monospace` font applies globally and is configured as the default in `tailwind.config`.
+
+---
+
+## Dark / Light Mode
+
+- The app supports dark and light mode via a `ThemeProvider` context that toggles a `dark` class on `<html>`.
+- shadcn/ui's CSS variables handle all colour switching automatically — never hardcode colours outside of CSS variables.
+- Default to the user's OS preference (`prefers-color-scheme`) on first visit. Persist the user's explicit choice in `localStorage`.
+- All Tailwind colour utilities must use semantic tokens (`bg-background`, `text-foreground`, `border-border`, etc.) — never use raw palette values like `bg-white` or `text-gray-900` which break in dark mode.
+- The `ThemeProvider` and its `useTheme` hook live in `frontend/src/context/theme.tsx` and are the single source of truth for the current theme.
+
+---
+
+## Responsive Design
+
+- **Mobile-first.** All UI is designed and built for small screens first, then scaled up for larger viewports. Use Tailwind's responsive prefixes (`sm:`, `md:`, `lg:`) to add complexity upward, never downward.
+- Touch targets must be large enough to tap comfortably (minimum `44px` height for interactive elements).
+- No horizontal scrolling on any viewport.
+- Test layouts at 375px width (iPhone SE) as the baseline.
+
+---
+
 ## General
 
 - **No comments.** Code must be self-documenting through clear naming and structure. Do not write inline comments, block comments, or docstrings unless explicitly asked. If a comment feels necessary, the code should be refactored instead.
