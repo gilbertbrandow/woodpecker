@@ -41,6 +41,8 @@ def exchange_code_for_token(code: str, verifier: str, redirect_uri: str) -> str 
         "code": code,
         "code_verifier": verifier,
     })
+    if not response.ok:
+        return None
     return response.json().get("access_token")
 
 

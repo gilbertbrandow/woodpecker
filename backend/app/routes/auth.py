@@ -1,5 +1,7 @@
 import os
 from flask import Blueprint, redirect, session, request, jsonify, Response
+from app.extensions import db
+from app.models.user import User
 from app.services.auth_service import (
     build_lichess_auth_url,
     exchange_code_for_token,
@@ -34,7 +36,11 @@ def callback() -> Response:
     if not access_token:
         return redirect(f"{APP_ORIGIN}?error=token_failed")
 
-    user = get_or_create_user(access_token)
+    try:
+        user = get_or_create_user(access_token)
+    except Exception:
+        return redirect(f"{APP_ORIGIN}?error=user_fetch_failed")
+
     session["user_id"] = user.id
     return redirect(APP_ORIGIN)
 
@@ -50,9 +56,6 @@ def me() -> tuple[Response, int] | Response:
     user_id = session.get("user_id")
     if not user_id:
         return jsonify({"error": "not authenticated"}), 401
-
-    from app.models.user import User
-    from app.extensions import db
 
     user = db.session.get(User, user_id)
     if not user:

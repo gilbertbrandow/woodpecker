@@ -57,14 +57,14 @@ backend/
 ### Routing — TanStack Router
 
 - TanStack Router is the sole routing solution. No React Router.
-- All routes are file-based under `frontend/src/routes/`.
+- Routes are defined in `frontend/src/router.tsx` using code-based routing.
 - Route params and search params are fully typed — never cast or use `as`.
-- Protected routes are enforced via a `beforeLoad` guard that checks auth state and redirects to `/` if unauthenticated.
+- Protected routes guard via `useEffect` redirect when `auth.loading` is false and `auth.user` is null.
 
 ### API Client
 
 - All backend communication goes through `frontend/src/lib/api.ts`. No `fetch` calls outside this file.
-- `api.ts` exposes typed async functions per endpoint. It handles base URL (from `VITE_API_BASE_URL`), JSON serialisation, and maps HTTP error responses to thrown errors.
+- `api.ts` exposes typed async functions per endpoint. All paths are relative (`/api/...`) — the Vite dev proxy and nginx in production both route these to the backend. `api.ts` handles JSON serialisation and maps HTTP error responses to thrown `ApiError` instances.
 - As error handling evolves, `api.ts` is the single place to add retry logic, auth error interception, or response normalisation.
 
 ### Notifications — Sonner
@@ -72,7 +72,9 @@ backend/
 - Sonner is the sole notification system. No `alert()`, no custom toast state.
 - Import `toast` from `sonner` wherever a user-facing notification is needed.
 - `<Toaster />` is mounted once at the app root.
-- Use `toast.success`, `toast.error`, and `toast.info` consistently. Reserve `toast.error` for failures the user must act on or be aware of.
+- Always use the title + description structure: `toast('Title', { description: 'Supporting detail.' })`. A single-line toast is never enough.
+- `richColors` is intentionally not set — all toasts render in neutral colors. Semantic meaning comes from the message, not the color. Reserve `toast.error` for failures the user must act on.
+- Toaster is positioned `bottom-center`.
 
 ---
 
