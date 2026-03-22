@@ -25,4 +25,13 @@ shell-backend:
 shell-db:
 	$(LOCAL_COMPOSE) exec db psql -U woodpecker woodpecker
 
-.PHONY: up up-build down logs ps build shell-backend shell-db
+migrate-init:
+	$(LOCAL_COMPOSE) exec backend flask --app app db init
+
+migrate:
+	$(LOCAL_COMPOSE) exec backend flask --app app db migrate -m "$(msg)"
+
+migrate-upgrade:
+	$(LOCAL_COMPOSE) exec backend flask --app app db upgrade
+
+.PHONY: up up-build down logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade
