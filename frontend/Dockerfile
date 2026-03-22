@@ -1,12 +1,12 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 FROM node:20-alpine AS dev
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 COPY . .
 EXPOSE 5173
 CMD ["sh", "-lc", "npm run dev -- --host 0.0.0.0 --port 5173"]

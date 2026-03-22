@@ -20,11 +20,8 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-woodpecker}:${POSTGRES_PASSWORD:-woodpecker}@db:5432/${POSTGRES_DB:-woodpecker}
       SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY}
-      # Lichess OAuth
       LICHESS_CLIENT_ID: ${LICHESS_CLIENT_ID:?set LICHESS_CLIENT_ID}
-      LICHESS_CLIENT_SECRET: ${LICHESS_CLIENT_SECRET:-}
       LICHESS_REDIRECT_URI: ${LICHESS_REDIRECT_URI:?set LICHESS_REDIRECT_URI}
-      # Frontend origin for cookies/CORS (adjust in dev/prod overrides)
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:5173}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-0}
       FLASK_ENV: ${FLASK_ENV:-production}
