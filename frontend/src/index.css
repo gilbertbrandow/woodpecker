@@ -5,6 +5,7 @@
 @layer base {
   :root {
     --toast-shadow: 0 8px 30px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+    --status-online: 142 71% 45%;
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
     --primary: 240 5.9% 10%;
@@ -25,6 +26,7 @@
 
   .dark {
     --toast-shadow: 0 8px 30px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
+    --status-online: 142 71% 45%;
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
     --primary: 0 0% 98%;

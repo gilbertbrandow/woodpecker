@@ -1,5 +1,6 @@
-import { createRouter, createRoute, createRootRouteWithContext, Outlet } from '@tanstack/react-router'
+import { createRouter, createRoute, createRootRouteWithContext } from '@tanstack/react-router'
 import type { AuthContextValue } from './context/auth'
+import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
 
@@ -8,7 +9,7 @@ type RouterContext = {
 }
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
-  component: () => <Outlet />,
+  component: Layout,
 })
 
 const loginRoute = createRoute({

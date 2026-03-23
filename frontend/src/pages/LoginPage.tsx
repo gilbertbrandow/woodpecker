@@ -1,11 +1,11 @@
+import * as React from 'react'
 import { useEffect } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useAuth } from '../context/auth'
 import { Button } from '../components/ui/button'
 import { LichessIcon } from '../components/LichessIcon'
-import { ThemeToggle } from '../components/ThemeToggle'
 
-export function LoginPage() {
+export function LoginPage(): React.ReactElement | null {
   const { user, loading } = useAuth()
   const navigate = useNavigate()
 
@@ -18,26 +18,19 @@ export function LoginPage() {
   if (loading) return null
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center bg-background">
-      <div className="absolute right-4 top-4">
-        <ThemeToggle />
+    <div className="flex flex-1 flex-col items-center justify-center gap-8 px-4">
+      <div className="flex flex-col items-center gap-3 text-center">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">Welcome</h1>
+        <p className="max-w-sm text-sm text-muted-foreground">
+          Woodpecker is a free training tool for Lichess players. Sign in with your Lichess account
+          to get started.
+        </p>
       </div>
-      <div className="flex flex-col items-center gap-8">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Woodpecker</h1>
-        <a href="/api/auth/login">
-          <Button size="lg" className="gap-3">
-            <LichessIcon className="h-5 w-5" />
-            Sign in with Lichess
-          </Button>
-        </a>
-      </div>
-      <a
-        href="https://www.amazon.se/-/en/Axel-Smith/dp/1784830542"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="absolute bottom-6 text-xs text-muted-foreground hover:text-foreground transition-colors"
-      >
-        Based on the Woodpecker Method by Axel Smith
+      <a href="/api/auth/login">
+        <Button size="lg" className="gap-3">
+          <LichessIcon className="h-5 w-5" />
+          Sign in with Lichess
+        </Button>
       </a>
     </div>
   )
