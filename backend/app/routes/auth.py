@@ -62,4 +62,9 @@ def me() -> tuple[Response, int] | Response:
         session.clear()
         return jsonify({"error": "not authenticated"}), 401
 
-    return jsonify({"id": user.id, "username": user.lichess_username})
+    return jsonify({
+        "id": user.id,
+        "username": user.lichess_username,
+        "nickname": user.nickname,
+        "avatarUrl": user.avatar_url,
+    })

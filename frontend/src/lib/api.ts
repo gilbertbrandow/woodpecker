@@ -33,6 +33,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 export type AuthUser = {
   id: number
   username: string
+  nickname: string | null
+  avatarUrl: string | null
+}
+
+export type SettingsPayload = {
+  nickname?: string
+  avatarUrl?: string
 }
 
 export const api = {
@@ -42,5 +49,9 @@ export const api = {
   },
   health: {
     check: (): Promise<{ status: string }> => request('/health'),
+  },
+  settings: {
+    update: (payload: SettingsPayload): Promise<AuthUser> =>
+      request('/settings', { method: 'PATCH', body: JSON.stringify(payload) }),
   },
 }

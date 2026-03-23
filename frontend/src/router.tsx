@@ -3,6 +3,7 @@ import type { AuthContextValue } from './context/auth'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
+import { SettingsPage } from './pages/SettingsPage'
 
 type RouterContext = {
   auth: AuthContextValue
@@ -24,7 +25,13 @@ const dashboardRoute = createRoute({
   component: DashboardPage,
 })
 
-const routeTree = rootRoute.addChildren([loginRoute, dashboardRoute])
+const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/app/settings',
+  component: SettingsPage,
+})
+
+const routeTree = rootRoute.addChildren([loginRoute, dashboardRoute, settingsRoute])
 
 export const router = createRouter({
   routeTree,

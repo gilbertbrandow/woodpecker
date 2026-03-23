@@ -3,6 +3,7 @@ from flask import Flask
 from app.extensions import db, cors, migrate
 from app.routes.health import health_bp
 from app.routes.auth import auth_bp
+from app.routes.settings import settings_bp
 
 
 def create_app() -> Flask:
@@ -20,5 +21,6 @@ def create_app() -> Flask:
 
     app.register_blueprint(health_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(settings_bp)
 
     return app
