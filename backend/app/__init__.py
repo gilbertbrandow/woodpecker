@@ -5,6 +5,8 @@ from app.routes.health import health_bp
 from app.routes.auth import auth_bp
 from app.routes.settings import settings_bp
 from app.routes.subsets import subsets_bp
+from app.routes.themes import themes_bp
+from app.routes.openings import openings_bp
 from app.commands.puzzles import puzzles_cli
 from app.commands.openings import openings_cli
 
@@ -26,6 +28,8 @@ def create_app() -> Flask:
     app.register_blueprint(auth_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(subsets_bp)
+    app.register_blueprint(themes_bp)
+    app.register_blueprint(openings_bp)
 
     app.cli.add_command(puzzles_cli)
     app.cli.add_command(openings_cli)

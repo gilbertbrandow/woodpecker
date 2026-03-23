@@ -161,11 +161,13 @@ def _sample_and_insert(
     return len(sampled_ids)
 
 
-def create_subset(user_id: int, name: str) -> Subset:
+def create_subset(user_id: int, name: str, puzzle_count: int) -> Subset:
     name = name.strip()
     if not name:
         raise ValueError("Name is required.")
-    subset = Subset(user_id=user_id, name=name, status="draft")
+    if not (5 <= puzzle_count <= 1000):
+        raise ValueError("puzzle_count must be between 5 and 1000.")
+    subset = Subset(user_id=user_id, name=name, status="draft", puzzle_count=puzzle_count)
     db.session.add(subset)
     db.session.commit()
     return subset

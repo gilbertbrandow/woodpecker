@@ -24,10 +24,13 @@ def _subset_to_dict(subset: Subset) -> dict[str, object]:
 def create_subset() -> tuple[Response, int]:
     data: dict[str, object] = request.get_json(silent=True) or {}
     name = data.get("name", "")
+    puzzle_count_raw = data.get("puzzleCount")
     if not isinstance(name, str):
         return jsonify({"error": "name must be a string"}), 400
+    if not isinstance(puzzle_count_raw, int):
+        return jsonify({"error": "puzzleCount must be an integer"}), 400
     try:
-        subset = subset_svc.create_subset(session["user_id"], name)
+        subset = subset_svc.create_subset(session["user_id"], name, puzzle_count_raw)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     return jsonify(_subset_to_dict(subset)), 201
