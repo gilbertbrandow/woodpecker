@@ -34,4 +34,16 @@ migrate:
 migrate-upgrade:
 	$(LOCAL_COMPOSE) exec backend flask --app app db upgrade
 
-.PHONY: up up-build down logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade
+puzzle-copy:
+	$(LOCAL_COMPOSE) cp $(file) backend:/tmp/lichess_db_puzzle.csv.zst
+
+puzzle-import:
+	$(LOCAL_COMPOSE) exec backend flask --app app puzzles import --file /tmp/lichess_db_puzzle.csv.zst $(args)
+
+puzzle-copy-prod:
+	$(PROD_COMPOSE) cp $(file) backend:/tmp/lichess_db_puzzle.csv.zst
+
+puzzle-import-prod:
+	$(PROD_COMPOSE) exec backend flask --app app puzzles import --file /tmp/lichess_db_puzzle.csv.zst $(args)
+
+.PHONY: up up-build down logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade puzzle-copy puzzle-import puzzle-copy-prod puzzle-import-prod
