@@ -23,22 +23,6 @@ def _load_cache(model: type[Theme] | type[Opening]) -> dict[str, int]:
     return {name: id_ for name, id_ in rows}
 
 
-def _flush_new_names(names: set[str], model: type[Theme] | type[Opening], cache: dict[str, int]) -> None:
-    new = names - cache.keys()
-    if not new:
-        return
-    stmt = pg_insert(model.__table__).values([{"name": n} for n in new]).on_conflict_do_nothing(
-        index_elements=["name"]
-    )
-    db.session.execute(stmt)
-    db.session.commit()
-    fresh = db.session.execute(
-        db.select(model.name, model.id).where(model.name.in_(new))
-    ).all()
-    for name, id_ in fresh:
-        cache[name] = id_
-
-
 def _open_stream(file_path: str) -> tuple[IO, IO]:
     if file_path.endswith(".zst"):
         fh = open(file_path, "rb")
@@ -65,27 +49,19 @@ def import_puzzles(
     rows_read = 0
     rows_inserted = 0
     rows_skipped = 0
+    unknown_themes: set[str] = set()
+    unknown_openings: set[str] = set()
 
     theme_cache: dict[str, int] = _load_cache(Theme)
     opening_cache: dict[str, int] = _load_cache(Opening)
 
-    puzzle_batch: list[dict] = []
+    puzzle_batch: list[dict[str, str | int]] = []
     batch_themes: list[list[str]] = []
     batch_openings: list[list[str]] = []
 
     def flush() -> int:
         if not puzzle_batch:
             return 0
-
-        batch_theme_names: set[str] = set()
-        batch_opening_names: set[str] = set()
-        for t_list in batch_themes:
-            batch_theme_names.update(t_list)
-        for o_list in batch_openings:
-            batch_opening_names.update(o_list)
-
-        _flush_new_names(batch_theme_names, Theme, theme_cache)
-        _flush_new_names(batch_opening_names, Opening, opening_cache)
 
         stmt = pg_insert(Puzzle.__table__).values(puzzle_batch).on_conflict_do_nothing(
             index_elements=["puzzle_id"]
@@ -115,10 +91,14 @@ def import_puzzles(
                     tid = theme_cache.get(t)
                     if tid is not None:
                         theme_assoc.append({"puzzle_id": pid, "theme_id": tid})
+                    else:
+                        unknown_themes.add(t)
                 for o in o_list:
                     oid = opening_cache.get(o)
                     if oid is not None:
                         opening_assoc.append({"puzzle_id": pid, "opening_id": oid})
+                    else:
+                        unknown_openings.add(o)
 
             if theme_assoc:
                 db.session.execute(
@@ -178,3 +158,8 @@ def import_puzzles(
 
     elapsed = time.monotonic() - start
     click.echo(f"\nDone. Inserted: {rows_inserted} | Skipped: {rows_skipped} | Time: {elapsed:.1f}s")
+
+    if unknown_themes:
+        click.echo(f"Warning: {len(unknown_themes)} unknown theme key(s) skipped: {', '.join(sorted(unknown_themes))}")
+    if unknown_openings:
+        click.echo(f"Warning: {len(unknown_openings)} unknown opening key(s) skipped: {', '.join(sorted(unknown_openings))}")

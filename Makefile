@@ -46,4 +46,10 @@ puzzle-copy-prod:
 puzzle-import-prod:
 	$(PROD_COMPOSE) exec backend flask --app app puzzles import --file /tmp/lichess_db_puzzle.csv.zst $(args)
 
-.PHONY: up up-build down logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade puzzle-copy puzzle-import puzzle-copy-prod puzzle-import-prod
+openings-import:
+	$(LOCAL_COMPOSE) exec backend flask --app app openings import $(args)
+
+openings-import-prod:
+	$(PROD_COMPOSE) exec backend flask --app app openings import $(args)
+
+.PHONY: up up-build down logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade puzzle-copy puzzle-import puzzle-copy-prod puzzle-import-prod openings-import openings-import-prod
