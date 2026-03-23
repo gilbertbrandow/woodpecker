@@ -4,6 +4,7 @@ import { RouterProvider } from '@tanstack/react-router'
 import { Toaster } from 'sonner'
 import { ThemeProvider } from './context/theme'
 import { AuthProvider, useAuth } from './context/auth'
+import { TooltipProvider } from './components/ui/tooltip'
 import { router } from './router'
 import './index.css'
 
@@ -18,6 +19,7 @@ if (!rootElement) throw new Error('Root element not found')
 createRoot(rootElement).render(
   <StrictMode>
     <ThemeProvider>
+      <TooltipProvider>
       <AuthProvider>
         <InnerApp />
         <Toaster
@@ -31,6 +33,7 @@ createRoot(rootElement).render(
           }}
         />
       </AuthProvider>
+      </TooltipProvider>
     </ThemeProvider>
   </StrictMode>,
 )

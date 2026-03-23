@@ -93,7 +93,7 @@ backend/
 - The app supports dark and light mode via a `ThemeProvider` context that toggles a `dark` class on `<html>`.
 - shadcn/ui's CSS variables handle all colour switching automatically — never hardcode colours outside of CSS variables.
 - Default to the user's OS preference (`prefers-color-scheme`) on first visit. Persist the user's explicit choice in `localStorage`.
-- All Tailwind colour utilities must use semantic tokens (`bg-background`, `text-foreground`, `border-border`, etc.) — never use raw palette values like `bg-white` or `text-gray-900` which break in dark mode.
+- All Tailwind colour utilities must use semantic tokens (`bg-background`, `text-foreground`, `border-border`, etc.) — never use raw palette values like `bg-white` or `text-gray-900` which break in dark mode. **Exception:** warning and error callout components (e.g. amber banners, destructive notices) may use raw palette values (e.g. `border-amber-600/30`, `text-amber-800`) with appropriate dark-mode variants, since these carry intentional semantic colour meaning beyond what the neutral token scale expresses.
 - The `ThemeProvider` and its `useTheme` hook live in `frontend/src/context/theme.tsx` and are the single source of truth for the current theme.
 
 ---

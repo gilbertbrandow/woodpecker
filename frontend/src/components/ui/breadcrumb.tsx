@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { Slot } from '@radix-ui/react-slot'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
@@ -19,9 +20,14 @@ function BreadcrumbItem({ className, ...props }: React.ComponentPropsWithoutRef<
   return <li className={cn('inline-flex items-center gap-1.5', className)} {...props} />
 }
 
-function BreadcrumbLink({ className, ...props }: React.ComponentPropsWithoutRef<'a'>): React.ReactElement {
+function BreadcrumbLink({
+  asChild,
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<'a'> & { asChild?: boolean }): React.ReactElement {
+  const Comp = asChild ? Slot : 'a'
   return (
-    <a
+    <Comp
       className={cn('transition-colors hover:text-foreground', className)}
       {...props}
     />

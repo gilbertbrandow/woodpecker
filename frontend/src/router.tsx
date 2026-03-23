@@ -4,6 +4,8 @@ import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { SubsetNewPage } from './pages/SubsetNewPage'
+import { SubsetPage } from './pages/SubsetPage'
 
 type RouterContext = {
   auth: AuthContextValue
@@ -31,7 +33,25 @@ const settingsRoute = createRoute({
   component: SettingsPage,
 })
 
-const routeTree = rootRoute.addChildren([loginRoute, dashboardRoute, settingsRoute])
+const subsetNewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/app/subsets/new',
+  component: SubsetNewPage,
+})
+
+const subsetRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/app/subsets/$subsetId',
+  component: SubsetPage,
+})
+
+const routeTree = rootRoute.addChildren([
+  loginRoute,
+  dashboardRoute,
+  settingsRoute,
+  subsetNewRoute,
+  subsetRoute,
+])
 
 export const router = createRouter({
   routeTree,
