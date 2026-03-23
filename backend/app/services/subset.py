@@ -9,7 +9,7 @@ from app.models.subset import Subset, SubsetPuzzle
 
 DEFAULT_RATING_MIN = 0
 DEFAULT_RATING_MAX = 9999
-RATING_BUCKET_SIZE = 50
+RATING_BUCKET_SIZE = 25
 PAGE_SIZE = 50
 
 
@@ -81,7 +81,7 @@ def _sample_puzzles(
             ),
             theme_scores AS (
                 SELECT pt.puzzle_id,
-                       SUM(COALESCE((:theme_weights::jsonb)->>(t.name), '1')::float) AS score
+                       SUM(COALESCE(CAST(:theme_weights AS jsonb)->>(t.name), '1')::float) AS score
                 FROM puzzle_themes pt
                 JOIN themes t ON t.id = pt.theme_id
                 WHERE pt.puzzle_id IN (SELECT id FROM eligible)
@@ -93,7 +93,7 @@ def _sample_puzzles(
                     COALESCE(ts.score, 0.0)
                     * CASE
                         WHEN :mu IS NULL OR :sigma IS NULL THEN 1.0
-                        ELSE exp(-0.5 * power((e.rating::float - :mu::float) / :sigma::float, 2))
+                        ELSE exp(-0.5 * power((e.rating::float - CAST(:mu AS float)) / CAST(:sigma AS float), 2))
                       END
                     * CASE
                         WHEN :opening_strength = 0 THEN 1.0
@@ -106,7 +106,7 @@ def _sample_puzzles(
             SELECT id
             FROM weighted
             WHERE weight > 0
-            ORDER BY random() ^ (1.0 / weight) DESC
+            ORDER BY ln(random()) / weight DESC
             LIMIT :count
         """),
         {
@@ -391,6 +391,8 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
             "openings": [],
             "avgPopularity": 0,
             "avgNbPlays": 0,
+            "avgRating": 0,
+            "noOpeningCount": 0,
             "totalActive": 0,
         }
 
@@ -398,6 +400,7 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
     total = len(active_rows)
     avg_popularity = sum(r.popularity for r in active_rows) / total
     avg_nb_plays = sum(r.nb_plays for r in active_rows) / total
+    avg_rating = round(sum(r.rating for r in active_rows) / total)
 
     bucket_map: dict[int, int] = {}
     for r in active_rows:
@@ -436,12 +439,20 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
         {"name": r.name, "displayName": r.display_name, "count": r.cnt} for r in opening_rows
     ]
 
+    with_opening = db.session.execute(
+        sa.text("SELECT COUNT(DISTINCT puzzle_id) FROM puzzle_openings WHERE puzzle_id = ANY(:ids)"),
+        {"ids": int_ids},
+    ).scalar()
+    no_opening_count = total - int(with_opening or 0)
+
     return {
         "ratingBuckets": rating_buckets,
         "themes": themes,
         "openings": openings,
         "avgPopularity": round(avg_popularity, 1),
         "avgNbPlays": round(avg_nb_plays, 1),
+        "avgRating": avg_rating,
+        "noOpeningCount": no_opening_count,
         "totalActive": total,
     }
 

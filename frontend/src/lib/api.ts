@@ -87,6 +87,8 @@ export type SubsetStats = {
   openings: { name: string; displayName: string; count: number }[]
   avgPopularity: number
   avgNbPlays: number
+  avgRating: number
+  noOpeningCount: number
   totalActive: number
 }
 
