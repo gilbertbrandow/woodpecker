@@ -66,24 +66,33 @@ export type SubsetConfig = {
   }
 }
 
+export type PuzzleLabel = { name: string; displayName: string }
+export type PuzzleOpening = { name: string; displayName: string; eco: string }
+
 export type Puzzle = {
   puzzleId: string
   rating: number
   popularity: number
   nbPlays: number
-  themes: string[]
-  openings: string[]
+  gameUrl: string
+  themes: PuzzleLabel[]
+  openings: PuzzleOpening[]
 }
+
+export type SortColumn = 'rating' | 'popularity' | 'nb_plays'
+export type SortOrder = 'asc' | 'desc'
 
 export type PuzzlePage = {
   puzzles: Puzzle[]
-  nextPage: number | null
+  page: number
+  pageSize: number
+  totalPages: number
   total: number
 }
 
 export type SubsetStats = {
   ratingBuckets: { min: number; max: number; count: number }[]
-  themes: { name: string; displayName: string; count: number }[]
+  themes: { name: string; displayName: string; description: string; count: number }[]
   openings: { name: string; displayName: string; count: number }[]
   avgPopularity: number
   avgNbPlays: number
@@ -131,8 +140,19 @@ export const api = {
     refill: (id: number): Promise<{ filled: number; needed: number }> =>
       request(`/subsets/${id}/refill`, { method: 'POST' }),
     lock: (id: number): Promise<Subset> => request(`/subsets/${id}/lock`, { method: 'POST' }),
-    getPuzzles: (id: number, page?: number): Promise<PuzzlePage> =>
-      request(`/subsets/${id}/puzzles${page !== undefined ? `?page=${page}` : ''}`),
+    getPuzzles: (
+      id: number,
+      page?: number,
+      sort?: SortColumn,
+      order?: SortOrder,
+    ): Promise<PuzzlePage> => {
+      const params = new URLSearchParams()
+      if (page !== undefined) params.set('page', String(page))
+      if (sort) params.set('sort', sort)
+      if (order) params.set('order', order)
+      const qs = params.toString()
+      return request(`/subsets/${id}/puzzles${qs ? `?${qs}` : ''}`)
+    },
     discardPuzzle: (id: number, puzzleId: string): Promise<void> =>
       request(`/subsets/${id}/puzzles/${puzzleId}`, { method: 'DELETE' }),
     getStats: (id: number): Promise<SubsetStats> => request(`/subsets/${id}/stats`),

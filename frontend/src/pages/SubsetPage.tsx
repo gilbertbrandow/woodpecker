@@ -2,13 +2,12 @@ import * as React from "react";
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, Link, useParams } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Trash2, Lock, Undo2 } from "lucide-react";
+import { ChevronDown, Lock, Undo2 } from "lucide-react";
 import { useAuth } from "../context/auth";
 import {
   api,
   type Subset,
   type SubsetConfig,
-  type Puzzle,
   type SubsetStats as SubsetStatsType,
 } from "../lib/api";
 import { Button } from "../components/ui/button";
@@ -54,6 +53,12 @@ import {
   type OpeningValue,
 } from "../components/subsets/OpeningSelector";
 import { SubsetStats } from "../components/subsets/SubsetStats";
+import { PuzzleTable } from "../components/subsets/PuzzleTable";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "../components/ui/collapsible";
 
 const RATING_DEFAULT: RatingValue = {
   min: 1800,
@@ -107,37 +112,59 @@ function buildConfig(
   return config;
 }
 
-function SectionHeader({
+function SectionTrigger({
   title,
   description,
+  open,
+  changed,
   onReset,
+  ...rest
 }: {
   title: string;
   description: string;
+  open: boolean;
+  changed: boolean;
   onReset?: () => void;
-}): React.ReactElement {
+} & React.ComponentPropsWithoutRef<"button">): React.ReactElement {
   return (
-    <div className="mb-4 flex items-start justify-between gap-12">
-      <div>
-        <h2 className="mb-1 text-sm font-medium">{title}</h2>
-        <p className="text-xs text-muted-foreground">{description}</p>
-      </div>
-      {onReset && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onReset}
-              className="shrink-0 text-muted-foreground"
-            >
-              <Undo2 className="h-3.5 w-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Reset section</TooltipContent>
-        </Tooltip>
-      )}
-    </div>
+    <button
+      type="button"
+      className="flex h-8 w-full items-center justify-between border-b text-left"
+      {...rest}
+    >
+      <span className="flex items-center gap-2 text-sm font-medium">
+        <ChevronDown
+          className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
+          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
+        />
+        {title}
+        {onReset && changed && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReset();
+                }}
+              >
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 w-5 p-0 text-muted-foreground"
+                  tabIndex={-1}
+                >
+                  <Undo2 className="h-3.5 w-3.5" />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>Reset section</TooltipContent>
+          </Tooltip>
+        )}
+      </span>
+      <span className="hidden text-xs text-muted-foreground sm:block">
+        {description}
+      </span>
+    </button>
   );
 }
 
@@ -172,12 +199,12 @@ export function SubsetPage(): React.ReactElement | null {
   const [isSaving, setIsSaving] = useState(false);
   const [isFilling, setIsFilling] = useState(false);
 
-  const [puzzles, setPuzzles] = useState<Puzzle[]>([]);
-  const [nextPage, setNextPage] = useState<number | null>(null);
   const [total, setTotal] = useState(0);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-
   const [stats, setStats] = useState<SubsetStatsType | null>(null);
+  const [puzzlesOpen, setPuzzlesOpen] = useState(true);
+  const [ratingOpen, setRatingOpen] = useState(true);
+  const [themesOpen, setThemesOpen] = useState(false);
+  const [openingOpen, setOpeningOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -185,18 +212,18 @@ export function SubsetPage(): React.ReactElement | null {
     }
   }, [user, authLoading, navigate]);
 
-  const loadPuzzlesAndStats = useCallback(
-    async (subsetIdArg: number): Promise<void> => {
-      const [page, s] = await Promise.all([
-        api.subsets.getPuzzles(subsetIdArg),
-        api.subsets.getStats(subsetIdArg),
-      ]);
-      setPuzzles(page.puzzles);
-      setNextPage(page.nextPage);
-      setTotal(page.total);
-      setStats(s);
+  const loadStats = useCallback(async (subsetIdArg: number): Promise<void> => {
+    const s = await api.subsets.getStats(subsetIdArg);
+    setStats(s);
+    setTotal(s.totalActive);
+  }, []);
+
+  const handleTotalChange = useCallback(
+    (n: number): void => {
+      setTotal(n);
+      void loadStats(id);
     },
-    [],
+    [id, loadStats],
   );
 
   useEffect(() => {
@@ -211,7 +238,7 @@ export function SubsetPage(): React.ReactElement | null {
         setIsDirty(false);
         if (s.status !== "draft") {
           setActiveTab("puzzles");
-          await loadPuzzlesAndStats(id);
+          await loadStats(id);
         }
       })
       .catch(() =>
@@ -220,7 +247,7 @@ export function SubsetPage(): React.ReactElement | null {
         }),
       )
       .finally(() => setPageLoading(false));
-  }, [id, user, loadPuzzlesAndStats]);
+  }, [id, user, loadStats]);
 
   const markDirty = (): void => setIsDirty(true);
 
@@ -237,9 +264,7 @@ export function SubsetPage(): React.ReactElement | null {
       setSubset(updated);
       setIsDirty(false);
       if (updated.status === "draft") {
-        setPuzzles([]);
         setStats(null);
-        setNextPage(null);
         setTotal(0);
       }
       toast("Configuration saved", {
@@ -266,20 +291,18 @@ export function SubsetPage(): React.ReactElement | null {
         );
         setSubset(updated);
         setIsDirty(false);
-        setPuzzles([]);
         setStats(null);
-        setNextPage(null);
         setTotal(0);
       }
       if (total === 0) {
         const result = await api.subsets.fill(id);
         const updated = await api.subsets.get(id);
         setSubset(updated);
-        await loadPuzzlesAndStats(id);
+        await loadStats(id);
         setActiveTab("puzzles");
         if (result.filled < result.requested) {
           toast("Fill complete", {
-            description: `Filled ${result.filled} of ${result.requested} requested puzzles. Pool may be smaller than expected.`,
+            description: `Filled ${result.filled} of ${result.requested} requested puzzles.`,
           });
         } else {
           toast("Fill complete", {
@@ -288,7 +311,7 @@ export function SubsetPage(): React.ReactElement | null {
         }
       } else {
         const result = await api.subsets.refill(id);
-        await loadPuzzlesAndStats(id);
+        await loadStats(id);
         toast("Refill complete", {
           description:
             result.filled === 0
@@ -319,40 +342,11 @@ export function SubsetPage(): React.ReactElement | null {
     }
   };
 
-  const handleDiscard = async (puzzleId: string): Promise<void> => {
-    try {
-      await api.subsets.discardPuzzle(id, puzzleId);
-      setPuzzles((prev) => prev.filter((p) => p.puzzleId !== puzzleId));
-      setTotal((prev) => prev - 1);
-      const updated = await api.subsets.getStats(id);
-      setStats(updated);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Please try again.";
-      toast.error("Remove failed", { description: msg });
-    }
-  };
-
-  const handleLoadMore = async (): Promise<void> => {
-    if (nextPage === null) return;
-    setIsLoadingMore(true);
-    try {
-      const page = await api.subsets.getPuzzles(id, nextPage);
-      setPuzzles((prev) => [...prev, ...page.puzzles]);
-      setNextPage(page.nextPage);
-    } catch {
-      toast.error("Failed to load more puzzles", {
-        description: "Please try again.",
-      });
-    } finally {
-      setIsLoadingMore(false);
-    }
-  };
-
   if (authLoading || !user) return null;
 
   if (pageLoading) {
     return (
-      <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+      <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
         <p className="text-sm text-muted-foreground">Loading…</p>
       </div>
     );
@@ -360,7 +354,7 @@ export function SubsetPage(): React.ReactElement | null {
 
   if (!subset) {
     return (
-      <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+      <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
         <p className="text-sm text-muted-foreground">Subset not found.</p>
       </div>
     );
@@ -368,11 +362,12 @@ export function SubsetPage(): React.ReactElement | null {
 
   const locked = subset.status === "locked";
   const isBusy = isSaving || isFilling;
-  const needsFill = !locked && total < (subset.puzzleCount ?? 0);
+  const puzzleCount = subset.puzzleCount ?? 0;
+  const isFull = total >= puzzleCount;
   const fillLabel = total === 0 ? "Fill" : "Refill";
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+    <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
       <Breadcrumb className="mb-6">
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -396,21 +391,64 @@ export function SubsetPage(): React.ReactElement | null {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
           <TabsList>
             <TabsTrigger value="configure">Configure</TabsTrigger>
             <TabsTrigger value="puzzles">
               Puzzles{total > 0 ? ` (${total})` : ""}
             </TabsTrigger>
           </TabsList>
-          {needsFill && (
-            <Button
-              size="sm"
-              onClick={() => void handleFillOrRefill()}
-              disabled={isBusy}
-            >
-              {isFilling ? `${fillLabel}ing…` : fillLabel}
-            </Button>
+
+          {!locked && (
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void handleFillOrRefill()}
+                disabled={isBusy || isFull}
+              >
+                {isFilling ? `${fillLabel}ing…` : fillLabel}
+              </Button>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          disabled={total < MIN_LOCK_PUZZLES || isBusy}
+                        >
+                          <Lock className="mr-1.5 h-3.5 w-3.5" />
+                          Lock in
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Lock this subset?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Locking is permanent. The subset will be frozen with
+                            its current {total} puzzle{total !== 1 ? "s" : ""}{" "}
+                            and cannot be modified.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => void handleLock()}>
+                            Lock
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </span>
+                </TooltipTrigger>
+                {total < MIN_LOCK_PUZZLES && (
+                  <TooltipContent>
+                    Need at least {MIN_LOCK_PUZZLES} puzzles to lock
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </div>
           )}
         </div>
         <Separator className="mb-6 mt-3" />
@@ -434,78 +472,103 @@ export function SubsetPage(): React.ReactElement | null {
             </div>
           )}
 
-          <div className="flex flex-col gap-8">
-            <section>
-              <SectionHeader
-                title="Rating distribution"
-                description="Set the rating range and optionally concentrate the distribution around a specific rating. The chart shows the relative sampling probability at each rating."
-                onReset={
-                  !locked
-                    ? () => {
-                        setRating(RATING_DEFAULT);
-                        markDirty();
-                      }
-                    : undefined
-                }
-              />
-              <RatingChart
-                value={rating}
-                onChange={(v) => {
-                  setRating(v);
-                  markDirty();
-                }}
-                disabled={locked || isBusy}
-              />
-            </section>
+          <div className="flex flex-col gap-4">
+            <Collapsible open={ratingOpen} onOpenChange={setRatingOpen}>
+              <CollapsibleTrigger asChild>
+                <SectionTrigger
+                  title="Puzzle rating"
+                  description="Range and concentration of puzzle ratings."
+                  open={ratingOpen}
+                  changed={
+                    JSON.stringify(rating) !== JSON.stringify(RATING_DEFAULT)
+                  }
+                  onReset={
+                    !locked
+                      ? () => {
+                          setRating(RATING_DEFAULT);
+                          markDirty();
+                        }
+                      : undefined
+                  }
+                />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="pt-4">
+                  <RatingChart
+                    value={rating}
+                    onChange={(v) => {
+                      setRating(v);
+                      markDirty();
+                    }}
+                    disabled={locked || isBusy}
+                  />
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
 
-            <section>
-              <SectionHeader
-                title="Theme weights"
-                description="Adjust the relative likelihood of each theme. Default weight 1 is neutral. Weight 0 excludes puzzles whose only themes are at zero."
-                onReset={
-                  !locked
-                    ? () => {
-                        setThemes({});
-                        markDirty();
-                      }
-                    : undefined
-                }
-              />
-              <ThemeWeights
-                value={themes}
-                onChange={(v) => {
-                  setThemes(v);
-                  markDirty();
-                }}
-                disabled={locked || isBusy}
-              />
-            </section>
+            <Collapsible open={themesOpen} onOpenChange={setThemesOpen}>
+              <CollapsibleTrigger asChild>
+                <SectionTrigger
+                  title="Tactical themes"
+                  description="Relative likelihood of each tactical motif."
+                  open={themesOpen}
+                  changed={Object.keys(themes).length > 0}
+                  onReset={
+                    !locked
+                      ? () => {
+                          setThemes({});
+                          markDirty();
+                        }
+                      : undefined
+                  }
+                />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="pt-4">
+                  <ThemeWeights
+                    value={themes}
+                    onChange={(v) => {
+                      setThemes(v);
+                      markDirty();
+                    }}
+                    disabled={locked || isBusy}
+                  />
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
 
-            <Separator />
-
-            <section>
-              <SectionHeader
-                title="Opening preferences"
-                description="Bias sampling towards puzzles from specific openings and control how strongly they are preferred."
-                onReset={
-                  !locked
-                    ? () => {
-                        setOpening(OPENING_DEFAULT);
-                        markDirty();
-                      }
-                    : undefined
-                }
-              />
-              <OpeningSelector
-                value={opening}
-                onChange={(v) => {
-                  setOpening(v);
-                  markDirty();
-                }}
-                disabled={locked || isBusy}
-              />
-            </section>
+            <Collapsible open={openingOpen} onOpenChange={setOpeningOpen}>
+              <CollapsibleTrigger asChild>
+                <SectionTrigger
+                  title="Openings"
+                  description="Favour puzzles from specific openings."
+                  open={openingOpen}
+                  changed={opening.items.length > 0}
+                  onReset={
+                    !locked
+                      ? () => {
+                          setOpening(OPENING_DEFAULT);
+                          markDirty();
+                        }
+                      : undefined
+                  }
+                />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="pt-4">
+                  <OpeningSelector
+                    value={opening}
+                    onChange={(v) => {
+                      setOpening(v);
+                      markDirty();
+                    }}
+                    disabled={locked || isBusy}
+                  />
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
+
           {!locked && (
             <div className="flex flex-wrap items-center gap-3 pt-4">
               <Button
@@ -520,160 +583,48 @@ export function SubsetPage(): React.ReactElement | null {
         </TabsContent>
 
         <TabsContent value="puzzles">
-          {subset.status === "draft" ? (
-            <div className="py-12 text-center">
-              <p className="text-sm text-muted-foreground">
-                Configure and fill the subset to see puzzles here.
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4"
-                onClick={() => setActiveTab("configure")}
-              >
-                Go to Configure
-              </Button>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-8">
-              {stats && <SubsetStats stats={stats} />}
+          <div className="flex flex-col gap-8">
+            {stats && <SubsetStats stats={stats} />}
 
-              <Separator />
-
-              <div>
-                <p className="mb-3 text-sm text-muted-foreground">
-                  {total} puzzle{total !== 1 ? "s" : ""}
-                </p>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-xs text-muted-foreground">
-                        <th className="pb-2 pr-4 font-medium">ID</th>
-                        <th className="pb-2 pr-4 font-medium">Rating</th>
-                        <th className="pb-2 pr-4 font-medium">Themes</th>
-                        <th className="pb-2 pr-4 font-medium">Openings</th>
-                        <th className="pb-2 pr-4 font-medium">Popularity</th>
-                        <th className="pb-2 pr-4 font-medium">Plays</th>
-                        {!locked && <th className="pb-2 font-medium" />}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {puzzles.map((p) => (
-                        <tr key={p.puzzleId}>
-                          <td className="py-2 pr-4 font-mono text-xs">
-                            {p.puzzleId}
-                          </td>
-                          <td className="py-2 pr-4 tabular-nums">{p.rating}</td>
-                          <td className="py-2 pr-4">
-                            <div className="flex flex-wrap gap-1">
-                              {p.themes.slice(0, 3).map((t) => (
-                                <Badge
-                                  key={t}
-                                  variant="outline"
-                                  className="text-xs"
-                                >
-                                  {t}
-                                </Badge>
-                              ))}
-                              {p.themes.length > 3 && (
-                                <Badge variant="outline" className="text-xs">
-                                  +{p.themes.length - 3}
-                                </Badge>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-2 pr-4">
-                            <div className="flex flex-wrap gap-1">
-                              {p.openings.slice(0, 1).map((o) => (
-                                <Badge
-                                  key={o}
-                                  variant="outline"
-                                  className="text-xs"
-                                >
-                                  {o}
-                                </Badge>
-                              ))}
-                              {p.openings.length > 1 && (
-                                <Badge variant="outline" className="text-xs">
-                                  +{p.openings.length - 1}
-                                </Badge>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-2 pr-4 tabular-nums">
-                            {p.popularity}
-                          </td>
-                          <td className="py-2 pr-4 tabular-nums">
-                            {p.nbPlays.toLocaleString()}
-                          </td>
-                          {!locked && (
-                            <td className="py-2">
-                              <button
-                                type="button"
-                                onClick={() => void handleDiscard(p.puzzleId)}
-                                className="flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-                                aria-label="Remove puzzle"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+            <Collapsible open={puzzlesOpen} onOpenChange={setPuzzlesOpen}>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between border-b pb-2.5 text-left"
+                >
+                  <span className="flex items-center gap-2 text-sm font-medium">
+                    <ChevronDown
+                      className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
+                      style={{
+                        transform: puzzlesOpen
+                          ? "rotate(180deg)"
+                          : "rotate(0deg)",
+                      }}
+                    />
+                    Puzzle list
+                  </span>
+                  <span className="hidden text-xs text-muted-foreground sm:block">
+                    All puzzles currently in this subset
+                  </span>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="pt-6">
+                  {locked && (
+                    <div className="mb-4 flex items-center gap-2 rounded-md border px-4 py-3 text-sm text-muted-foreground">
+                      <Lock className="h-4 w-4 shrink-0" />
+                      This subset is locked. Configuration cannot be changed.
+                    </div>
+                  )}
+                  <PuzzleTable
+                    subsetId={id}
+                    locked={locked}
+                    onTotalChange={handleTotalChange}
+                  />
                 </div>
-
-                {nextPage !== null && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-4"
-                    onClick={() => void handleLoadMore()}
-                    disabled={isLoadingMore}
-                  >
-                    {isLoadingMore ? "Loading…" : "Load more"}
-                  </Button>
-                )}
-              </div>
-
-              {!locked && (
-                <div className="flex flex-wrap items-center gap-3">
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        disabled={total < MIN_LOCK_PUZZLES || isBusy}
-                        title={
-                          total < MIN_LOCK_PUZZLES
-                            ? `Need at least ${MIN_LOCK_PUZZLES} puzzles to lock`
-                            : undefined
-                        }
-                      >
-                        <Lock className="mr-2 h-4 w-4" />
-                        Lock in
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Lock this subset?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Locking is permanent. The subset will be frozen with
-                          its current {total} puzzle{total !== 1 ? "s" : ""} and
-                          cannot be modified.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => void handleLock()}>
-                          Lock
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              )}
-            </div>
-          )}
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

@@ -111,64 +111,78 @@ export function RatingChart({
 
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="relative h-56">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart
-            data={data}
-            margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
-          >
-            <XAxis
-              dataKey="rating"
-              tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-              axisLine={false}
-              tickLine={false}
-              interval="preserveStartEnd"
-            />
-            <YAxis hide domain={[0, 1.05]} />
-            <Tooltip
-              content={({ active, payload }) => {
-                if (!active || !payload?.length) return null;
-                const entry = payload[0];
-                const weight = entry?.value;
-                const rating = (
-                  entry?.payload as { rating: number } | undefined
-                )?.rating;
-                return (
-                  <div className="rounded border bg-background px-2 py-1 text-xs shadow">
-                    <p className="text-muted-foreground">Rating {rating}</p>
-                    <p>
-                      Weight{" "}
-                      {typeof weight === "number" ? weight.toFixed(3) : weight}
-                    </p>
-                  </div>
-                );
-              }}
-            />
-            <Area
-              type="monotone"
-              dataKey="weight"
-              stroke={CHART_BLUE}
-              fill={CHART_BLUE}
-              fillOpacity={0.15}
-              strokeWidth={2}
-              dot={false}
-              isAnimationActive={false}
-            />
-            {!isUniform && <Customized component={MeanLine} />}
-          </AreaChart>
-        </ResponsiveContainer>
-        {isUniform && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <span className="text-xs text-muted-foreground">
-              Uniform distribution
-            </span>
-          </div>
-        )}
+    <div className="rounded-md border p-4">
+      <div className="mb-4">
+        <p className="text-sm font-semibold">Range & Distribution</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Puzzles are sampled within the range, weighted towards the mean and concentrated around said mean according to σ.
+        </p>
+      </div>
+      <div className="relative">
+        <div className="h-56">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart
+              data={data}
+              margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
+            >
+              <defs>
+                <linearGradient id="ratingConfigGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={CHART_BLUE} stopOpacity={0.8} />
+                  <stop offset="95%" stopColor={CHART_BLUE} stopOpacity={0.1} />
+                </linearGradient>
+              </defs>
+              <XAxis
+                dataKey="rating"
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                axisLine={false}
+                tickLine={false}
+                interval="preserveStartEnd"
+              />
+              <YAxis hide domain={[0, 1.05]} />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const entry = payload[0];
+                  const weight = entry?.value;
+                  const rating = (
+                    entry?.payload as { rating: number } | undefined
+                  )?.rating;
+                  return (
+                    <div className="rounded border bg-background px-2 py-1 text-xs shadow">
+                      <p className="text-muted-foreground">Rating {rating}</p>
+                      <p>
+                        Weight{" "}
+                        {typeof weight === "number" ? weight.toFixed(3) : weight}
+                      </p>
+                    </div>
+                  );
+                }}
+              />
+              <Area
+                type="monotone"
+                dataKey="weight"
+                stroke={CHART_BLUE}
+                fill="url(#ratingConfigGradient)"
+                fillOpacity={1}
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={false}
+              />
+              {!isUniform && <Customized component={MeanLine} />}
+            </AreaChart>
+          </ResponsiveContainer>
+          {isUniform && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <span className="text-xs">
+                Uniform distribution
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1.5">
+      <div className="mt-4 flex flex-col gap-8">
+        <div className="flex flex-col gap-4">
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>Rating range</span>
             <span>
@@ -185,7 +199,7 @@ export function RatingChart({
           />
         </div>
         {!isUniform && (
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-4">
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>Mean (μ)</span>
               <span>{effectiveMean}</span>
@@ -203,7 +217,7 @@ export function RatingChart({
             />
           </div>
         )}
-        <div className="mt-2 flex flex-col gap-1.5">
+        <div className="mt-2 flex flex-col gap-4">
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>Standard deviation (σ)</span>
             <span>{isUniform ? "Uniform" : displaySigma}</span>

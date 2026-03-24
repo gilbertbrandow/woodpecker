@@ -51,7 +51,7 @@ export function SubsetNewPage(): React.ReactElement | null {
   }
 
   return (
-    <div className="mx-auto w-full max-w-lg px-4 py-8 sm:px-6">
+    <div className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
       <Breadcrumb className="mb-6">
         <BreadcrumbList>
           <BreadcrumbItem>

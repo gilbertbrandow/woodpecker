@@ -102,7 +102,7 @@ backend/
 
 - **Mobile-first.** All UI is designed and built for small screens first, then scaled up for larger viewports. Use Tailwind's responsive prefixes (`sm:`, `md:`, `lg:`) to add complexity upward, never downward.
 - Touch targets must be large enough to tap comfortably (minimum `44px` height for interactive elements).
-- No horizontal scrolling on any viewport.
+- No horizontal scrolling on the page itself. Data tables may scroll horizontally within their container (`overflow-auto`); action/icon columns must remain visible via `sticky right-0 bg-background`.
 - Test layouts at 375px width (iPhone SE) as the baseline.
 
 ---

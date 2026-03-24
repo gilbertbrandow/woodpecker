@@ -89,7 +89,7 @@ export function SettingsPage(): React.ReactElement | null {
   }
 
   return (
-    <div className="w-full max-w-lg mx-auto px-4 py-8">
+    <div className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
       <Breadcrumb className="mb-6">
         <BreadcrumbList>
           <BreadcrumbItem>

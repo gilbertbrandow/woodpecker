@@ -45,7 +45,7 @@ export function OpeningSelector({ value, onChange, disabled = false }: OpeningSe
         .then((data) => {
           const match = data.find((r) => r.name === name)
           if (match?.displayName) {
-            setDisplayNames((prev) => ({ ...prev, [name]: match.displayName }))
+            setDisplayNames((prev) => ({ ...prev, [name]: match.displayName ?? name }))
           }
         })
         .catch(() => {})

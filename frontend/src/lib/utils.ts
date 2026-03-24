@@ -9,3 +9,7 @@ export function cn(...inputs: ClassValue[]): string {
 export function displayName(user: AuthUser): string {
   return user.nickname ?? user.username
 }
+
+export function formatNumber(n: number): string {
+  return n.toLocaleString('sv-SE').replace(',', '.')
+}

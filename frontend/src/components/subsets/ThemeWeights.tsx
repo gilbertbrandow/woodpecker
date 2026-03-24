@@ -1,10 +1,8 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
-import { ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, type Theme } from '../../lib/api'
 import { Input } from '../ui/input'
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '../ui/collapsible'
 import { ThemeSlider } from './ThemeSlider'
 
 type ThemeWeightsProps = {
@@ -51,7 +49,6 @@ export function ThemeWeights({ value, onChange, disabled = false }: ThemeWeights
   const [themes, setThemes] = useState<Theme[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [open, setOpen] = useState(false)
 
   useEffect(() => {
     api.themes
@@ -73,8 +70,6 @@ export function ThemeWeights({ value, onChange, disabled = false }: ThemeWeights
 
   const getWeight = (name: string): number => value[name] ?? 1
 
-  const adjustedCount = Object.keys(value).length
-
   const filtered = themes.filter((t) => {
     if (!search) return true
     const q = search.toLowerCase()
@@ -84,51 +79,30 @@ export function ThemeWeights({ value, onChange, disabled = false }: ThemeWeights
     )
   })
 
-  return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger asChild>
-        <button
-          type="button"
-          className="flex w-full items-center justify-between rounded-md border px-4 py-2.5 text-left text-sm hover:bg-accent"
-        >
-          <span className="font-medium">
-            {open ? 'Hide themes' : 'Show themes'}
-            {adjustedCount > 0 && (
-              <span className="ml-2 text-xs font-normal text-muted-foreground">
-                {adjustedCount} adjusted
-              </span>
-            )}
-          </span>
-          {open ? <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />}
-        </button>
-      </CollapsibleTrigger>
+  if (loading) {
+    return <p className="py-4 text-center text-sm text-muted-foreground">Loading themes…</p>
+  }
 
-      <CollapsibleContent className="mt-2">
-        {loading ? (
-          <p className="py-4 text-center text-sm text-muted-foreground">Loading themes…</p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            <Input
-              placeholder="Search themes…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              disabled={disabled}
-              className="h-9"
-            />
-            <div className="flex flex-col gap-1.5">
-              {filtered.map((t) => (
-                <ThemeRow
-                  key={t.name}
-                  theme={t}
-                  weight={getWeight(t.name)}
-                  onChange={(v) => handleWeightChange(t.name, v)}
-                  disabled={disabled}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-      </CollapsibleContent>
-    </Collapsible>
+  return (
+    <div className="flex flex-col gap-2">
+      <Input
+        placeholder="Search themes…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        disabled={disabled}
+        className="h-9"
+      />
+      <div className="flex flex-col gap-1.5">
+        {filtered.map((t) => (
+          <ThemeRow
+            key={t.name}
+            theme={t}
+            weight={getWeight(t.name)}
+            onChange={(v) => handleWeightChange(t.name, v)}
+            disabled={disabled}
+          />
+        ))}
+      </div>
+    </div>
   )
 }
