@@ -9,8 +9,13 @@ from app.models.subset import Subset, SubsetPuzzle
 
 DEFAULT_RATING_MIN = 0
 DEFAULT_RATING_MAX = 9999
-RATING_BUCKET_SIZE = 25
-PAGE_SIZE = 50
+RATING_BUCKET_SIZE = 50
+PAGE_SIZE = 25
+VALID_SORT_COLUMNS: dict[str, str] = {
+    "rating": "p.rating",
+    "popularity": "p.popularity",
+    "nb_plays": "p.nb_plays",
+}
 
 
 def _parse_config(config: dict[str, object]) -> tuple[
@@ -300,7 +305,9 @@ def lock_subset(subset_id: int, user_id: int) -> Subset:
 def list_active_puzzles(
     subset_id: int,
     user_id: int,
-    cursor: int | None,
+    page: int,
+    sort: str | None,
+    order: str,
 ) -> dict[str, object]:
     _get_owned_subset(subset_id, user_id)
 
@@ -311,50 +318,57 @@ def list_active_puzzles(
         )
     ).scalar_one()
 
+    total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+    page = max(1, min(page, total_pages))
+    offset = (page - 1) * PAGE_SIZE
+
+    sort_col = VALID_SORT_COLUMNS.get(sort or "", "sp.position")
+    order_dir = "DESC" if order == "desc" else "ASC"
+
     rows = db.session.execute(
-        sa.text("""
-            SELECT p.id, p.puzzle_id, p.rating, p.popularity, p.nb_plays, sp.position
+        sa.text(f"""
+            SELECT p.id, p.puzzle_id, p.rating, p.popularity, p.nb_plays
             FROM subset_puzzles sp
             JOIN puzzles p ON p.id = sp.puzzle_id
             WHERE sp.subset_id = :sid AND sp.is_discarded = FALSE
-              AND (:cursor IS NULL OR sp.position > :cursor)
-            ORDER BY sp.position
-            LIMIT :limit
+            ORDER BY {sort_col} {order_dir}
+            LIMIT :limit OFFSET :offset
         """),
-        {"sid": subset_id, "cursor": cursor, "limit": PAGE_SIZE + 1},
+        {"sid": subset_id, "limit": PAGE_SIZE, "offset": offset},
     ).all()
 
-    has_next = len(rows) > PAGE_SIZE
-    page_rows = rows[:PAGE_SIZE]
+    if not rows:
+        return {"puzzles": [], "page": page, "pageSize": PAGE_SIZE, "totalPages": total_pages, "total": total}
 
-    if not page_rows:
-        return {"puzzles": [], "nextPage": None, "total": total}
-
-    int_ids = [r.id for r in page_rows]
+    int_ids = [r.id for r in rows]
 
     theme_rows = db.session.execute(
         sa.text("""
-            SELECT pt.puzzle_id, t.display_name
+            SELECT pt.puzzle_id, t.name, t.display_name
             FROM puzzle_themes pt JOIN themes t ON t.id = pt.theme_id
             WHERE pt.puzzle_id = ANY(:ids)
         """),
         {"ids": int_ids},
     ).all()
-    theme_map: dict[int, list[str]] = {}
+    theme_map: dict[int, list[dict[str, str]]] = {}
     for tr in theme_rows:
-        theme_map.setdefault(tr.puzzle_id, []).append(tr.display_name or "")
+        theme_map.setdefault(tr.puzzle_id, []).append(
+            {"name": tr.name, "displayName": tr.display_name or tr.name}
+        )
 
     opening_rows = db.session.execute(
         sa.text("""
-            SELECT po.puzzle_id, o.display_name
+            SELECT po.puzzle_id, o.name, o.display_name
             FROM puzzle_openings po JOIN openings o ON o.id = po.opening_id
             WHERE po.puzzle_id = ANY(:ids)
         """),
         {"ids": int_ids},
     ).all()
-    opening_map: dict[int, list[str]] = {}
+    opening_map: dict[int, list[dict[str, str]]] = {}
     for or_ in opening_rows:
-        opening_map.setdefault(or_.puzzle_id, []).append(or_.display_name or "")
+        opening_map.setdefault(or_.puzzle_id, []).append(
+            {"name": or_.name, "displayName": or_.display_name or or_.name}
+        )
 
     puzzles = [
         {
@@ -365,11 +379,10 @@ def list_active_puzzles(
             "themes": theme_map.get(r.id, []),
             "openings": opening_map.get(r.id, []),
         }
-        for r in page_rows
+        for r in rows
     ]
 
-    next_page: int | None = page_rows[-1].position if has_next else None
-    return {"puzzles": puzzles, "nextPage": next_page, "total": total}
+    return {"puzzles": puzzles, "page": page, "pageSize": PAGE_SIZE, "totalPages": total_pages, "total": total}
 
 
 def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
@@ -413,16 +426,17 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
 
     theme_rows = db.session.execute(
         sa.text("""
-            SELECT t.name, t.display_name, COUNT(*) AS cnt
+            SELECT t.name, t.display_name, t.description, COUNT(*) AS cnt
             FROM puzzle_themes pt JOIN themes t ON t.id = pt.theme_id
             WHERE pt.puzzle_id = ANY(:ids)
-            GROUP BY t.name, t.display_name
+            GROUP BY t.name, t.display_name, t.description
             ORDER BY cnt DESC
         """),
         {"ids": int_ids},
     ).all()
     themes: list[dict[str, object]] = [
-        {"name": r.name, "displayName": r.display_name, "count": r.cnt} for r in theme_rows
+        {"name": r.name, "displayName": r.display_name, "description": r.description, "count": r.cnt}
+        for r in theme_rows
     ]
 
     opening_rows = db.session.execute(

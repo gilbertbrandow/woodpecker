@@ -108,19 +108,27 @@ def refill(subset_id: int) -> tuple[Response, int]:
     return jsonify({"filled": filled, "needed": needed}), 200
 
 
+VALID_SORT_PARAMS = {"rating", "popularity", "nb_plays"}
+
+
 @subsets_bp.get("/<int:subset_id>/puzzles")
 @login_required
 def get_puzzles(subset_id: int) -> tuple[Response, int] | Response:
-    page_raw = request.args.get("page")
-    cursor: int | None = None
-    if page_raw is not None:
-        try:
-            cursor = int(page_raw)
-        except ValueError:
-            return jsonify({"error": "page must be an integer"}), 400
+    try:
+        page = int(request.args.get("page", "1"))
+    except ValueError:
+        return jsonify({"error": "page must be an integer"}), 400
+
+    sort = request.args.get("sort") or None
+    if sort is not None and sort not in VALID_SORT_PARAMS:
+        return jsonify({"error": f"sort must be one of: {', '.join(sorted(VALID_SORT_PARAMS))}"}), 400
+
+    order = request.args.get("order", "asc").lower()
+    if order not in ("asc", "desc"):
+        return jsonify({"error": "order must be 'asc' or 'desc'"}), 400
 
     try:
-        result = subset_svc.list_active_puzzles(subset_id, session["user_id"], cursor)
+        result = subset_svc.list_active_puzzles(subset_id, session["user_id"], page, sort, order)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
     except PermissionError as e:
