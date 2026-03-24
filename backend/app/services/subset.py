@@ -9,7 +9,7 @@ from app.models.subset import Subset, SubsetPuzzle
 
 DEFAULT_RATING_MIN = 0
 DEFAULT_RATING_MAX = 9999
-RATING_BUCKET_SIZE = 50
+RATING_BUCKET_SIZE = 10
 PAGE_SIZE = 25
 VALID_SORT_COLUMNS: dict[str, str] = {
     "rating": "p.rating",
@@ -327,7 +327,7 @@ def list_active_puzzles(
 
     rows = db.session.execute(
         sa.text(f"""
-            SELECT p.id, p.puzzle_id, p.rating, p.popularity, p.nb_plays
+            SELECT p.id, p.puzzle_id, p.rating, p.popularity, p.nb_plays, p.game_url
             FROM subset_puzzles sp
             JOIN puzzles p ON p.id = sp.puzzle_id
             WHERE sp.subset_id = :sid AND sp.is_discarded = FALSE
@@ -358,7 +358,7 @@ def list_active_puzzles(
 
     opening_rows = db.session.execute(
         sa.text("""
-            SELECT po.puzzle_id, o.name, o.display_name
+            SELECT po.puzzle_id, o.name, o.display_name, o.eco
             FROM puzzle_openings po JOIN openings o ON o.id = po.opening_id
             WHERE po.puzzle_id = ANY(:ids)
         """),
@@ -367,7 +367,7 @@ def list_active_puzzles(
     opening_map: dict[int, list[dict[str, str]]] = {}
     for or_ in opening_rows:
         opening_map.setdefault(or_.puzzle_id, []).append(
-            {"name": or_.name, "displayName": or_.display_name or or_.name}
+            {"name": or_.name, "displayName": or_.display_name or or_.name, "eco": or_.eco}
         )
 
     puzzles = [
@@ -376,6 +376,7 @@ def list_active_puzzles(
             "rating": r.rating,
             "popularity": r.popularity,
             "nbPlays": r.nb_plays,
+            "gameUrl": r.game_url,
             "themes": theme_map.get(r.id, []),
             "openings": opening_map.get(r.id, []),
         }
