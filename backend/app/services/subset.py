@@ -9,7 +9,7 @@ from app.models.subset import Subset, SubsetPuzzle
 
 DEFAULT_RATING_MIN = 0
 DEFAULT_RATING_MAX = 9999
-RATING_BUCKET_SIZE = 10
+RATING_BUCKET_SIZE = 50
 PAGE_SIZE = 25
 VALID_SORT_COLUMNS: dict[str, str] = {
     "rating": "p.rating",
@@ -387,7 +387,7 @@ def list_active_puzzles(
 
 
 def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
-    _get_owned_subset(subset_id, user_id)
+    subset = _get_owned_subset(subset_id, user_id)
 
     active_rows = db.session.execute(
         sa.text("""
@@ -398,9 +398,23 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
         {"sid": subset_id},
     ).all()
 
+    rating_cfg = (subset.config or {}).get("rating") or {}
+    rating_min = rating_cfg.get("min")
+    rating_max = rating_cfg.get("max")
+
     if not active_rows:
+        rating_buckets: list[dict[str, int]] = []
+        if rating_min is not None and rating_max is not None:
+            start_bucket = (int(rating_min) // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
+            end_bucket = ((int(rating_max) + RATING_BUCKET_SIZE - 1) // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
+
+            rating_buckets = [
+                {"min": b, "max": b + RATING_BUCKET_SIZE, "count": 0}
+                for b in range(start_bucket, end_bucket, RATING_BUCKET_SIZE)
+            ]
+
         return {
-            "ratingBuckets": [],
+            "ratingBuckets": rating_buckets,
             "themes": [],
             "openings": [],
             "avgPopularity": 0,
@@ -408,6 +422,11 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
             "avgRating": 0,
             "noOpeningCount": 0,
             "totalActive": 0,
+            "ratingRange": {
+                "min": rating_min,
+                "max": rating_max,
+                "step": RATING_BUCKET_SIZE,
+            },
         }
 
     int_ids = [r.id for r in active_rows]
@@ -416,10 +435,18 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
     avg_nb_plays = sum(r.nb_plays for r in active_rows) / total
     avg_rating = round(sum(r.rating for r in active_rows) / total)
 
-    bucket_map: dict[int, int] = {}
+    start_bucket = (int(rating_min) // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
+    end_bucket = ((int(rating_max) + RATING_BUCKET_SIZE - 1) // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
+
+    bucket_map: dict[int, int] = {
+        b: 0 for b in range(start_bucket, end_bucket, RATING_BUCKET_SIZE)
+    }
+
     for r in active_rows:
         bucket_min = (r.rating // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
-        bucket_map[bucket_min] = bucket_map.get(bucket_min, 0) + 1
+        if bucket_min in bucket_map:
+            bucket_map[bucket_min] += 1
+
     rating_buckets = [
         {"min": k, "max": k + RATING_BUCKET_SIZE, "count": v}
         for k, v in sorted(bucket_map.items())
@@ -469,8 +496,12 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
         "avgRating": avg_rating,
         "noOpeningCount": no_opening_count,
         "totalActive": total,
+        "ratingRange": {
+            "min": rating_min,
+            "max": rating_max,
+            "step": RATING_BUCKET_SIZE,
+        },
     }
-
 
 def list_subsets(user_id: int) -> list[Subset]:
     return list(
