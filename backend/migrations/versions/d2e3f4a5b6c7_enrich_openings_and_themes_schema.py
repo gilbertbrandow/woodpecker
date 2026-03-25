@@ -8,10 +8,10 @@ Create Date: 2026-03-23
 from alembic import op
 import sqlalchemy as sa
 
-revision = "d2e3f4a5b6c7"
-down_revision = "c1d2e3f4a5b6"
-branch_labels = None
-depends_on = None
+revision: str = "d2e3f4a5b6c7"
+down_revision: str | None = "c1d2e3f4a5b6"
+branch_labels: str | None = None
+depends_on: str | None = None
 
 
 def upgrade() -> None:

@@ -11,10 +11,10 @@ import xml.etree.ElementTree as ET
 from alembic import op
 import sqlalchemy as sa
 
-revision = "e3f4a5b6c7d8"
-down_revision = "d2e3f4a5b6c7"
-branch_labels = None
-depends_on = None
+revision: str = "e3f4a5b6c7d8"
+down_revision: str | None = "d2e3f4a5b6c7"
+branch_labels: str | None = None
+depends_on: str | None = None
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data")
 THEMES_FILE = os.path.join(DATA_DIR, "themes", "themes.xml")

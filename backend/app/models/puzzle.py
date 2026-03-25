@@ -1,26 +1,26 @@
 from sqlalchemy import Text, Integer, Index, Table, Column, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.extensions import db
+from app.extensions import Base
 from app.models.theme import Theme
 from app.models.opening import Opening
 
 
 puzzle_themes = Table(
     "puzzle_themes",
-    db.metadata,
+    Base.metadata,
     Column("puzzle_id", Integer, ForeignKey("puzzles.id"), primary_key=True),
     Column("theme_id", Integer, ForeignKey("themes.id"), primary_key=True),
 )
 
 puzzle_openings = Table(
     "puzzle_openings",
-    db.metadata,
+    Base.metadata,
     Column("puzzle_id", Integer, ForeignKey("puzzles.id"), primary_key=True),
     Column("opening_id", Integer, ForeignKey("openings.id"), primary_key=True),
 )
 
 
-class Puzzle(db.Model):
+class Puzzle(Base):
     __tablename__ = "puzzles"
 
     id: Mapped[int] = mapped_column(primary_key=True)

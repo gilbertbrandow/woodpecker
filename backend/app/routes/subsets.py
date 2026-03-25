@@ -55,6 +55,20 @@ def get_subset(subset_id: int) -> tuple[Response, int] | Response:
     return jsonify(_subset_to_dict(subset))
 
 
+@subsets_bp.delete("/<int:subset_id>")
+@login_required
+def delete_subset(subset_id: int) -> tuple[Response, int]:
+    try:
+        subset_svc.delete_subset(subset_id, session["user_id"])
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify(), 204
+
+
 @subsets_bp.patch("/<int:subset_id>/config")
 @login_required
 def save_config(subset_id: int) -> tuple[Response, int] | Response:
@@ -145,7 +159,7 @@ def discard_puzzle(subset_id: int, lichess_puzzle_id: str) -> tuple[Response, in
         return jsonify({"error": str(e)}), 404
     except PermissionError as e:
         return jsonify({"error": str(e)}), 403
-    return "", 204
+    return jsonify(), 204
 
 
 @subsets_bp.get("/<int:subset_id>/stats")

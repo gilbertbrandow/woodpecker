@@ -151,7 +151,7 @@ def _sample_and_insert(
     start_pos = (existing_max + 1) if existing_max is not None else 0
 
     db.session.execute(
-        sa.insert(SubsetPuzzle.__table__).values(
+        sa.insert(SubsetPuzzle).values(
             [
                 {
                     "subset_id": subset_id,
@@ -192,7 +192,7 @@ def save_config(
 
     if subset.status == "filled":
         db.session.execute(
-            sa.delete(SubsetPuzzle.__table__).where(
+            sa.delete(SubsetPuzzle).where(
                 SubsetPuzzle.subset_id == subset_id
             )
         )
@@ -212,7 +212,7 @@ def fill(subset_id: int, user_id: int) -> tuple[int, int]:
         raise ValueError("Configuration is not set.")
 
     db.session.execute(
-        sa.delete(SubsetPuzzle.__table__).where(
+        sa.delete(SubsetPuzzle).where(
             SubsetPuzzle.subset_id == subset_id,
             SubsetPuzzle.is_discarded.is_(False),
         )
@@ -398,9 +398,12 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
         {"sid": subset_id},
     ).all()
 
-    rating_cfg = (subset.config or {}).get("rating") or {}
-    rating_min = rating_cfg.get("min")
-    rating_max = rating_cfg.get("max")
+    _rating_val = (subset.config or {}).get("rating")
+    rating_cfg: dict[str, object] = _rating_val if isinstance(_rating_val, dict) else {}
+    _min = rating_cfg.get("min")
+    _max = rating_cfg.get("max")
+    rating_min: int | None = int(_min) if isinstance(_min, (int, float)) else None
+    rating_max: int | None = int(_max) if isinstance(_max, (int, float)) else None
 
     if not active_rows:
         rating_buckets: list[dict[str, int]] = []
@@ -435,8 +438,10 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
     avg_nb_plays = sum(r.nb_plays for r in active_rows) / total
     avg_rating = round(sum(r.rating for r in active_rows) / total)
 
-    start_bucket = (int(rating_min) // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
-    end_bucket = ((int(rating_max) + RATING_BUCKET_SIZE - 1) // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
+    actual_min = rating_min if rating_min is not None else min(r.rating for r in active_rows)
+    actual_max = rating_max if rating_max is not None else max(r.rating for r in active_rows)
+    start_bucket = (actual_min // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
+    end_bucket = ((actual_max + RATING_BUCKET_SIZE - 1) // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
 
     bucket_map: dict[int, int] = {
         b: 0 for b in range(start_bucket, end_bucket, RATING_BUCKET_SIZE)
@@ -513,6 +518,14 @@ def list_subsets(user_id: int) -> list[Subset]:
 
 def get_subset(subset_id: int, user_id: int) -> Subset:
     return _get_owned_subset(subset_id, user_id)
+
+
+def delete_subset(subset_id: int, user_id: int) -> None:
+    subset = _get_owned_subset(subset_id, user_id)
+    if subset.status == "locked":
+        raise ValueError("Locked subsets cannot be deleted.")
+    db.session.delete(subset)
+    db.session.commit()
 
 
 def _get_owned_subset(subset_id: int, user_id: int) -> Subset:

@@ -1,5 +1,6 @@
 import os
 from flask import Blueprint, redirect, session, request, jsonify, Response
+from werkzeug.wrappers import Response as WerkzeugResponse
 from app.extensions import db
 from app.models.user import User
 from app.services.auth_service import (
@@ -18,14 +19,14 @@ LICHESS_REDIRECT_URI = os.environ.get(
 
 
 @auth_bp.get("/login")
-def login() -> Response:
+def login() -> WerkzeugResponse:
     verifier, challenge = generate_pkce_pair()
     session["code_verifier"] = verifier
     return redirect(build_lichess_auth_url(challenge, LICHESS_REDIRECT_URI))
 
 
 @auth_bp.get("/callback")
-def callback() -> Response:
+def callback() -> WerkzeugResponse:
     code = request.args.get("code")
     verifier = session.pop("code_verifier", None)
 

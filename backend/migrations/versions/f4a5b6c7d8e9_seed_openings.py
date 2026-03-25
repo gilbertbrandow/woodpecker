@@ -12,10 +12,10 @@ import re
 from alembic import op
 import sqlalchemy as sa
 
-revision = "f4a5b6c7d8e9"
-down_revision = "e3f4a5b6c7d8"
-branch_labels = None
-depends_on = None
+revision: str = "f4a5b6c7d8e9"
+down_revision: str | None = "e3f4a5b6c7d8"
+branch_labels: str | None = None
+depends_on: str | None = None
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data")
 OPENINGS_DIR = os.path.join(DATA_DIR, "openings")

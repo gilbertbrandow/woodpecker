@@ -1,9 +1,9 @@
 from sqlalchemy import Text, Integer, Index, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
-from app.extensions import db
+from app.extensions import Base
 
 
-class Opening(db.Model):
+class Opening(Base):
     __tablename__ = "openings"
 
     id: Mapped[int] = mapped_column(primary_key=True)

@@ -9,10 +9,10 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = 'a8b3c4d5e6f7'
-down_revision = '2f63b1488359'
-branch_labels = None
-depends_on = None
+revision: str = 'a8b3c4d5e6f7'
+down_revision: str | None = '2f63b1488359'
+branch_labels: str | None = None
+depends_on: str | None = None
 
 
 def upgrade() -> None:

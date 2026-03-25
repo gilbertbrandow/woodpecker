@@ -10,10 +10,10 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 
-revision = "1a2b3c4d5e6f"
-down_revision = "f4a5b6c7d8e9"
-branch_labels = None
-depends_on = None
+revision: str = "1a2b3c4d5e6f"
+down_revision: str | None = "f4a5b6c7d8e9"
+branch_labels: str | None = None
+depends_on: str | None = None
 
 
 def upgrade() -> None:

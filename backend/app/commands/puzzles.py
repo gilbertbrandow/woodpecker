@@ -1,12 +1,14 @@
 import csv
 import io
 import time
-from typing import IO
+from typing import IO, cast
 
 import click
+import sqlalchemy as sa
 import zstandard
 from flask.cli import AppGroup
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.engine import CursorResult
 
 from app.extensions import db
 from app.models.puzzle import Puzzle, puzzle_themes, puzzle_openings
@@ -63,10 +65,10 @@ def import_puzzles(
         if not puzzle_batch:
             return 0
 
-        stmt = pg_insert(Puzzle.__table__).values(puzzle_batch).on_conflict_do_nothing(
+        stmt = pg_insert(cast(sa.Table, Puzzle.__table__)).values(puzzle_batch).on_conflict_do_nothing(
             index_elements=["puzzle_id"]
         )
-        result = db.session.execute(stmt)
+        result = cast(CursorResult[sa.Any], db.session.execute(stmt))
         db.session.commit()
 
         inserted_count = result.rowcount if result.rowcount >= 0 else 0

@@ -1,7 +1,9 @@
 import csv
 import re
+from typing import cast
 
 import click
+import sqlalchemy as sa
 from flask.cli import AppGroup
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -45,15 +47,16 @@ def import_openings(file_paths: tuple[str, ...]) -> None:
         click.echo("No rows found.")
         return
 
+    opening_table = cast(sa.Table, Opening.__table__)
     stmt = (
-        pg_insert(Opening.__table__)
+        pg_insert(opening_table)
         .values(rows)
         .on_conflict_do_update(
             index_elements=["name"],
             set_={
-                "display_name": pg_insert(Opening.__table__).excluded.display_name,
-                "eco": pg_insert(Opening.__table__).excluded.eco,
-                "pgn": pg_insert(Opening.__table__).excluded.pgn,
+                "display_name": pg_insert(opening_table).excluded.display_name,
+                "eco": pg_insert(opening_table).excluded.eco,
+                "pgn": pg_insert(opening_table).excluded.pgn,
             },
         )
     )

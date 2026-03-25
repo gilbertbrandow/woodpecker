@@ -5,10 +5,10 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
-from app.extensions import db
+from app.extensions import Base
 
 
-class Subset(db.Model):
+class Subset(Base):
     __tablename__ = "subsets"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -27,7 +27,7 @@ class Subset(db.Model):
     )
 
 
-class SubsetPuzzle(db.Model):
+class SubsetPuzzle(Base):
     __tablename__ = "subset_puzzles"
 
     subset_id: Mapped[int] = mapped_column(Integer, ForeignKey("subsets.id"), primary_key=True)

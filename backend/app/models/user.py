@@ -1,10 +1,10 @@
 from datetime import datetime, timezone
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
-from app.extensions import db
+from app.extensions import Base
 
 
-class User(db.Model):
+class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)

@@ -20,6 +20,11 @@ These rules apply to every file in this repository, regardless of the feature or
 - Follow PEP 8. Use `ruff` for linting and formatting.
 - Prefer `dataclasses` or `TypedDict` over plain dicts for structured data.
 - Use `|` union syntax (Python 3.10+), not `Union[]` or `Optional[]`.
+- After writing or modifying any Python file, verify with `python -m mypy app/ migrations/` (run from `backend/` with the venv at `.venv/bin/mypy`). All files must pass with zero mypy errors before the task is considered done.
+- SQLAlchemy model classes must inherit from `Base` (imported from `app.extensions`), not `db.Model` — mypy cannot resolve the dynamic attribute.
+- When calling `sa.insert()` or `sa.delete()` with a mapped model, pass the model class directly (e.g. `sa.insert(SubsetPuzzle)`), not `Model.__table__`. For PostgreSQL `pg_insert` which requires a `Table`, use `cast(sa.Table, Model.__table__)`.
+- `db.session.execute()` returns `CursorResult` — cast explicitly when accessing `.rowcount` or similar cursor-specific attributes.
+- Dict values typed as `object` require `isinstance` narrowing before use (e.g. before calling `.get()` on a nested dict or passing to `int()`).
 
 ## Backend Structure
 

@@ -1,9 +1,9 @@
 from sqlalchemy import Text, Index
 from sqlalchemy.orm import Mapped, mapped_column
-from app.extensions import db
+from app.extensions import Base
 
 
-class Theme(db.Model):
+class Theme(Base):
     __tablename__ = "themes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
