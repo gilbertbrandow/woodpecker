@@ -99,58 +99,63 @@ export function DashboardPage(): React.ReactElement | null {
           No subsets yet. Create one to get started.
         </p>
       ) : (
-        <ul className="divide-y divide-border">
-          {subsets.map((subset) => (
-            <li key={subset.id} className="flex items-center gap-2">
-              <Link
-                to="/app/subsets/$subsetId"
-                params={{ subsetId: String(subset.id) }}
-                className="flex flex-1 items-center gap-4 py-3 hover:bg-accent/50 -mx-2 px-2 rounded-sm transition-colors min-w-0"
-              >
-                <SubsetAvatar username={user.username} avatarUrl={user.avatarUrl} />
-                <div className="flex flex-1 flex-col gap-0.5 min-w-0">
-                  <span className="truncate text-sm font-medium">{subset.name}</span>
-                  <span className="text-xs text-muted-foreground capitalize">{subset.status} · {subset.puzzleCount} puzzles</span>
-                </div>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {new Date(subset.createdAt).toLocaleDateString()}
-                </span>
-              </Link>
-              {subset.status !== 'locked' && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <button
-                      type="button"
-                      disabled={deletingId !== null}
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
-                      aria-label="Delete subset"
-                    >
-                      {deletingId === subset.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete subset?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        "{subset.name}" and all its puzzles will be permanently removed. This cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => void handleDelete(subset)}>
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
-            </li>
-          ))}
-        </ul>
+        <div className="rounded-md border">
+          <ul className="divide-y divide-border">
+            {subsets.map((subset) => {
+              const isOwn = subset.ownedBy.username === user.username
+              return (
+                <li key={subset.id} className="flex items-center gap-2 px-4">
+                  <Link
+                    to="/app/subsets/$subsetId"
+                    params={{ subsetId: String(subset.id) }}
+                    className="flex flex-1 items-center gap-4 py-3 min-w-0"
+                  >
+                    <SubsetAvatar username={subset.ownedBy.username} avatarUrl={subset.ownedBy.avatarUrl} />
+                    <div className="flex flex-1 flex-col gap-0.5 min-w-0">
+                      <span className="truncate text-sm font-medium">{subset.name}</span>
+                      <span className="text-xs text-muted-foreground capitalize">{subset.status} · {subset.puzzleCount} puzzles</span>
+                    </div>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {new Date(subset.createdAt).toLocaleDateString()}
+                    </span>
+                  </Link>
+                  {isOwn && subset.status !== 'locked' && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <button
+                          type="button"
+                          disabled={deletingId !== null}
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
+                          aria-label="Delete subset"
+                        >
+                          {deletingId === subset.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete subset?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            "{subset.name}" and all its puzzles will be permanently removed. This cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => void handleDelete(subset)}>
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </div>
       )}
     </div>
   )

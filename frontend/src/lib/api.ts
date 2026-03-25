@@ -50,6 +50,7 @@ export type Subset = {
   config: SubsetConfig | null
   createdAt: string
   lockedAt: string | null
+  ownedBy: { username: string; avatarUrl: string | null }
 }
 
 export type SubsetConfig = {

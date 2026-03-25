@@ -2,7 +2,7 @@ import * as React from "react";
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, Link, useParams } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ChevronDown, Lock, Undo2 } from "lucide-react";
+import { ChevronDown, Lock, Trash2, Undo2 } from "lucide-react";
 import { useAuth } from "../context/auth";
 import {
   api,
@@ -334,6 +334,17 @@ export function SubsetPage(): React.ReactElement | null {
     }
   };
 
+  const handleDelete = async (): Promise<void> => {
+    try {
+      await api.subsets.delete(id);
+      toast("Subset deleted", { description: "The subset has been removed." });
+      void navigate({ to: "/app" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Please try again.";
+      toast.error("Delete failed", { description: msg });
+    }
+  };
+
   const handleLock = async (): Promise<void> => {
     try {
       const updated = await api.subsets.lock(id);
@@ -409,6 +420,29 @@ export function SubsetPage(): React.ReactElement | null {
 
           {!locked && (
             <div className="flex items-center gap-2">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" variant="outline" disabled={isBusy}>
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                    Delete
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this subset?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      "{subset.name}" and all its puzzles will be permanently removed. This cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => void handleDelete()}>
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
               <Button
                 size="sm"
                 variant="outline"

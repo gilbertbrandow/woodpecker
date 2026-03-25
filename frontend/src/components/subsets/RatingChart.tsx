@@ -4,7 +4,6 @@ import {
   Area,
   XAxis,
   YAxis,
-  Customized,
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
@@ -64,28 +63,6 @@ export function RatingChart({
     isUniform ? null : displaySigma,
   );
 
-  const MeanLine: React.FC<{
-    xAxisMap?: Record<string, { scale: (v: number) => number }>;
-    yAxisMap?: Record<string, { top: number; height: number }>;
-  }> = ({ xAxisMap, yAxisMap }) => {
-    if (!xAxisMap || !yAxisMap) return null;
-    const xScale = xAxisMap[0]?.scale;
-    const yAxis = yAxisMap[0];
-    if (!xScale || !yAxis) return null;
-    const x = xScale(effectiveMean);
-    return (
-      <line
-        x1={x}
-        x2={x}
-        y1={yAxis.top}
-        y2={yAxis.top + yAxis.height}
-        stroke={CHART_BLUE}
-        strokeDasharray="3 3"
-        strokeOpacity={0.5}
-      />
-    );
-  };
-
   const handleRangeChange = (vals: number[]): void => {
     const newMin = vals[0] ?? value.min;
     const newMax = vals[1] ?? value.max;
@@ -108,7 +85,6 @@ export function RatingChart({
       });
     }
   };
-
 
   return (
     <div className="rounded-md border p-4">
@@ -168,7 +144,6 @@ export function RatingChart({
                 dot={false}
                 isAnimationActive={false}
               />
-              {!isUniform && <Customized component={MeanLine} />}
             </AreaChart>
           </ResponsiveContainer>
           {isUniform && (
