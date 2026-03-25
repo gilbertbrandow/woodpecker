@@ -139,6 +139,7 @@ export const api = {
       request(`/subsets/${id}/fill`, { method: 'POST' }),
     refill: (id: number): Promise<{ filled: number; needed: number }> =>
       request(`/subsets/${id}/refill`, { method: 'POST' }),
+    delete: (id: number): Promise<void> => request(`/subsets/${id}`, { method: 'DELETE' }),
     lock: (id: number): Promise<Subset> => request(`/subsets/${id}/lock`, { method: 'POST' }),
     getPuzzles: (
       id: number,

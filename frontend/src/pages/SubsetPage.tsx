@@ -240,6 +240,11 @@ export function SubsetPage(): React.ReactElement | null {
           setActiveTab("puzzles");
           await loadStats(id);
         }
+        if (s.status === "locked") {
+          setRatingOpen(false);
+          setThemesOpen(false);
+          setOpeningOpen(false);
+        }
       })
       .catch(() =>
         toast.error("Failed to load subset", {
@@ -333,6 +338,9 @@ export function SubsetPage(): React.ReactElement | null {
     try {
       const updated = await api.subsets.lock(id);
       setSubset(updated);
+      setRatingOpen(false);
+      setThemesOpen(false);
+      setOpeningOpen(false);
       toast("Subset locked", {
         description: "This subset is now frozen and ready for scheduling.",
       });
