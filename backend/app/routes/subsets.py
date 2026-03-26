@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request, session, Response
 
 from app.decorators import login_required
+from app.extensions import db
 from app.models.subset import Subset
 from app.models.user import User
 from app.services import subset as subset_svc
@@ -13,7 +14,7 @@ def _subset_to_dict(subset: Subset, owner: User | None = None) -> dict[str, obje
         "id": subset.id,
         "name": subset.name,
         "status": subset.status,
-        "puzzleCount": subset.locked_puzzle_count if subset.status == "locked" else subset.puzzle_count,
+        "puzzleCount": subset.locked_puzzle_count if subset.locked_puzzle_count is not None else subset.puzzle_count,
         "config": subset.config,
         "createdAt": subset.created_at.isoformat(),
         "lockedAt": subset.locked_at.isoformat() if subset.locked_at else None,
@@ -98,7 +99,8 @@ def save_config(subset_id: int) -> tuple[Response, int] | Response:
         return jsonify({"error": str(e)}), 403
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    return jsonify(_subset_to_dict(subset))
+    owner = db.session.get(User, session["user_id"])
+    return jsonify(_subset_to_dict(subset, owner))
 
 
 @subsets_bp.post("/<int:subset_id>/fill")
@@ -193,4 +195,5 @@ def lock_subset(subset_id: int) -> tuple[Response, int] | Response:
     except ValueError as e:
         status_code = 409 if "Already locked" in str(e) else 400
         return jsonify({"error": str(e)}), status_code
-    return jsonify(_subset_to_dict(subset))
+    owner = db.session.get(User, session["user_id"])
+    return jsonify(_subset_to_dict(subset, owner))

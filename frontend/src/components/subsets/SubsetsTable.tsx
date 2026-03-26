@@ -144,7 +144,7 @@ export function SubsetsTable({ subsets, currentUsername, deletingId, onDelete }:
         if (sortKey === 'name') {
           cmp = a.name.localeCompare(b.name)
         } else if (sortKey === 'puzzleCount') {
-          cmp = (a.puzzleCount ?? 0) - (b.puzzleCount ?? 0)
+          cmp = a.puzzleCount - b.puzzleCount
         } else if (sortKey === 'lockedAt') {
           const aTime = a.lockedAt ? new Date(a.lockedAt).getTime() : 0
           const bTime = b.lockedAt ? new Date(b.lockedAt).getTime() : 0
@@ -215,7 +215,7 @@ export function SubsetsTable({ subsets, currentUsername, deletingId, onDelete }:
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {subset.puzzleCount ?? '—'}
+                      {subset.puzzleCount}
                     </TableCell>
                     <TableCell className="hidden text-muted-foreground sm:table-cell">
                       {subset.lockedAt ? formatDate(subset.lockedAt) : formatDate(subset.createdAt)}

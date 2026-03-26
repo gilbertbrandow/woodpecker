@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   AreaChart,
   Area,
@@ -43,6 +43,8 @@ type SubsetStatsProps = {
 
 export function SubsetStats({ stats }: SubsetStatsProps): React.ReactElement {
   const [open, setOpen] = useState(true)
+  const [chartsReady, setChartsReady] = useState(false)
+  useEffect(() => { setChartsReady(true) }, [])
   const topThemes = stats.themes.slice(0, 20).map((t) => ({
     ...t,
     label:
@@ -104,7 +106,7 @@ export function SubsetStats({ stats }: SubsetStatsProps): React.ReactElement {
             <StatCard label="Avg plays" value={formatNumber(stats.avgNbPlays)} />
           </div>
 
-          <div className="rounded-md border p-4">
+          {chartsReady && <div className="rounded-md border p-4">
             <div className="mb-4">
               <p className="text-sm font-semibold">Rating distribution</p>
               <p className="mt-1 text-xs text-muted-foreground">How puzzles in this subset are spread across rating ranges</p>
@@ -154,9 +156,9 @@ export function SubsetStats({ stats }: SubsetStatsProps): React.ReactElement {
                 />
               </AreaChart>
             </ChartContainer>
-          </div>
+          </div>}
 
-          {topThemes.length > 0 && (
+          {chartsReady && topThemes.length > 0 && (
             <div className="rounded-md border p-4">
               <div className="mb-4">
                 <p className="text-sm font-semibold">Top themes</p>

@@ -46,7 +46,7 @@ export type Subset = {
   id: number
   name: string
   status: 'draft' | 'filled' | 'locked'
-  puzzleCount: number | null
+  puzzleCount: number
   config: SubsetConfig | null
   createdAt: string
   lockedAt: string | null

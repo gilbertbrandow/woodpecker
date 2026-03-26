@@ -382,7 +382,7 @@ export function SubsetPage(): React.ReactElement | null {
   const locked = subset.status === "locked";
   const isOwn = subset.ownedBy.username === user.username;
   const isBusy = isSaving || isFilling;
-  const puzzleCount = subset.puzzleCount ?? 0;
+  const puzzleCount = subset.puzzleCount;
   const isFull = total >= puzzleCount;
   const fillLabel = total === 0 ? "Fill" : "Refill";
 
