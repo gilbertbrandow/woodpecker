@@ -2,13 +2,14 @@ from flask import Blueprint, jsonify, request, session, Response
 
 from app.decorators import login_required
 from app.models.subset import Subset
+from app.models.user import User
 from app.services import subset as subset_svc
 
 subsets_bp = Blueprint("subsets", __name__, url_prefix="/subsets")
 
 
-def _subset_to_dict(subset: Subset) -> dict[str, object]:
-    return {
+def _subset_to_dict(subset: Subset, owner: User | None = None) -> dict[str, object]:
+    d: dict[str, object] = {
         "id": subset.id,
         "name": subset.name,
         "status": subset.status,
@@ -17,6 +18,12 @@ def _subset_to_dict(subset: Subset) -> dict[str, object]:
         "createdAt": subset.created_at.isoformat(),
         "lockedAt": subset.locked_at.isoformat() if subset.locked_at else None,
     }
+    if owner is not None:
+        d["ownedBy"] = {
+            "username": owner.lichess_username,
+            "avatarUrl": owner.avatar_url,
+        }
+    return d
 
 
 @subsets_bp.post("")
@@ -39,20 +46,20 @@ def create_subset() -> tuple[Response, int]:
 @subsets_bp.get("")
 @login_required
 def list_subsets() -> Response:
-    subsets = subset_svc.list_subsets(session["user_id"])
-    return jsonify([_subset_to_dict(s) for s in subsets])
+    rows = subset_svc.list_subsets(session["user_id"])
+    return jsonify([_subset_to_dict(s, owner) for s, owner in rows])
 
 
 @subsets_bp.get("/<int:subset_id>")
 @login_required
 def get_subset(subset_id: int) -> tuple[Response, int] | Response:
     try:
-        subset = subset_svc.get_subset(subset_id, session["user_id"])
+        subset, owner = subset_svc.get_subset(subset_id, session["user_id"])
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
     except PermissionError as e:
         return jsonify({"error": str(e)}), 403
-    return jsonify(_subset_to_dict(subset))
+    return jsonify(_subset_to_dict(subset, owner))
 
 
 @subsets_bp.delete("/<int:subset_id>")

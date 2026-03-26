@@ -6,6 +6,7 @@ import sqlalchemy as sa
 from app.extensions import db
 from app.models.puzzle import Puzzle
 from app.models.subset import Subset, SubsetPuzzle
+from app.models.user import User
 
 DEFAULT_RATING_MIN = 0
 DEFAULT_RATING_MAX = 9999
@@ -309,7 +310,7 @@ def list_active_puzzles(
     sort: str | None,
     order: str,
 ) -> dict[str, object]:
-    _get_owned_subset(subset_id, user_id)
+    _get_viewable_subset(subset_id, user_id)
 
     total: int = db.session.execute(
         db.select(db.func.count()).where(
@@ -387,7 +388,7 @@ def list_active_puzzles(
 
 
 def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
-    subset = _get_owned_subset(subset_id, user_id)
+    subset = _get_viewable_subset(subset_id, user_id)
 
     active_rows = db.session.execute(
         sa.text("""
@@ -508,16 +509,27 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
         },
     }
 
-def list_subsets(user_id: int) -> list[Subset]:
-    return list(
-        db.session.execute(
-            db.select(Subset).where(Subset.user_id == user_id).order_by(Subset.created_at.desc())
-        ).scalars()
-    )
+def list_subsets(user_id: int) -> list[tuple[Subset, User]]:
+    rows = db.session.execute(
+        db.select(Subset, User)
+        .join(User, User.id == Subset.user_id)
+        .where(
+            sa.or_(
+                Subset.user_id == user_id,
+                sa.and_(Subset.status == "locked", Subset.user_id != user_id),
+            )
+        )
+        .order_by(Subset.created_at.desc())
+    ).all()
+    return [(row[0], row[1]) for row in rows]
 
 
-def get_subset(subset_id: int, user_id: int) -> Subset:
-    return _get_owned_subset(subset_id, user_id)
+def get_subset(subset_id: int, user_id: int) -> tuple[Subset, User]:
+    subset = _get_viewable_subset(subset_id, user_id)
+    owner = db.session.get(User, subset.user_id)
+    if owner is None:
+        raise LookupError("Subset owner not found.")
+    return subset, owner
 
 
 def delete_subset(subset_id: int, user_id: int) -> None:
@@ -533,5 +545,14 @@ def _get_owned_subset(subset_id: int, user_id: int) -> Subset:
     if subset is None:
         raise LookupError("Subset not found.")
     if subset.user_id != user_id:
+        raise PermissionError("Access denied.")
+    return subset
+
+
+def _get_viewable_subset(subset_id: int, user_id: int) -> Subset:
+    subset = db.session.get(Subset, subset_id)
+    if subset is None:
+        raise LookupError("Subset not found.")
+    if subset.user_id != user_id and subset.status != "locked":
         raise PermissionError("Access denied.")
     return subset

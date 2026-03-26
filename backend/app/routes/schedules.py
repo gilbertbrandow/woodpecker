@@ -1,0 +1,91 @@
+from flask import Blueprint, Response, jsonify, request, session
+
+from app.decorators import login_required
+from app.models.schedule import Schedule
+from app.services import schedule as schedule_svc
+
+schedules_bp = Blueprint("schedules", __name__, url_prefix="/schedules")
+
+
+def _schedule_to_dict(schedule: Schedule) -> dict[str, object]:
+    config = schedule.config
+    total_days = schedule_svc.compute_total_days(config) if config else 0
+    return {
+        "id": schedule.id,
+        "name": schedule.name,
+        "description": schedule.description,
+        "subsetId": schedule.subset_id,
+        "status": schedule.status,
+        "config": config,
+        "totalDays": total_days,
+        "createdAt": schedule.created_at.isoformat(),
+        "lockedAt": schedule.locked_at.isoformat() if schedule.locked_at else None,
+    }
+
+
+@schedules_bp.post("")
+@login_required
+def create_schedule() -> tuple[Response, int]:
+    data: dict[str, object] = request.get_json(silent=True) or {}
+    name = data.get("name", "")
+    subset_id_raw = data.get("subsetId")
+    if not isinstance(name, str):
+        return jsonify({"error": "name must be a string"}), 400
+    if not isinstance(subset_id_raw, int):
+        return jsonify({"error": "subsetId must be an integer"}), 400
+    try:
+        schedule = schedule_svc.create_schedule(session["user_id"], name, subset_id_raw)
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify(_schedule_to_dict(schedule)), 201
+
+
+@schedules_bp.get("")
+@login_required
+def list_schedules() -> Response:
+    schedules = schedule_svc.list_schedules(session["user_id"])
+    return jsonify(schedules)
+
+
+@schedules_bp.get("/<int:schedule_id>")
+@login_required
+def get_schedule(schedule_id: int) -> tuple[Response, int] | Response:
+    try:
+        schedule = schedule_svc.get_schedule(schedule_id, session["user_id"])
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    return jsonify(_schedule_to_dict(schedule))
+
+
+@schedules_bp.patch("/<int:schedule_id>")
+@login_required
+def update_schedule(schedule_id: int) -> tuple[Response, int] | Response:
+    updates: dict[str, object] = request.get_json(silent=True) or {}
+    try:
+        schedule = schedule_svc.update_schedule(schedule_id, session["user_id"], updates)
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify(_schedule_to_dict(schedule))
+
+
+@schedules_bp.post("/<int:schedule_id>/lock")
+@login_required
+def lock_schedule(schedule_id: int) -> tuple[Response, int] | Response:
+    try:
+        schedule = schedule_svc.lock_schedule(schedule_id, session["user_id"])
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    except ValueError as e:
+        status_code = 409 if "Already locked" in str(e) else 400
+        return jsonify({"error": str(e)}), status_code
+    return jsonify(_schedule_to_dict(schedule))
