@@ -6,6 +6,8 @@ import { DashboardPage } from './pages/DashboardPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { SubsetNewPage } from './pages/SubsetNewPage'
 import { SubsetPage } from './pages/SubsetPage'
+import { ScheduleNewPage } from './pages/ScheduleNewPage'
+import { SchedulePage } from './pages/SchedulePage'
 
 type RouterContext = {
   auth: AuthContextValue
@@ -45,12 +47,26 @@ const subsetRoute = createRoute({
   component: SubsetPage,
 })
 
+const scheduleNewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/app/schedules/new',
+  component: ScheduleNewPage,
+})
+
+const scheduleRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/app/schedules/$scheduleId',
+  component: SchedulePage,
+})
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   dashboardRoute,
   settingsRoute,
   subsetNewRoute,
   subsetRoute,
+  scheduleNewRoute,
+  scheduleRoute,
 ])
 
 export const router = createRouter({
