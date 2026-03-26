@@ -65,6 +65,7 @@ import {
   DurationInput,
   formatDuration,
 } from "../components/schedules/DurationInput";
+import { formatNumber } from "../lib/utils";
 
 const MAX_RUNS = 20;
 
@@ -234,6 +235,18 @@ export function SchedulePage(): React.ReactElement | null {
   );
   const canLock = runs.length > 0;
 
+  const puzzleCount = subset?.puzzleCount ?? 0;
+  const runDays = runs.map((r) => Math.max(1, Math.round(r.target_hours / 24)));
+  const totalActiveDays = runDays.reduce((s, d) => s + d, 0);
+  const totalScheduleDays =
+    totalActiveDays +
+    runs.reduce((s, r) => s + Math.round(r.break_after_hours / 24), 0);
+  const totalAttempts = puzzleCount * runs.length;
+  const peakPuzzlesPerDay =
+    puzzleCount > 0 && runDays.length > 0
+      ? Math.round(puzzleCount / Math.min(...runDays))
+      : 0;
+
   const markDirty = (): void => setIsDirty(true);
 
   const handleDelete = async (): Promise<void> => {
@@ -339,9 +352,6 @@ export function SchedulePage(): React.ReactElement | null {
               {formatDuration(schedule.totalHours)}
             </span>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            created by {schedule.createdBy.username}
-          </p>
         </div>
 
         {showActions && (
@@ -740,7 +750,27 @@ export function SchedulePage(): React.ReactElement | null {
                 </button>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <div className="pt-4">
+                <div className="flex flex-col gap-4 pt-4">
+                  {runs.length > 0 && puzzleCount > 0 && (
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                      <div className="flex flex-col gap-0.5 rounded-md border p-3">
+                        <p className="text-xs text-muted-foreground">Total attempts</p>
+                        <p className="text-lg font-semibold tabular-nums">{formatNumber(totalAttempts)}</p>
+                      </div>
+                      <div className="flex flex-col gap-0.5 rounded-md border p-3">
+                        <p className="text-xs text-muted-foreground">Total duration</p>
+                        <p className="text-lg font-semibold tabular-nums">{formatDuration(totalHours)}</p>
+                      </div>
+                      <div className="flex flex-col gap-0.5 rounded-md border p-3">
+                        <p className="text-xs text-muted-foreground">Active days</p>
+                        <p className="text-lg font-semibold tabular-nums">{formatNumber(totalActiveDays)} days</p>
+                      </div>
+                      <div className="flex flex-col gap-0.5 rounded-md border p-3">
+                        <p className="text-xs text-muted-foreground">Peak daily demand</p>
+                        <p className="text-lg font-semibold tabular-nums">{formatNumber(peakPuzzlesPerDay)} / day</p>
+                      </div>
+                    </div>
+                  )}
                   {insightsLoading && (
                     <p className="text-sm text-muted-foreground">Loading…</p>
                   )}

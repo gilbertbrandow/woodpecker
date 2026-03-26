@@ -112,6 +112,13 @@ backend/
 
 ---
 
+## Number formatting
+
+- Always use `formatNumber` from `frontend/src/lib/utils.ts` when displaying numeric values to the user. Never use `.toLocaleString()`, `Intl.NumberFormat`, or raw number interpolation for displayed figures.
+- `formatNumber` formats with a space as the thousands separator and a dot as the decimal separator (e.g. `1 234.56`), matching the project's locale convention.
+
+---
+
 ## General
 
 - **No comments.** Code must be self-documenting through clear naming and structure. Do not write inline comments, block comments, or docstrings unless explicitly asked. If a comment feels necessary, the code should be refactored instead.
