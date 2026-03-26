@@ -9,7 +9,9 @@ import {
   type Subset,
   type SubsetConfig,
   type SubsetStats as SubsetStatsType,
+  type ScheduleSummary,
 } from "../lib/api";
+import { SchedulesTable } from "../components/schedules/SchedulesTable";
 import { Button } from "../components/ui/button";
 import {
   Tooltip,
@@ -181,6 +183,78 @@ function statusBadge(status: Subset["status"]): React.ReactElement {
   );
 }
 
+function UsedBySchedules({
+  subsetId,
+  currentUsername,
+}: {
+  subsetId: number;
+  currentUsername: string;
+}): React.ReactElement {
+  const [open, setOpen] = useState(true);
+  const [schedules, setSchedules] = useState<ScheduleSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    api.schedules
+      .list(subsetId)
+      .then((data) => setSchedules(data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [subsetId]);
+
+  const handleDelete = (schedule: ScheduleSummary): void => {
+    setDeletingId(schedule.id);
+    api.schedules
+      .delete(schedule.id)
+      .then(() =>
+        setSchedules((prev) => prev.filter((s) => s.id !== schedule.id)),
+      )
+      .catch(() => {})
+      .finally(() => setDeletingId(null));
+  };
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center justify-between border-b pb-2.5 text-left"
+        >
+          <span className="flex items-center gap-2 text-sm font-medium">
+            <ChevronDown
+              className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
+              style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
+            />
+            Used by{schedules.length > 0 ? ` (${schedules.length})` : ""}
+          </span>
+          <span className="hidden text-xs text-muted-foreground sm:block">
+            Schedules that use this subset
+          </span>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="pt-4">
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : schedules.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No schedules use this subset yet.
+            </p>
+          ) : (
+            <SchedulesTable
+              schedules={schedules}
+              currentUsername={currentUsername}
+              deletingId={deletingId}
+              onDelete={handleDelete}
+            />
+          )}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 export function SubsetPage(): React.ReactElement | null {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -189,7 +263,7 @@ export function SubsetPage(): React.ReactElement | null {
 
   const [subset, setSubset] = useState<Subset | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<string>("configure");
+  const [activeTab, setActiveTab] = useState<string>("configuration");
 
   const [rating, setRating] = useState<RatingValue>(RATING_DEFAULT);
   const [themes, setThemes] = useState<Record<string, number>>({});
@@ -236,8 +310,8 @@ export function SubsetPage(): React.ReactElement | null {
         setThemes(s.config?.themes ?? {});
         setOpening(configToOpening(s.config));
         setIsDirty(false);
+        setActiveTab(s.status === "locked" ? "insights" : "configuration");
         if (s.status !== "draft") {
-          setActiveTab("puzzles");
           await loadStats(id);
         }
         if (s.status === "locked") {
@@ -304,7 +378,6 @@ export function SubsetPage(): React.ReactElement | null {
         const updated = await api.subsets.get(id);
         setSubset(updated);
         await loadStats(id);
-        setActiveTab("puzzles");
         if (result.filled < result.requested) {
           toast("Fill complete", {
             description: `Filled ${result.filled} of ${result.requested} requested puzzles.`,
@@ -413,10 +486,8 @@ export function SubsetPage(): React.ReactElement | null {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
           <TabsList>
-            <TabsTrigger value="configure">Configure</TabsTrigger>
-            <TabsTrigger value="puzzles">
-              Puzzles{total > 0 ? ` (${total})` : ""}
-            </TabsTrigger>
+            <TabsTrigger value="configuration">Configuration</TabsTrigger>
+            <TabsTrigger value="insights">Insights</TabsTrigger>
           </TabsList>
 
           {!locked && isOwn && (
@@ -496,7 +567,7 @@ export function SubsetPage(): React.ReactElement | null {
         </div>
         <Separator className="mb-6 mt-3" />
 
-        <TabsContent value="configure">
+        <TabsContent value="configuration">
           {!locked && isOwn && (
             <div className="flex flex-col gap-3 pb-5">
               <p className="rounded-md border bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
@@ -623,50 +694,55 @@ export function SubsetPage(): React.ReactElement | null {
               </Button>
             </div>
           )}
+
+          {total > 0 && (
+            <div className="mt-6">
+              <Collapsible open={puzzlesOpen} onOpenChange={setPuzzlesOpen}>
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between border-b pb-2.5 text-left"
+                  >
+                    <span className="flex items-center gap-2 text-sm font-medium">
+                      <ChevronDown
+                        className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
+                        style={{
+                          transform: puzzlesOpen
+                            ? "rotate(180deg)"
+                            : "rotate(0deg)",
+                        }}
+                      />
+                      Puzzles{total > 0 ? ` (${total})` : ""}
+                    </span>
+                    <span className="hidden text-xs text-muted-foreground sm:block">
+                      All puzzles currently in this subset
+                    </span>
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="pt-6">
+                    <PuzzleTable
+                      subsetId={id}
+                      locked={locked}
+                      onTotalChange={handleTotalChange}
+                    />
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
+          )}
         </TabsContent>
 
-        <TabsContent value="puzzles">
-          <div className="flex flex-col gap-8">
-            {stats && <SubsetStats stats={stats} />}
-
-            <Collapsible open={puzzlesOpen} onOpenChange={setPuzzlesOpen}>
-              <CollapsibleTrigger asChild>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between border-b pb-2.5 text-left"
-                >
-                  <span className="flex items-center gap-2 text-sm font-medium">
-                    <ChevronDown
-                      className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
-                      style={{
-                        transform: puzzlesOpen
-                          ? "rotate(180deg)"
-                          : "rotate(0deg)",
-                      }}
-                    />
-                    Puzzle list
-                  </span>
-                  <span className="hidden text-xs text-muted-foreground sm:block">
-                    All puzzles currently in this subset
-                  </span>
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="pt-6">
-                  {locked && (
-                    <div className="mb-4 flex items-center gap-2 rounded-md border px-4 py-3 text-sm text-muted-foreground">
-                      <Lock className="h-4 w-4 shrink-0" />
-                      This subset is locked. Configuration cannot be changed.
-                    </div>
-                  )}
-                  <PuzzleTable
-                    subsetId={id}
-                    locked={locked}
-                    onTotalChange={handleTotalChange}
-                  />
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
+        <TabsContent value="insights">
+          <div className="flex flex-col gap-4">
+            {stats ? (
+              <SubsetStats stats={stats} />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No data yet — fill the subset first.
+              </p>
+            )}
+            <UsedBySchedules subsetId={id} currentUsername={user.username} />
           </div>
         </TabsContent>
       </Tabs>

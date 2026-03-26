@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import cast
 
 import sqlalchemy as sa
@@ -178,9 +178,58 @@ def get_schedule(schedule_id: int, user_id: int) -> Schedule:
     return _get_accessible_schedule(schedule_id, user_id)
 
 
-def list_schedules(user_id: int) -> list[dict[str, object]]:
+def get_schedule_insights(schedule_id: int, user_id: int) -> list[dict[str, object]]:
+    schedule = _get_accessible_schedule(schedule_id, user_id)
+    subset = db.session.get(Subset, schedule.subset_id)
+    if subset is None:
+        return []
+
+    puzzle_count = (
+        subset.locked_puzzle_count
+        if subset.locked_puzzle_count is not None
+        else subset.puzzle_count
+    )
+    if not puzzle_count or not schedule.config:
+        return []
+
+    runs_raw = schedule.config.get("runs")
+    if not isinstance(runs_raw, list) or not runs_raw:
+        return []
+
+    result: list[dict[str, object]] = []
+    current = date.today()
+
+    for run_item in runs_raw:
+        if not isinstance(run_item, dict):
+            continue
+        run = cast(dict[str, object], run_item)
+        target_hours_raw = run.get("target_hours")
+        break_hours_raw = run.get("break_after_hours")
+        if not isinstance(target_hours_raw, int) or not isinstance(break_hours_raw, int):
+            continue
+
+        run_days = max(1, round(target_hours_raw / 24))
+        puzzles_per_day = round(puzzle_count / run_days, 1)
+
+        for _ in range(run_days):
+            result.append({"date": current.isoformat(), "puzzlesPerDay": puzzles_per_day})
+            current += timedelta(days=1)
+
+        break_days = round(break_hours_raw / 24)
+        for _ in range(break_days):
+            result.append({"date": current.isoformat(), "puzzlesPerDay": 0})
+            current += timedelta(days=1)
+
+    return result
+
+
+def list_schedules(user_id: int, subset_id: int | None = None) -> list[dict[str, object]]:
+    subset_clause = "AND s.subset_id = :subset_id" if subset_id is not None else ""
+    params: dict[str, object] = {"uid": user_id}
+    if subset_id is not None:
+        params["subset_id"] = subset_id
     rows = db.session.execute(
-        sa.text("""
+        sa.text(f"""
             SELECT s.id, s.name, s.description, s.status, s.config,
                    s.created_at, s.locked_at, s.subset_id,
                    u.lichess_username, u.avatar_url,
@@ -188,10 +237,11 @@ def list_schedules(user_id: int) -> list[dict[str, object]]:
             FROM schedules s
             JOIN users u ON u.id = s.user_id
             JOIN subsets sub ON sub.id = s.subset_id
-            WHERE s.status = 'locked' OR s.user_id = :uid
+            WHERE (s.status = 'locked' OR s.user_id = :uid)
+            {subset_clause}
             ORDER BY s.created_at DESC
         """),
-        {"uid": user_id},
+        params,
     ).all()
 
     result: list[dict[str, object]] = []

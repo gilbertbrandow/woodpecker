@@ -145,6 +145,11 @@ export type ScheduleSummary = {
   lockedAt: string | null
 }
 
+export type ScheduleInsightPoint = {
+  date: string
+  puzzlesPerDay: number
+}
+
 export type Schedule = {
   id: number
   name: string
@@ -204,7 +209,8 @@ export const api = {
     getStats: (id: number): Promise<SubsetStats> => request(`/subsets/${id}/stats`),
   },
   schedules: {
-    list: (): Promise<ScheduleSummary[]> => request('/schedules'),
+    list: (subsetId?: number): Promise<ScheduleSummary[]> =>
+      request(`/schedules${subsetId !== undefined ? `?subsetId=${subsetId}` : ''}`),
     get: (id: number): Promise<Schedule> => request(`/schedules/${id}`),
     create: (name: string, subsetId: number): Promise<Schedule> =>
       request('/schedules', { method: 'POST', body: JSON.stringify({ name, subsetId }) }),
@@ -216,6 +222,8 @@ export const api = {
     lock: (id: number): Promise<Schedule> =>
       request(`/schedules/${id}/lock`, { method: 'POST' }),
     delete: (id: number): Promise<void> => request(`/schedules/${id}`, { method: 'DELETE' }),
+    insights: (id: number): Promise<ScheduleInsightPoint[]> =>
+      request<{ data: ScheduleInsightPoint[] }>(`/schedules/${id}/insights`).then((r) => r.data),
   },
   themes: {
     list: (): Promise<Theme[]> => request('/themes'),

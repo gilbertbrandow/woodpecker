@@ -1,17 +1,41 @@
-import * as React from 'react'
-import { useState, useEffect } from 'react'
-import { useNavigate, Link, useParams } from '@tanstack/react-router'
-import { toast } from 'sonner'
-import { ChevronDown, Lock, Plus, Trash2 } from 'lucide-react'
-import { useAuth } from '../context/auth'
-import { api, type Schedule, type ScheduleConfig, type ScheduleRunDef, type PuzzleOrder, type Subset } from '../lib/api'
-import { parseAvatarValue } from '../lib/avatar'
-import { DefaultAvatar } from '../components/DefaultAvatar'
-import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar'
-import { Tooltip, TooltipTrigger, TooltipContent } from '../components/ui/tooltip'
-import { Button } from '../components/ui/button'
-import { Badge } from '../components/ui/badge'
-import { Input } from '../components/ui/input'
+import * as React from "react";
+import { useState, useEffect } from "react";
+import { useNavigate, Link, useParams } from "@tanstack/react-router";
+import { toast } from "sonner";
+import { ChevronDown, Lock, Plus, Trash2 } from "lucide-react";
+import { useAuth } from "../context/auth";
+import {
+  api,
+  type Schedule,
+  type ScheduleConfig,
+  type ScheduleRunDef,
+  type PuzzleOrder,
+  type Subset,
+  type ScheduleInsightPoint,
+} from "../lib/api";
+import { AreaChart, Area, XAxis, YAxis } from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  type ChartConfig,
+} from "../components/ui/chart";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "../components/ui/tabs";
+import { parseAvatarValue } from "../lib/avatar";
+import { DefaultAvatar } from "../components/DefaultAvatar";
+import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "../components/ui/tooltip";
+import { Button } from "../components/ui/button";
+import { Badge } from "../components/ui/badge";
+import { Input } from "../components/ui/input";
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -22,7 +46,7 @@ import {
   AlertDialogFooter,
   AlertDialogCancel,
   AlertDialogAction,
-} from '../components/ui/alert-dialog'
+} from "../components/ui/alert-dialog";
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -30,32 +54,43 @@ import {
   BreadcrumbLink,
   BreadcrumbSeparator,
   BreadcrumbPage,
-} from '../components/ui/breadcrumb'
+} from "../components/ui/breadcrumb";
 import {
   Collapsible,
   CollapsibleTrigger,
   CollapsibleContent,
-} from '../components/ui/collapsible'
-import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group'
-import { DurationInput, formatDuration } from '../components/schedules/DurationInput'
+} from "../components/ui/collapsible";
+import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
+import {
+  DurationInput,
+  formatDuration,
+} from "../components/schedules/DurationInput";
 
-const MAX_RUNS = 20
+const MAX_RUNS = 20;
 
+const INSIGHTS_CONFIG: ChartConfig = {
+  puzzlesPerDay: { label: "Puzzles / day", color: "hsl(var(--chart-1))" },
+};
+
+function formatTickDate(v: string): string {
+  const d = new Date(v + "T12:00:00");
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
 function buildConfig(
   runs: ScheduleRunDef[],
   puzzleOrder: PuzzleOrder,
-  failedMode: 'none' | 'queue',
+  failedMode: "none" | "queue",
   maxRepeats: number,
 ): ScheduleConfig {
   return {
     runs,
     puzzle_order: puzzleOrder,
     failed_repetition:
-      failedMode === 'queue'
-        ? { mode: 'queue', max_repeats: maxRepeats }
-        : { mode: 'none' },
-  }
+      failedMode === "queue"
+        ? { mode: "queue", max_repeats: maxRepeats }
+        : { mode: "none" },
+  };
 }
 
 function SectionTrigger({
@@ -64,10 +99,10 @@ function SectionTrigger({
   open,
   ...rest
 }: {
-  title: string
-  description: string
-  open: boolean
-} & React.ComponentPropsWithoutRef<'button'>): React.ReactElement {
+  title: string;
+  description: string;
+  open: boolean;
+} & React.ComponentPropsWithoutRef<"button">): React.ReactElement {
   return (
     <button
       type="button"
@@ -77,76 +112,108 @@ function SectionTrigger({
       <span className="flex items-center gap-2 text-sm font-medium">
         <ChevronDown
           className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
-          style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}
+          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
         />
         {title}
       </span>
-      <span className="hidden text-xs text-muted-foreground sm:block">{description}</span>
+      <span className="hidden text-xs text-muted-foreground sm:block">
+        {description}
+      </span>
     </button>
-  )
+  );
 }
 
 export function SchedulePage(): React.ReactElement | null {
-  const { user, loading: authLoading } = useAuth()
-  const navigate = useNavigate()
-  const { scheduleId } = useParams({ from: '/app/schedules/$scheduleId' })
-  const id = parseInt(scheduleId, 10)
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const { scheduleId } = useParams({ from: "/app/schedules/$scheduleId" });
+  const id = parseInt(scheduleId, 10);
 
-  const [schedule, setSchedule] = useState<Schedule | null>(null)
-  const [subset, setSubset] = useState<Subset | null>(null)
-  const [pageLoading, setPageLoading] = useState(true)
+  const [schedule, setSchedule] = useState<Schedule | null>(null);
+  const [subset, setSubset] = useState<Subset | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
-  const [runs, setRuns] = useState<ScheduleRunDef[]>([])
-  const [puzzleOrder, setPuzzleOrder] = useState<PuzzleOrder>('random')
-  const [failedMode, setFailedMode] = useState<'none' | 'queue'>('none')
-  const [maxRepeats, setMaxRepeats] = useState(2)
-  const [isDirty, setIsDirty] = useState(false)
+  const [runs, setRuns] = useState<ScheduleRunDef[]>([]);
+  const [puzzleOrder, setPuzzleOrder] = useState<PuzzleOrder>("random");
+  const [failedMode, setFailedMode] = useState<"none" | "queue">("none");
+  const [maxRepeats, setMaxRepeats] = useState(2);
+  const [isDirty, setIsDirty] = useState(false);
 
-  const [isSaving, setIsSaving] = useState(false)
+  const [isSaving, setIsSaving] = useState(false);
 
-  const [runsOpen, setRunsOpen] = useState(true)
-  const [orderOpen, setOrderOpen] = useState(true)
-  const [repetitionOpen, setRepetitionOpen] = useState(true)
+  const [runsOpen, setRunsOpen] = useState(true);
+  const [orderOpen, setOrderOpen] = useState(true);
+  const [repetitionOpen, setRepetitionOpen] = useState(true);
+
+  const [activeTab, setActiveTab] = useState("configuration");
+  const [insightsData, setInsightsData] = useState<ScheduleInsightPoint[] | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [chartsReady, setChartsReady] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(true);
+  const [usedByOpen, setUsedByOpen] = useState(true);
 
   useEffect(() => {
     if (!authLoading && !user) {
-      void navigate({ to: '/' })
+      void navigate({ to: "/" });
     }
-  }, [user, authLoading, navigate])
+  }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    if (!user) return
+    if (!user) return;
     api.schedules
       .get(id)
       .then((s) => {
-        setSchedule(s)
+        setSchedule(s);
         if (s.config) {
-          setRuns(s.config.runs)
-          setPuzzleOrder(s.config.puzzle_order)
-          setFailedMode(s.config.failed_repetition.mode)
-          setMaxRepeats(s.config.failed_repetition.max_repeats ?? 2)
+          setRuns(s.config.runs);
+          setPuzzleOrder(s.config.puzzle_order);
+          setFailedMode(s.config.failed_repetition.mode);
+          setMaxRepeats(s.config.failed_repetition.max_repeats ?? 2);
         }
-        setIsDirty(false)
-        if (s.status === 'locked') {
-          setRunsOpen(false)
-          setOrderOpen(false)
-          setRepetitionOpen(false)
+        setIsDirty(false);
+        if (s.status === "locked") {
+          setRunsOpen(false);
+          setOrderOpen(false);
+          setRepetitionOpen(false);
+          setActiveTab("insights");
         }
-        return api.subsets.get(s.subsetId)
+        return api.subsets.get(s.subsetId);
       })
       .then((sub) => setSubset(sub))
-      .catch(() => toast.error('Failed to load schedule', { description: 'Could not fetch schedule data.' }))
-      .finally(() => setPageLoading(false))
-  }, [id, user])
+      .catch(() =>
+        toast.error("Failed to load schedule", {
+          description: "Could not fetch schedule data.",
+        }),
+      )
+      .finally(() => setPageLoading(false));
+  }, [id, user]);
 
-  if (authLoading || !user) return null
+  useEffect(() => {
+    setChartsReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== "insights" || insightsData !== null || !user) return;
+    setInsightsLoading(true);
+    api.schedules
+      .insights(id)
+      .then((data) => setInsightsData(data))
+      .catch(() =>
+        toast.error("Failed to load insights", {
+          description: "Could not fetch chart data.",
+        }),
+      )
+      .finally(() => setInsightsLoading(false));
+  }, [activeTab, id, user, insightsData]);
+
+  if (authLoading || !user) return null;
 
   if (pageLoading) {
     return (
       <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
         <p className="text-sm text-muted-foreground">Loading…</p>
       </div>
-    )
+    );
   }
 
   if (!schedule) {
@@ -154,73 +221,96 @@ export function SchedulePage(): React.ReactElement | null {
       <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
         <p className="text-sm text-muted-foreground">Schedule not found.</p>
       </div>
-    )
+    );
   }
 
-  const locked = schedule.status === 'locked'
-  const isOwn = schedule.createdBy.username === user.username
-  const showActions = isOwn && !locked
+  const locked = schedule.status === "locked";
+  const isOwn = schedule.createdBy.username === user.username;
+  const showActions = isOwn && !locked;
 
-  const totalHours = runs.reduce((sum, r) => sum + r.target_hours + r.break_after_hours, 0)
-  const canLock = !isDirty && runs.length > 0
+  const totalHours = runs.reduce(
+    (sum, r) => sum + r.target_hours + r.break_after_hours,
+    0,
+  );
+  const canLock = runs.length > 0;
 
-  const markDirty = (): void => setIsDirty(true)
+  const markDirty = (): void => setIsDirty(true);
 
   const handleDelete = async (): Promise<void> => {
     try {
-      await api.schedules.delete(id)
-      toast('Schedule deleted', { description: 'The schedule has been removed.' })
-      void navigate({ to: '/app' })
+      await api.schedules.delete(id);
+      toast("Schedule deleted", {
+        description: "The schedule has been removed.",
+      });
+      void navigate({ to: "/app" });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Please try again.'
-      toast.error('Delete failed', { description: msg })
+      const msg = err instanceof Error ? err.message : "Please try again.";
+      toast.error("Delete failed", { description: msg });
     }
-  }
+  };
 
   const handleSave = async (): Promise<void> => {
-    setIsSaving(true)
+    setIsSaving(true);
     try {
-      const config = buildConfig(runs, puzzleOrder, failedMode, maxRepeats)
-      const updated = await api.schedules.update(id, { config })
-      setSchedule(updated)
-      setIsDirty(false)
-      toast('Configuration saved', { description: 'Your settings have been saved.' })
+      const config = buildConfig(runs, puzzleOrder, failedMode, maxRepeats);
+      const updated = await api.schedules.update(id, { config });
+      setSchedule(updated);
+      setIsDirty(false);
+      toast("Configuration saved", {
+        description: "Your settings have been saved.",
+      });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Please try again.'
-      toast.error('Save failed', { description: msg })
+      const msg = err instanceof Error ? err.message : "Please try again.";
+      toast.error("Save failed", { description: msg });
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
   const handleLock = async (): Promise<void> => {
     try {
-      const updated = await api.schedules.lock(id)
-      setSchedule(updated)
-      setRunsOpen(false)
-      setOrderOpen(false)
-      setRepetitionOpen(false)
-      toast('Schedule locked', { description: 'This schedule is now ready for use.' })
+      if (isDirty) {
+        setIsSaving(true);
+        const config = buildConfig(runs, puzzleOrder, failedMode, maxRepeats);
+        await api.schedules.update(id, { config });
+        setIsDirty(false);
+        setIsSaving(false);
+      }
+      const updated = await api.schedules.lock(id);
+      setSchedule(updated);
+      setRunsOpen(false);
+      setOrderOpen(false);
+      setRepetitionOpen(false);
+      toast("Schedule locked", {
+        description: "This schedule is now ready for use.",
+      });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Please try again.'
-      toast.error('Lock failed', { description: msg })
+      setIsSaving(false);
+      const msg = err instanceof Error ? err.message : "Please try again.";
+      toast.error("Lock failed", { description: msg });
     }
-  }
+  };
 
-  const updateRun = (index: number, field: keyof ScheduleRunDef, hours: number): void => {
-    setRuns((prev) => prev.map((r, i) => (i === index ? { ...r, [field]: hours } : r)))
-    markDirty()
-  }
+  const updateRun = (
+    index: number,
+    field: keyof ScheduleRunDef,
+    hours: number,
+  ): void => {
+    setRuns((prev) =>
+      prev.map((r, i) => (i === index ? { ...r, [field]: hours } : r)),
+    );
+    markDirty();
+  };
 
   const addRun = (): void => {
-    setRuns((prev) => [...prev, { target_hours: 168, break_after_hours: 0 }])
-    markDirty()
-  }
+    setRuns((prev) => [...prev, { target_hours: 168, break_after_hours: 0 }]);
+    markDirty();
+  };
 
   const removeRun = (index: number): void => {
-    setRuns((prev) => prev.filter((_, i) => i !== index))
-    markDirty()
-  }
+    setRuns((prev) => prev.filter((_, i) => i !== index));
+    markDirty();
+  };
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
@@ -245,7 +335,9 @@ export function SchedulePage(): React.ReactElement | null {
             <Badge variant="outline" className="capitalize text-xs">
               {schedule.status}
             </Badge>
-            <span className="text-sm text-muted-foreground">{formatDuration(schedule.totalHours)}</span>
+            <span className="text-sm text-muted-foreground">
+              {formatDuration(schedule.totalHours)}
+            </span>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             created by {schedule.createdBy.username}
@@ -265,12 +357,15 @@ export function SchedulePage(): React.ReactElement | null {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete this schedule?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    "{schedule.name}" will be permanently removed. This cannot be undone.
+                    "{schedule.name}" will be permanently removed. This cannot
+                    be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => void handleDelete()}>Delete</AlertDialogAction>
+                  <AlertDialogAction onClick={() => void handleDelete()}>
+                    Delete
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -281,7 +376,7 @@ export function SchedulePage(): React.ReactElement | null {
               onClick={() => void handleSave()}
               disabled={!isDirty || isSaving}
             >
-              {isSaving ? 'Saving…' : 'Save configuration'}
+              {isSaving ? "Saving…" : "Save configuration"}
             </Button>
 
             <AlertDialog>
@@ -295,12 +390,15 @@ export function SchedulePage(): React.ReactElement | null {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Lock this schedule?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Locking is permanent. The schedule configuration cannot be changed after this.
+                    Locking is permanent. The schedule configuration cannot be
+                    changed after this.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => void handleLock()}>Lock</AlertDialogAction>
+                  <AlertDialogAction onClick={() => void handleLock()}>
+                    Lock
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -308,61 +406,91 @@ export function SchedulePage(): React.ReactElement | null {
         )}
       </div>
 
-      {locked && (
-        <div className="mb-6 flex items-center gap-2 rounded-md border px-4 py-3 text-sm text-muted-foreground">
-          <Lock className="h-4 w-4 shrink-0" />
-          This schedule is locked. Configuration cannot be changed.
-        </div>
-      )}
-
       {subset && (
         <div className="mb-6 rounded-lg border bg-card">
           <div className="border-b px-4 py-2.5">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Subset</span>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Subset
+            </span>
           </div>
           <div
             className="flex cursor-pointer items-center gap-4 px-4 py-3 transition-colors hover:bg-muted/50"
-            onClick={() => void navigate({ to: '/app/subsets/$subsetId', params: { subsetId: String(subset.id) } })}
+            onClick={() =>
+              void navigate({
+                to: "/app/subsets/$subsetId",
+                params: { subsetId: String(subset.id) },
+              })
+            }
           >
             <div onClick={(e) => e.stopPropagation()}>
               {(() => {
-                const av = parseAvatarValue(subset.ownedBy.avatarUrl)
-                const avatar = av.type === 'custom' ? (
-                  <Avatar className="h-6 w-6 shrink-0">
-                    <AvatarImage src={av.url} alt={subset.ownedBy.username} />
-                    <AvatarFallback><DefaultAvatar username={subset.ownedBy.username} className="h-6 w-6" /></AvatarFallback>
-                  </Avatar>
-                ) : (
-                  <DefaultAvatar
-                    username={subset.ownedBy.username}
-                    piece={av.type === 'default' ? av.piece : undefined}
-                    color={av.type === 'default' ? av.color : undefined}
-                    className="h-6 w-6 shrink-0 text-[10px]"
-                  />
-                )
+                const av = parseAvatarValue(subset.ownedBy.avatarUrl);
+                const avatar =
+                  av.type === "custom" ? (
+                    <Avatar className="h-6 w-6 shrink-0">
+                      <AvatarImage src={av.url} alt={subset.ownedBy.username} />
+                      <AvatarFallback>
+                        <DefaultAvatar
+                          username={subset.ownedBy.username}
+                          className="h-6 w-6"
+                        />
+                      </AvatarFallback>
+                    </Avatar>
+                  ) : (
+                    <DefaultAvatar
+                      username={subset.ownedBy.username}
+                      piece={av.type === "default" ? av.piece : undefined}
+                      color={av.type === "default" ? av.color : undefined}
+                      className="h-6 w-6 shrink-0 text-[10px]"
+                    />
+                  );
                 return (
                   <Tooltip delayDuration={100}>
                     <TooltipTrigger asChild>
-                      <span className="inline-flex cursor-default">{avatar}</span>
+                      <span className="inline-flex cursor-default">
+                        {avatar}
+                      </span>
                     </TooltipTrigger>
                     <TooltipContent>{subset.ownedBy.username}</TooltipContent>
                   </Tooltip>
-                )
+                );
               })()}
             </div>
             <span className="flex-1 font-medium">{subset.name}</span>
-            <Badge variant="outline" className="capitalize text-xs">{subset.status}</Badge>
-            <span className="text-sm tabular-nums text-muted-foreground">{subset.puzzleCount} puzzles</span>
+            <Badge variant="outline" className="capitalize text-xs">
+              {subset.status}
+            </Badge>
+            <span className="text-sm tabular-nums text-muted-foreground">
+              {subset.puzzleCount} puzzles
+            </span>
             {subset.lockedAt && (
               <span className="hidden text-sm text-muted-foreground sm:block">
-                {new Date(subset.lockedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                {new Date(subset.lockedAt).toLocaleDateString(undefined, {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })}
               </span>
             )}
           </div>
         </div>
       )}
 
-      <div className="flex flex-col gap-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
+        <TabsList className="mb-6">
+          <TabsTrigger value="configuration">Configuration</TabsTrigger>
+          <TabsTrigger value="insights">Insights</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="configuration">
+          {locked && (
+            <div className="mb-6 flex items-center gap-2 rounded-md border px-4 py-3 text-sm text-muted-foreground">
+              <Lock className="h-4 w-4 shrink-0" />
+              This schedule is locked. Configuration cannot be changed.
+            </div>
+          )}
+
+          <div className="flex flex-col gap-4">
         <Collapsible open={runsOpen} onOpenChange={setRunsOpen}>
           <CollapsibleTrigger asChild>
             <SectionTrigger
@@ -373,43 +501,38 @@ export function SchedulePage(): React.ReactElement | null {
           </CollapsibleTrigger>
           <CollapsibleContent>
             <div className="pt-4">
-              {locked ? (
-                <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-5">
                   {runs.map((run, i) => (
-                    <div key={i} className="flex gap-3 text-sm text-muted-foreground">
-                      <span className="w-12 shrink-0 font-medium text-foreground">Run {i + 1}</span>
-                      <span>{formatDuration(run.target_hours)}</span>
-                      {run.break_after_hours > 0 && (
-                        <span>then {formatDuration(run.break_after_hours)} break</span>
-                      )}
-                    </div>
-                  ))}
-                  <p className="mt-2 text-sm font-medium">Total: {formatDuration(totalHours)}</p>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-5">
-                  {runs.map((run, i) => (
-                    <div key={i} className="flex items-center gap-3 rounded-md bg-muted/50 px-3 py-2.5">
-                      <span className="flex-1 text-sm font-medium">Run {i + 1}</span>
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 rounded-md bg-muted/50 px-3 py-2.5"
+                    >
+                      <span className="flex-1 text-sm font-medium">
+                        Run {i + 1}
+                      </span>
                       <div className="flex flex-1 items-center gap-1.5">
-                        <span className="text-xs text-muted-foreground">Duration</span>
+                        <span className="text-xs text-muted-foreground">
+                          Duration
+                        </span>
                         <DurationInput
                           value={run.target_hours}
-                          onChange={(h) => updateRun(i, 'target_hours', h)}
-                          disabled={isSaving}
+                          onChange={(h) => updateRun(i, "target_hours", h)}
+                          disabled={locked || isSaving}
                         />
                       </div>
                       <div className="flex flex-1 items-center gap-1.5">
-                        <span className="text-xs text-muted-foreground">Break</span>
+                        <span className="text-xs text-muted-foreground">
+                          Break
+                        </span>
                         <DurationInput
                           value={run.break_after_hours}
-                          onChange={(h) => updateRun(i, 'break_after_hours', h)}
-                          disabled={isSaving || i === runs.length - 1}
+                          onChange={(h) => updateRun(i, "break_after_hours", h)}
+                          disabled={locked || isSaving || i === runs.length - 1}
                           allowZero
                         />
                       </div>
                       <div className="w-7">
-                        {runs.length > 1 && (
+                        {!locked && runs.length > 1 && (
                           <button
                             type="button"
                             onClick={() => removeRun(i)}
@@ -423,7 +546,7 @@ export function SchedulePage(): React.ReactElement | null {
                       </div>
                     </div>
                   ))}
-                  {runs.length < MAX_RUNS && (
+                  {!locked && runs.length < MAX_RUNS && (
                     <button
                       type="button"
                       onClick={addRun}
@@ -434,9 +557,10 @@ export function SchedulePage(): React.ReactElement | null {
                       Add run
                     </button>
                   )}
-                  <p className="text-sm text-muted-foreground">Total: {formatDuration(totalHours)}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Total: {formatDuration(totalHours)}
+                  </p>
                 </div>
-              )}
             </div>
           </CollapsibleContent>
         </Collapsible>
@@ -454,23 +578,52 @@ export function SchedulePage(): React.ReactElement | null {
               <RadioGroup
                 value={puzzleOrder}
                 onValueChange={(v) => {
-                  setPuzzleOrder(v as PuzzleOrder)
-                  markDirty()
+                  setPuzzleOrder(v as PuzzleOrder);
+                  markDirty();
                 }}
                 disabled={locked || isSaving}
                 className="gap-4"
               >
-                {([
-                  { value: 'random', label: 'Random', description: 'Shuffled independently at the start of each run.' },
-                  { value: 'fixed', label: 'Fixed', description: "Follows the subset's curation order. Identical across runs." },
-                  { value: 'rating_asc', label: 'Rating ↑', description: 'Easiest first. Identical across runs.' },
-                  { value: 'rating_desc', label: 'Rating ↓', description: 'Hardest first. Identical across runs.' },
-                ] as const).map((opt) => (
+                {(
+                  [
+                    {
+                      value: "random",
+                      label: "Random",
+                      description:
+                        "Shuffled independently at the start of each run.",
+                    },
+                    {
+                      value: "fixed",
+                      label: "Fixed",
+                      description:
+                        "Follows the subset's curation order. Identical across runs.",
+                    },
+                    {
+                      value: "rating_asc",
+                      label: "Rating ↑",
+                      description: "Easiest first. Identical across runs.",
+                    },
+                    {
+                      value: "rating_desc",
+                      label: "Rating ↓",
+                      description: "Hardest first. Identical across runs.",
+                    },
+                  ] as const
+                ).map((opt) => (
                   <div key={opt.value} className="flex items-start gap-3">
-                    <RadioGroupItem value={opt.value} id={`order-${opt.value}`} className="mt-0.5" />
-                    <label htmlFor={`order-${opt.value}`} className="flex flex-col gap-0.5 cursor-pointer">
+                    <RadioGroupItem
+                      value={opt.value}
+                      id={`order-${opt.value}`}
+                      className="mt-0.5"
+                    />
+                    <label
+                      htmlFor={`order-${opt.value}`}
+                      className="flex flex-col gap-0.5 cursor-pointer"
+                    >
                       <span className="text-sm font-medium">{opt.label}</span>
-                      <span className="text-xs text-muted-foreground">{opt.description}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {opt.description}
+                      </span>
                     </label>
                   </div>
                 ))}
@@ -492,41 +645,62 @@ export function SchedulePage(): React.ReactElement | null {
               <RadioGroup
                 value={failedMode}
                 onValueChange={(v) => {
-                  setFailedMode(v as 'none' | 'queue')
-                  markDirty()
+                  setFailedMode(v as "none" | "queue");
+                  markDirty();
                 }}
                 disabled={locked || isSaving}
                 className="gap-4"
               >
                 <div className="flex items-start gap-3">
-                  <RadioGroupItem value="none" id="failed-none" className="mt-0.5" />
-                  <label htmlFor="failed-none" className="flex flex-col gap-0.5 cursor-pointer">
+                  <RadioGroupItem
+                    value="none"
+                    id="failed-none"
+                    className="mt-0.5"
+                  />
+                  <label
+                    htmlFor="failed-none"
+                    className="flex flex-col gap-0.5 cursor-pointer"
+                  >
                     <span className="text-sm font-medium">No repetition</span>
-                    <span className="text-xs text-muted-foreground">Failure is recorded. Puzzle is not repeated in this run.</span>
+                    <span className="text-xs text-muted-foreground">
+                      Failure is recorded. Puzzle is not repeated in this run.
+                    </span>
                   </label>
                 </div>
                 <div className="flex items-start gap-3">
-                  <RadioGroupItem value="queue" id="failed-queue" className="mt-0.5" />
-                  <label htmlFor="failed-queue" className="flex flex-col gap-0.5 cursor-pointer">
+                  <RadioGroupItem
+                    value="queue"
+                    id="failed-queue"
+                    className="mt-0.5"
+                  />
+                  <label
+                    htmlFor="failed-queue"
+                    className="flex flex-col gap-0.5 cursor-pointer"
+                  >
                     <span className="text-sm font-medium">Re-queue</span>
-                    <span className="text-xs text-muted-foreground">Failed puzzle is appended to the end of the remaining queue.</span>
+                    <span className="text-xs text-muted-foreground">
+                      Failed puzzle is appended to the end of the remaining
+                      queue.
+                    </span>
                   </label>
                 </div>
               </RadioGroup>
 
-              {failedMode === 'queue' && (
+              {failedMode === "queue" && (
                 <div className="mt-4 flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Repeat up to</span>
+                  <span className="text-sm text-muted-foreground">
+                    Repeat up to
+                  </span>
                   <Input
                     type="number"
                     min={1}
                     max={5}
                     value={maxRepeats}
                     onChange={(e) => {
-                      const v = parseInt(e.target.value, 10)
+                      const v = parseInt(e.target.value, 10);
                       if (!isNaN(v)) {
-                        setMaxRepeats(Math.min(5, Math.max(1, v)))
-                        markDirty()
+                        setMaxRepeats(Math.min(5, Math.max(1, v)));
+                        markDirty();
                       }
                     }}
                     disabled={locked || isSaving}
@@ -538,7 +712,175 @@ export function SchedulePage(): React.ReactElement | null {
             </div>
           </CollapsibleContent>
         </Collapsible>
-      </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="insights">
+          <div className="flex flex-col gap-4">
+            <Collapsible open={statsOpen} onOpenChange={setStatsOpen}>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between border-b pb-2.5 text-left"
+                >
+                  <span className="flex items-center gap-2 text-sm font-medium">
+                    <ChevronDown
+                      className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
+                      style={{
+                        transform: statsOpen
+                          ? "rotate(180deg)"
+                          : "rotate(0deg)",
+                      }}
+                    />
+                    Stats
+                  </span>
+                  <span className="hidden text-xs text-muted-foreground sm:block">
+                    Daily puzzle targets over the schedule timeline
+                  </span>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="pt-4">
+                  {insightsLoading && (
+                    <p className="text-sm text-muted-foreground">Loading…</p>
+                  )}
+                  {!insightsLoading &&
+                    insightsData !== null &&
+                    insightsData.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        No data — configure at least one run with a duration
+                        greater than zero.
+                      </p>
+                    )}
+                  {!insightsLoading &&
+                    insightsData !== null &&
+                    insightsData.length > 0 && (
+                      <div className="rounded-md border p-4">
+                        <div className="mb-4">
+                          <p className="text-sm font-semibold">
+                            Daily puzzle targets
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Average puzzles to complete each day to finish each
+                            run on time
+                          </p>
+                        </div>
+                        {chartsReady && (
+                          <ChartContainer
+                            config={INSIGHTS_CONFIG}
+                            className="h-64 w-full"
+                          >
+                            <AreaChart
+                              data={insightsData}
+                              margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
+                            >
+                              <defs>
+                                <linearGradient
+                                  id="insightsGradient"
+                                  x1="0"
+                                  y1="0"
+                                  x2="0"
+                                  y2="1"
+                                >
+                                  <stop
+                                    offset="5%"
+                                    stopColor="var(--color-puzzlesPerDay)"
+                                    stopOpacity={0.8}
+                                  />
+                                  <stop
+                                    offset="95%"
+                                    stopColor="var(--color-puzzlesPerDay)"
+                                    stopOpacity={0.1}
+                                  />
+                                </linearGradient>
+                              </defs>
+                              <XAxis
+                                dataKey="date"
+                                tickLine={false}
+                                axisLine={false}
+                                interval={6}
+                                tick={{ fontSize: 10 }}
+                                tickFormatter={formatTickDate}
+                              />
+                              <YAxis
+                                tickLine={false}
+                                axisLine={false}
+                                tick={{ fontSize: 10 }}
+                                width={32}
+                              />
+                              <ChartTooltip
+                                content={({ active, payload }) => {
+                                  if (!active || !payload?.length) return null;
+                                  const point = payload[0]
+                                    ?.payload as ScheduleInsightPoint;
+                                  return (
+                                    <div className="rounded-md border bg-background px-3 py-2 text-xs shadow-md">
+                                      <p className="font-medium">
+                                        {new Date(
+                                          point.date + "T12:00:00",
+                                        ).toLocaleDateString(undefined, {
+                                          weekday: "short",
+                                          month: "short",
+                                          day: "numeric",
+                                        })}
+                                      </p>
+                                      <p className="text-muted-foreground">
+                                        {point.puzzlesPerDay} puzzles / day
+                                      </p>
+                                    </div>
+                                  );
+                                }}
+                              />
+                              <Area
+                                type="step"
+                                dataKey="puzzlesPerDay"
+                                stroke="var(--color-puzzlesPerDay)"
+                                fill="url(#insightsGradient)"
+                                isAnimationActive={false}
+                              />
+                            </AreaChart>
+                          </ChartContainer>
+                        )}
+                      </div>
+                    )}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            <Collapsible open={usedByOpen} onOpenChange={setUsedByOpen}>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between border-b pb-2.5 text-left"
+                >
+                  <span className="flex items-center gap-2 text-sm font-medium">
+                    <ChevronDown
+                      className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
+                      style={{
+                        transform: usedByOpen
+                          ? "rotate(180deg)"
+                          : "rotate(0deg)",
+                      }}
+                    />
+                    Participants
+                  </span>
+                  <span className="hidden text-xs text-muted-foreground sm:block">
+                    Users participating in this schedule
+                  </span>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="pt-4">
+                  {/* TODO: Populate with ScheduleParticipation data once that model is implemented */}
+                  <p className="text-sm text-muted-foreground">
+                    No participants yet.
+                  </p>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
-  )
+  );
 }

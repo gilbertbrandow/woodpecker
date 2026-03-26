@@ -55,7 +55,9 @@ def create_schedule() -> tuple[Response, int]:
 @schedules_bp.get("")
 @login_required
 def list_schedules() -> Response:
-    schedules = schedule_svc.list_schedules(session["user_id"])
+    subset_id_raw = request.args.get("subsetId")
+    subset_id = int(subset_id_raw) if subset_id_raw and subset_id_raw.isdigit() else None
+    schedules = schedule_svc.list_schedules(session["user_id"], subset_id=subset_id)
     return jsonify(schedules)
 
 
@@ -96,6 +98,18 @@ def delete_schedule(schedule_id: int) -> tuple[Response, int]:
     except PermissionError as e:
         return jsonify({"error": str(e)}), 403
     return jsonify({}), 204
+
+
+@schedules_bp.get("/<int:schedule_id>/insights")
+@login_required
+def get_schedule_insights(schedule_id: int) -> tuple[Response, int] | Response:
+    try:
+        data = schedule_svc.get_schedule_insights(schedule_id, session["user_id"])
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    return jsonify({"data": data})
 
 
 @schedules_bp.post("/<int:schedule_id>/lock")
