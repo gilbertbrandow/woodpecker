@@ -24,12 +24,12 @@ def _validate_config(config: dict[str, object]) -> None:
         if not isinstance(run_item, dict):
             raise ValueError(f"config.runs[{i}] must be an object.")
         run = cast(dict[str, object], run_item)
-        target_days = run.get("target_days")
-        break_after = run.get("break_after_days")
-        if not isinstance(target_days, int) or target_days < 1:
-            raise ValueError(f"config.runs[{i}].target_days must be a positive integer.")
+        target_hours = run.get("target_hours")
+        break_after = run.get("break_after_hours")
+        if not isinstance(target_hours, int) or target_hours < 1:
+            raise ValueError(f"config.runs[{i}].target_hours must be a positive integer.")
         if not isinstance(break_after, int) or break_after < 0:
-            raise ValueError(f"config.runs[{i}].break_after_days must be a non-negative integer.")
+            raise ValueError(f"config.runs[{i}].break_after_hours must be a non-negative integer.")
 
     order_raw = config.get("puzzle_order")
     if order_raw not in VALID_PUZZLE_ORDERS:
@@ -52,7 +52,7 @@ def _validate_config(config: dict[str, object]) -> None:
             )
 
 
-def compute_total_days(config: dict[str, object]) -> int:
+def compute_total_hours(config: dict[str, object]) -> int:
     runs_raw = config.get("runs")
     if not isinstance(runs_raw, list):
         return 0
@@ -61,8 +61,8 @@ def compute_total_days(config: dict[str, object]) -> int:
         if not isinstance(run_item, dict):
             continue
         run = cast(dict[str, object], run_item)
-        target = run.get("target_days")
-        break_after = run.get("break_after_days")
+        target = run.get("target_hours")
+        break_after = run.get("break_after_hours")
         total += (target if isinstance(target, int) else 0) + (
             break_after if isinstance(break_after, int) else 0
         )
@@ -164,7 +164,7 @@ def list_schedules(user_id: int) -> list[dict[str, object]]:
     rows = db.session.execute(
         sa.text("""
             SELECT s.id, s.name, s.description, s.status, s.config,
-                   s.created_at, s.locked_at, u.lichess_username
+                   s.created_at, s.locked_at, u.lichess_username, u.avatar_url
             FROM schedules s
             JOIN users u ON u.id = s.user_id
             WHERE s.status = 'locked' OR s.user_id = :uid
@@ -178,7 +178,7 @@ def list_schedules(user_id: int) -> list[dict[str, object]]:
         config: dict[str, object] = row.config if isinstance(row.config, dict) else {}
         runs_raw = config.get("runs")
         run_count = len(runs_raw) if isinstance(runs_raw, list) else 0
-        total_days = compute_total_days(config)
+        total_hours = compute_total_hours(config)
         order_raw = config.get("puzzle_order")
         puzzle_order = order_raw if isinstance(order_raw, str) else None
         result.append({
@@ -186,9 +186,9 @@ def list_schedules(user_id: int) -> list[dict[str, object]]:
             "name": row.name,
             "description": row.description,
             "status": row.status,
-            "createdBy": row.lichess_username,
+            "createdBy": {"username": row.lichess_username, "avatarUrl": row.avatar_url},
             "runCount": run_count,
-            "totalDays": total_days,
+            "totalHours": total_hours,
             "puzzleOrder": puzzle_order,
             "createdAt": row.created_at.isoformat(),
             "lockedAt": row.locked_at.isoformat() if row.locked_at else None,

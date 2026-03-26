@@ -1,15 +1,24 @@
 from flask import Blueprint, Response, jsonify, request, session
 
 from app.decorators import login_required
+from app.extensions import db
 from app.models.schedule import Schedule
+from app.models.user import User
 from app.services import schedule as schedule_svc
 
 schedules_bp = Blueprint("schedules", __name__, url_prefix="/schedules")
 
 
-def _schedule_to_dict(schedule: Schedule) -> dict[str, object]:
+def _load_creator(schedule: Schedule) -> User:
+    creator = db.session.get(User, schedule.user_id)
+    if creator is None:
+        raise LookupError("Schedule creator not found.")
+    return creator
+
+
+def _schedule_to_dict(schedule: Schedule, creator: User) -> dict[str, object]:
     config = schedule.config
-    total_days = schedule_svc.compute_total_days(config) if config else 0
+    total_hours = schedule_svc.compute_total_hours(config) if config else 0
     return {
         "id": schedule.id,
         "name": schedule.name,
@@ -17,7 +26,8 @@ def _schedule_to_dict(schedule: Schedule) -> dict[str, object]:
         "subsetId": schedule.subset_id,
         "status": schedule.status,
         "config": config,
-        "totalDays": total_days,
+        "totalHours": total_hours,
+        "createdBy": {"username": creator.lichess_username, "avatarUrl": creator.avatar_url},
         "createdAt": schedule.created_at.isoformat(),
         "lockedAt": schedule.locked_at.isoformat() if schedule.locked_at else None,
     }
@@ -39,7 +49,7 @@ def create_schedule() -> tuple[Response, int]:
         return jsonify({"error": str(e)}), 404
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    return jsonify(_schedule_to_dict(schedule)), 201
+    return jsonify(_schedule_to_dict(schedule, _load_creator(schedule))), 201
 
 
 @schedules_bp.get("")
@@ -58,7 +68,7 @@ def get_schedule(schedule_id: int) -> tuple[Response, int] | Response:
         return jsonify({"error": str(e)}), 404
     except PermissionError as e:
         return jsonify({"error": str(e)}), 403
-    return jsonify(_schedule_to_dict(schedule))
+    return jsonify(_schedule_to_dict(schedule, _load_creator(schedule)))
 
 
 @schedules_bp.patch("/<int:schedule_id>")
@@ -73,7 +83,7 @@ def update_schedule(schedule_id: int) -> tuple[Response, int] | Response:
         return jsonify({"error": str(e)}), 403
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    return jsonify(_schedule_to_dict(schedule))
+    return jsonify(_schedule_to_dict(schedule, _load_creator(schedule)))
 
 
 @schedules_bp.post("/<int:schedule_id>/lock")
@@ -88,4 +98,4 @@ def lock_schedule(schedule_id: int) -> tuple[Response, int] | Response:
     except ValueError as e:
         status_code = 409 if "Already locked" in str(e) else 400
         return jsonify({"error": str(e)}), status_code
-    return jsonify(_schedule_to_dict(schedule))
+    return jsonify(_schedule_to_dict(schedule, _load_creator(schedule)))
