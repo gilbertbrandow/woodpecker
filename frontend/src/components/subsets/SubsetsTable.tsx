@@ -1,11 +1,11 @@
 import * as React from 'react'
 import { useState, useMemo } from 'react'
-import { Link } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { ArrowUpDown, ArrowUp, ArrowDown, Loader2, Trash2 } from 'lucide-react'
 import { parseAvatarValue } from '../../lib/avatar'
 import { DefaultAvatar } from '../DefaultAvatar'
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar'
-import { Button } from '../ui/button'
+import { Tooltip, TooltipTrigger, TooltipContent } from '../ui/tooltip'
 import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
 import {
@@ -39,25 +39,30 @@ type SubsetsTableProps = {
   onDelete: (subset: Subset) => void
 }
 
-function SubsetAvatar({ username, avatarUrl }: { username: string; avatarUrl: string | null }): React.ReactElement {
+function CreatorAvatar({ username, avatarUrl }: { username: string; avatarUrl: string | null }): React.ReactElement {
   const avatarValue = parseAvatarValue(avatarUrl)
-  if (avatarValue.type === 'custom') {
-    return (
-      <Avatar className="h-6 w-6 shrink-0">
-        <AvatarImage src={avatarValue.url} alt={`${username}'s avatar`} />
-        <AvatarFallback>
-          <DefaultAvatar username={username} className="h-6 w-6" />
-        </AvatarFallback>
-      </Avatar>
-    )
-  }
-  return (
+  const avatar = avatarValue.type === 'custom' ? (
+    <Avatar className="h-6 w-6 shrink-0">
+      <AvatarImage src={avatarValue.url} alt={`${username}'s avatar`} />
+      <AvatarFallback>
+        <DefaultAvatar username={username} className="h-6 w-6" />
+      </AvatarFallback>
+    </Avatar>
+  ) : (
     <DefaultAvatar
       username={username}
       piece={avatarValue.type === 'default' ? avatarValue.piece : undefined}
       color={avatarValue.type === 'default' ? avatarValue.color : undefined}
       className="h-6 w-6 text-[10px]"
     />
+  )
+  return (
+    <Tooltip delayDuration={100}>
+      <TooltipTrigger asChild>
+        <span className="inline-flex cursor-default">{avatar}</span>
+      </TooltipTrigger>
+      <TooltipContent>{username}</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -106,6 +111,7 @@ const STATUS_BADGE: Record<Subset['status'], string> = {
 }
 
 export function SubsetsTable({ subsets, currentUsername, deletingId, onDelete }: SubsetsTableProps): React.ReactElement {
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [ownerFilter, setOwnerFilter] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('lockedAt')
@@ -175,8 +181,8 @@ export function SubsetsTable({ subsets, currentUsername, deletingId, onDelete }:
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">Creator</TableHead>
               <SortHead label="Name" sortKey="name" current={sortKey} dir={sortDir} onSort={handleSort} />
-              <TableHead className="hidden sm:table-cell">Creator</TableHead>
               <TableHead className="hidden md:table-cell">Status</TableHead>
               <SortHead label="Puzzles" sortKey="puzzleCount" current={sortKey} dir={sortDir} onSort={handleSort} className="text-right" />
               <SortHead label="Date" sortKey="lockedAt" current={sortKey} dir={sortDir} onSort={handleSort} className="hidden sm:table-cell" />
@@ -194,20 +200,15 @@ export function SubsetsTable({ subsets, currentUsername, deletingId, onDelete }:
               filtered.map((subset) => {
                 const isOwn = subset.ownedBy.username === currentUsername
                 return (
-                  <TableRow key={subset.id}>
-                    <TableCell>
-                      <Link
-                        to="/app/subsets/$subsetId"
-                        params={{ subsetId: String(subset.id) }}
-                        className="flex items-center gap-2 hover:underline"
-                      >
-                        <SubsetAvatar username={subset.ownedBy.username} avatarUrl={subset.ownedBy.avatarUrl} />
-                        <span className="font-medium">{subset.name}</span>
-                      </Link>
+                  <TableRow
+                    key={subset.id}
+                    className="cursor-pointer"
+                    onClick={() => void navigate({ to: '/app/subsets/$subsetId', params: { subsetId: String(subset.id) } })}
+                  >
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <CreatorAvatar username={subset.ownedBy.username} avatarUrl={subset.ownedBy.avatarUrl} />
                     </TableCell>
-                    <TableCell className="hidden text-muted-foreground sm:table-cell">
-                      {subset.ownedBy.username}
-                    </TableCell>
+                    <TableCell className="font-medium">{subset.name}</TableCell>
                     <TableCell className="hidden md:table-cell">
                       <Badge variant={STATUS_BADGE[subset.status] as 'outline'} className="capitalize text-xs">
                         {subset.status}
@@ -217,10 +218,10 @@ export function SubsetsTable({ subsets, currentUsername, deletingId, onDelete }:
                       {subset.puzzleCount ?? '—'}
                     </TableCell>
                     <TableCell className="hidden text-muted-foreground sm:table-cell">
-                      {subset.lockedAt ? formatDate(subset.lockedAt) : '—'}
+                      {subset.lockedAt ? formatDate(subset.lockedAt) : formatDate(subset.createdAt)}
                     </TableCell>
-                    <TableCell>
-                      {isOwn && subset.status !== 'locked' && (
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      {isOwn && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <button

@@ -21,6 +21,7 @@ class Subset(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    locked_puzzle_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     puzzles: Mapped[list["SubsetPuzzle"]] = relationship(
         "SubsetPuzzle", order_by="SubsetPuzzle.position", cascade="all, delete-orphan"

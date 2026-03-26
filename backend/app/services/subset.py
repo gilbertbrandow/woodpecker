@@ -5,6 +5,7 @@ import sqlalchemy as sa
 
 from app.extensions import db
 from app.models.puzzle import Puzzle
+from app.models.schedule import Schedule
 from app.models.subset import Subset, SubsetPuzzle
 from app.models.user import User
 
@@ -299,6 +300,7 @@ def lock_subset(subset_id: int, user_id: int) -> Subset:
 
     subset.status = "locked"
     subset.locked_at = datetime.now(timezone.utc)
+    subset.locked_puzzle_count = active_count
     db.session.commit()
     return subset
 
@@ -534,8 +536,11 @@ def get_subset(subset_id: int, user_id: int) -> tuple[Subset, User]:
 
 def delete_subset(subset_id: int, user_id: int) -> None:
     subset = _get_owned_subset(subset_id, user_id)
-    if subset.status == "locked":
-        raise ValueError("Locked subsets cannot be deleted.")
+    referenced = db.session.execute(
+        sa.select(sa.literal(1)).where(Schedule.subset_id == subset_id).limit(1)
+    ).first()
+    if referenced is not None:
+        raise ValueError("Cannot delete a subset that is referenced by a schedule.")
     db.session.delete(subset)
     db.session.commit()
 
