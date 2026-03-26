@@ -86,6 +86,18 @@ def update_schedule(schedule_id: int) -> tuple[Response, int] | Response:
     return jsonify(_schedule_to_dict(schedule, _load_creator(schedule)))
 
 
+@schedules_bp.delete("/<int:schedule_id>")
+@login_required
+def delete_schedule(schedule_id: int) -> tuple[Response, int]:
+    try:
+        schedule_svc.delete_schedule(schedule_id, session["user_id"])
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    return jsonify({}), 204
+
+
 @schedules_bp.post("/<int:schedule_id>/lock")
 @login_required
 def lock_schedule(schedule_id: int) -> tuple[Response, int] | Response:

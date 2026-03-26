@@ -13,7 +13,7 @@ def _subset_to_dict(subset: Subset, owner: User | None = None) -> dict[str, obje
         "id": subset.id,
         "name": subset.name,
         "status": subset.status,
-        "puzzleCount": subset.puzzle_count,
+        "puzzleCount": subset.locked_puzzle_count if subset.status == "locked" else subset.puzzle_count,
         "config": subset.config,
         "createdAt": subset.created_at.isoformat(),
         "lockedAt": subset.locked_at.isoformat() if subset.locked_at else None,

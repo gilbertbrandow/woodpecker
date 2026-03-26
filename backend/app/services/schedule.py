@@ -11,6 +11,18 @@ MAX_RUNS = 20
 MAX_REPEATS = 5
 VALID_PUZZLE_ORDERS = frozenset({"random", "fixed", "rating_asc", "rating_desc"})
 
+DEFAULT_CONFIG: dict[str, object] = {
+    "runs": [
+        {"target_hours": 672, "break_after_hours": 168},
+        {"target_hours": 336, "break_after_hours": 72},
+        {"target_hours": 168, "break_after_hours": 48},
+        {"target_hours": 72, "break_after_hours": 24},
+        {"target_hours": 24, "break_after_hours": 0},
+    ],
+    "puzzle_order": "random",
+    "failed_repetition": {"mode": "none"},
+}
+
 
 def _validate_config(config: dict[str, object]) -> None:
     runs_raw = config.get("runs")
@@ -96,7 +108,7 @@ def create_schedule(user_id: int, name: str, subset_id: int) -> Schedule:
         raise LookupError("Subset not found.")
     if subset.status != "locked":
         raise ValueError("Subset must be locked before creating a schedule.")
-    schedule = Schedule(user_id=user_id, subset_id=subset_id, name=name, status="draft")
+    schedule = Schedule(user_id=user_id, subset_id=subset_id, name=name, status="draft", config=DEFAULT_CONFIG)
     db.session.add(schedule)
     db.session.commit()
     return schedule
@@ -156,6 +168,12 @@ def lock_schedule(schedule_id: int, user_id: int) -> Schedule:
     return schedule
 
 
+def delete_schedule(schedule_id: int, user_id: int) -> None:
+    schedule = _get_owned_schedule(schedule_id, user_id)
+    db.session.delete(schedule)
+    db.session.commit()
+
+
 def get_schedule(schedule_id: int, user_id: int) -> Schedule:
     return _get_accessible_schedule(schedule_id, user_id)
 
@@ -164,9 +182,12 @@ def list_schedules(user_id: int) -> list[dict[str, object]]:
     rows = db.session.execute(
         sa.text("""
             SELECT s.id, s.name, s.description, s.status, s.config,
-                   s.created_at, s.locked_at, u.lichess_username, u.avatar_url
+                   s.created_at, s.locked_at, s.subset_id,
+                   u.lichess_username, u.avatar_url,
+                   sub.name AS subset_name
             FROM schedules s
             JOIN users u ON u.id = s.user_id
+            JOIN subsets sub ON sub.id = s.subset_id
             WHERE s.status = 'locked' OR s.user_id = :uid
             ORDER BY s.created_at DESC
         """),
@@ -187,6 +208,8 @@ def list_schedules(user_id: int) -> list[dict[str, object]]:
             "description": row.description,
             "status": row.status,
             "createdBy": {"username": row.lichess_username, "avatarUrl": row.avatar_url},
+            "subsetId": row.subset_id,
+            "subsetName": row.subset_name,
             "runCount": run_count,
             "totalHours": total_hours,
             "puzzleOrder": puzzle_order,

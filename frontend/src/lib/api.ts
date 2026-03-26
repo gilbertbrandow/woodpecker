@@ -46,7 +46,7 @@ export type Subset = {
   id: number
   name: string
   status: 'draft' | 'filled' | 'locked'
-  puzzleCount: number
+  puzzleCount: number | null
   config: SubsetConfig | null
   createdAt: string
   lockedAt: string | null
@@ -114,6 +114,50 @@ export type Opening = {
   eco: string | null
 }
 
+export type ScheduleRunDef = {
+  target_hours: number
+  break_after_hours: number
+}
+
+export type PuzzleOrder = 'random' | 'fixed' | 'rating_asc' | 'rating_desc'
+
+export type ScheduleConfig = {
+  runs: ScheduleRunDef[]
+  puzzle_order: PuzzleOrder
+  failed_repetition: {
+    mode: 'none' | 'queue'
+    max_repeats?: number
+  }
+}
+
+export type ScheduleSummary = {
+  id: number
+  name: string
+  description: string | null
+  status: 'draft' | 'locked'
+  createdBy: { username: string; avatarUrl: string | null }
+  subsetId: number
+  subsetName: string
+  runCount: number
+  totalHours: number
+  puzzleOrder: PuzzleOrder | null
+  createdAt: string
+  lockedAt: string | null
+}
+
+export type Schedule = {
+  id: number
+  name: string
+  description: string | null
+  subsetId: number
+  status: 'draft' | 'locked'
+  config: ScheduleConfig | null
+  totalHours: number
+  createdBy: { username: string; avatarUrl: string | null }
+  createdAt: string
+  lockedAt: string | null
+}
+
 export const api = {
   auth: {
     me: (): Promise<AuthUser> => request('/auth/me'),
@@ -158,6 +202,20 @@ export const api = {
     discardPuzzle: (id: number, puzzleId: string): Promise<void> =>
       request(`/subsets/${id}/puzzles/${puzzleId}`, { method: 'DELETE' }),
     getStats: (id: number): Promise<SubsetStats> => request(`/subsets/${id}/stats`),
+  },
+  schedules: {
+    list: (): Promise<ScheduleSummary[]> => request('/schedules'),
+    get: (id: number): Promise<Schedule> => request(`/schedules/${id}`),
+    create: (name: string, subsetId: number): Promise<Schedule> =>
+      request('/schedules', { method: 'POST', body: JSON.stringify({ name, subsetId }) }),
+    update: (
+      id: number,
+      updates: { name?: string; description?: string | null; config?: ScheduleConfig | null },
+    ): Promise<Schedule> =>
+      request(`/schedules/${id}`, { method: 'PATCH', body: JSON.stringify(updates) }),
+    lock: (id: number): Promise<Schedule> =>
+      request(`/schedules/${id}/lock`, { method: 'POST' }),
+    delete: (id: number): Promise<void> => request(`/schedules/${id}`, { method: 'DELETE' }),
   },
   themes: {
     list: (): Promise<Theme[]> => request('/themes'),
