@@ -380,6 +380,7 @@ export function SubsetPage(): React.ReactElement | null {
   }
 
   const locked = subset.status === "locked";
+  const isOwn = subset.ownedBy.username === user.username;
   const isBusy = isSaving || isFilling;
   const puzzleCount = subset.puzzleCount ?? 0;
   const isFull = total >= puzzleCount;
@@ -418,7 +419,7 @@ export function SubsetPage(): React.ReactElement | null {
             </TabsTrigger>
           </TabsList>
 
-          {!locked && (
+          {!locked && isOwn && (
             <div className="flex items-center gap-2">
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -496,7 +497,7 @@ export function SubsetPage(): React.ReactElement | null {
         <Separator className="mb-6 mt-3" />
 
         <TabsContent value="configure">
-          {!locked && (
+          {!locked && isOwn && (
             <div className="flex flex-col gap-3 pb-5">
               <p className="rounded-md border bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
                 Configuration is a set of preferences, not hard guarantees.
@@ -525,7 +526,7 @@ export function SubsetPage(): React.ReactElement | null {
                     JSON.stringify(rating) !== JSON.stringify(RATING_DEFAULT)
                   }
                   onReset={
-                    !locked
+                    !locked && isOwn
                       ? () => {
                           setRating(RATING_DEFAULT);
                           markDirty();
@@ -542,7 +543,7 @@ export function SubsetPage(): React.ReactElement | null {
                       setRating(v);
                       markDirty();
                     }}
-                    disabled={locked || isBusy}
+                    disabled={locked || !isOwn || isBusy}
                   />
                 </div>
               </CollapsibleContent>
@@ -556,7 +557,7 @@ export function SubsetPage(): React.ReactElement | null {
                   open={themesOpen}
                   changed={Object.keys(themes).length > 0}
                   onReset={
-                    !locked
+                    !locked && isOwn
                       ? () => {
                           setThemes({});
                           markDirty();
@@ -573,7 +574,7 @@ export function SubsetPage(): React.ReactElement | null {
                       setThemes(v);
                       markDirty();
                     }}
-                    disabled={locked || isBusy}
+                    disabled={locked || !isOwn || isBusy}
                   />
                 </div>
               </CollapsibleContent>
@@ -587,7 +588,7 @@ export function SubsetPage(): React.ReactElement | null {
                   open={openingOpen}
                   changed={opening.items.length > 0}
                   onReset={
-                    !locked
+                    !locked && isOwn
                       ? () => {
                           setOpening(OPENING_DEFAULT);
                           markDirty();
@@ -604,14 +605,14 @@ export function SubsetPage(): React.ReactElement | null {
                       setOpening(v);
                       markDirty();
                     }}
-                    disabled={locked || isBusy}
+                    disabled={locked || !isOwn || isBusy}
                   />
                 </div>
               </CollapsibleContent>
             </Collapsible>
           </div>
 
-          {!locked && (
+          {!locked && isOwn && (
             <div className="flex flex-wrap items-center gap-3 pt-4">
               <Button
                 onClick={() => void handleSave()}
