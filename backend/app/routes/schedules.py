@@ -5,6 +5,7 @@ from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.user import User
 from app.services import schedule as schedule_svc
+from app.services import schedule_participation as participation_svc
 
 schedules_bp = Blueprint("schedules", __name__, url_prefix="/schedules")
 
@@ -110,6 +111,59 @@ def get_schedule_insights(schedule_id: int) -> tuple[Response, int] | Response:
     except PermissionError as e:
         return jsonify({"error": str(e)}), 403
     return jsonify({"data": data})
+
+
+@schedules_bp.get("/<int:schedule_id>/participations/me")
+@login_required
+def get_my_participation_for_schedule(schedule_id: int) -> tuple[Response, int] | Response:
+    participation = participation_svc.get_my_participation_for_schedule(
+        schedule_id, session["user_id"]
+    )
+    if participation is None:
+        return jsonify({"error": "Not enrolled."}), 404
+    return jsonify({
+        "id": participation.id,
+        "scheduleId": participation.schedule_id,
+        "status": participation.status,
+        "startedAt": participation.started_at.isoformat(),
+        "completedAt": participation.completed_at.isoformat() if participation.completed_at else None,
+        "abortedAt": participation.aborted_at.isoformat() if participation.aborted_at else None,
+    })
+
+
+@schedules_bp.get("/<int:schedule_id>/participations")
+@login_required
+def get_schedule_participants(schedule_id: int) -> tuple[Response, int] | Response:
+    try:
+        result = participation_svc.get_schedule_participants(schedule_id, session["user_id"])
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    return jsonify(result)
+
+
+@schedules_bp.get("/<int:schedule_id>/participation-insights")
+@login_required
+def get_participation_insights(schedule_id: int) -> tuple[Response, int] | Response:
+    runs_raw = request.args.get("runs", "")
+    participants_raw = request.args.get("participants", "")
+    try:
+        run_indices = [int(r) for r in runs_raw.split(",") if r.strip()] if runs_raw else []
+        participant_ids = (
+            [int(p) for p in participants_raw.split(",") if p.strip()]
+            if participants_raw
+            else []
+        )
+    except ValueError:
+        return jsonify({"error": "Invalid runs or participants parameter."}), 400
+    try:
+        result = participation_svc.get_participation_insights(
+            schedule_id, session["user_id"], run_indices, participant_ids
+        )
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify(result)
 
 
 @schedules_bp.post("/<int:schedule_id>/lock")

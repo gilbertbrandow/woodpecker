@@ -1,0 +1,108 @@
+from flask import Blueprint, Response, jsonify, request, session
+
+from app.decorators import login_required
+from app.services import schedule_participation as participation_svc
+
+participations_bp = Blueprint("participations", __name__, url_prefix="/participations")
+
+
+@participations_bp.post("")
+@login_required
+def create_participation() -> tuple[Response, int]:
+    data: dict[str, object] = request.get_json(silent=True) or {}
+    schedule_id_raw = data.get("scheduleId")
+    if not isinstance(schedule_id_raw, int):
+        return jsonify({"error": "scheduleId must be an integer"}), 400
+    try:
+        participation = participation_svc.create_participation(session["user_id"], schedule_id_raw)
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    except ValueError as e:
+        status_code = 409 if "Already enrolled" in str(e) else 400
+        return jsonify({"error": str(e)}), status_code
+    return jsonify(participation_svc.participation_full_dict(participation)), 201
+
+
+@participations_bp.get("")
+@login_required
+def list_my_participations() -> Response:
+    return jsonify(participation_svc.list_my_participations(session["user_id"]))
+
+
+@participations_bp.get("/all")
+@login_required
+def list_all_participations() -> Response:
+    schedule_id_raw = request.args.get("scheduleId")
+    schedule_id = int(schedule_id_raw) if schedule_id_raw is not None else None
+    return jsonify(participation_svc.list_all_participations(schedule_id))
+
+
+@participations_bp.get("/<int:participation_id>")
+@login_required
+def get_participation(participation_id: int) -> tuple[Response, int] | Response:
+    try:
+        participation = participation_svc.get_participation(participation_id, session["user_id"])
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    try:
+        result = participation_svc.participation_full_dict(participation)
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    return jsonify(result)
+
+
+@participations_bp.put("/<int:participation_id>/run-targets/<int:run_index>")
+@login_required
+def set_run_target(participation_id: int, run_index: int) -> tuple[Response, int] | Response:
+    data: dict[str, object] = request.get_json(silent=True) or {}
+    target_accuracy_raw = data.get("targetAccuracy")
+    target_solve_seconds_raw = data.get("targetSolveSeconds")
+
+    if target_accuracy_raw is not None and not isinstance(target_accuracy_raw, (int, float)):
+        return jsonify({"error": "targetAccuracy must be a number or null"}), 400
+    if target_solve_seconds_raw is not None and not isinstance(target_solve_seconds_raw, int):
+        return jsonify({"error": "targetSolveSeconds must be an integer or null"}), 400
+
+    target_accuracy = float(target_accuracy_raw) if target_accuracy_raw is not None else None
+
+    try:
+        target = participation_svc.set_run_target(
+            participation_id,
+            session["user_id"],
+            run_index,
+            target_accuracy,
+            target_solve_seconds_raw if isinstance(target_solve_seconds_raw, int) else None,
+        )
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    return jsonify({
+        "runIndex": target.run_index,
+        "targetAccuracy": target.target_accuracy,
+        "targetSolveSeconds": target.target_solve_seconds,
+    })
+
+
+@participations_bp.post("/<int:participation_id>/abort")
+@login_required
+def abort_participation(participation_id: int) -> tuple[Response, int] | Response:
+    try:
+        participation = participation_svc.abort_participation(participation_id, session["user_id"])
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    except ValueError as e:
+        status_code = 409 if "terminal" in str(e) else 400
+        return jsonify({"error": str(e)}), status_code
+    try:
+        result = participation_svc.participation_full_dict(participation)
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    return jsonify(result)

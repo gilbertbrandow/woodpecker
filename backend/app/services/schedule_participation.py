@@ -1,0 +1,315 @@
+from datetime import datetime, timezone
+from typing import cast
+
+import sqlalchemy as sa
+
+from app.extensions import db
+from app.models.schedule import Schedule
+from app.models.schedule_participation import ParticipationRunTarget, ScheduleParticipation
+from app.models.subset import Subset
+from app.models.user import User
+
+
+def _compute_total_hours(config: dict[str, object]) -> int:
+    runs_raw = config.get("runs")
+    if not isinstance(runs_raw, list):
+        return 0
+    total = 0
+    for run_item in runs_raw:
+        if not isinstance(run_item, dict):
+            continue
+        run = cast(dict[str, object], run_item)
+        target = run.get("target_hours")
+        break_after = run.get("break_after_hours")
+        total += (target if isinstance(target, int) else 0) + (
+            break_after if isinstance(break_after, int) else 0
+        )
+    return total
+
+
+def _get_owned_participation(participation_id: int, user_id: int) -> ScheduleParticipation:
+    participation = db.session.get(ScheduleParticipation, participation_id)
+    if participation is None:
+        raise LookupError("Participation not found.")
+    if participation.user_id != user_id:
+        raise PermissionError("Access denied.")
+    return participation
+
+
+def participation_full_dict(participation: ScheduleParticipation) -> dict[str, object]:
+    schedule = db.session.get(Schedule, participation.schedule_id)
+    if schedule is None:
+        raise LookupError("Schedule not found.")
+    subset = db.session.get(Subset, schedule.subset_id)
+    if subset is None:
+        raise LookupError("Subset not found.")
+    creator = db.session.get(User, schedule.user_id)
+    if creator is None:
+        raise LookupError("Schedule creator not found.")
+
+    config = schedule.config if isinstance(schedule.config, dict) else {}
+    runs_raw = config.get("runs")
+    run_count = len(runs_raw) if isinstance(runs_raw, list) else 0
+    order_raw = config.get("puzzle_order")
+    puzzle_order = order_raw if isinstance(order_raw, str) else None
+    total_hours = _compute_total_hours(config)
+
+    puzzle_count = (
+        subset.locked_puzzle_count
+        if subset.locked_puzzle_count is not None
+        else subset.puzzle_count
+    ) or 0
+
+    run_targets: list[dict[str, object]] = [
+        {
+            "runIndex": rt.run_index,
+            "targetAccuracy": rt.target_accuracy,
+            "targetSolveSeconds": rt.target_solve_seconds,
+        }
+        for rt in sorted(participation.run_targets, key=lambda t: t.run_index)
+    ]
+
+    return {
+        "id": participation.id,
+        "scheduleId": participation.schedule_id,
+        "status": participation.status,
+        "startedAt": participation.started_at.isoformat(),
+        "completedAt": participation.completed_at.isoformat() if participation.completed_at else None,
+        "abortedAt": participation.aborted_at.isoformat() if participation.aborted_at else None,
+        "runTargets": run_targets,
+        "schedule": {
+            "id": schedule.id,
+            "name": schedule.name,
+            "description": schedule.description,
+            "status": schedule.status,
+            "totalHours": total_hours,
+            "runCount": run_count,
+            "puzzleOrder": puzzle_order,
+            "createdBy": {
+                "username": creator.lichess_username,
+                "avatarUrl": creator.avatar_url,
+            },
+            "subset": {
+                "id": subset.id,
+                "name": subset.name,
+                "puzzleCount": puzzle_count,
+            },
+        },
+    }
+
+
+def create_participation(user_id: int, schedule_id: int) -> ScheduleParticipation:
+    schedule = db.session.get(Schedule, schedule_id)
+    if schedule is None:
+        raise LookupError("Schedule not found.")
+    if schedule.status != "locked":
+        raise ValueError("Schedule must be locked before enrolling.")
+
+    existing = db.session.scalar(
+        sa.select(ScheduleParticipation).where(
+            ScheduleParticipation.schedule_id == schedule_id,
+            ScheduleParticipation.user_id == user_id,
+        )
+    )
+    if existing is not None:
+        raise ValueError("Already enrolled in this schedule.")
+
+    participation = ScheduleParticipation(
+        user_id=user_id,
+        schedule_id=schedule_id,
+        status="draft",
+    )
+    db.session.add(participation)
+    db.session.commit()
+    return participation
+
+
+def get_participation(participation_id: int, user_id: int) -> ScheduleParticipation:
+    return _get_owned_participation(participation_id, user_id)
+
+
+def list_my_participations(user_id: int) -> list[dict[str, object]]:
+    rows = db.session.execute(
+        sa.text("""
+            SELECT sp.id, sp.schedule_id, sp.status,
+                   sp.started_at, sp.completed_at, sp.aborted_at,
+                   s.name AS schedule_name, s.subset_id, s.config
+            FROM schedule_participations sp
+            JOIN schedules s ON s.id = sp.schedule_id
+            WHERE sp.user_id = :uid
+            ORDER BY sp.started_at DESC
+        """),
+        {"uid": user_id},
+    ).all()
+
+    result: list[dict[str, object]] = []
+    for row in rows:
+        config: dict[str, object] = row.config if isinstance(row.config, dict) else {}
+        runs_raw = config.get("runs")
+        total_runs = len(runs_raw) if isinstance(runs_raw, list) else 0
+        result.append({
+            "id": row.id,
+            "scheduleId": row.schedule_id,
+            "scheduleName": row.schedule_name,
+            "subsetId": row.subset_id,
+            "status": row.status,
+            "runsCompleted": 0,
+            "totalRuns": total_runs,
+            "startedAt": row.started_at.isoformat(),
+            "completedAt": row.completed_at.isoformat() if row.completed_at else None,
+            "abortedAt": row.aborted_at.isoformat() if row.aborted_at else None,
+        })
+    return result
+
+
+def set_run_target(
+    participation_id: int,
+    user_id: int,
+    run_index: int,
+    target_accuracy: float | None,
+    target_solve_seconds: int | None,
+) -> ParticipationRunTarget:
+    participation = _get_owned_participation(participation_id, user_id)
+
+    schedule = db.session.get(Schedule, participation.schedule_id)
+    if schedule is None:
+        raise LookupError("Schedule not found.")
+    config = schedule.config if isinstance(schedule.config, dict) else {}
+    runs_raw = config.get("runs")
+    run_count = len(runs_raw) if isinstance(runs_raw, list) else 0
+    if run_index < 0 or run_index >= run_count:
+        raise ValueError(f"run_index must be between 0 and {run_count - 1}.")
+
+    if target_accuracy is not None and not (0.0 <= target_accuracy <= 100.0):
+        raise ValueError("targetAccuracy must be between 0 and 100.")
+    if target_solve_seconds is not None and target_solve_seconds < 1:
+        raise ValueError("targetSolveSeconds must be at least 1.")
+
+    target = db.session.get(ParticipationRunTarget, (participation_id, run_index))
+    if target is None:
+        target = ParticipationRunTarget(
+            participation_id=participation_id,
+            run_index=run_index,
+        )
+        db.session.add(target)
+    target.target_accuracy = target_accuracy
+    target.target_solve_seconds = target_solve_seconds
+    db.session.commit()
+    return target
+
+
+def abort_participation(participation_id: int, user_id: int) -> ScheduleParticipation:
+    participation = _get_owned_participation(participation_id, user_id)
+    if participation.status in ("completed", "aborted"):
+        raise ValueError("Participation is already terminal.")
+    participation.status = "aborted"
+    participation.aborted_at = datetime.now(timezone.utc)
+    db.session.commit()
+    return participation
+
+
+def list_all_participations(schedule_id: int | None = None) -> list[dict[str, object]]:
+    where = "WHERE sp.schedule_id = :sid" if schedule_id is not None else ""
+    rows = db.session.execute(
+        sa.text(f"""
+            SELECT sp.id, sp.schedule_id, sp.status,
+                   sp.started_at, sp.completed_at, sp.aborted_at,
+                   s.name AS schedule_name, s.subset_id, s.config,
+                   u.lichess_username, u.avatar_url
+            FROM schedule_participations sp
+            JOIN schedules s ON s.id = sp.schedule_id
+            JOIN users u ON u.id = sp.user_id
+            {where}
+            ORDER BY sp.started_at DESC
+        """),
+        {"sid": schedule_id} if schedule_id is not None else {},
+    ).all()
+
+    result: list[dict[str, object]] = []
+    for row in rows:
+        config: dict[str, object] = row.config if isinstance(row.config, dict) else {}
+        runs_raw = config.get("runs")
+        total_runs = len(runs_raw) if isinstance(runs_raw, list) else 0
+        result.append({
+            "id": row.id,
+            "scheduleId": row.schedule_id,
+            "scheduleName": row.schedule_name,
+            "subsetId": row.subset_id,
+            "status": row.status,
+            "runsCompleted": 0,
+            "totalRuns": total_runs,
+            "startedAt": row.started_at.isoformat(),
+            "completedAt": row.completed_at.isoformat() if row.completed_at else None,
+            "abortedAt": row.aborted_at.isoformat() if row.aborted_at else None,
+            "user": {
+                "username": row.lichess_username,
+                "avatarUrl": row.avatar_url,
+            },
+        })
+    return result
+
+
+def get_my_participation_for_schedule(
+    schedule_id: int, user_id: int
+) -> ScheduleParticipation | None:
+    return db.session.scalar(
+        sa.select(ScheduleParticipation).where(
+            ScheduleParticipation.schedule_id == schedule_id,
+            ScheduleParticipation.user_id == user_id,
+        )
+    )
+
+
+def get_schedule_participants(
+    schedule_id: int, user_id: int
+) -> dict[str, object]:
+    my_participation = get_my_participation_for_schedule(schedule_id, user_id)
+    if my_participation is None:
+        raise PermissionError("You are not enrolled in this schedule.")
+
+    rows = db.session.execute(
+        sa.text("""
+            SELECT sp.id, sp.started_at, u.lichess_username, u.avatar_url
+            FROM schedule_participations sp
+            JOIN users u ON u.id = sp.user_id
+            WHERE sp.schedule_id = :sid
+            ORDER BY sp.started_at ASC
+        """),
+        {"sid": schedule_id},
+    ).all()
+
+    participants: list[dict[str, object]] = [
+        {
+            "id": row.id,
+            "username": row.lichess_username,
+            "avatarUrl": row.avatar_url,
+            "startedAt": row.started_at.isoformat(),
+        }
+        for row in rows
+    ]
+    return {"count": len(participants), "participants": participants}
+
+
+def get_participation_insights(
+    schedule_id: int,
+    user_id: int,
+    run_indices: list[int],
+    participant_ids: list[int],
+) -> dict[str, object]:
+    my_participation = get_my_participation_for_schedule(schedule_id, user_id)
+    if my_participation is None:
+        raise PermissionError("You are not enrolled in this schedule.")
+
+    if participant_ids:
+        enrolled_ids = list(
+            db.session.scalars(
+                sa.select(ScheduleParticipation.id).where(
+                    ScheduleParticipation.id.in_(participant_ids),
+                    ScheduleParticipation.schedule_id == schedule_id,
+                )
+            ).all()
+        )
+        if len(enrolled_ids) != len(set(participant_ids)):
+            raise ValueError("Some participant ids do not belong to this schedule.")
+
+    return {"datapoints": []}
