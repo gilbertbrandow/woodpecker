@@ -238,9 +238,6 @@ export function SchedulePage(): React.ReactElement | null {
   const puzzleCount = subset?.puzzleCount ?? 0;
   const runDays = runs.map((r) => Math.max(1, Math.round(r.target_hours / 24)));
   const totalActiveDays = runDays.reduce((s, d) => s + d, 0);
-  const totalScheduleDays =
-    totalActiveDays +
-    runs.reduce((s, r) => s + Math.round(r.break_after_hours / 24), 0);
   const totalAttempts = puzzleCount * runs.length;
   const peakPuzzlesPerDay =
     puzzleCount > 0 && runDays.length > 0
@@ -892,10 +889,10 @@ export function SchedulePage(): React.ReactElement | null {
                           : "rotate(0deg)",
                       }}
                     />
-                    Participants
+                    Used by
                   </span>
                   <span className="hidden text-xs text-muted-foreground sm:block">
-                    Users participating in this schedule
+                    Users who have used this schedule
                   </span>
                 </button>
               </CollapsibleTrigger>
@@ -903,7 +900,7 @@ export function SchedulePage(): React.ReactElement | null {
                 <div className="pt-4">
                   {/* TODO: Populate with ScheduleParticipation data once that model is implemented */}
                   <p className="text-sm text-muted-foreground">
-                    No participants yet.
+                    No users yet.
                   </p>
                 </div>
               </CollapsibleContent>
