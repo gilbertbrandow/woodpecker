@@ -46,6 +46,9 @@ def participation_full_dict(participation: ScheduleParticipation) -> dict[str, o
     creator = db.session.get(User, schedule.user_id)
     if creator is None:
         raise LookupError("Schedule creator not found.")
+    owner = db.session.get(User, participation.user_id)
+    if owner is None:
+        raise LookupError("Participation owner not found.")
 
     config = schedule.config if isinstance(schedule.config, dict) else {}
     runs_raw = config.get("runs")
@@ -76,6 +79,7 @@ def participation_full_dict(participation: ScheduleParticipation) -> dict[str, o
         "startedAt": participation.started_at.isoformat(),
         "completedAt": participation.completed_at.isoformat() if participation.completed_at else None,
         "abortedAt": participation.aborted_at.isoformat() if participation.aborted_at else None,
+        "ownerUsername": owner.lichess_username,
         "runTargets": run_targets,
         "schedule": {
             "id": schedule.id,
@@ -84,6 +88,7 @@ def participation_full_dict(participation: ScheduleParticipation) -> dict[str, o
             "status": schedule.status,
             "totalHours": total_hours,
             "runCount": run_count,
+            "runs": runs_raw if isinstance(runs_raw, list) else [],
             "puzzleOrder": puzzle_order,
             "createdBy": {
                 "username": creator.lichess_username,
@@ -124,8 +129,11 @@ def create_participation(user_id: int, schedule_id: int) -> ScheduleParticipatio
     return participation
 
 
-def get_participation(participation_id: int, user_id: int) -> ScheduleParticipation:
-    return _get_owned_participation(participation_id, user_id)
+def get_participation(participation_id: int) -> ScheduleParticipation:
+    participation = db.session.get(ScheduleParticipation, participation_id)
+    if participation is None:
+        raise LookupError("Participation not found.")
+    return participation
 
 
 def list_my_participations(user_id: int) -> list[dict[str, object]]:

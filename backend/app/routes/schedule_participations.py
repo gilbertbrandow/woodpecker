@@ -41,11 +41,9 @@ def list_all_participations() -> Response:
 @login_required
 def get_participation(participation_id: int) -> tuple[Response, int] | Response:
     try:
-        participation = participation_svc.get_participation(participation_id, session["user_id"])
+        participation = participation_svc.get_participation(participation_id)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
-    except PermissionError as e:
-        return jsonify({"error": str(e)}), 403
     try:
         result = participation_svc.participation_full_dict(participation)
     except LookupError as e:
