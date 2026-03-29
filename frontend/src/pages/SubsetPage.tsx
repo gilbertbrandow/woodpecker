@@ -484,8 +484,8 @@ export function SubsetPage(): React.ReactElement | null {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <TabsList>
+        <div className="flexflex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <TabsList className="mb-6">
             <TabsTrigger value="configuration">Configuration</TabsTrigger>
             <TabsTrigger value="insights">Insights</TabsTrigger>
           </TabsList>
@@ -565,8 +565,6 @@ export function SubsetPage(): React.ReactElement | null {
             </div>
           )}
         </div>
-        <Separator className="mb-6 mt-3" />
-
         <TabsContent value="configuration">
           {!locked && isOwn && (
             <div className="flex flex-col gap-3 pb-5">

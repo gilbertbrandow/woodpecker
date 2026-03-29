@@ -12,6 +12,9 @@ import {
   type PuzzleOrder,
   type Subset,
   type ScheduleInsightPoint,
+  type MyScheduleParticipation,
+  type ParticipationStatus,
+  type AllParticipationSummary,
 } from "../lib/api";
 import { AreaChart, Area, XAxis, YAxis } from "recharts";
 import {
@@ -25,14 +28,9 @@ import {
   TabsTrigger,
   TabsContent,
 } from "../components/ui/tabs";
-import { parseAvatarValue } from "../lib/avatar";
-import { DefaultAvatar } from "../components/DefaultAvatar";
-import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from "../components/ui/tooltip";
+import { UserAvatar } from "../components/UserAvatar";
+import { ProgressBar } from "../components/ProgressBar";
+import { ParticipationsTable } from "../components/participations/ParticipationsTable";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
@@ -69,6 +67,21 @@ import { formatNumber } from "../lib/utils";
 
 const MAX_RUNS = 20;
 
+const PARTICIPATION_STATUS_LABELS: Record<ParticipationStatus, string> = {
+  draft: "Not started",
+  in_progress: "In progress",
+  completed: "Completed",
+  aborted: "Aborted",
+};
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 const INSIGHTS_CONFIG: ChartConfig = {
   puzzlesPerDay: { label: "Puzzles / day", color: "hsl(var(--chart-1))" },
 };
@@ -93,6 +106,7 @@ function buildConfig(
         : { mode: "none" },
   };
 }
+
 
 function SectionTrigger({
   title,
@@ -146,6 +160,10 @@ export function SchedulePage(): React.ReactElement | null {
   const [orderOpen, setOrderOpen] = useState(true);
   const [repetitionOpen, setRepetitionOpen] = useState(true);
 
+  const [myParticipation, setMyParticipation] = useState<MyScheduleParticipation | null | undefined>(undefined)
+  const [enrolling, setEnrolling] = useState(false)
+  const [scheduleParticipations, setScheduleParticipations] = useState<AllParticipationSummary[] | null>(null)
+
   const [activeTab, setActiveTab] = useState("configuration");
   const [insightsData, setInsightsData] = useState<ScheduleInsightPoint[] | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
@@ -177,6 +195,10 @@ export function SchedulePage(): React.ReactElement | null {
           setOrderOpen(false);
           setRepetitionOpen(false);
           setActiveTab("insights");
+          api.schedules
+            .getMyParticipation(s.id)
+            .then((p) => setMyParticipation(p))
+            .catch(() => setMyParticipation(null));
         }
         return api.subsets.get(s.subsetId);
       })
@@ -192,6 +214,14 @@ export function SchedulePage(): React.ReactElement | null {
   useEffect(() => {
     setChartsReady(true);
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== "insights" || scheduleParticipations !== null || !user) return;
+    api.participations
+      .listAll(id)
+      .then(setScheduleParticipations)
+      .catch(() => {});
+  }, [activeTab, id, user, scheduleParticipations]);
 
   useEffect(() => {
     if (activeTab !== "insights" || insightsData !== null || !user) return;
@@ -245,6 +275,27 @@ export function SchedulePage(): React.ReactElement | null {
       : 0;
 
   const markDirty = (): void => setIsDirty(true);
+
+  const handleEnroll = async (): Promise<void> => {
+    setEnrolling(true);
+    try {
+      const participation = await api.participations.create(id);
+      void navigate({
+        to: "/app/participations/$participationId",
+        params: { participationId: String(participation.id) },
+      });
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("409")) {
+        const p = await api.schedules.getMyParticipation(id);
+        setMyParticipation(p);
+      } else {
+        const msg = err instanceof Error ? err.message : "Please try again.";
+        toast.error("Enroll failed", { description: msg });
+      }
+    } finally {
+      setEnrolling(false);
+    }
+  };
 
   const handleDelete = async (): Promise<void> => {
     try {
@@ -429,40 +480,7 @@ export function SchedulePage(): React.ReactElement | null {
               })
             }
           >
-            <div onClick={(e) => e.stopPropagation()}>
-              {(() => {
-                const av = parseAvatarValue(subset.ownedBy.avatarUrl);
-                const avatar =
-                  av.type === "custom" ? (
-                    <Avatar className="h-6 w-6 shrink-0">
-                      <AvatarImage src={av.url} alt={subset.ownedBy.username} />
-                      <AvatarFallback>
-                        <DefaultAvatar
-                          username={subset.ownedBy.username}
-                          className="h-6 w-6"
-                        />
-                      </AvatarFallback>
-                    </Avatar>
-                  ) : (
-                    <DefaultAvatar
-                      username={subset.ownedBy.username}
-                      piece={av.type === "default" ? av.piece : undefined}
-                      color={av.type === "default" ? av.color : undefined}
-                      className="h-6 w-6 shrink-0 text-[10px]"
-                    />
-                  );
-                return (
-                  <Tooltip delayDuration={100}>
-                    <TooltipTrigger asChild>
-                      <span className="inline-flex cursor-default">
-                        {avatar}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>{subset.ownedBy.username}</TooltipContent>
-                  </Tooltip>
-                );
-              })()}
-            </div>
+            <UserAvatar username={subset.ownedBy.username} avatarUrl={subset.ownedBy.avatarUrl} />
             <span className="flex-1 font-medium">{subset.name}</span>
             <Badge variant="outline" className="capitalize text-xs">
               {subset.status}
@@ -480,6 +498,52 @@ export function SchedulePage(): React.ReactElement | null {
               </span>
             )}
           </div>
+        </div>
+      )}
+
+      {locked && (
+        <div className="mb-6 rounded-lg border bg-card">
+          <div className="border-b px-4 py-2.5">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              My Training
+            </span>
+          </div>
+
+          {myParticipation === undefined ? (
+            <div className="px-4 py-3">
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            </div>
+          ) : myParticipation === null ? (
+            <div className="flex items-center gap-3 px-4 py-3">
+              <p className="flex-1 text-sm text-muted-foreground">
+                You are not training this schedule.
+              </p>
+              <Button size="sm" onClick={() => void handleEnroll()} disabled={enrolling}>
+                {enrolling ? "Starting…" : "Start training"}
+              </Button>
+            </div>
+          ) : (
+            <div
+              className="flex cursor-pointer items-center gap-6 px-4 py-3 transition-colors hover:bg-muted/50"
+              onClick={() =>
+                void navigate({
+                  to: "/app/participations/$participationId",
+                  params: { participationId: String(myParticipation.id) },
+                })
+              }
+            >
+              <UserAvatar username={user.username} avatarUrl={user.avatarUrl} className="h-7 w-7" />
+              <ProgressBar value={65} tooltipLabel="3/5 Runs, 67% completed" className="w-40" />
+              <div className="flex flex-1 items-center justify-end gap-4">
+                <Badge variant="outline" className="text-xs">
+                  {PARTICIPATION_STATUS_LABELS[myParticipation.status]}
+                </Badge>
+                <span className="hidden text-xs text-muted-foreground sm:block">
+                  {formatDate(myParticipation.startedAt)}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -892,16 +956,17 @@ export function SchedulePage(): React.ReactElement | null {
                     Used by
                   </span>
                   <span className="hidden text-xs text-muted-foreground sm:block">
-                    Users who have used this schedule
+                    Users who trained with this schedule
                   </span>
                 </button>
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="pt-4">
-                  {/* TODO: Populate with ScheduleParticipation data once that model is implemented */}
-                  <p className="text-sm text-muted-foreground">
-                    No users yet.
-                  </p>
+                  {scheduleParticipations === null ? (
+                    <p className="text-sm text-muted-foreground">Loading…</p>
+                  ) : (
+                    <ParticipationsTable participations={scheduleParticipations} hideSchedule />
+                  )}
                 </div>
               </CollapsibleContent>
             </Collapsible>

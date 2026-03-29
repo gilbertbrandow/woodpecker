@@ -2,10 +2,7 @@ import * as React from 'react'
 import { useState, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { ArrowUpDown, ArrowUp, ArrowDown, Loader2, Trash2 } from 'lucide-react'
-import { parseAvatarValue } from '../../lib/avatar'
-import { DefaultAvatar } from '../DefaultAvatar'
-import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar'
-import { Tooltip, TooltipTrigger, TooltipContent } from '../ui/tooltip'
+import { UserAvatar } from '../UserAvatar'
 import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
 import {
@@ -39,32 +36,6 @@ type SubsetsTableProps = {
   onDelete: (subset: Subset) => void
 }
 
-function CreatorAvatar({ username, avatarUrl }: { username: string; avatarUrl: string | null }): React.ReactElement {
-  const avatarValue = parseAvatarValue(avatarUrl)
-  const avatar = avatarValue.type === 'custom' ? (
-    <Avatar className="h-6 w-6 shrink-0">
-      <AvatarImage src={avatarValue.url} alt={`${username}'s avatar`} />
-      <AvatarFallback>
-        <DefaultAvatar username={username} className="h-6 w-6" />
-      </AvatarFallback>
-    </Avatar>
-  ) : (
-    <DefaultAvatar
-      username={username}
-      piece={avatarValue.type === 'default' ? avatarValue.piece : undefined}
-      color={avatarValue.type === 'default' ? avatarValue.color : undefined}
-      className="h-6 w-6 text-[10px]"
-    />
-  )
-  return (
-    <Tooltip delayDuration={100}>
-      <TooltipTrigger asChild>
-        <span className="inline-flex cursor-default">{avatar}</span>
-      </TooltipTrigger>
-      <TooltipContent>{username}</TooltipContent>
-    </Tooltip>
-  )
-}
 
 function SortHead({
   label,
@@ -205,8 +176,8 @@ export function SubsetsTable({ subsets, currentUsername, deletingId, onDelete }:
                     className="cursor-pointer"
                     onClick={() => void navigate({ to: '/app/subsets/$subsetId', params: { subsetId: String(subset.id) } })}
                   >
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <CreatorAvatar username={subset.ownedBy.username} avatarUrl={subset.ownedBy.avatarUrl} />
+                    <TableCell>
+                      <UserAvatar username={subset.ownedBy.username} avatarUrl={subset.ownedBy.avatarUrl} />
                     </TableCell>
                     <TableCell className="font-medium">{subset.name}</TableCell>
                     <TableCell className="hidden md:table-cell">
@@ -220,7 +191,7 @@ export function SubsetsTable({ subsets, currentUsername, deletingId, onDelete }:
                     <TableCell className="hidden text-muted-foreground sm:table-cell">
                       {subset.lockedAt ? formatDate(subset.lockedAt) : formatDate(subset.createdAt)}
                     </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
+                    <TableCell>
                       {isOwn && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -229,6 +200,7 @@ export function SubsetsTable({ subsets, currentUsername, deletingId, onDelete }:
                               disabled={deletingId !== null}
                               className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
                               aria-label="Delete subset"
+                              onClick={(e) => e.stopPropagation()}
                             >
                               {deletingId === subset.id ? (
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />

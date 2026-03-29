@@ -150,6 +150,80 @@ export type ScheduleInsightPoint = {
   puzzlesPerDay: number
 }
 
+export type RunTarget = {
+  runIndex: number
+  targetAccuracy: number | null
+  targetSolveSeconds: number | null
+}
+
+export type ParticipationStatus = 'draft' | 'in_progress' | 'completed' | 'aborted'
+
+export type ParticipationScheduleSummary = {
+  id: number
+  name: string
+  description: string | null
+  status: 'locked'
+  totalHours: number
+  runCount: number
+  runs: { target_hours: number; break_after_hours: number }[]
+  puzzleOrder: PuzzleOrder | null
+  createdBy: { username: string; avatarUrl: string | null }
+  subset: { id: number; name: string; puzzleCount: number }
+}
+
+export type ScheduleParticipation = {
+  id: number
+  scheduleId: number
+  status: ParticipationStatus
+  startedAt: string
+  completedAt: string | null
+  abortedAt: string | null
+  ownerUsername: string
+  runTargets: RunTarget[]
+  schedule: ParticipationScheduleSummary
+}
+
+export type MyParticipationSummary = {
+  id: number
+  scheduleId: number
+  scheduleName: string
+  subsetId: number
+  status: ParticipationStatus
+  runsCompleted: number
+  totalRuns: number
+  startedAt: string
+  completedAt: string | null
+  abortedAt: string | null
+}
+
+export type AllParticipationSummary = MyParticipationSummary & {
+  user: { username: string; avatarUrl: string | null }
+}
+
+export type ParticipantInfo = {
+  id: number
+  username: string
+  avatarUrl: string | null
+  startedAt: string
+}
+
+export type InsightDatapoint = {
+  participationId: number
+  username: string
+  runIndex: number
+  accuracy: number
+  totalSolveSeconds: number
+}
+
+export type MyScheduleParticipation = {
+  id: number
+  scheduleId: number
+  status: ParticipationStatus
+  startedAt: string
+  completedAt: string | null
+  abortedAt: string | null
+}
+
 export type Schedule = {
   id: number
   name: string
@@ -224,6 +298,42 @@ export const api = {
     delete: (id: number): Promise<void> => request(`/schedules/${id}`, { method: 'DELETE' }),
     insights: (id: number): Promise<ScheduleInsightPoint[]> =>
       request<{ data: ScheduleInsightPoint[] }>(`/schedules/${id}/insights`).then((r) => r.data),
+    getMyParticipation: (scheduleId: number): Promise<MyScheduleParticipation | null> =>
+      request<MyScheduleParticipation>(`/schedules/${scheduleId}/participations/me`).catch(
+        (err: unknown) => {
+          if (err instanceof ApiError && err.status === 404) return null
+          throw err
+        },
+      ),
+    getParticipants: (id: number): Promise<{ count: number; participants: ParticipantInfo[] }> =>
+      request(`/schedules/${id}/participations`),
+    getParticipationInsights: (
+      id: number,
+      runs: number[],
+      participants: number[],
+    ): Promise<{ datapoints: InsightDatapoint[] }> =>
+      request(
+        `/schedules/${id}/participation-insights?runs=${runs.join(',')}&participants=${participants.join(',')}`,
+      ),
+  },
+  participations: {
+    create: (scheduleId: number): Promise<ScheduleParticipation> =>
+      request('/participations', { method: 'POST', body: JSON.stringify({ scheduleId }) }),
+    get: (id: number): Promise<ScheduleParticipation> => request(`/participations/${id}`),
+    listMine: (): Promise<MyParticipationSummary[]> => request('/participations'),
+    listAll: (scheduleId?: number): Promise<AllParticipationSummary[]> =>
+      request(`/participations/all${scheduleId !== undefined ? `?scheduleId=${scheduleId}` : ''}`),
+    setRunTarget: (
+      participationId: number,
+      runIndex: number,
+      target: { targetAccuracy: number | null; targetSolveSeconds: number | null },
+    ): Promise<RunTarget> =>
+      request(`/participations/${participationId}/run-targets/${runIndex}`, {
+        method: 'PUT',
+        body: JSON.stringify(target),
+      }),
+    abort: (participationId: number): Promise<ScheduleParticipation> =>
+      request(`/participations/${participationId}/abort`, { method: 'POST' }),
   },
   themes: {
     list: (): Promise<Theme[]> => request('/themes'),

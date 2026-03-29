@@ -2,10 +2,7 @@ import * as React from 'react'
 import { useState, useMemo } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { ArrowUpDown, ArrowUp, ArrowDown, Loader2, Trash2 } from 'lucide-react'
-import { parseAvatarValue } from '../../lib/avatar'
-import { DefaultAvatar } from '../DefaultAvatar'
-import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar'
-import { Tooltip, TooltipTrigger, TooltipContent } from '../ui/tooltip'
+import { UserAvatar } from '../UserAvatar'
 import { Badge } from '../ui/badge'
 import { Input } from '../ui/input'
 import {
@@ -40,32 +37,6 @@ type SchedulesTableProps = {
   onDelete: (schedule: ScheduleSummary) => void
 }
 
-function CreatorAvatar({ username, avatarUrl }: { username: string; avatarUrl: string | null }): React.ReactElement {
-  const avatarValue = parseAvatarValue(avatarUrl)
-  const avatar = avatarValue.type === 'custom' ? (
-    <Avatar className="h-6 w-6 shrink-0">
-      <AvatarImage src={avatarValue.url} alt={`${username}'s avatar`} />
-      <AvatarFallback>
-        <DefaultAvatar username={username} className="h-6 w-6" />
-      </AvatarFallback>
-    </Avatar>
-  ) : (
-    <DefaultAvatar
-      username={username}
-      piece={avatarValue.type === 'default' ? avatarValue.piece : undefined}
-      color={avatarValue.type === 'default' ? avatarValue.color : undefined}
-      className="h-6 w-6 text-[10px]"
-    />
-  )
-  return (
-    <Tooltip delayDuration={100}>
-      <TooltipTrigger asChild>
-        <span className="inline-flex cursor-default">{avatar}</span>
-      </TooltipTrigger>
-      <TooltipContent>{username}</TooltipContent>
-    </Tooltip>
-  )
-}
 
 function SortHead({
   label,
@@ -203,16 +174,17 @@ export function SchedulesTable({ schedules, currentUsername, deletingId, onDelet
                     className="cursor-pointer"
                     onClick={() => void navigate({ to: '/app/schedules/$scheduleId', params: { scheduleId: String(schedule.id) } })}
                   >
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <CreatorAvatar username={schedule.createdBy.username} avatarUrl={schedule.createdBy.avatarUrl} />
+                    <TableCell>
+                      <UserAvatar username={schedule.createdBy.username} avatarUrl={schedule.createdBy.avatarUrl} />
                     </TableCell>
                     <TableCell className="font-medium">{schedule.name}</TableCell>
-                    <TableCell className="hidden sm:table-cell" onClick={(e) => e.stopPropagation()}>
+                    <TableCell className="hidden sm:table-cell">
                       <Link
                         to="/app/subsets/$subsetId"
                         params={{ subsetId: String(schedule.subsetId) }}
                         className="text-sm text-muted-foreground hover:underline"
                         title={schedule.subsetName}
+                        onClick={(e) => e.stopPropagation()}
                       >
                         {schedule.subsetName.length > 8 ? `${schedule.subsetName.slice(0, 8)}…` : schedule.subsetName}
                       </Link>
@@ -231,7 +203,7 @@ export function SchedulesTable({ schedules, currentUsername, deletingId, onDelet
                     <TableCell className="hidden text-muted-foreground sm:table-cell">
                       {formatDate(schedule.lockedAt ?? schedule.createdAt)}
                     </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
+                    <TableCell>
                       {isOwn && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -240,6 +212,7 @@ export function SchedulesTable({ schedules, currentUsername, deletingId, onDelet
                               disabled={deletingId !== null}
                               className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
                               aria-label="Delete schedule"
+                              onClick={(e) => e.stopPropagation()}
                             >
                               {deletingId === schedule.id ? (
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />

@@ -4,9 +4,10 @@ import { useNavigate, Link } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../context/auth'
-import { api, type Subset, type ScheduleSummary } from '../lib/api'
+import { api, type Subset, type ScheduleSummary, type AllParticipationSummary } from '../lib/api'
 import { SubsetsTable } from '../components/subsets/SubsetsTable'
 import { SchedulesTable } from '../components/schedules/SchedulesTable'
+import { ParticipationsTable } from '../components/participations/ParticipationsTable'
 
 export function DashboardPage(): React.ReactElement | null {
   const { user, loading } = useAuth()
@@ -17,6 +18,8 @@ export function DashboardPage(): React.ReactElement | null {
   const [schedules, setSchedules] = useState<ScheduleSummary[]>([])
   const [schedulesLoading, setSchedulesLoading] = useState(true)
   const [deletingScheduleId, setDeletingScheduleId] = useState<number | null>(null)
+  const [participations, setParticipations] = useState<AllParticipationSummary[]>([])
+  const [participationsLoading, setParticipationsLoading] = useState(true)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -40,6 +43,17 @@ export function DashboardPage(): React.ReactElement | null {
       .then(setSchedules)
       .catch(() => toast.error('Failed to load schedules', { description: 'Could not fetch schedules.' }))
       .finally(() => setSchedulesLoading(false))
+  }, [user])
+
+  useEffect(() => {
+    if (!user) return
+    api.participations
+      .listAll()
+      .then(setParticipations)
+      .catch(() =>
+        toast.error('Failed to load training', { description: 'Could not fetch your training sessions.' }),
+      )
+      .finally(() => setParticipationsLoading(false))
   }, [user])
 
   const handleDeleteSchedule = async (schedule: ScheduleSummary): Promise<void> => {
@@ -128,6 +142,31 @@ export function DashboardPage(): React.ReactElement | null {
               deletingId={deletingScheduleId}
               onDelete={(s) => void handleDeleteSchedule(s)}
             />
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-lg border bg-card">
+        <div className="flex items-center justify-between border-b px-6 py-4">
+          <h1 className="text-base font-semibold">Training</h1>
+          <Link
+            to="/app/participations/new"
+            className="inline-flex h-8 items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            New training
+          </Link>
+        </div>
+
+        <div className="p-6">
+          {participationsLoading ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : participations.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              You have not started any training yet.
+            </p>
+          ) : (
+            <ParticipationsTable participations={participations} />
           )}
         </div>
       </div>
