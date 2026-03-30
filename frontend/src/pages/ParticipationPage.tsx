@@ -9,8 +9,6 @@ import {
   type ScheduleParticipation,
   type RunTarget,
   type ParticipationStatus,
-  type ParticipantInfo,
-  type InsightDatapoint,
 } from '../lib/api'
 import {
   Breadcrumb,
@@ -198,12 +196,6 @@ export function ParticipationPage(): React.ReactElement | null {
   const [pageLoading, setPageLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('configure')
 
-  const [participants, setParticipants] = useState<ParticipantInfo[]>([])
-  const [participantsLoading, setParticipantsLoading] = useState(false)
-  const [selectedRuns, setSelectedRuns] = useState<number[]>([])
-  const [selectedParticipants, setSelectedParticipants] = useState<number[]>([])
-  const [insightsData, setInsightsData] = useState<InsightDatapoint[]>([])
-  const [insightsLoading, setInsightsLoading] = useState(false)
   const [progressOpen, setProgressOpen] = useState(true)
   const [statsOpen, setStatsOpen] = useState(true)
 
@@ -217,11 +209,7 @@ export function ParticipationPage(): React.ReactElement | null {
     if (!user) return
     api.participations
       .get(id)
-      .then((p) => {
-        setParticipation(p)
-        const allRuns = p.schedule.runCount
-        setSelectedRuns(Array.from({ length: allRuns }, (_, i) => i))
-      })
+      .then((p) => setParticipation(p))
       .catch(() =>
         toast.error('Failed to load participation', {
           description: 'Could not fetch training data.',
@@ -229,34 +217,6 @@ export function ParticipationPage(): React.ReactElement | null {
       )
       .finally(() => setPageLoading(false))
   }, [id, user])
-
-  useEffect(() => {
-    if (activeTab !== 'insights' || !participation || participantsLoading || participants.length > 0)
-      return
-    setParticipantsLoading(true)
-    api.schedules
-      .getParticipants(participation.scheduleId)
-      .then(({ participants: list }) => {
-        setParticipants(list)
-        setSelectedParticipants(list.map((p) => p.id))
-      })
-      .catch(() =>
-        toast.error('Failed to load participants', { description: 'Could not fetch participant list.' }),
-      )
-      .finally(() => setParticipantsLoading(false))
-  }, [activeTab, participation, participantsLoading, participants.length])
-
-  useEffect(() => {
-    if (!participation || selectedRuns.length === 0 || selectedParticipants.length === 0) return
-    setInsightsLoading(true)
-    api.schedules
-      .getParticipationInsights(participation.scheduleId, selectedRuns, selectedParticipants)
-      .then(({ datapoints }) => setInsightsData(datapoints))
-      .catch(() =>
-        toast.error('Failed to load insights', { description: 'Could not fetch chart data.' }),
-      )
-      .finally(() => setInsightsLoading(false))
-  }, [participation, selectedRuns, selectedParticipants])
 
   const handleTargetSaved = (runIndex: number, target: RunTarget): void => {
     setParticipation((prev) => {
@@ -289,18 +249,6 @@ export function ParticipationPage(): React.ReactElement | null {
 
   const isOwner = participation.ownerUsername === user.username
   const runsCompleted = 0
-
-  const toggleRun = (i: number): void => {
-    setSelectedRuns((prev) =>
-      prev.includes(i) ? prev.filter((r) => r !== i) : [...prev, i],
-    )
-  }
-
-  const toggleParticipant = (pid: number): void => {
-    setSelectedParticipants((prev) =>
-      prev.includes(pid) ? prev.filter((p) => p !== pid) : [...prev, pid],
-    )
-  }
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
@@ -419,37 +367,9 @@ export function ParticipationPage(): React.ReactElement | null {
                 </button>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <div className="pt-4">
-                  <div className="mb-1 hidden items-center gap-2 sm:flex">
-                    {Array.from({ length: schedule.runCount }, (_, i) => (
-                      <React.Fragment key={i}>
-                        {i > 0 && <div className="h-px flex-1 bg-border" />}
-                        <div
-                          className={`flex h-6 w-6 items-center justify-center rounded-full border-2 text-xs font-medium ${
-                            i < runsCompleted
-                              ? 'border-foreground bg-foreground text-background'
-                              : i === runsCompleted
-                                ? 'border-foreground bg-foreground text-background font-bold'
-                                : 'border-border bg-background text-muted-foreground'
-                          }`}
-                        >
-                          {i + 1}
-                        </div>
-                      </React.Fragment>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground sm:text-center">
-                    {runsCompleted} of {schedule.runCount} runs completed
-                  </p>
-                  <div className="mt-2 h-1.5 w-full rounded-full bg-muted sm:hidden">
-                    <div
-                      className="h-full rounded-full bg-foreground transition-all"
-                      style={{
-                        width: schedule.runCount > 0 ? `${(runsCompleted / schedule.runCount) * 100}%` : '0%',
-                      }}
-                    />
-                  </div>
-                </div>
+                <p className="pt-4 text-sm text-muted-foreground">
+                  Your overall progress through this training will be shown here — how far along you are across all runs.
+                </p>
               </CollapsibleContent>
             </Collapsible>
 
@@ -469,72 +389,9 @@ export function ParticipationPage(): React.ReactElement | null {
                 </button>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <div className="flex flex-col gap-4 pt-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-medium text-muted-foreground">Runs</span>
-                      <div className="flex flex-wrap gap-1">
-                        {Array.from({ length: schedule.runCount }, (_, i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => toggleRun(i)}
-                            className={`rounded border px-2 py-0.5 text-xs transition-colors ${
-                              selectedRuns.includes(i)
-                                ? 'border-foreground bg-foreground text-background'
-                                : 'border-border text-muted-foreground hover:border-foreground/50'
-                            }`}
-                          >
-                            Run {i + 1}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-medium text-muted-foreground">Participants</span>
-                      {participantsLoading ? (
-                        <p className="text-xs text-muted-foreground">Loading…</p>
-                      ) : (
-                        <div className="flex flex-wrap gap-1">
-                          {participants.map((p) => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => toggleParticipant(p.id)}
-                              className={`rounded border px-2 py-0.5 text-xs transition-colors ${
-                                selectedParticipants.includes(p.id)
-                                  ? 'border-foreground bg-foreground text-background'
-                                  : 'border-border text-muted-foreground hover:border-foreground/50'
-                              }`}
-                            >
-                              {p.username}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    {(['Accuracy — Bar', 'Accuracy — Line', 'Solve time — Bar', 'Solve time — Line'] as const).map(
-                      (label) => (
-                        <div key={label} className="rounded-md border p-4">
-                          <p className="mb-1 text-sm font-medium">{label}</p>
-                          {insightsLoading ? (
-                            <p className="text-xs text-muted-foreground">Loading…</p>
-                          ) : insightsData.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">
-                              No data yet — complete a run to see results.
-                            </p>
-                          ) : (
-                            <p className="text-xs text-muted-foreground">Chart coming soon.</p>
-                          )}
-                        </div>
-                      ),
-                    )}
-                  </div>
-                </div>
+                <p className="pt-4 text-sm text-muted-foreground">
+                  Stats from your completed runs will appear here — accuracy and solve time per run, comparable across runs and other participants.
+                </p>
               </CollapsibleContent>
             </Collapsible>
           </div>
