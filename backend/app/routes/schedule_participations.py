@@ -1,6 +1,7 @@
 from flask import Blueprint, Response, jsonify, request, session
 
 from app.decorators import login_required
+from app.services import run as run_svc
 from app.services import schedule_participation as participation_svc
 
 participations_bp = Blueprint("participations", __name__, url_prefix="/participations")
@@ -85,6 +86,33 @@ def set_run_target(participation_id: int, run_index: int) -> tuple[Response, int
         "targetAccuracy": target.target_accuracy,
         "targetSolveSeconds": target.target_solve_seconds,
     })
+
+
+@participations_bp.post("/<int:participation_id>/runs")
+@login_required
+def start_run(participation_id: int) -> tuple[Response, int]:
+    try:
+        run = run_svc.start_run(participation_id, session["user_id"])
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    except ValueError as e:
+        code = 409 if "active run" in str(e) else 400
+        return jsonify({"error": str(e)}), code
+    return jsonify(run_svc.run_dict(run)), 201
+
+
+@participations_bp.get("/<int:participation_id>/runs")
+@login_required
+def list_runs(participation_id: int) -> tuple[Response, int] | Response:
+    try:
+        runs = run_svc.list_runs(participation_id, session["user_id"])
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    return jsonify([run_svc.run_dict(r) for r in runs])
 
 
 @participations_bp.post("/<int:participation_id>/abort")
