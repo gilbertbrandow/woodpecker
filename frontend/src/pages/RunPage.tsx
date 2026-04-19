@@ -10,7 +10,7 @@ import {
   type RunPuzzleList,
   type ScheduleParticipation,
 } from '../lib/api'
-import { formatNumber, formatSolveTimeMs, formatStartedAt } from '../lib/utils'
+import { formatNumber, formatSolveTime, formatSolveTimeMs, formatStartedAt } from '../lib/utils'
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -27,7 +27,7 @@ import {
 } from '../components/ui/collapsible'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
-import { Input } from '../components/ui/input'
+import { Slider } from '../components/ui/slider'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,7 +44,6 @@ import {
   TableCell,
   TableRow,
 } from '../components/ui/table'
-import { SolveTimeInput } from '../components/schedules/SolveTimeInput'
 import { RunPuzzleTable } from '../components/runs/RunPuzzleTable'
 
 function InsightsTab({ run, puzzleList }: { run: Run; puzzleList: RunPuzzleList }): React.ReactElement {
@@ -201,40 +200,59 @@ function ConfigureTab({
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="flex flex-col gap-5 pt-5">
-            <div className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium">Accuracy</span>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  placeholder="—"
-                  value={accuracy ?? ''}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    setAccuracy(v === '' ? null : Math.min(100, Math.max(0, parseFloat(v))))
-                  }}
-                  disabled={!isActive || saving}
-                  className="h-8 w-20 text-sm tabular-nums"
-                />
-                <span className="text-sm text-muted-foreground">%</span>
+          <div className="flex flex-col gap-7 pt-5">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-medium">Accuracy</span>
+                  <span className="text-xs text-muted-foreground">
+                    % of puzzles solved on the first attempt without failures
+                  </span>
+                </div>
+                <span className="shrink-0 tabular-nums text-sm font-medium">
+                  {accuracy !== null ? `${accuracy} %` : '—'}
+                </span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Target percentage of puzzles solved on the first attempt without failures.
-              </p>
+              <Slider
+                min={0}
+                max={100}
+                step={1}
+                value={[accuracy ?? 0]}
+                onValueChange={([v]) => setAccuracy(v ?? 0)}
+                disabled={!isActive || saving}
+                className={accuracy === null ? 'opacity-40' : ''}
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>0%</span>
+                <span>100%</span>
+              </div>
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium">Solve time</span>
-              <SolveTimeInput
-                value={solveSeconds}
-                onChange={setSolveSeconds}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-medium">Solve time</span>
+                  <span className="text-xs text-muted-foreground">
+                    Target average time to solve each puzzle
+                  </span>
+                </div>
+                <span className="shrink-0 tabular-nums text-sm font-medium">
+                  {solveSeconds !== null ? `${formatSolveTime(solveSeconds)} m:s` : '—'}
+                </span>
+              </div>
+              <Slider
+                min={0}
+                max={600}
+                step={5}
+                value={[solveSeconds ?? 0]}
+                onValueChange={([v]) => setSolveSeconds(v ?? 0)}
                 disabled={!isActive || saving}
+                className={solveSeconds === null ? 'opacity-40' : ''}
               />
-              <p className="text-xs text-muted-foreground">
-                Target average time to solve each puzzle. Helps track speed across runs.
-              </p>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>0:00</span>
+                <span>10:00</span>
+              </div>
             </div>
 
             {isActive && (

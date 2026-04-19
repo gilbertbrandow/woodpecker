@@ -89,6 +89,7 @@ export function ParticipationPage(): React.ReactElement | null {
   const [runs, setRuns] = useState<Run[]>([])
   const [pageLoading, setPageLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('configure')
+  const [runsOpen, setRunsOpen] = useState(true)
   const [progressOpen, setProgressOpen] = useState(true)
   const [statsOpen, setStatsOpen] = useState(true)
   const [showAbortDialog, setShowAbortDialog] = useState(false)
@@ -261,11 +262,30 @@ export function ParticipationPage(): React.ReactElement | null {
         </TabsList>
 
         <TabsContent value="configure">
-          <div className="rounded-md border">
+          <Collapsible open={runsOpen} onOpenChange={setRunsOpen}>
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between border-b pb-2.5 text-left"
+              >
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  <ChevronDown
+                    className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
+                    style={{ transform: runsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                  />
+                  Runs{schedule.runCount > 0 ? ` (${schedule.runCount})` : ''}
+                </span>
+                <span className="hidden text-xs text-muted-foreground sm:block">
+                  All runs in this training session
+                </span>
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+          <div className="rounded-md border mt-6">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Run</TableHead>
+                  <TableHead className="w-10">#</TableHead>
                   <TableHead>Duration</TableHead>
                   <TableHead>Break</TableHead>
                   <TableHead>Status</TableHead>
@@ -293,19 +313,15 @@ export function ParticipationPage(): React.ReactElement | null {
                     : 'Not started yet'
 
                   return (
-                    <TableRow key={i}>
-                      <TableCell className="text-sm font-medium">
-                        {run !== null ? (
-                          <Link
-                            to="/app/runs/$runId"
-                            params={{ runId: String(run.id) }}
-                            className="underline-offset-2 hover:underline"
-                          >
-                            Run {i + 1}
-                          </Link>
-                        ) : (
-                          <span className="text-muted-foreground">Run {i + 1}</span>
-                        )}
+                    <TableRow
+                      key={i}
+                      className={run !== null ? 'cursor-pointer' : ''}
+                      onClick={() => {
+                        if (run !== null) void navigate({ to: '/app/runs/$runId', params: { runId: String(run.id) } })
+                      }}
+                    >
+                      <TableCell className="tabular-nums text-sm text-muted-foreground">
+                        {i + 1}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {formatDuration(runDef.target_hours)}
@@ -341,7 +357,7 @@ export function ParticipationPage(): React.ReactElement | null {
                               <Button
                                 size="sm"
                                 disabled={startingIndex !== null}
-                                onClick={() => void handleStartRun(i)}
+                                onClick={(e) => { e.stopPropagation(); void handleStartRun(i) }}
                                 className="bg-foreground text-background hover:bg-foreground/90"
                               >
                                 {starting ? 'Starting…' : 'Start run'}
@@ -351,7 +367,7 @@ export function ParticipationPage(): React.ReactElement | null {
                               <Button
                                 size="sm"
                                 className="bg-foreground text-background hover:bg-foreground/90"
-                                onClick={() => void navigate({ to: '/app/runs/$runId/solve', params: { runId: String(run.id) } })}
+                                onClick={(e) => { e.stopPropagation(); void navigate({ to: '/app/runs/$runId/solve', params: { runId: String(run.id) } }) }}
                               >
                                 Continue
                               </Button>
@@ -361,7 +377,7 @@ export function ParticipationPage(): React.ReactElement | null {
                                 size="sm"
                                 variant="outline"
                                 disabled={!prevCompleted || startingIndex !== null}
-                                onClick={() => void handleStartRun(i)}
+                                onClick={(e) => { e.stopPropagation(); void handleStartRun(i) }}
                               >
                                 {starting ? 'Starting…' : 'Restart'}
                               </Button>
@@ -374,7 +390,9 @@ export function ParticipationPage(): React.ReactElement | null {
                 })}
               </TableBody>
             </Table>
-          </div>
+            </div>
+            </CollapsibleContent>
+          </Collapsible>
         </TabsContent>
 
         <TabsContent value="insights">
