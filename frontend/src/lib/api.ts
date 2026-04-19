@@ -224,6 +224,48 @@ export type MyScheduleParticipation = {
   abortedAt: string | null
 }
 
+export type RunStatus = 'active' | 'completed' | 'aborted'
+
+export type PositionStatus =
+  | 'not_started'
+  | 'in_progress'
+  | 'will_be_retried'
+  | 'solved'
+  | 'solved_with_retries'
+  | 'failed'
+
+export type Run = {
+  id: number
+  participationId: number
+  runIndex: number
+  status: RunStatus
+  startedAt: string
+  completedAt: string | null
+  abortedAt: string | null
+  totalPuzzles: number
+  solvedCount: number
+  solvedWithRetriesCount: number
+  willBeRetriedCount: number
+  failedCount: number
+  inProgressCount: number
+  currentRunPuzzleId: number | null
+}
+
+export type RunPuzzleListItem = {
+  runPuzzleId: number
+  position: number
+  puzzleId: string
+  rating: number
+  positionStatus: PositionStatus
+  tryCount: number
+  bestSolveTimeMs: number | null
+}
+
+export type RunPuzzleList = {
+  maxTriesPerPuzzle: number
+  puzzles: RunPuzzleListItem[]
+}
+
 export type Schedule = {
   id: number
   name: string
@@ -341,5 +383,15 @@ export const api = {
   openings: {
     search: (q: string): Promise<Opening[]> =>
       request(`/openings?q=${encodeURIComponent(q)}`),
+  },
+  runs: {
+    start: (participationId: number): Promise<Run> =>
+      request(`/participations/${participationId}/runs`, { method: 'POST' }),
+    list: (participationId: number): Promise<Run[]> =>
+      request(`/participations/${participationId}/runs`),
+    get: (runId: number): Promise<Run> => request(`/runs/${runId}`),
+    abort: (runId: number): Promise<Run> =>
+      request(`/runs/${runId}/abort`, { method: 'POST' }),
+    puzzles: (runId: number): Promise<RunPuzzleList> => request(`/runs/${runId}/puzzles`),
   },
 }

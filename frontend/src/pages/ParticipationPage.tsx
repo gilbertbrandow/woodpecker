@@ -6,8 +6,8 @@ import { ChevronDown } from 'lucide-react'
 import { useAuth } from '../context/auth'
 import {
   api,
+  type Run,
   type ScheduleParticipation,
-  type RunTarget,
   type ParticipationStatus,
 } from '../lib/api'
 import {
@@ -18,26 +18,36 @@ import {
   BreadcrumbSeparator,
   BreadcrumbPage,
 } from '../components/ui/breadcrumb'
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from '../components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
 import {
   Collapsible,
   CollapsibleTrigger,
   CollapsibleContent,
 } from '../components/ui/collapsible'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog'
 import { Button } from '../components/ui/button'
 import { UserAvatar } from '../components/UserAvatar'
 import { Badge } from '../components/ui/badge'
-import { Input } from '../components/ui/input'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../components/ui/table'
+import { ProgressBar } from '../components/ProgressBar'
 import { formatDuration } from '../components/schedules/DurationInput'
-import { SolveTimeInput } from '../components/schedules/SolveTimeInput'
-import { formatSolveTime } from '../lib/utils'
-
-type RunStatus = 'not_started' | 'in_progress' | 'completed'
+import { formatStartedAt } from '../lib/utils'
 
 const STATUS_LABELS: Record<ParticipationStatus, string> = {
   draft: 'Not started',
@@ -46,10 +56,11 @@ const STATUS_LABELS: Record<ParticipationStatus, string> = {
   aborted: 'Aborted',
 }
 
-const RUN_STATUS_LABELS: Record<RunStatus, string> = {
+const SLOT_STATUS_LABELS: Record<'not_started' | 'active' | 'completed' | 'aborted', string> = {
   not_started: 'Not started',
-  in_progress: 'In progress',
+  active: 'In progress',
   completed: 'Completed',
+  aborted: 'Aborted',
 }
 
 function formatDate(iso: string): string {
@@ -60,131 +71,13 @@ function formatDate(iso: string): string {
   })
 }
 
-type RunCardProps = {
-  runIndex: number
-  targetHours: number
-  breakAfterHours: number
-  runStatus: RunStatus
-  runTarget: RunTarget | undefined
-  participationId: number
-  participationStatus: ParticipationStatus
-  prevRunCompleted: boolean
-  isOwner: boolean
-  onTargetSaved: (target: RunTarget) => void
+function getRunForSlot(runs: Run[], slotIndex: number): Run | null {
+  const slotRuns = runs.filter((r) => r.runIndex === slotIndex)
+  const live = slotRuns.find((r) => r.status === 'active' || r.status === 'completed')
+  if (live) return live
+  return slotRuns.sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0] ?? null
 }
 
-function RunCard({
-  runIndex,
-  targetHours,
-  breakAfterHours,
-  runStatus,
-  runTarget,
-  participationId,
-  participationStatus,
-  prevRunCompleted,
-  isOwner,
-  onTargetSaved,
-}: RunCardProps): React.ReactElement {
-  const [accuracy, setAccuracy] = useState<number | null>(runTarget?.targetAccuracy ?? null)
-  const [solveSeconds, setSolveSeconds] = useState<number | null>(
-    runTarget?.targetSolveSeconds ?? null,
-  )
-  const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    setAccuracy(runTarget?.targetAccuracy ?? null)
-    setSolveSeconds(runTarget?.targetSolveSeconds ?? null)
-  }, [runTarget])
-
-  const isTerminal = participationStatus === 'completed' || participationStatus === 'aborted'
-  const isEditable = isOwner && !isTerminal && runStatus !== 'completed'
-
-  const saveTarget = async (): Promise<void> => {
-    if (saving) return
-    setSaving(true)
-    try {
-      const saved = await api.participations.setRunTarget(participationId, runIndex, {
-        targetAccuracy: accuracy,
-        targetSolveSeconds: solveSeconds,
-      })
-      onTargetSaved(saved)
-    } catch {
-      toast.error('Failed to save target', { description: 'Please try again.' })
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className={`rounded-lg border p-4 ${runStatus === 'not_started' ? 'border-border/50' : ''}`}>
-      <div className="mb-3 flex items-center justify-between">
-        <span className="text-sm font-medium">Run {runIndex + 1}</span>
-        <span className="text-xs">{RUN_STATUS_LABELS[runStatus]}</span>
-      </div>
-
-      <p className="mb-3 text-sm text-muted-foreground">
-        {formatDuration(targetHours)} target
-        {breakAfterHours > 0 && <> · {formatDuration(breakAfterHours)} break</>}
-      </p>
-
-      <div className="flex items-center justify-between gap-4 border-t pt-3">
-        {runStatus === 'completed' ? (
-          <div className="flex items-center gap-6 text-sm">
-            <span className="text-sm">
-              Accuracy <span className="font-medium">{accuracy !== null ? `${accuracy}%` : '—'}</span>
-            </span>
-            <span className="text-sm">
-              Solve time <span className="font-medium">{solveSeconds !== null ? formatSolveTime(solveSeconds) : '—'}</span>
-            </span>
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center gap-6">
-            <div className="flex items-center gap-2">
-              <span className="shrink-0 whitespace-nowrap text-sm">Accuracy</span>
-              <div className="flex items-center gap-1">
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  placeholder="—"
-                  value={accuracy ?? ''}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    setAccuracy(v === '' ? null : Math.min(100, Math.max(0, parseFloat(v))))
-                  }}
-                  onBlur={() => void saveTarget()}
-                  disabled={!isEditable || saving}
-                  className="h-8 w-20 text-sm tabular-nums"
-                />
-                <span className="text-sm">%</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="shrink-0 whitespace-nowrap text-sm">Solve time</span>
-              <SolveTimeInput
-                value={solveSeconds}
-                onChange={(s) => setSolveSeconds(s)}
-                disabled={!isEditable || saving}
-              />
-            </div>
-          </div>
-        )}
-
-        {isOwner && !isTerminal && (
-          <div className="shrink-0">
-            {runStatus === 'not_started' && (
-              <Button size="sm" disabled={!prevRunCompleted} className="bg-foreground text-background hover:bg-foreground/90">Start run</Button>
-            )}
-            {runStatus === 'in_progress' && <Button size="sm" className="bg-foreground text-background hover:bg-foreground/90">Continue</Button>}
-            {runStatus === 'completed' && (
-              <Button size="sm" variant="outline">View results</Button>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
 
 export function ParticipationPage(): React.ReactElement | null {
   const { user, loading: authLoading } = useAuth()
@@ -193,11 +86,14 @@ export function ParticipationPage(): React.ReactElement | null {
   const id = parseInt(participationId, 10)
 
   const [participation, setParticipation] = useState<ScheduleParticipation | null>(null)
+  const [runs, setRuns] = useState<Run[]>([])
   const [pageLoading, setPageLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('configure')
-
   const [progressOpen, setProgressOpen] = useState(true)
   const [statsOpen, setStatsOpen] = useState(true)
+  const [showAbortDialog, setShowAbortDialog] = useState(false)
+  const [aborting, setAborting] = useState(false)
+  const [startingIndex, setStartingIndex] = useState<number | null>(null)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -207,9 +103,11 @@ export function ParticipationPage(): React.ReactElement | null {
 
   useEffect(() => {
     if (!user) return
-    api.participations
-      .get(id)
-      .then((p) => setParticipation(p))
+    Promise.all([api.participations.get(id), api.runs.list(id)])
+      .then(([p, fetchedRuns]) => {
+        setParticipation(p)
+        setRuns(fetchedRuns)
+      })
       .catch(() =>
         toast.error('Failed to load participation', {
           description: 'Could not fetch training data.',
@@ -218,12 +116,40 @@ export function ParticipationPage(): React.ReactElement | null {
       .finally(() => setPageLoading(false))
   }, [id, user])
 
-  const handleTargetSaved = (runIndex: number, target: RunTarget): void => {
-    setParticipation((prev) => {
-      if (!prev) return prev
-      const existing = prev.runTargets.filter((t) => t.runIndex !== runIndex)
-      return { ...prev, runTargets: [...existing, target] }
-    })
+
+  const handleRunStarted = (run: Run): void => {
+    setRuns((prev) => [...prev, run])
+  }
+
+  const handleStartRun = async (runIndex: number): Promise<void> => {
+    if (startingIndex !== null || !participation) return
+    setStartingIndex(runIndex)
+    try {
+      const newRun = await api.runs.start(participation.id)
+      handleRunStarted(newRun)
+      void navigate({
+        to: '/app/runs/$runId/solve',
+        params: { runId: String(newRun.id) },
+      })
+    } catch {
+      toast.error('Failed to start run', { description: 'Please try again.' })
+      setStartingIndex(null)
+    }
+  }
+
+  const handleAbortParticipation = async (): Promise<void> => {
+    if (!participation || aborting) return
+    setAborting(true)
+    try {
+      const updated = await api.participations.abort(participation.id)
+      setParticipation(updated)
+      toast('Participation aborted', { description: 'Your progress has been saved.' })
+    } catch {
+      toast.error('Failed to abort', { description: 'Please try again.' })
+    } finally {
+      setAborting(false)
+      setShowAbortDialog(false)
+    }
   }
 
   if (authLoading || !user) return null
@@ -246,9 +172,8 @@ export function ParticipationPage(): React.ReactElement | null {
 
   const { schedule } = participation
   const runDefs = schedule.runs
-
   const isOwner = participation.ownerUsername === user.username
-  const runsCompleted = 0
+  const completedRunCount = runs.filter((r) => r.status === 'completed').length
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
@@ -275,10 +200,14 @@ export function ParticipationPage(): React.ReactElement | null {
             </Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Started {formatDate(participation.startedAt)}
+            Started {formatStartedAt(participation.startedAt)}
           </p>
         </div>
-
+        {isOwner && participation.status === 'in_progress' && (
+          <Button variant="ghost" size="sm" onClick={() => setShowAbortDialog(true)}>
+            Abort participation
+          </Button>
+        )}
       </div>
 
       {participation.status === 'aborted' && participation.abortedAt && (
@@ -295,20 +224,28 @@ export function ParticipationPage(): React.ReactElement | null {
 
       <div className="mb-6 rounded-lg border bg-card">
         <div className="border-b px-4 py-2.5">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Schedule
           </span>
         </div>
         <div
           className="flex cursor-pointer items-center gap-4 px-4 py-3 transition-colors hover:bg-muted/50"
-          onClick={() => void navigate({ to: '/app/schedules/$scheduleId', params: { scheduleId: String(schedule.id) } })}
+          onClick={() =>
+            void navigate({
+              to: '/app/schedules/$scheduleId',
+              params: { scheduleId: String(schedule.id) },
+            })
+          }
         >
-          <UserAvatar username={schedule.createdBy.username} avatarUrl={schedule.createdBy.avatarUrl} />
+          <UserAvatar
+            username={schedule.createdBy.username}
+            avatarUrl={schedule.createdBy.avatarUrl}
+          />
           <span className="flex-1 font-medium">{schedule.name}</span>
-          <Badge variant="outline" className="text-xs">Locked</Badge>
-          <span className="text-sm tabular-nums text-muted-foreground">
-            {schedule.runCount} runs
-          </span>
+          <Badge variant="outline" className="text-xs">
+            Locked
+          </Badge>
+          <span className="text-sm tabular-nums text-muted-foreground">{schedule.runCount} runs</span>
           {schedule.totalHours > 0 && (
             <span className="hidden text-sm text-muted-foreground sm:block">
               {formatDuration(schedule.totalHours)}
@@ -324,28 +261,119 @@ export function ParticipationPage(): React.ReactElement | null {
         </TabsList>
 
         <TabsContent value="configure">
-          <div className="flex flex-col gap-4">
-            {Array.from({ length: schedule.runCount }, (_, i) => {
-              const runDef = runDefs[i] ?? { target_hours: 0, break_after_hours: 0 }
-              const runStatus: RunStatus = 'not_started'
-              const runTarget = participation.runTargets.find((t) => t.runIndex === i)
-              const prevCompleted = i === 0 || runsCompleted >= i
-              return (
-                <RunCard
-                  key={i}
-                  runIndex={i}
-                  targetHours={runDef.target_hours}
-                  breakAfterHours={runDef.break_after_hours}
-                  runStatus={runStatus}
-                  runTarget={runTarget}
-                  participationId={participation.id}
-                  participationStatus={participation.status}
-                  prevRunCompleted={prevCompleted}
-                  isOwner={isOwner}
-                  onTargetSaved={(t) => handleTargetSaved(i, t)}
-                />
-              )
-            })}
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Run</TableHead>
+                  <TableHead>Duration</TableHead>
+                  <TableHead>Break</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Progress</TableHead>
+                  {(isOwner && participation.status === 'in_progress') && (
+                    <TableHead className="sticky right-0 bg-background" />
+                  )}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: schedule.runCount }, (_, i) => {
+                  const runDef = runDefs[i] ?? { target_hours: 0, break_after_hours: 0 }
+                  const run = getRunForSlot(runs, i)
+                  const prevCompleted = i === 0 || completedRunCount >= i
+                  const slotStatus: 'not_started' | 'active' | 'completed' | 'aborted' =
+                    run === null ? 'not_started'
+                    : run.status === 'active' ? 'active'
+                    : run.status === 'completed' ? 'completed'
+                    : 'aborted'
+                  const starting = startingIndex === i
+                  const resolved = run !== null ? run.solvedCount + run.solvedWithRetriesCount + run.failedCount : 0
+                  const progressValue = run !== null && run.totalPuzzles > 0 ? (resolved / run.totalPuzzles) * 100 : 0
+                  const progressTooltip = run !== null
+                    ? `${resolved} / ${run.totalPuzzles} puzzles resolved`
+                    : 'Not started yet'
+
+                  return (
+                    <TableRow key={i}>
+                      <TableCell className="text-sm font-medium">
+                        {run !== null ? (
+                          <Link
+                            to="/app/runs/$runId"
+                            params={{ runId: String(run.id) }}
+                            className="underline-offset-2 hover:underline"
+                          >
+                            Run {i + 1}
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground">Run {i + 1}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatDuration(runDef.target_hours)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {runDef.break_after_hours > 0 ? formatDuration(runDef.break_after_hours) : <span className="text-muted-foreground/40">—</span>}
+                      </TableCell>
+                      <TableCell>
+                        {slotStatus === 'active' ? (
+                          <Badge
+                            variant="outline"
+                            className="text-xs border-blue-500/30 bg-blue-500/10 text-blue-600 dark:border-blue-400/30 dark:bg-blue-400/10 dark:text-blue-400"
+                          >
+                            {SLOT_STATUS_LABELS[slotStatus]}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs">
+                            {SLOT_STATUS_LABELS[slotStatus]}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <ProgressBar
+                          value={progressValue}
+                          tooltipLabel={progressTooltip}
+                          className="w-28"
+                        />
+                      </TableCell>
+                      {(isOwner && participation.status === 'in_progress') && (
+                        <TableCell className="sticky right-0 bg-background text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {slotStatus === 'not_started' && prevCompleted && (
+                              <Button
+                                size="sm"
+                                disabled={startingIndex !== null}
+                                onClick={() => void handleStartRun(i)}
+                                className="bg-foreground text-background hover:bg-foreground/90"
+                              >
+                                {starting ? 'Starting…' : 'Start run'}
+                              </Button>
+                            )}
+                            {slotStatus === 'active' && run !== null && (
+                              <Button
+                                size="sm"
+                                className="bg-foreground text-background hover:bg-foreground/90"
+                                onClick={() => void navigate({ to: '/app/runs/$runId/solve', params: { runId: String(run.id) } })}
+                              >
+                                Continue
+                              </Button>
+                            )}
+                            {slotStatus === 'aborted' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={!prevCompleted || startingIndex !== null}
+                                onClick={() => void handleStartRun(i)}
+                              >
+                                {starting ? 'Starting…' : 'Restart'}
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
           </div>
         </TabsContent>
 
@@ -368,7 +396,8 @@ export function ParticipationPage(): React.ReactElement | null {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <p className="pt-4 text-sm text-muted-foreground">
-                  Your overall progress through this training will be shown here — how far along you are across all runs.
+                  Your overall progress through this training will be shown here — how far along
+                  you are across all runs.
                 </p>
               </CollapsibleContent>
             </Collapsible>
@@ -390,13 +419,35 @@ export function ParticipationPage(): React.ReactElement | null {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <p className="pt-4 text-sm text-muted-foreground">
-                  Stats from your completed runs will appear here — accuracy and solve time per run, comparable across runs and other participants.
+                  Stats from your completed runs will appear here — accuracy and solve time per
+                  run, comparable across runs and other participants.
                 </p>
               </CollapsibleContent>
             </Collapsible>
           </div>
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={showAbortDialog} onOpenChange={setShowAbortDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Abort participation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This cannot be undone. Your completed runs will be preserved but the participation
+              will be marked as aborted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleAbortParticipation()}
+              disabled={aborting}
+            >
+              {aborting ? 'Aborting…' : 'Abort'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

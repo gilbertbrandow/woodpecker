@@ -1,0 +1,246 @@
+import * as React from 'react'
+import { useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  getPaginationRowModel,
+  flexRender,
+  type ColumnDef,
+  type SortingState,
+  type Column,
+} from '@tanstack/react-table'
+import { ChevronUp, ChevronDown, ChevronsUpDown, ExternalLink } from 'lucide-react'
+import { Badge } from '../ui/badge'
+import { Button } from '../ui/button'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '../ui/table'
+import { type RunPuzzleListItem, type PositionStatus } from '../../lib/api'
+import { formatSolveTimeMs } from '../../lib/utils'
+
+const PAGE_SIZE = 25
+
+const POSITION_STATUS_LABELS: Record<PositionStatus, string> = {
+  not_started: 'Not started',
+  in_progress: 'In progress',
+  will_be_retried: 'Will retry',
+  solved: 'Solved',
+  solved_with_retries: 'Solved',
+  failed: 'Failed',
+}
+
+const ACTIONABLE_STATUSES: PositionStatus[] = ['not_started', 'in_progress', 'will_be_retried']
+
+type ColMeta = { className?: string }
+
+type RunPuzzleTableProps = {
+  puzzles: RunPuzzleListItem[]
+  runIdStr: string
+  isActive: boolean
+}
+
+function SortHeader({
+  column,
+  label,
+}: {
+  column: Column<RunPuzzleListItem, unknown>
+  label: string
+}): React.ReactElement {
+  const sorted = column.getIsSorted()
+  return (
+    <button
+      type="button"
+      className="flex items-center gap-1 hover:text-foreground"
+      onClick={() => column.toggleSorting(sorted === 'asc')}
+    >
+      {label}
+      {sorted === 'asc' ? (
+        <ChevronUp className="h-3.5 w-3.5" />
+      ) : sorted === 'desc' ? (
+        <ChevronDown className="h-3.5 w-3.5" />
+      ) : (
+        <ChevronsUpDown className="h-3.5 w-3.5 opacity-40" />
+      )}
+    </button>
+  )
+}
+
+export function RunPuzzleTable({ puzzles, runIdStr, isActive }: RunPuzzleTableProps): React.ReactElement {
+  const navigate = useNavigate()
+  const [sorting, setSorting] = useState<SortingState>([])
+
+  const handleRowClick = (item: RunPuzzleListItem): void => {
+    if (!isActive || !ACTIONABLE_STATUSES.includes(item.positionStatus)) return
+    void navigate({
+      to: '/app/runs/$runId/solve',
+      params: { runId: runIdStr },
+      search: { runPuzzleId: item.runPuzzleId },
+    })
+  }
+
+  const columns: ColumnDef<RunPuzzleListItem>[] = [
+    {
+      accessorKey: 'position',
+      header: '#',
+      enableSorting: false,
+      meta: { className: 'w-12 text-right' } satisfies ColMeta,
+      cell: ({ row }) => (
+        <span className="font-mono text-sm text-muted-foreground">{row.original.position + 1}</span>
+      ),
+    },
+    {
+      accessorKey: 'rating',
+      header: ({ column }) => <SortHeader column={column} label="Rating" />,
+      meta: { className: 'min-w-24' } satisfies ColMeta,
+      cell: ({ row }) => <span className="tabular-nums">{row.original.rating}</span>,
+    },
+    {
+      accessorKey: 'positionStatus',
+      header: 'Status',
+      enableSorting: false,
+      meta: { className: 'min-w-32' } satisfies ColMeta,
+      cell: ({ row }) => (
+        <Badge variant="outline">{POSITION_STATUS_LABELS[row.original.positionStatus]}</Badge>
+      ),
+    },
+    {
+      accessorKey: 'bestSolveTimeMs',
+      header: ({ column }) => <SortHeader column={column} label="Best time" />,
+      meta: { className: 'min-w-28 text-right' } satisfies ColMeta,
+      sortUndefined: 'last',
+      cell: ({ row }) => (
+        <span className="tabular-nums">
+          {row.original.bestSolveTimeMs !== null ? formatSolveTimeMs(row.original.bestSolveTimeMs) : '—'}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'tryCount',
+      header: ({ column }) => <SortHeader column={column} label="Tries" />,
+      meta: { className: 'min-w-20 text-right' } satisfies ColMeta,
+      cell: ({ row }) => (
+        <span className="tabular-nums">{row.original.tryCount > 0 ? row.original.tryCount : '—'}</span>
+      ),
+    },
+    {
+      id: 'game',
+      header: '',
+      enableSorting: false,
+      meta: { className: 'sticky right-0 bg-background' } satisfies ColMeta,
+      cell: ({ row }) => (
+        <a
+          href={`https://lichess.org/training/${row.original.puzzleId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+          aria-label="Open puzzle on Lichess"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <ExternalLink className="h-4 w-4" />
+        </a>
+      ),
+    },
+  ]
+
+  const table = useReactTable({
+    data: puzzles,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    initialState: {
+      pagination: { pageIndex: 0, pageSize: PAGE_SIZE },
+    },
+    state: { sorting },
+    onSortingChange: (updater) => {
+      const next = typeof updater === 'function' ? updater(sorting) : updater
+      setSorting(next)
+      table.setPageIndex(0)
+    },
+  })
+
+  const { pageIndex } = table.getState().pagination
+  const total = puzzles.length
+  const start = pageIndex * PAGE_SIZE + 1
+  const end = Math.min(pageIndex * PAGE_SIZE + table.getRowModel().rows.length, total)
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((hg) => (
+              <TableRow key={hg.id}>
+                {hg.headers.map((h) => (
+                  <TableHead key={h.id} className={(h.column.columnDef.meta as ColMeta | undefined)?.className}>
+                    {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="py-8 text-center text-sm text-muted-foreground">
+                  No puzzles yet.
+                </TableCell>
+              </TableRow>
+            ) : (
+              table.getRowModel().rows.map((row) => {
+                const clickable = isActive && ACTIONABLE_STATUSES.includes(row.original.positionStatus)
+                return (
+                  <TableRow
+                    key={row.id}
+                    className={clickable ? 'cursor-pointer' : ''}
+                    onClick={() => handleRowClick(row.original)}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id} className={(cell.column.columnDef.meta as ColMeta | undefined)?.className}>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                )
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="flex flex-col items-start gap-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <span>
+          {total === 0 ? 'No puzzles' : `Showing ${start}–${end} of ${total}`}
+        </span>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            ← Prev
+          </Button>
+          <span className="tabular-nums">
+            Page {pageIndex + 1} of {table.getPageCount()}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            Next →
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -1,4 +1,4 @@
-import { createRouter, createRoute, createRootRouteWithContext } from '@tanstack/react-router'
+import { createRouter, createRoute, createRootRouteWithContext, redirect } from '@tanstack/react-router'
 import type { AuthContextValue } from './context/auth'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
@@ -10,6 +10,8 @@ import { ScheduleNewPage } from './pages/ScheduleNewPage'
 import { SchedulePage } from './pages/SchedulePage'
 import { ParticipationPage } from './pages/ParticipationPage'
 import { ParticipationNewPage } from './pages/ParticipationNewPage'
+import { RunPage } from './pages/RunPage'
+import { BoardPage } from './pages/BoardPage'
 
 type RouterContext = {
   auth: AuthContextValue
@@ -25,64 +27,96 @@ const loginRoute = createRoute({
   component: LoginPage,
 })
 
-const dashboardRoute = createRoute({
+const appRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/app',
+  beforeLoad: ({ context }) => {
+    if (!context.auth.loading && !context.auth.user) {
+      throw redirect({ to: '/' })
+    }
+  },
+})
+
+const dashboardRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/',
   component: DashboardPage,
 })
 
 const settingsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/app/settings',
+  getParentRoute: () => appRoute,
+  path: '/settings',
   component: SettingsPage,
 })
 
 const subsetNewRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/app/subsets/new',
+  getParentRoute: () => appRoute,
+  path: '/subsets/new',
   component: SubsetNewPage,
 })
 
 const subsetRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/app/subsets/$subsetId',
+  getParentRoute: () => appRoute,
+  path: '/subsets/$subsetId',
   component: SubsetPage,
 })
 
 const scheduleNewRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/app/schedules/new',
+  getParentRoute: () => appRoute,
+  path: '/schedules/new',
   component: ScheduleNewPage,
 })
 
 const scheduleRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/app/schedules/$scheduleId',
+  getParentRoute: () => appRoute,
+  path: '/schedules/$scheduleId',
   component: SchedulePage,
 })
 
+const participationNewRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/participations/new',
+  component: ParticipationNewPage,
+})
+
 const participationRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/app/participations/$participationId',
+  getParentRoute: () => appRoute,
+  path: '/participations/$participationId',
   component: ParticipationPage,
 })
 
-const participationNewRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/app/participations/new',
-  component: ParticipationNewPage,
+const runRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/runs/$runId',
+  component: RunPage,
+})
+
+const runSolveRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/runs/$runId/solve',
+  component: BoardPage,
+  validateSearch: (search: Record<string, unknown>): { runPuzzleId?: number } => {
+    const val = search.runPuzzleId
+    if (val === undefined || val === null) return {}
+    const n = Number(val)
+    return { runPuzzleId: Number.isFinite(n) ? n : undefined }
+  },
 })
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
-  dashboardRoute,
-  settingsRoute,
-  subsetNewRoute,
-  subsetRoute,
-  scheduleNewRoute,
-  scheduleRoute,
-  participationRoute,
-  participationNewRoute,
+  appRoute.addChildren([
+    dashboardRoute,
+    settingsRoute,
+    subsetNewRoute,
+    subsetRoute,
+    scheduleNewRoute,
+    scheduleRoute,
+    participationNewRoute,
+    participationRoute,
+    runRoute,
+    runSolveRoute,
+  ]),
 ])
 
 export const router = createRouter({

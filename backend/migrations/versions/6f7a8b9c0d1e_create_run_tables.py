@@ -1,7 +1,7 @@
 """create run tables
 
 Revision ID: 6f7a8b9c0d1e
-Revises: f4a5b6c7d8e9
+Revises: 5e6f7a8b9c0d
 Create Date: 2026-04-03
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision: str = "6f7a8b9c0d1e"
-down_revision: str | None = "f4a5b6c7d8e9"
+down_revision: str | None = "5e6f7a8b9c0d"
 branch_labels: str | None = None
 depends_on: str | None = None
 
