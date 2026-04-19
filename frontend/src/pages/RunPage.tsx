@@ -146,7 +146,7 @@ function ConfigureTab({
   participation: ScheduleParticipation | null
 }): React.ReactElement {
   const [targetsOpen, setTargetsOpen] = useState(true)
-  const [puzzlesOpen, setPuzzlesOpen] = useState(true)
+  const [puzzlesOpen, setPuzzlesOpen] = useState(false)
 
   const runTarget = participation?.runTargets.find((t) => t.runIndex === run.runIndex)
   const [accuracy, setAccuracy] = useState<number | null>(runTarget?.targetAccuracy ?? null)
@@ -200,7 +200,7 @@ function ConfigureTab({
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="flex flex-col gap-7 pt-5">
+          <div className="flex flex-col gap-7 pt-5 pb-3">
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex flex-col gap-0.5">
