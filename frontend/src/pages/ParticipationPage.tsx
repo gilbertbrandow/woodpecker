@@ -126,7 +126,7 @@ export function ParticipationPage(): React.ReactElement | null {
     if (startingIndex !== null || !participation) return
     setStartingIndex(runIndex)
     try {
-      const newRun = await api.runs.start(participation.id)
+      const newRun = await api.runs.start(participation.id, runIndex)
       handleRunStarted(newRun)
       void navigate({
         to: '/app/runs/$runId/solve',
@@ -174,7 +174,14 @@ export function ParticipationPage(): React.ReactElement | null {
   const { schedule } = participation
   const runDefs = schedule.runs
   const isOwner = participation.ownerUsername === user.username
+  const canManageRuns = isOwner && (participation.status === 'draft' || participation.status === 'in_progress')
   const completedRunCount = runs.filter((r) => r.status === 'completed').length
+  const hasActiveRun = runs.some((r) => r.status === 'active')
+  const startableRunIndex = (
+    canManageRuns &&
+    !hasActiveRun &&
+    completedRunCount < schedule.runCount
+  ) ? completedRunCount : null
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
@@ -290,7 +297,7 @@ export function ParticipationPage(): React.ReactElement | null {
                   <TableHead>Break</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Progress</TableHead>
-                  {(isOwner && participation.status === 'in_progress') && (
+                  {canManageRuns && (
                     <TableHead className="sticky right-0 bg-background" />
                   )}
                 </TableRow>
@@ -299,12 +306,12 @@ export function ParticipationPage(): React.ReactElement | null {
                 {Array.from({ length: schedule.runCount }, (_, i) => {
                   const runDef = runDefs[i] ?? { target_hours: 0, break_after_hours: 0 }
                   const run = getRunForSlot(runs, i)
-                  const prevCompleted = i === 0 || completedRunCount >= i
                   const slotStatus: 'not_started' | 'active' | 'completed' | 'aborted' =
                     run === null ? 'not_started'
                     : run.status === 'active' ? 'active'
                     : run.status === 'completed' ? 'completed'
                     : 'aborted'
+                  const canStartThisRow = startableRunIndex === i && slotStatus !== 'active' && slotStatus !== 'completed'
                   const starting = startingIndex === i
                   const resolved = run !== null ? run.solvedCount + run.solvedWithRetriesCount + run.failedCount : 0
                   const progressValue = run !== null && run.totalPuzzles > 0 ? (resolved / run.totalPuzzles) * 100 : 0
@@ -350,10 +357,10 @@ export function ParticipationPage(): React.ReactElement | null {
                           className="w-28"
                         />
                       </TableCell>
-                      {(isOwner && participation.status === 'in_progress') && (
+                      {canManageRuns && (
                         <TableCell className="sticky right-0 bg-background text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {slotStatus === 'not_started' && prevCompleted && (
+                            {canStartThisRow && (
                               <Button
                                 size="sm"
                                 disabled={startingIndex !== null}
@@ -370,16 +377,6 @@ export function ParticipationPage(): React.ReactElement | null {
                                 onClick={(e) => { e.stopPropagation(); void navigate({ to: '/app/runs/$runId/solve', params: { runId: String(run.id) } }) }}
                               >
                                 Continue
-                              </Button>
-                            )}
-                            {slotStatus === 'aborted' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={!prevCompleted || startingIndex !== null}
-                                onClick={(e) => { e.stopPropagation(); void handleStartRun(i) }}
-                              >
-                                {starting ? 'Starting…' : 'Restart'}
                               </Button>
                             )}
                           </div>

@@ -73,7 +73,7 @@ def _current_run_puzzle_id(run_id: int) -> int | None:
 
 def _attempt_dict(attempt: PuzzleAttempt) -> dict[str, object]:
     return {
-        "attemptId": attempt.id,
+        "id": attempt.id,
         "tryNumber": attempt.try_number,
         "status": attempt.status,
         "startedAt": attempt.started_at.isoformat(),
@@ -90,9 +90,13 @@ def _run_puzzle_full_dict(run_puzzle: RunPuzzle) -> dict[str, object]:
     run = db.session.get(Run, run_puzzle.run_id)
     if run is None:
         raise LookupError("Run not found.")
-    _, config = _get_schedule_config(run)
+    schedule, config = _get_schedule_config(run)
     max_tries_raw = config.get("max_tries_per_puzzle")
     max_tries = max_tries_raw if isinstance(max_tries_raw, int) else 1
+
+    total_puzzles = db.session.scalar(
+        sa.select(sa.func.count()).where(RunPuzzle.run_id == run_puzzle.run_id)
+    ) or 0
 
     sorted_attempts = sorted(run_puzzle.attempts, key=lambda a: a.try_number)
     in_progress_attempt = next((a for a in sorted_attempts if a.status == "in_progress"), None)
@@ -120,6 +124,9 @@ def _run_puzzle_full_dict(run_puzzle: RunPuzzle) -> dict[str, object]:
         "currentTryNumber": current_try_number,
         "currentAttemptId": current_attempt_id,
         "tries": [_attempt_dict(a) for a in sorted_attempts],
+        "totalPuzzles": total_puzzles,
+        "scheduleName": schedule.name,
+        "runIndex": run.run_index,
     }
 
 
@@ -171,7 +178,7 @@ def run_dict(run: Run) -> dict[str, object]:
     }
 
 
-def start_run(participation_id: int, user_id: int) -> Run:
+def start_run(participation_id: int, user_id: int, expected_run_index: int | None = None) -> Run:
     participation = db.session.get(ScheduleParticipation, participation_id)
     if participation is None:
         raise LookupError("Participation not found.")
@@ -207,6 +214,8 @@ def start_run(participation_id: int, user_id: int) -> Run:
 
     if run_index >= run_count:
         raise ValueError("All run slots for this schedule are already completed.")
+    if expected_run_index is not None and expected_run_index != run_index:
+        raise ValueError("Run slot is no longer startable.")
 
     puzzle_ids: list[int] = list(
         db.session.scalars(

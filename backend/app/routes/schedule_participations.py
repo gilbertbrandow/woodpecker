@@ -91,8 +91,17 @@ def set_run_target(participation_id: int, run_index: int) -> tuple[Response, int
 @participations_bp.post("/<int:participation_id>/runs")
 @login_required
 def start_run(participation_id: int) -> tuple[Response, int]:
+    data: dict[str, object] = request.get_json(silent=True) or {}
+    run_index_raw = data.get("runIndex")
+    if run_index_raw is not None and not isinstance(run_index_raw, int):
+        return jsonify({"error": "runIndex must be an integer"}), 400
+
     try:
-        run = run_svc.start_run(participation_id, session["user_id"])
+        run = run_svc.start_run(
+            participation_id,
+            session["user_id"],
+            run_index_raw if isinstance(run_index_raw, int) else None,
+        )
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
     except PermissionError as e:
