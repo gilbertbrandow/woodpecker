@@ -21,6 +21,7 @@ import {
   BreadcrumbPage,
 } from '../components/ui/breadcrumb'
 import { Badge } from '../components/ui/badge'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
 import { Check, X } from 'lucide-react'
 
 const HEADER_H = 57
@@ -33,6 +34,7 @@ const MAX_BOARD = 760
 const MOVE_FEEDBACK_SUCCESS_MS = 200
 const WRONG_REVERT_MS = 500
 const FAILED_TO_OVERVIEW_MS = 300
+const TIMER_UPDATE_MS = 50
 
 type Mode = 'loading' | 'focus' | 'failed' | 'overview'
 type Orientation = 'white' | 'black'
@@ -66,10 +68,28 @@ function playerColor(fen: string): Orientation {
 }
 
 function formatTimer(seconds: number): string {
-  const capped = Math.min(seconds, 600)
-  const m = Math.floor(capped / 60)
-  const s = capped % 60
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  const capped = Math.min(seconds, 6_000)
+  const wholeTenths = Math.floor(capped)
+  const m = Math.floor(wholeTenths / 600)
+  const s = Math.floor((wholeTenths % 600) / 10)
+  const t = wholeTenths % 10
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${t}`
+}
+
+function formatTargetSolveTime(tenths: number): string {
+  const wholeSeconds = Math.floor(Math.max(0, tenths) / 10)
+  const minutes = Math.floor(wholeSeconds / 60)
+  const seconds = wholeSeconds % 60
+
+  if (minutes === 0) {
+    return `${seconds}s`
+  }
+
+  if (seconds === 0) {
+    return `${minutes}m`
+  }
+
+  return `${minutes}m ${seconds}s`
 }
 
 function computeFinalFen(fen: string, solutionMoves: string[]): string {
@@ -166,6 +186,55 @@ function MoveFeedbackBadge({ result, square, orientation }: MoveFeedbackBadgePro
   )
 }
 
+type TimerCardProps = {
+  timerText: string
+  elapsedTenths: number
+  targetSolveTenths: number | null
+  muted?: boolean
+}
+
+function TimerCard({ timerText, elapsedTenths, targetSolveTenths, muted = false }: TimerCardProps): React.ReactElement {
+  const hasTarget = targetSolveTenths !== null && targetSolveTenths > 0
+  const rawLeftPct = hasTarget ? ((targetSolveTenths - elapsedTenths) / targetSolveTenths) * 100 : 0
+  const leftPct = Math.max(0, Math.min(100, rawLeftPct))
+  const targetText = hasTarget ? formatTargetSolveTime(targetSolveTenths) : ''
+  const progressHue = leftPct >= 60
+    ? 60 + ((leftPct - 60) / 40) * 60
+    : leftPct >= 20
+      ? ((leftPct - 20) / 40) * 60
+      : 0
+  const progressColor = `hsl(${progressHue} 55% 48%)`
+
+  return (
+    <div className="min-h-24 rounded-md px-3 py-3">
+      <div className="flex min-h-16 flex-col items-start justify-center">
+        <div className="inline-flex flex-col items-start">
+          <span className={`tabular-nums text-3xl font-semibold leading-none ${muted ? 'text-muted-foreground' : 'text-foreground'}`}>
+            {timerText}
+          </span>
+          {hasTarget && (
+            <Tooltip delayDuration={100}>
+              <TooltipTrigger asChild>
+                <div className="mt-3 w-full max-w-full cursor-default">
+                  <div className="h-1.5 bg-foreground/15">
+                    <div
+                      className="ml-auto h-full transition-[width,background-color] duration-100 ease-linear"
+                      style={{ width: `${leftPct}%`, backgroundColor: progressColor }}
+                    />
+                  </div>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                {`Target solve time: ${targetText}. This bar shows how much of that time is remaining.`}
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function BoardPage(): React.ReactElement {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -214,6 +283,7 @@ export function BoardPage(): React.ReactElement {
   const [hintSquare, setHintSquare] = useState<string | null>(null)
 
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [targetSolveTenths, setTargetSolveTenths] = useState<number | null>(null)
   const [overviewFen, setOverviewFen] = useState('')
   const [boardKey, setBoardKey] = useState(0)
 
@@ -283,8 +353,22 @@ export function BoardPage(): React.ReactElement {
   useEffect(() => {
     void (async () => {
       try {
-        const data = await api.runs.getPuzzle(runId, runPuzzleId)
+        const [data, run] = await Promise.all([
+          api.runs.getPuzzle(runId, runPuzzleId),
+          api.runs.get(runId),
+        ])
         const solutionMoves = data.solution.split(' ')
+
+        let resolvedTargetSolveTenths: number | null = null
+        try {
+          const participation = await api.participations.get(run.participationId)
+          const runTarget = participation.runTargets.find((t) => t.runIndex === data.runIndex)
+          resolvedTargetSolveTenths = runTarget?.targetSolveSeconds !== null && runTarget?.targetSolveSeconds !== undefined
+            ? Math.max(0, Math.round(runTarget.targetSolveSeconds * 10))
+            : null
+        } catch {
+          resolvedTargetSolveTenths = null
+        }
 
         if (solutionMoves.length < 2) {
           toast.error('Invalid puzzle', { description: 'Puzzle solution is too short.' })
@@ -325,6 +409,7 @@ export function BoardPage(): React.ReactElement {
         ]
 
         setPuzzle(data)
+        setTargetSolveTenths(resolvedTargetSolveTenths)
         setOrientation(playerColor(data.fen))
         setCurrentAttemptId(resolvedAttemptId)
         setElapsedSeconds(0)
@@ -358,9 +443,9 @@ export function BoardPage(): React.ReactElement {
   useEffect(() => {
     if (mode !== 'focus') return
     timerRef.current = setInterval(() => {
-      elapsedRef.current += 1
+      elapsedRef.current += TIMER_UPDATE_MS / 100
       setElapsedSeconds(elapsedRef.current)
-    }, 1000)
+    }, TIMER_UPDATE_MS)
     return () => {
       if (timerRef.current !== null) {
         clearInterval(timerRef.current)
@@ -802,9 +887,11 @@ export function BoardPage(): React.ReactElement {
           </div>
 
           <aside className={sidebarCls} style={sidebarH}>
-            <span className="tabular-nums text-sm font-medium">
-              {formatTimer(elapsedSeconds)}
-            </span>
+            <TimerCard
+              timerText={formatTimer(elapsedSeconds)}
+              elapsedTenths={elapsedSeconds}
+              targetSolveTenths={targetSolveTenths}
+            />
             <div className="mt-auto">{moveStatusCard}</div>
           </aside>
         </div>
@@ -848,7 +935,12 @@ export function BoardPage(): React.ReactElement {
           </div>
 
           <aside className={sidebarCls} style={sidebarH}>
-            <span className="tabular-nums text-sm text-muted-foreground">{elapsed}</span>
+            <TimerCard
+              timerText={elapsed}
+              elapsedTenths={elapsedRef.current}
+              targetSolveTenths={targetSolveTenths}
+              muted={true}
+            />
             <div className="mt-auto flex flex-col gap-3">
               <Button variant="outline" size="sm" onClick={handleShowHint} disabled={inputBlocked}>
                 Show Hint
