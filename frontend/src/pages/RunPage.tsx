@@ -54,7 +54,8 @@ function InsightsTab({ run, puzzleList }: { run: Run; puzzleList: RunPuzzleList 
       : null
 
   const solvedTimes = puzzleList.puzzles
-    .map((p) => p.bestSolveTimeMs)
+    .filter((p) => p.positionStatus === 'solved' || p.positionStatus === 'solved_with_retries')
+    .map((p) => p.timeMs)
     .filter((ms): ms is number => ms !== null)
 
   const avgMs =

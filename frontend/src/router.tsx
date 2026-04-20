@@ -11,6 +11,8 @@ import { SchedulePage } from './pages/SchedulePage'
 import { ParticipationPage } from './pages/ParticipationPage'
 import { ParticipationNewPage } from './pages/ParticipationNewPage'
 import { RunPage } from './pages/RunPage'
+import { RunResolverPage } from './pages/RunResolverPage'
+import { PuzzleResolverPage } from './pages/PuzzleResolverPage'
 import { BoardPage } from './pages/BoardPage'
 
 type RouterContext = {
@@ -94,13 +96,19 @@ const runRoute = createRoute({
 const runSolveRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/runs/$runId/solve',
+  component: RunResolverPage,
+})
+
+const puzzleResolverRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/runs/$runId/puzzles/$runPuzzleId',
+  component: PuzzleResolverPage,
+})
+
+const attemptRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/runs/$runId/puzzles/$runPuzzleId/attempts/$attemptId',
   component: BoardPage,
-  validateSearch: (search: Record<string, unknown>): { runPuzzleId?: number } => {
-    const val = search.runPuzzleId
-    if (val === undefined || val === null) return {}
-    const n = Number(val)
-    return { runPuzzleId: Number.isFinite(n) ? n : undefined }
-  },
 })
 
 const routeTree = rootRoute.addChildren([
@@ -116,6 +124,8 @@ const routeTree = rootRoute.addChildren([
     participationRoute,
     runRoute,
     runSolveRoute,
+    puzzleResolverRoute,
+    attemptRoute,
   ]),
 ])
 

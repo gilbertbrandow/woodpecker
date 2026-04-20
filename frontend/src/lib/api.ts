@@ -35,11 +35,15 @@ export type AuthUser = {
   username: string
   nickname: string | null
   avatarUrl: string | null
+  boardTheme: string
+  pieceTheme: string
 }
 
 export type SettingsPayload = {
   nickname?: string
   avatarUrl?: string
+  boardTheme?: string
+  pieceTheme?: string
 }
 
 export type Subset = {
@@ -258,7 +262,7 @@ export type RunPuzzleListItem = {
   rating: number
   positionStatus: PositionStatus
   tryCount: number
-  bestSolveTimeMs: number | null
+  timeMs: number | null
 }
 
 export type RunPuzzleList = {
@@ -277,6 +281,41 @@ export type Schedule = {
   createdBy: { username: string; avatarUrl: string | null }
   createdAt: string
   lockedAt: string | null
+}
+
+export type AttemptSummary = {
+  id: number
+  tryNumber: number
+  status: 'in_progress' | 'solved' | 'failed'
+  startedAt: string
+  completedAt: string | null
+  timeSpentMs: number | null
+  moves: string[]
+}
+
+export type RunPuzzleFull = {
+  runPuzzleId: number
+  position: number
+  positionStatus: PositionStatus
+  puzzleId: string
+  fen: string
+  solution: string
+  rating: number
+  gameUrl: string
+  maxTriesPerPuzzle: number
+  currentTryNumber: number
+  currentAttemptId: number | null
+  tries: AttemptSummary[]
+  totalPuzzles: number
+  scheduleName: string
+  runIndex: number
+}
+
+export type CompleteAttemptResult = {
+  positionResolved: boolean
+  triesRemaining: number
+  markedForRetry: boolean
+  nextRunPuzzleId: number | null
 }
 
 export const api = {
@@ -385,13 +424,33 @@ export const api = {
       request(`/openings?q=${encodeURIComponent(q)}`),
   },
   runs: {
-    start: (participationId: number): Promise<Run> =>
-      request(`/participations/${participationId}/runs`, { method: 'POST' }),
+    start: (participationId: number, runIndex?: number): Promise<Run> =>
+      request(`/participations/${participationId}/runs`, {
+        method: 'POST',
+        body: JSON.stringify(runIndex === undefined ? {} : { runIndex }),
+      }),
     list: (participationId: number): Promise<Run[]> =>
       request(`/participations/${participationId}/runs`),
     get: (runId: number): Promise<Run> => request(`/runs/${runId}`),
     abort: (runId: number): Promise<Run> =>
       request(`/runs/${runId}/abort`, { method: 'POST' }),
     puzzles: (runId: number): Promise<RunPuzzleList> => request(`/runs/${runId}/puzzles`),
+    getPuzzle: (runId: number, runPuzzleId: number): Promise<RunPuzzleFull> =>
+      request(`/runs/${runId}/puzzles/${runPuzzleId}`),
+    startPuzzle: (runId: number, runPuzzleId: number): Promise<RunPuzzleFull> =>
+      request(`/runs/${runId}/puzzles/${runPuzzleId}/start`, { method: 'POST' }),
+    continue: (runId: number): Promise<RunPuzzleFull> =>
+      request(`/runs/${runId}/continue`, { method: 'POST' }),
+  },
+  attempts: {
+    complete: (
+      attemptId: number,
+      status: 'solved' | 'failed',
+      moves: string[],
+    ): Promise<CompleteAttemptResult> =>
+      request(`/attempts/${attemptId}/complete`, {
+        method: 'POST',
+        body: JSON.stringify({ status, moves }),
+      }),
   },
 }

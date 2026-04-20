@@ -32,8 +32,17 @@ const POSITION_STATUS_LABELS: Record<PositionStatus, string> = {
   in_progress: 'In progress',
   will_be_retried: 'Will retry',
   solved: 'Solved',
-  solved_with_retries: 'Solved',
+  solved_with_retries: 'Solved with retries',
   failed: 'Failed',
+}
+
+const POSITION_STATUS_CLASS: Record<PositionStatus, string> = {
+  not_started: '',
+  in_progress: 'border-amber-600/30 bg-amber-50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400',
+  will_be_retried: 'border-amber-600/30 bg-amber-50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400',
+  solved: 'border-green-600/30 bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400',
+  solved_with_retries: 'border-green-600/30 bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400',
+  failed: 'border-red-600/30 bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400',
 }
 
 const ACTIONABLE_STATUSES: PositionStatus[] = ['not_started', 'in_progress', 'will_be_retried']
@@ -79,9 +88,8 @@ export function RunPuzzleTable({ puzzles, runIdStr, isActive }: RunPuzzleTablePr
   const handleRowClick = (item: RunPuzzleListItem): void => {
     if (!isActive || !ACTIONABLE_STATUSES.includes(item.positionStatus)) return
     void navigate({
-      to: '/app/runs/$runId/solve',
-      params: { runId: runIdStr },
-      search: { runPuzzleId: item.runPuzzleId },
+      to: '/app/runs/$runId/puzzles/$runPuzzleId',
+      params: { runId: runIdStr, runPuzzleId: String(item.runPuzzleId) },
     })
   }
 
@@ -106,18 +114,23 @@ export function RunPuzzleTable({ puzzles, runIdStr, isActive }: RunPuzzleTablePr
       header: 'Status',
       enableSorting: false,
       meta: { className: 'min-w-32' } satisfies ColMeta,
-      cell: ({ row }) => (
-        <Badge variant="outline">{POSITION_STATUS_LABELS[row.original.positionStatus]}</Badge>
-      ),
+      cell: ({ row }) => {
+        const status = row.original.positionStatus
+        return (
+          <Badge variant="outline" className={POSITION_STATUS_CLASS[status]}>
+            {POSITION_STATUS_LABELS[status]}
+          </Badge>
+        )
+      },
     },
     {
-      accessorKey: 'bestSolveTimeMs',
-      header: ({ column }) => <SortHeader column={column} label="Best time" />,
+      accessorKey: 'timeMs',
+      header: ({ column }) => <SortHeader column={column} label="Time" />,
       meta: { className: 'min-w-28 text-right' } satisfies ColMeta,
       sortUndefined: 'last',
       cell: ({ row }) => (
         <span className="tabular-nums">
-          {row.original.bestSolveTimeMs !== null ? formatSolveTimeMs(row.original.bestSolveTimeMs) : '—'}
+          {row.original.timeMs !== null ? formatSolveTimeMs(row.original.timeMs) : '—'}
         </span>
       ),
     },

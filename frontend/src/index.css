@@ -58,3 +58,12 @@
     @apply bg-background text-foreground;
   }
 }
+
+.cg-wrap coords.ranks {
+  left: auto;
+  right: 4px;
+}
+
+.cg-wrap coords.files {
+  text-transform: none;
+}
