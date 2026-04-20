@@ -250,7 +250,7 @@ export function SettingsPage(): React.ReactElement | null {
       <section className="py-6 border-b border-border">
         <h2 className="text-sm font-semibold mb-4">Board theme</h2>
         <p className="text-xs text-muted-foreground mb-3">
-          Choose the board image used when solving puzzles.
+          Choose the board theme.
         </p>
         <div className="flex flex-wrap gap-2">
           {BOARD_THEMES.map((theme) => {
@@ -288,7 +288,7 @@ export function SettingsPage(): React.ReactElement | null {
       <section className="py-6 border-b border-border">
         <h2 className="text-sm font-semibold mb-4">Piece set</h2>
         <p className="text-xs text-muted-foreground mb-3">
-          Choose the piece set used when solving puzzles.
+          Choose a piece set.
         </p>
         <div className="flex flex-wrap gap-2">
           {PIECE_SETS.map((set) => {
@@ -324,8 +324,8 @@ export function SettingsPage(): React.ReactElement | null {
         <h2 className="text-sm font-semibold mb-4">Appearance</h2>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm">Theme</p>
-            <p className="text-xs text-muted-foreground">Switches between light and dark mode.</p>
+            <p className="text-sm">Application theme</p>
+            <p className="text-xs text-muted-foreground mt-4">Switches between light and dark mode.</p>
           </div>
           <ThemeToggle />
         </div>

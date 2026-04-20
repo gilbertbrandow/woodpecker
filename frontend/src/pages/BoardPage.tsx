@@ -140,7 +140,6 @@ export function BoardPage(): React.ReactElement {
   const runPuzzleId = parseInt(runPuzzleIdStr, 10)
   const attemptId = parseInt(attemptIdStr, 10)
 
-  // ── Refs: mutable game state read by stable callbacks ──────────────────────
   const chessRef = useRef<Chess | null>(null)
   const modeRef = useRef<Mode>('loading')
   const moveIndexRef = useRef(1)
@@ -153,13 +152,12 @@ export function BoardPage(): React.ReactElement {
   const elapsedRef = useRef(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pendingPromotionRef = useRef<PendingPromotion | null>(null)
+  const committedLastMoveRef = useRef<[string, string] | undefined>(undefined)
 
-  // Refs to the latest conclude/enterOverview — so handleUserMove never goes stale
   const concludeFnRef = useRef<(status: 'solved' | 'failed') => Promise<void>>(async () => {})
   const enterOverviewFnRef = useRef<() => void>(() => {})
   const concludingRef = useRef(false)
 
-  // ── State: drives rendering ─────────────────────────────────────────────────
   const [mode, setMode] = useState<Mode>('loading')
   const [puzzle, setPuzzle] = useState<RunPuzzleFull | null>(null)
   const [orientation, setOrientation] = useState<Orientation>('white')
@@ -180,7 +178,6 @@ export function BoardPage(): React.ReactElement {
   const [concluding, setConcluding] = useState(false)
   const [, setCompleteResult] = useState<CompleteAttemptResult | null>(null)
 
-  // ── Board sizing: fill viewport height minus chrome ────────────────────────
   const [boardSize, setBoardSize] = useState(480)
 
   useEffect(() => {
@@ -200,7 +197,6 @@ export function BoardPage(): React.ReactElement {
     return () => window.removeEventListener('resize', compute)
   }, [])
 
-  // ── Sync helpers (update ref + state together) ──────────────────────────────
   const setFen = useCallback((fen: string): void => {
     displayFenRef.current = fen
     setDisplayFen(fen)
@@ -216,7 +212,6 @@ export function BoardPage(): React.ReactElement {
     setPendingPromotion(v)
   }, [])
 
-  // ── Load puzzle on mount ────────────────────────────────────────────────────
   useEffect(() => {
     void (async () => {
       try {
@@ -279,6 +274,7 @@ export function BoardPage(): React.ReactElement {
           setFen(initialFen)
           setDests(computeDests(chess))
           setLastMove(initialLastMove)
+          committedLastMoveRef.current = initialLastMove
         }
 
         modeRef.current = targetMode
@@ -290,7 +286,6 @@ export function BoardPage(): React.ReactElement {
     })()
   }, [runId, runPuzzleId, attemptId])
 
-  // ── Timer: runs only in focus mode ─────────────────────────────────────────
   useEffect(() => {
     if (mode !== 'focus') return
     timerRef.current = setInterval(() => {
@@ -305,7 +300,6 @@ export function BoardPage(): React.ReactElement {
     }
   }, [mode])
 
-  // ── beforeunload: registered while an attempt is live ──────────────────────
   useEffect(() => {
     if (currentAttemptId === null) return
     const handler = (e: BeforeUnloadEvent): void => { e.preventDefault() }
@@ -313,7 +307,6 @@ export function BoardPage(): React.ReactElement {
     return () => window.removeEventListener('beforeunload', handler)
   }, [currentAttemptId])
 
-  // ── Mode transitions ────────────────────────────────────────────────────────
   const enterOverview = useCallback((): void => {
     const data = puzzleRef.current
     if (!data) return
@@ -333,7 +326,6 @@ export function BoardPage(): React.ReactElement {
     setHintSquare(null)
   }, [])
 
-  // Keep fn refs up-to-date so stable handleUserMove always calls the latest
   enterOverviewFnRef.current = enterOverview
 
   const conclude = useCallback(async (status: 'solved' | 'failed'): Promise<void> => {
@@ -367,13 +359,14 @@ export function BoardPage(): React.ReactElement {
 
   concludeFnRef.current = conclude
 
-  // ── Core board logic (stable — reads only from refs) ────────────────────────
   const applyOpponentMove = useCallback((uci: string): void => {
     const chess = chessRef.current
     if (!chess) return
     applyUci(chess, uci)
     setFen(chess.fen())
-    setLastMove([uci.slice(0, 2), uci.slice(2, 4)])
+    const lm: [string, string] = [uci.slice(0, 2), uci.slice(2, 4)]
+    setLastMove(lm)
+    committedLastMoveRef.current = lm
     setDests(computeDests(chess))
     moveIndexRef.current += 1
   }, [setFen])
@@ -388,6 +381,7 @@ export function BoardPage(): React.ReactElement {
     }
     setFen(chess.fen())
     setLastMove([orig, dest])
+    committedLastMoveRef.current = [orig, dest]
     setDests(computeDests(chess))
     setHintSquare(null)
     moveIndexRef.current += 1
@@ -433,14 +427,13 @@ export function BoardPage(): React.ReactElement {
       displayFenRef.current = prevFen
       setDisplayFen(prevFen)
       setDests(computeDests(chess))
-      setLastMove(undefined)
+      setLastMove(committedLastMoveRef.current)
       setHintSquare(null)
       inputBlockedRef.current = false
       setInputBlocked(false)
     }, 500)
   }, [setFen])
 
-  // Stable — safe to pass to chessground events
   const handleUserMove = useCallback((orig: string, dest: string): void => {
     if (inputBlockedRef.current) return
     if (concludingRef.current) return
@@ -538,7 +531,6 @@ export function BoardPage(): React.ReactElement {
     }, 150)
   }, [setFen, applyOpponentMove])
 
-  // ── Render ──────────────────────────────────────────────────────────────────
   if (!puzzle || mode === 'loading') {
     return (
       <div className="flex h-full items-center justify-center">
@@ -586,7 +578,6 @@ export function BoardPage(): React.ReactElement {
     </div>
   )
 
-  // Active board (focus / failed)
   const activeBoard = (
     <div className="chess-board-container relative shrink-0" style={{ width: boardSize, height: boardSize }}>
       <Chessground
@@ -596,12 +587,15 @@ export function BoardPage(): React.ReactElement {
         fen={displayFen}
         orientation={orientation}
         turnColor={orientation}
+        coordinates={true}
         movable={{
           color: orientation,
           dests,
+          showDests: true,
           free: false,
           events: { after: handleUserMove },
         }}
+        draggable={{ showGhost: true }}
         lastMove={lastMove}
         animation={{ enabled: true, duration: 150 }}
         highlight={{ lastMove: true, check: true }}
@@ -623,7 +617,6 @@ export function BoardPage(): React.ReactElement {
     </div>
   )
 
-  // Static board (overview)
   const staticBoard = (
     <div className="chess-board-container shrink-0" style={{ width: boardSize, height: boardSize }}>
       <Chessground
@@ -632,6 +625,7 @@ export function BoardPage(): React.ReactElement {
         fen={overviewFen}
         orientation={orientation}
         turnColor={orientation}
+        coordinates={true}
         movable={{ color: undefined, free: false }}
         lastMove={undefined}
         animation={{ enabled: false }}
@@ -645,7 +639,6 @@ export function BoardPage(): React.ReactElement {
   const innerCls = 'flex w-full items-start gap-6'
   const sidebarCls = 'hidden flex-1 flex-col md:flex'
 
-  // ── Focus mode ──────────────────────────────────────────────────────────────
   if (mode === 'focus') {
     return (
       <div className={outerCls}>
@@ -718,7 +711,6 @@ export function BoardPage(): React.ReactElement {
     )
   }
 
-  // ── Failed mode ─────────────────────────────────────────────────────────────
   if (mode === 'failed') {
     const elapsed = formatTimer(elapsedRef.current)
     return (
@@ -770,7 +762,6 @@ export function BoardPage(): React.ReactElement {
     )
   }
 
-  // ── Overview mode (shell — content defined by future spec) ──────────────────
   return (
     <div className={outerCls}>
       <div className={innerCls}>
