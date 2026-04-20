@@ -78,13 +78,16 @@
   right: 0;
   width: 12.5%;
   text-align: right;
-  font-weight: bold;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .cg-wrap coords.ranks coord {
   transform: none;
-  padding-top: 2px;
-  padding-right: 3px;
+  padding-top: 1px;
+  padding-right: 4px;
 }
 
 .cg-wrap coords.files {
@@ -92,11 +95,20 @@
   left: 0;
   text-transform: none;
   text-align: left;
-  font-weight: bold;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .cg-wrap coords.files coord {
-  padding-left: 3px;
+  padding-left: 4px;
+  padding-bottom: 1px;
+}
+
+.cg-wrap piece.ghost {
+  opacity: 0.42;
+  filter: saturate(0.05) brightness(0.75);
 }
 
 /* Alternate coord text colour so letters contrast on both light and dark squares */
@@ -115,15 +127,19 @@
 }
 
 cg-board square.move-dest {
-  background: radial-gradient(rgba(20, 85, 30, 0.5) 22%, #208530 0, rgba(0, 0, 0, 0.3) 0, rgba(0, 0, 0, 0) 0);
+  background: radial-gradient(rgba(20, 85, 30, 0.5) 19%, rgba(0, 0, 0, 0) calc(20% + 1px));
 }
 
 cg-board square.oc.move-dest {
-  background: radial-gradient(transparent 0%, transparent 80%, rgba(20, 85, 0, 0.3) 80%);
+  background: radial-gradient(transparent 0%, transparent 79%, rgba(20, 85, 0, 0.3) calc(80% + 1px));
 }
 
 cg-board square.move-dest:hover {
-  background: rgba(20, 85, 30, 0.3);
+  background: radial-gradient(rgba(20, 85, 30, 0.56) 28%, rgba(20, 85, 30, 0.22) 62%, rgba(0, 0, 0, 0) 68%);
+}
+
+.cg-wrap:has(piece.dragging) cg-board square.move-dest:hover {
+  background: radial-gradient(rgba(20, 85, 30, 0.65) 30%, rgba(20, 85, 30, 0.26) 68%, rgba(0, 0, 0, 0) 72%);
 }
 
 cg-board square.last-move {

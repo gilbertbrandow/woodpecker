@@ -10,17 +10,8 @@ import { toast } from 'sonner'
 import { api, type RunPuzzleFull, type CompleteAttemptResult } from '../lib/api'
 import { useAuth } from '../context/auth'
 import { useChessTheme } from '../hooks/useChessTheme'
+import { resolvePieceSet } from '../lib/themes'
 import { Button } from '../components/ui/button'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../components/ui/alert-dialog'
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -30,6 +21,7 @@ import {
   BreadcrumbPage,
 } from '../components/ui/breadcrumb'
 import { Badge } from '../components/ui/badge'
+import { Check, X } from 'lucide-react'
 
 const HEADER_H = 57
 const FOOTER_H = 49
@@ -38,10 +30,19 @@ const H_PAD_MD = 48
 const H_PAD_SM = 32
 const MIN_SIDEBAR = 96
 const MAX_BOARD = 760
+const MOVE_FEEDBACK_SUCCESS_MS = 200
+const WRONG_REVERT_MS = 500
+const FAILED_TO_OVERVIEW_MS = 300
 
 type Mode = 'loading' | 'focus' | 'failed' | 'overview'
 type Orientation = 'white' | 'black'
 type PendingPromotion = { orig: string; dest: string }
+type MoveFeedbackResult = 'correct' | 'wrong'
+type MoveFeedbackState = {
+  lastMoveResult: MoveFeedbackResult | null
+  lastMoveSquare: string | null
+  isShowingMoveFeedback: boolean
+}
 
 function computeDests(chess: Chess): Map<string, string[]> {
   const dests = new Map<string, string[]>()
@@ -128,6 +129,43 @@ function PromotionPicker({ pending, orientation, onSelect, onCancel }: Promotion
   )
 }
 
+type MoveFeedbackBadgeProps = {
+  result: MoveFeedbackResult
+  square: string
+  orientation: Orientation
+}
+
+function MoveFeedbackBadge({ result, square, orientation }: MoveFeedbackBadgeProps): React.ReactElement | null {
+  if (square.length !== 2) return null
+
+  const file = square.charCodeAt(0) - 97
+  const rank = Number(square[1])
+  if (Number.isNaN(rank) || file < 0 || file > 7 || rank < 1 || rank > 8) return null
+
+  const col = orientation === 'white' ? file : 7 - file
+  const row = orientation === 'white' ? 8 - rank : rank - 1
+  const left = col * 12.5
+  const top = row * 12.5
+  const isCorrect = result === 'correct'
+
+  return (
+    <div
+      className="pointer-events-none absolute z-20"
+      style={{ left: `${left}%`, top: `${top}%`, width: '12.5%', height: '12.5%' }}
+    >
+      <div
+        className={`absolute right-[6%] top-[6%] flex h-[38%] w-[38%] items-center justify-center rounded-full border shadow-sm ${
+          isCorrect
+            ? 'border-emerald-300/90 bg-emerald-500/85 text-white'
+            : 'border-red-300/90 bg-red-500/85 text-white'
+        }`}
+      >
+        {isCorrect ? <Check className="h-[65%] w-[65%]" strokeWidth={3} /> : <X className="h-[65%] w-[65%]" strokeWidth={3} />}
+      </div>
+    </div>
+  )
+}
+
 export function BoardPage(): React.ReactElement {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -153,6 +191,11 @@ export function BoardPage(): React.ReactElement {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pendingPromotionRef = useRef<PendingPromotion | null>(null)
   const committedLastMoveRef = useRef<[string, string] | undefined>(undefined)
+  const moveFeedbackRef = useRef<MoveFeedbackState>({
+    lastMoveResult: null,
+    lastMoveSquare: null,
+    isShowingMoveFeedback: false,
+  })
 
   const concludeFnRef = useRef<(status: 'solved' | 'failed') => Promise<void>>(async () => {})
   const enterOverviewFnRef = useRef<() => void>(() => {})
@@ -174,9 +217,10 @@ export function BoardPage(): React.ReactElement {
   const [overviewFen, setOverviewFen] = useState('')
   const [boardKey, setBoardKey] = useState(0)
 
-  const [showGiveUpDialog, setShowGiveUpDialog] = useState(false)
-  const [concluding, setConcluding] = useState(false)
   const [, setCompleteResult] = useState<CompleteAttemptResult | null>(null)
+  const [lastMoveResult, setLastMoveResult] = useState<MoveFeedbackResult | null>(null)
+  const [lastMoveSquare, setLastMoveSquare] = useState<string | null>(null)
+  const [isShowingMoveFeedback, setIsShowingMoveFeedback] = useState(false)
 
   const [boardSize, setBoardSize] = useState(480)
 
@@ -211,6 +255,30 @@ export function BoardPage(): React.ReactElement {
     pendingPromotionRef.current = v
     setPendingPromotion(v)
   }, [])
+
+  const setMoveFeedback = useCallback((
+    result: MoveFeedbackResult | null,
+    square: string | null,
+    visible: boolean,
+  ): void => {
+    moveFeedbackRef.current = {
+      lastMoveResult: result,
+      lastMoveSquare: square,
+      isShowingMoveFeedback: visible,
+    }
+    setLastMoveResult(result)
+    setLastMoveSquare(square)
+    setIsShowingMoveFeedback(visible)
+  }, [])
+
+  const clearMoveFeedback = useCallback((): void => {
+    setMoveFeedback(null, null, false)
+  }, [setMoveFeedback])
+
+  const hideMoveFeedbackBadge = useCallback((): void => {
+    const current = moveFeedbackRef.current
+    setMoveFeedback(current.lastMoveResult, current.lastMoveSquare, false)
+  }, [setMoveFeedback])
 
   useEffect(() => {
     void (async () => {
@@ -262,6 +330,7 @@ export function BoardPage(): React.ReactElement {
         setElapsedSeconds(0)
         setPendingPromotionBoth(null)
         setBlocked(false)
+        clearMoveFeedback()
         setHintSquare(null)
 
         if (targetMode === 'overview') {
@@ -284,7 +353,7 @@ export function BoardPage(): React.ReactElement {
         void navigate({ to: '/app/runs/$runId', params: { runId: runIdStr }, replace: true })
       }
     })()
-  }, [runId, runPuzzleId, attemptId])
+  }, [runId, runPuzzleId, attemptId, clearMoveFeedback])
 
   useEffect(() => {
     if (mode !== 'focus') return
@@ -337,7 +406,6 @@ export function BoardPage(): React.ReactElement {
     if (id === null) return
 
     concludingRef.current = true
-    setConcluding(true)
     try {
       const result = await api.attempts.complete(id, status, movesPlayedRef.current)
       setCompleteResult(result)
@@ -353,7 +421,6 @@ export function BoardPage(): React.ReactElement {
       toast.error('Failed to submit attempt', { description: 'Please try again.' })
     } finally {
       concludingRef.current = false
-      setConcluding(false)
     }
   }, [enterFailed])
 
@@ -383,22 +450,28 @@ export function BoardPage(): React.ReactElement {
     setLastMove([orig, dest])
     committedLastMoveRef.current = [orig, dest]
     setDests(computeDests(chess))
+    setMoveFeedback('correct', dest, true)
     setHintSquare(null)
     moveIndexRef.current += 1
 
     const solutionMoves = solutionMovesRef.current
     if (moveIndexRef.current >= solutionMoves.length) {
-      if (modeRef.current === 'focus') {
-        void concludeFnRef.current('solved')
-      } else {
-        setTimeout(() => enterOverviewFnRef.current(), 300)
-      }
+      setTimeout(() => {
+        if (modeRef.current === 'focus') {
+          void concludeFnRef.current('solved')
+        } else {
+          setTimeout(() => enterOverviewFnRef.current(), FAILED_TO_OVERVIEW_MS)
+        }
+      }, MOVE_FEEDBACK_SUCCESS_MS)
       return
     }
 
     const opponentUci = solutionMoves[moveIndexRef.current]
-    setTimeout(() => applyOpponentMove(opponentUci), 150)
-  }, [setFen, applyOpponentMove])
+    setTimeout(() => {
+      hideMoveFeedbackBadge()
+      applyOpponentMove(opponentUci)
+    }, MOVE_FEEDBACK_SUCCESS_MS)
+  }, [setFen, applyOpponentMove, hideMoveFeedbackBadge, setMoveFeedback])
 
   const resolveWrongMove = useCallback((
     orig: string,
@@ -411,11 +484,11 @@ export function BoardPage(): React.ReactElement {
     const prevFen = displayFenRef.current
     inputBlockedRef.current = true
     setInputBlocked(true)
+    setMoveFeedback('wrong', dest, true)
 
     const uci = orig + dest + (promotionPiece ?? '')
     if (modeRef.current === 'focus') {
       movesPlayedRef.current = [...movesPlayedRef.current, uci]
-      void concludeFnRef.current('failed')
     }
 
     chess.move({ from: orig, to: dest, promotion: promotionPiece ?? 'q' })
@@ -428,11 +501,15 @@ export function BoardPage(): React.ReactElement {
       setDisplayFen(prevFen)
       setDests(computeDests(chess))
       setLastMove(committedLastMoveRef.current)
+      hideMoveFeedbackBadge()
       setHintSquare(null)
       inputBlockedRef.current = false
       setInputBlocked(false)
-    }, 500)
-  }, [setFen])
+      if (modeRef.current === 'focus') {
+        void concludeFnRef.current('failed')
+      }
+    }, WRONG_REVERT_MS)
+  }, [setFen, setMoveFeedback, hideMoveFeedbackBadge])
 
   const handleUserMove = useCallback((orig: string, dest: string): void => {
     if (inputBlockedRef.current) return
@@ -519,7 +596,7 @@ export function BoardPage(): React.ReactElement {
         inputBlockedRef.current = false
         setInputBlocked(false)
         enterOverviewFnRef.current()
-      }, 300)
+      }, FAILED_TO_OVERVIEW_MS)
       return
     }
 
@@ -567,14 +644,61 @@ export function BoardPage(): React.ReactElement {
 
   const puzzleInfo = (
     <div className="flex flex-col gap-0.5">
-      <span className="text-xs text-muted-foreground">
-        Puzzle {puzzle.position + 1} of {puzzle.totalPuzzles}
-      </span>
       {puzzle.maxTriesPerPuzzle > 1 && (
         <span className="text-xs text-muted-foreground">
           Try {puzzle.currentTryNumber}
         </span>
       )}
+    </div>
+  )
+
+  const turnToMove: Orientation = displayFen.split(' ')[1] === 'b' ? 'black' : 'white'
+  const turnLabel = turnToMove === 'white' ? 'White' : 'Black'
+  const pieceSet = resolvePieceSet(user?.pieceTheme ?? '')
+  const kingPieceUrl = turnToMove === 'white' ? pieceSet.pieces.wK : pieceSet.pieces.bK
+  const moveStatusTitle = lastMoveResult === 'correct'
+    ? 'Correct, continue'
+    : lastMoveResult === 'wrong'
+      ? 'Wrong, try again'
+      : `${turnLabel} to move`
+  const moveStatusHelp = lastMoveResult === 'correct'
+    ? 'Great move. Stay sharp for the next position.'
+    : lastMoveResult === 'wrong'
+      ? 'Try another idea from this position.'
+      : `Find the best move for ${turnToMove}.`
+
+  const moveStatusIcon = lastMoveResult === 'correct'
+    ? (
+        <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-600/35 bg-emerald-500/15 text-emerald-700 dark:border-emerald-400/35 dark:bg-emerald-400/15 dark:text-emerald-300">
+        <Check className="h-6 w-6" strokeWidth={2.75} />
+      </span>
+    )
+    : lastMoveResult === 'wrong'
+      ? (
+        <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-red-600/35 bg-red-500/15 text-red-700 dark:border-red-400/35 dark:bg-red-400/15 dark:text-red-300">
+          <X className="h-6 w-6" strokeWidth={2.75} />
+        </span>
+      )
+      : (
+        <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border bg-white">
+          <img
+            src={kingPieceUrl}
+            alt={`${turnLabel} king`}
+            className="h-9 w-9 object-contain"
+            draggable={false}
+          />
+        </span>
+      )
+
+  const moveStatusCard = (
+    <div className="min-h-24 rounded-md border border-border px-3 py-3 text-foreground">
+      <div className="flex min-h-16 items-center gap-3">
+        {moveStatusIcon}
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="text-base font-semibold leading-tight">{moveStatusTitle}</span>
+          <span className="text-xs text-muted-foreground leading-tight">{moveStatusHelp}</span>
+        </div>
+      </div>
     </div>
   )
 
@@ -614,11 +738,18 @@ export function BoardPage(): React.ReactElement {
           onCancel={onPromotionCancel}
         />
       )}
+      {isShowingMoveFeedback && lastMoveResult && lastMoveSquare && (
+        <MoveFeedbackBadge
+          result={lastMoveResult}
+          square={lastMoveSquare}
+          orientation={orientation}
+        />
+      )}
     </div>
   )
 
   const staticBoard = (
-    <div className="chess-board-container shrink-0" style={{ width: boardSize, height: boardSize }}>
+    <div className="chess-board-container relative shrink-0" style={{ width: boardSize, height: boardSize }}>
       <Chessground
         width={boardSize}
         height={boardSize}
@@ -632,6 +763,13 @@ export function BoardPage(): React.ReactElement {
         highlight={{ lastMove: false, check: false }}
         premovable={{ enabled: false }}
       />
+      {lastMoveResult === 'correct' && lastMoveSquare !== null && (
+        <MoveFeedbackBadge
+          result={lastMoveResult}
+          square={lastMoveSquare}
+          orientation={orientation}
+        />
+      )}
     </div>
   )
 
@@ -660,14 +798,6 @@ export function BoardPage(): React.ReactElement {
               <span className="tabular-nums text-sm font-medium">
                 {formatTimer(elapsedSeconds)}
               </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowGiveUpDialog(true)}
-                disabled={concluding}
-              >
-                Give Up
-              </Button>
             </div>
           </div>
 
@@ -675,38 +805,9 @@ export function BoardPage(): React.ReactElement {
             <span className="tabular-nums text-sm font-medium">
               {formatTimer(elapsedSeconds)}
             </span>
-            <div className="mt-auto">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowGiveUpDialog(true)}
-                disabled={concluding}
-              >
-                Give Up
-              </Button>
-            </div>
+            <div className="mt-auto">{moveStatusCard}</div>
           </aside>
         </div>
-
-        <AlertDialog open={showGiveUpDialog} onOpenChange={setShowGiveUpDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Give up on this puzzle?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Your progress on this try will be recorded.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => void conclude('failed')}
-                disabled={concluding}
-              >
-                {concluding ? 'Submitting…' : 'Give Up'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
     )
   }
@@ -748,13 +849,14 @@ export function BoardPage(): React.ReactElement {
 
           <aside className={sidebarCls} style={sidebarH}>
             <span className="tabular-nums text-sm text-muted-foreground">{elapsed}</span>
-            <div className="mt-auto flex flex-col gap-2">
+            <div className="mt-auto flex flex-col gap-3">
               <Button variant="outline" size="sm" onClick={handleShowHint} disabled={inputBlocked}>
                 Show Hint
               </Button>
               <Button variant="outline" size="sm" onClick={handleShowSolution} disabled={inputBlocked}>
                 Show Solution
               </Button>
+              {moveStatusCard}
             </div>
           </aside>
         </div>
