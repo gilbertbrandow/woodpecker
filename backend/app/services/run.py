@@ -324,7 +324,14 @@ def list_run_puzzles(run_id: int, user_id: int) -> dict[str, object]:
                    p.puzzle_id,
                    p.rating,
                    COUNT(pa.id) FILTER (WHERE pa.status != 'in_progress') AS try_count,
-                   MIN(pa.time_spent_ms) FILTER (WHERE pa.status = 'solved') AS best_solve_time_ms
+                   (
+                       SELECT pa2.time_spent_ms
+                       FROM puzzle_attempts pa2
+                       WHERE pa2.run_puzzle_id = rp.id
+                         AND pa2.status != 'in_progress'
+                       ORDER BY pa2.try_number DESC
+                       LIMIT 1
+                   ) AS time_ms
             FROM run_puzzles rp
             JOIN puzzles p ON p.id = rp.puzzle_id
             LEFT JOIN puzzle_attempts pa ON pa.run_puzzle_id = rp.id
@@ -343,9 +350,7 @@ def list_run_puzzles(run_id: int, user_id: int) -> dict[str, object]:
             "rating": row.rating,
             "positionStatus": row.position_status,
             "tryCount": int(row.try_count) if row.try_count is not None else 0,
-            "bestSolveTimeMs": (
-                int(row.best_solve_time_ms) if row.best_solve_time_ms is not None else None
-            ),
+            "timeMs": int(row.time_ms) if row.time_ms is not None else None,
         }
         for row in rows
     ]

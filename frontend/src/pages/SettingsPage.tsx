@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { useAuth } from '../context/auth'
 import { api } from '../lib/api'
 import { AVATAR_PIECES, AVATAR_COLORS, parseAvatarValue, type AvatarPiece, type AvatarColor } from '../lib/avatar'
+import { BOARD_THEMES, PIECE_SETS } from '../lib/themes'
 import { Button } from '../components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar'
 import { DefaultAvatar } from '../components/DefaultAvatar'
@@ -24,6 +25,8 @@ export function SettingsPage(): React.ReactElement | null {
   const [nickname, setNickname] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [saving, setSaving] = useState(false)
+  const [savingBoard, setSavingBoard] = useState(false)
+  const [savingPiece, setSavingPiece] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -85,6 +88,32 @@ export function SettingsPage(): React.ReactElement | null {
       toast('Avatar reset', { description: 'Reverted to your generated avatar.' })
     } catch {
       toast.error('Something went wrong', { description: 'Please try again.' })
+    }
+  }
+
+  const selectBoardTheme = async (themeId: string): Promise<void> => {
+    if (savingBoard || themeId === user.boardTheme) return
+    setSavingBoard(true)
+    try {
+      const updated = await api.settings.update({ boardTheme: themeId })
+      updateUser(updated)
+    } catch {
+      toast.error('Something went wrong', { description: 'Please try again.' })
+    } finally {
+      setSavingBoard(false)
+    }
+  }
+
+  const selectPieceTheme = async (setId: string): Promise<void> => {
+    if (savingPiece || setId === user.pieceTheme) return
+    setSavingPiece(true)
+    try {
+      const updated = await api.settings.update({ pieceTheme: setId })
+      updateUser(updated)
+    } catch {
+      toast.error('Something went wrong', { description: 'Please try again.' })
+    } finally {
+      setSavingPiece(false)
     }
   }
 
@@ -216,6 +245,79 @@ export function SettingsPage(): React.ReactElement | null {
         >
           Reset to auto
         </Button>
+      </section>
+
+      <section className="py-6 border-b border-border">
+        <h2 className="text-sm font-semibold mb-4">Board theme</h2>
+        <p className="text-xs text-muted-foreground mb-3">
+          Choose the board image used when solving puzzles.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {BOARD_THEMES.map((theme) => {
+            const isActive = user.boardTheme === theme.id
+            const previewUrl = theme.thumbnailUrl ?? theme.url
+            return (
+              <button
+                key={theme.id}
+                type="button"
+                onClick={() => void selectBoardTheme(theme.id)}
+                aria-label={theme.label}
+                aria-pressed={isActive}
+                title={theme.label}
+                disabled={savingBoard}
+                className={
+                  isActive
+                    ? 'rounded p-0.5 ring-2 ring-foreground ring-offset-2 ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait'
+                    : 'rounded p-0.5 ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover:ring-1 hover:ring-muted-foreground hover:ring-offset-1 disabled:cursor-wait'
+                }
+              >
+                <div
+                  className="w-14 h-10 rounded overflow-hidden"
+                  style={{
+                    backgroundImage: `url("${previewUrl}")`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                  }}
+                />
+              </button>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className="py-6 border-b border-border">
+        <h2 className="text-sm font-semibold mb-4">Piece set</h2>
+        <p className="text-xs text-muted-foreground mb-3">
+          Choose the piece set used when solving puzzles.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {PIECE_SETS.map((set) => {
+            const isActive = user.pieceTheme === set.id
+            return (
+              <button
+                key={set.id}
+                type="button"
+                onClick={() => void selectPieceTheme(set.id)}
+                aria-label={set.label}
+                aria-pressed={isActive}
+                title={set.label}
+                disabled={savingPiece}
+                className={
+                  isActive
+                    ? 'rounded p-1 ring-2 ring-foreground ring-offset-2 ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait'
+                    : 'rounded p-1 ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover:ring-1 hover:ring-muted-foreground hover:ring-offset-1 disabled:cursor-wait'
+                }
+              >
+                <img
+                  src={set.knightPreviewUrl}
+                  alt={set.label}
+                  className="h-10 w-10 object-contain"
+                  draggable={false}
+                />
+              </button>
+            )
+          })}
+        </div>
       </section>
 
       <section className="py-6">

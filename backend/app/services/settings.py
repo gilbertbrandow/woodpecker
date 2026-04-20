@@ -6,6 +6,18 @@ AVATAR_COLORS = {
     "navy", "sky", "forest", "sage", "amber", "straw", "crimson", "rust",
 }
 
+BOARD_THEMES = {
+    "blue", "blue2", "brown", "green", "green-plastic", "maple", "wood","wood4",
+}
+
+PIECE_SETS = {
+    "alpha", "anarcandy", "companion","maestro",
+    "merida",
+}
+
+DEFAULT_BOARD_THEME = "blue"
+DEFAULT_PIECE_SET = "alpha"
+
 
 def _validate_nickname(value: str) -> str | None:
     stripped = value.strip()
@@ -34,10 +46,24 @@ def _validate_avatar_url(value: str) -> str | None:
     raise ValueError("Avatar URL must start with https:// or be a valid default avatar.")
 
 
+def _validate_board_theme(value: str) -> str:
+    if value not in BOARD_THEMES:
+        raise ValueError(f"Invalid board theme: {value!r}.")
+    return value
+
+
+def _validate_piece_set(value: str) -> str:
+    if value not in PIECE_SETS:
+        raise ValueError(f"Invalid piece set: {value!r}.")
+    return value
+
+
 def update_user_settings(
     user_id: int,
     nickname: str | None,
     avatar_url: str | None,
+    board_theme: str | None,
+    piece_theme: str | None,
 ) -> User:
     user = db.session.get(User, user_id)
     if not user:
@@ -47,6 +73,10 @@ def update_user_settings(
         user.nickname = _validate_nickname(nickname)
     if avatar_url is not None:
         user.avatar_url = _validate_avatar_url(avatar_url)
+    if board_theme is not None:
+        user.board_theme = _validate_board_theme(board_theme)
+    if piece_theme is not None:
+        user.piece_theme = _validate_piece_set(piece_theme)
 
     db.session.commit()
     return user

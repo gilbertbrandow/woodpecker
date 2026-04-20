@@ -68,4 +68,6 @@ def me() -> tuple[Response, int] | Response:
         "username": user.lichess_username,
         "nickname": user.nickname,
         "avatarUrl": user.avatar_url,
+        "boardTheme": user.board_theme,
+        "pieceTheme": user.piece_theme,
     })

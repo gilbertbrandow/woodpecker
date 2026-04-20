@@ -12,6 +12,8 @@ def _user_to_dict(user: User) -> dict[str, object]:
         "username": user.lichess_username,
         "nickname": user.nickname,
         "avatarUrl": user.avatar_url,
+        "boardTheme": user.board_theme,
+        "pieceTheme": user.piece_theme,
     }
 
 
@@ -23,12 +25,16 @@ def patch_settings() -> tuple[Response, int] | Response:
 
     nickname = data.get("nickname")
     avatar_url = data.get("avatarUrl")
+    board_theme = data.get("boardTheme")
+    piece_theme = data.get("pieceTheme")
 
     try:
         user = update_user_settings(
             user_id,
             str(nickname) if nickname is not None else None,
             str(avatar_url) if avatar_url is not None else None,
+            str(board_theme) if board_theme is not None else None,
+            str(piece_theme) if piece_theme is not None else None,
         )
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
