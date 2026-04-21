@@ -119,6 +119,18 @@ backend/
 
 ---
 
+## Running Tests
+
+Always run tests after modifying backend or frontend code to verify nothing is broken.
+
+- **Frontend:** `make test-frontend` (runs from `frontend/`, uses Vitest)
+- **Backend:** `make test-backend` (runs from `backend/`, uses pytest via `.venv/bin/pytest`)
+- **Both:** `make test`
+
+The backend tests do not require a running database — service-layer tests are pure logic and the Flask app fixture uses lazy DB connections. Run `make test` before considering any task complete.
+
+---
+
 ## General
 
 - **No comments.** Code must be self-documenting through clear naming and structure. Do not write inline comments, block comments, or docstrings unless explicitly asked. If a comment feels necessary, the code should be refactored instead.

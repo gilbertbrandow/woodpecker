@@ -61,4 +61,22 @@ openings-import:
 openings-import-prod:
 	$(PROD_COMPOSE) exec backend flask --app app openings import $(args)
 
-.PHONY: up up-build down logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade migrate-current migrate-history migrate-rollback puzzle-copy puzzle-import puzzle-copy-prod puzzle-import-prod openings-import openings-import-prod
+test-frontend:
+	cd frontend && npm run test:run
+
+test-backend:
+	cd backend && .venv/bin/pytest
+
+test: test-frontend test-backend
+
+test-frontend-docker:
+	$(LOCAL_COMPOSE) run --rm frontend npm run test:run
+
+test-backend-docker:
+	$(LOCAL_COMPOSE) run --rm backend pytest
+
+test-docker:
+	$(MAKE) test-frontend-docker
+	$(MAKE) test-backend-docker
+
+.PHONY: up up-build down logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade migrate-current migrate-history migrate-rollback puzzle-copy puzzle-import puzzle-copy-prod puzzle-import-prod openings-import openings-import-prod test-frontend test-backend test

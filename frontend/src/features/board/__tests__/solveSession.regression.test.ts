@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { SessionAttemptHistoryItem, SessionAttemptStatus } from '../context/solveSession'
+import type { SessionAttemptHistoryItem, SessionAttemptStatus } from '../../../context/solveSession'
 
 type SolveSessionState = { attemptHistory: SessionAttemptHistoryItem[] }
 
