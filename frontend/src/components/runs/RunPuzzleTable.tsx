@@ -115,6 +115,14 @@ export function RunPuzzleTable({ puzzles, runIdStr, isActive }: RunPuzzleTablePr
   const navigate = useNavigate()
   const [sorting, setSorting] = useState<SortingState>([])
 
+  const openSolvePuzzle = (runPuzzleId: number): void => {
+    if (!isActive) return
+    void navigate({
+      to: '/app/runs/$runId/puzzles/$runPuzzleId',
+      params: { runId: runIdStr, runPuzzleId: String(runPuzzleId) },
+    })
+  }
+
   const columns: ColumnDef<RunPuzzleListItem>[] = [
     {
       accessorKey: 'position',
@@ -187,10 +195,7 @@ export function RunPuzzleTable({ puzzles, runIdStr, isActive }: RunPuzzleTablePr
               disabled={!isActive}
               onClick={(e) => {
                 e.stopPropagation()
-                void navigate({
-                  to: '/app/runs/$runId/puzzles/$runPuzzleId',
-                  params: { runId: runIdStr, runPuzzleId: String(item.runPuzzleId) },
-                })
+                openSolvePuzzle(item.runPuzzleId)
               }}
             >
               <Play className="h-4 w-4" />
@@ -262,7 +267,11 @@ export function RunPuzzleTable({ puzzles, runIdStr, isActive }: RunPuzzleTablePr
               </TableRow>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow
+                  key={row.id}
+                  className={isActive ? 'cursor-pointer' : undefined}
+                  onClick={() => openSolvePuzzle(row.original.runPuzzleId)}
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className={(cell.column.columnDef.meta as ColMeta | undefined)?.className}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
