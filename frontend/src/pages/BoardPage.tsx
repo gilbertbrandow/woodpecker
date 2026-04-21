@@ -195,6 +195,8 @@ type TimerCardProps = {
 
 function TimerCard({ timerText, elapsedTenths, targetSolveTenths, muted = false }: TimerCardProps): React.ReactElement {
   const hasTarget = targetSolveTenths !== null && targetSolveTenths > 0
+  const isExpired = hasTarget && elapsedTenths >= targetSolveTenths
+  const shouldShowBar = hasTarget && !isExpired
   const rawLeftPct = hasTarget ? ((targetSolveTenths - elapsedTenths) / targetSolveTenths) * 100 : 0
   const leftPct = Math.max(0, Math.min(100, rawLeftPct))
   const targetText = hasTarget ? formatTargetSolveTime(targetSolveTenths) : ''
@@ -209,25 +211,36 @@ function TimerCard({ timerText, elapsedTenths, targetSolveTenths, muted = false 
     <div className="min-h-24 rounded-md px-3 py-3">
       <div className="flex min-h-16 flex-col items-start justify-center">
         <div className="inline-flex flex-col items-start">
-          <span className={`tabular-nums text-3xl font-semibold leading-none ${muted ? 'text-muted-foreground' : 'text-foreground'}`}>
-            {timerText}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`tabular-nums text-3xl font-semibold leading-none ${muted ? 'text-muted-foreground' : 'text-foreground'}`}>
+              {timerText}
+            </span>
+            {isExpired && (
+              <Badge variant="secondary" className="h-6 rounded-sm px-2 text-[11px] font-medium">
+                Target time missed
+              </Badge>
+            )}
+          </div>
           {hasTarget && (
-            <Tooltip delayDuration={100}>
-              <TooltipTrigger asChild>
-                <div className="mt-3 w-full max-w-full cursor-default">
-                  <div className="h-1.5 bg-foreground/15">
-                    <div
-                      className="ml-auto h-full transition-[width,background-color] duration-100 ease-linear"
-                      style={{ width: `${leftPct}%`, backgroundColor: progressColor }}
-                    />
-                  </div>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                {`Target solve time: ${targetText}. This bar shows how much of that time is remaining.`}
-              </TooltipContent>
-            </Tooltip>
+            <div className="mt-3 h-1.5 w-full max-w-full">
+              {shouldShowBar && (
+                <Tooltip delayDuration={100}>
+                  <TooltipTrigger asChild>
+                    <div className="w-full cursor-default">
+                      <div className="h-1.5 bg-foreground/15">
+                        <div
+                          className="ml-auto h-full transition-[width,background-color] duration-100 ease-linear"
+                          style={{ width: `${leftPct}%`, backgroundColor: progressColor }}
+                        />
+                      </div>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {`Target solve time: ${targetText}. This bar shows how much of that time is remaining.`}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -765,7 +778,7 @@ export function BoardPage(): React.ReactElement {
         </span>
       )
       : (
-        <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border bg-white">
+        <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white">
           <img
             src={kingPieceUrl}
             alt={`${turnLabel} king`}
