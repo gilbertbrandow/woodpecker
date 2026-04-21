@@ -412,6 +412,7 @@ export function BoardPage(): React.ReactElement | null {
 
   const concludeFnRef = useRef<(status: 'solved' | 'failed') => Promise<void>>(async () => {})
   const concludingRef = useRef(false)
+  const skipNextLoadRef = useRef(false)
 
   const [mode, setMode] = useState<Mode>('loading')
   const [puzzle, setPuzzle] = useState<RunPuzzleFull | null>(null)
@@ -429,6 +430,7 @@ export function BoardPage(): React.ReactElement | null {
   const [targetSolveTenths, setTargetSolveTenths] = useState<number | null>(null)
   const [participationId, setParticipationId] = useState<number | null>(null)
   const [boardKey, setBoardKey] = useState(0)
+  const [isLoadingNextPuzzle, setIsLoadingNextPuzzle] = useState(false)
 
   const [overviewRun, setOverviewRun] = useState<Run | null>(null)
   const [overviewPuzzleList, setOverviewPuzzleList] = useState<RunPuzzleList | null>(null)
@@ -498,6 +500,10 @@ export function BoardPage(): React.ReactElement | null {
   }, [setMoveFeedback])
 
   useEffect(() => {
+    if (skipNextLoadRef.current) {
+      skipNextLoadRef.current = false
+      return
+    }
     void (async () => {
       try {
         setParticipationId(null)
@@ -642,6 +648,71 @@ export function BoardPage(): React.ReactElement | null {
     modeRef.current = 'overview'
     setMode('overview')
   }, [setFen, setPendingPromotionBoth])
+
+  const handleNextPuzzle = useCallback(async (): Promise<void> => {
+    setIsLoadingNextPuzzle(true)
+    try {
+      const data = await api.runs.continue(runId)
+      if (data.currentAttemptId === null) {
+        toast.error('Run complete', { description: 'No more puzzles to solve.' })
+        void navigate({ to: '/app/runs/$runId', params: { runId: runIdStr }, replace: true })
+        return
+      }
+
+      const solutionMoves = data.solution.split(' ')
+      if (solutionMoves.length < 2) {
+        toast.error('Invalid puzzle', { description: 'Puzzle solution is too short.' })
+        void navigate({ to: '/app/runs/$runId', params: { runId: runIdStr }, replace: true })
+        return
+      }
+
+      const chess = new Chess(data.fen)
+      applyUci(chess, solutionMoves[0])
+      const initialLastMove: [string, string] = [solutionMoves[0].slice(0, 2), solutionMoves[0].slice(2, 4)]
+
+      chessRef.current = chess
+      solutionMovesRef.current = solutionMoves
+      moveIndexRef.current = 1
+      inputBlockedRef.current = false
+      movesPlayedRef.current = []
+      currentAttemptIdRef.current = data.currentAttemptId
+      puzzleRef.current = data
+      elapsedRef.current = 0
+      committedLastMoveRef.current = initialLastMove
+
+      setOverviewFreshPuzzle(null)
+      setOverviewRun(null)
+      setOverviewPuzzleList(null)
+      setPuzzle(data)
+      setCurrentAttemptId(data.currentAttemptId)
+      setOrientation(playerColor(data.fen))
+      setElapsedSeconds(0)
+      setPendingPromotionBoth(null)
+      setBlocked(false)
+      clearMoveFeedback()
+      setHintSquare(null)
+      setFen(chess.fen())
+      setDests(computeDests(chess))
+      setLastMove(initialLastMove)
+      modeRef.current = 'focus'
+      setMode('focus')
+      setBoardKey((k) => k + 1)
+
+      skipNextLoadRef.current = true
+      void navigate({
+        to: '/app/runs/$runId/puzzles/$runPuzzleId/attempts/$attemptId',
+        params: {
+          runId: runIdStr,
+          runPuzzleId: String(data.runPuzzleId),
+          attemptId: String(data.currentAttemptId),
+        },
+      })
+    } catch {
+      toast.error('Failed to load next puzzle', { description: 'Please try again.' })
+    } finally {
+      setIsLoadingNextPuzzle(false)
+    }
+  }, [navigate, runId, runIdStr, setFen, setBlocked, setPendingPromotionBoth, clearMoveFeedback])
 
   const enterFailed = useCallback((): void => {
     modeRef.current = 'failed'
@@ -1213,8 +1284,8 @@ export function BoardPage(): React.ReactElement | null {
     <div className="mt-auto flex flex-col gap-3">
       <Button
         className="w-full bg-foreground text-background hover:bg-foreground/90"
-        disabled={overviewRun.status !== 'active'}
-        onClick={() => void navigate({ to: '/app/runs/$runId/solve', params: { runId: runIdStr } })}
+        disabled={overviewRun.status !== 'active' || isLoadingNextPuzzle}
+        onClick={() => void handleNextPuzzle()}
       >
         Next puzzle
       </Button>
