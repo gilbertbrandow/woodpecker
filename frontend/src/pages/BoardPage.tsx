@@ -7,7 +7,7 @@ import { Chess, type Square } from 'chess.js'
 // @ts-ignore — react-chessground ships no bundled type declarations
 import Chessground from 'react-chessground'
 import { toast } from 'sonner'
-import { api, type RunPuzzleFull, type CompleteAttemptResult } from '../lib/api'
+import { api, type RunPuzzleFull, type CompleteAttemptResult, type Run, type RunPuzzleList, type RunPuzzleListItem } from '../lib/api'
 import { useAuth } from '../context/auth'
 import { useChessTheme } from '../hooks/useChessTheme'
 import { resolvePieceSet } from '../lib/themes'
@@ -24,6 +24,7 @@ import { Badge } from '../components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
 import { Check, X } from 'lucide-react'
 import type { PositionStatus } from '../lib/api'
+import { formatSolveTimeMs } from '../lib/utils'
 
 const HEADER_H = 57
 const FOOTER_H = 49
@@ -37,7 +38,7 @@ const WRONG_REVERT_MS = 500
 const FAILED_TO_OVERVIEW_MS = 300
 const TIMER_UPDATE_MS = 50
 
-type Mode = 'loading' | 'focus' | 'failed'
+type Mode = 'loading' | 'focus' | 'failed' | 'overview'
 type Orientation = 'white' | 'black'
 type PendingPromotion = { orig: string; dest: string }
 type MoveFeedbackResult = 'correct' | 'wrong'
@@ -104,6 +105,79 @@ function positionStatusLabel(status: PositionStatus): string {
   }
 }
 
+function computeFinalFen(fen: string, solutionMoves: string[]): string {
+  const chess = new Chess(fen)
+  for (const uci of solutionMoves) applyUci(chess, uci)
+  return chess.fen()
+}
+
+const POSITION_STATUS_CLASS: Record<PositionStatus, string> = {
+  not_started: '',
+  in_progress: 'border-amber-600/30 bg-amber-50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400',
+  will_be_retried: 'border-amber-600/30 bg-amber-50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400',
+  solved: 'border-green-600/30 bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400',
+  solved_with_retries: 'border-green-600/30 bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400',
+  failed: 'border-red-600/30 bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400',
+}
+
+const ATTEMPT_STATUS_CLASS: Record<string, string> = {
+  solved: 'border-green-600/30 bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400',
+  failed: 'border-red-600/30 bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400',
+  in_progress: 'border-amber-600/30 bg-amber-50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400',
+}
+
+const ATTEMPT_STATUS_LABEL: Record<string, string> = {
+  solved: 'Solved',
+  failed: 'Failed',
+  in_progress: 'In progress',
+}
+
+type StatsResult = {
+  accuracy: number | null
+  avgTimeMs: number | null
+  solvedCount: number
+  resolvedCount: number
+  timeCount: number
+}
+
+function computeStats(puzzles: RunPuzzleListItem[], excludeId?: number): StatsResult {
+  const items = excludeId !== undefined ? puzzles.filter((p) => p.runPuzzleId !== excludeId) : puzzles
+  const resolved = items.filter((p) =>
+    p.positionStatus === 'solved' || p.positionStatus === 'solved_with_retries' || p.positionStatus === 'failed',
+  )
+  const solvedItems = resolved.filter(
+    (p) => p.positionStatus === 'solved' || p.positionStatus === 'solved_with_retries',
+  )
+  const times = solvedItems.map((p) => p.timeMs).filter((t): t is number => t !== null)
+  return {
+    accuracy: resolved.length > 0 ? (solvedItems.length / resolved.length) * 100 : null,
+    avgTimeMs: times.length > 0 ? Math.round(times.reduce((a, b) => a + b, 0) / times.length) : null,
+    solvedCount: solvedItems.length,
+    resolvedCount: resolved.length,
+    timeCount: times.length,
+  }
+}
+
+type DeltaBadgeProps = {
+  delta: number | null
+  goodWhenPositive: boolean
+  format: (n: number) => string
+}
+
+function DeltaBadge({ delta, goodWhenPositive, format }: DeltaBadgeProps): React.ReactElement | null {
+  if (delta === null || delta === 0) return null
+  const isGood = goodWhenPositive ? delta > 0 : delta < 0
+  const arrow = delta > 0 ? '▲' : '▼'
+  const sign = delta > 0 ? '+' : '−'
+  const cls = isGood
+    ? 'border-green-600/30 bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+    : 'border-red-600/30 bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400'
+  return (
+    <Badge variant="outline" className={`text-xs ${cls}`}>
+      {arrow} {sign}{format(Math.abs(delta))}
+    </Badge>
+  )
+}
 
 type AttemptScoringProps = {
   currentTryNumber: number
@@ -356,6 +430,10 @@ export function BoardPage(): React.ReactElement | null {
   const [participationId, setParticipationId] = useState<number | null>(null)
   const [boardKey, setBoardKey] = useState(0)
 
+  const [overviewRun, setOverviewRun] = useState<Run | null>(null)
+  const [overviewPuzzleList, setOverviewPuzzleList] = useState<RunPuzzleList | null>(null)
+  const [overviewFreshPuzzle, setOverviewFreshPuzzle] = useState<RunPuzzleFull | null>(null)
+
   const [, setCompleteResult] = useState<CompleteAttemptResult | null>(null)
   const [lastMoveResult, setLastMoveResult] = useState<MoveFeedbackResult | null>(null)
   const [lastMoveSquare, setLastMoveSquare] = useState<string | null>(null)
@@ -478,8 +556,8 @@ export function BoardPage(): React.ReactElement | null {
           solutionMoves[0].slice(2, 4),
         ]
 
-        setPuzzle(data)
-  setParticipationId(run.participationId)
+          setPuzzle(data)
+          setParticipationId(run.participationId)
         setTargetSolveTenths(resolvedTargetSolveTenths)
         setOrientation(playerColor(data.fen))
         setCurrentAttemptId(resolvedAttemptId)
@@ -490,18 +568,16 @@ export function BoardPage(): React.ReactElement | null {
         setHintSquare(null)
 
         if (targetMode === 'overview') {
-          void navigate({
-            to: '/app/runs/$runId/puzzles/$runPuzzleId/overview',
-            params: { runId: runIdStr, runPuzzleId: runPuzzleIdStr },
-            replace: true,
-          })
-          return
+          const finalFen = computeFinalFen(data.fen, solutionMoves)
+          setFen(finalFen)
+          setDests(new Map())
+          setLastMove(undefined)
+        } else {
+          setFen(initialFen)
+          setDests(computeDests(chess))
+          setLastMove(initialLastMove)
+          committedLastMoveRef.current = initialLastMove
         }
-
-        setFen(initialFen)
-        setDests(computeDests(chess))
-        setLastMove(initialLastMove)
-        committedLastMoveRef.current = initialLastMove
 
         modeRef.current = targetMode
         setMode(targetMode)
@@ -533,13 +609,39 @@ export function BoardPage(): React.ReactElement | null {
     return () => window.removeEventListener('beforeunload', handler)
   }, [currentAttemptId])
 
-  const navigateToOverview = useCallback((): void => {
-    void navigate({
-      to: '/app/runs/$runId/puzzles/$runPuzzleId/overview',
-      params: { runId: runIdStr, runPuzzleId: runPuzzleIdStr },
-      replace: true,
-    })
-  }, [navigate, runIdStr, runPuzzleIdStr])
+  useEffect(() => {
+    if (mode !== 'overview') return
+    setOverviewFreshPuzzle(null)
+    setOverviewRun(null)
+    setOverviewPuzzleList(null)
+    void (async () => {
+      try {
+        const [freshPuzzle, runData, listData] = await Promise.all([
+          api.runs.getPuzzle(runId, runPuzzleId),
+          api.runs.get(runId),
+          api.runs.puzzles(runId),
+        ])
+        setOverviewFreshPuzzle(freshPuzzle)
+        setOverviewRun(runData)
+        setOverviewPuzzleList(listData)
+      } catch {
+        toast.error('Failed to load overview', { description: 'Please try again.' })
+      }
+    })()
+  }, [mode, runId, runPuzzleId])
+
+  const enterOverview = useCallback((): void => {
+    const data = puzzleRef.current
+    if (!data) return
+    const finalFen = computeFinalFen(data.fen, solutionMovesRef.current)
+    setFen(finalFen)
+    setDests(new Map())
+    setLastMove(undefined)
+    setHintSquare(null)
+    setPendingPromotionBoth(null)
+    modeRef.current = 'overview'
+    setMode('overview')
+  }, [setFen, setPendingPromotionBoth])
 
   const enterFailed = useCallback((): void => {
     modeRef.current = 'failed'
@@ -563,7 +665,7 @@ export function BoardPage(): React.ReactElement | null {
       currentAttemptIdRef.current = null
 
       if (result.markedForRetry || status === 'solved') {
-        navigateToOverview()
+        enterOverview()
       } else {
         enterFailed()
       }
@@ -572,7 +674,7 @@ export function BoardPage(): React.ReactElement | null {
     } finally {
       concludingRef.current = false
     }
-  }, [enterFailed])
+  }, [enterFailed, enterOverview])
 
   concludeFnRef.current = conclude
 
@@ -610,7 +712,7 @@ export function BoardPage(): React.ReactElement | null {
         if (modeRef.current === 'focus') {
           void concludeFnRef.current('solved')
         } else {
-          setTimeout(() => navigateToOverview(), FAILED_TO_OVERVIEW_MS)
+          setTimeout(() => enterOverview(), FAILED_TO_OVERVIEW_MS)
         }
       }, MOVE_FEEDBACK_SUCCESS_MS)
       return
@@ -621,7 +723,7 @@ export function BoardPage(): React.ReactElement | null {
       hideMoveFeedbackBadge()
       applyOpponentMove(opponentUci)
     }, MOVE_FEEDBACK_SUCCESS_MS)
-  }, [setFen, applyOpponentMove, hideMoveFeedbackBadge, setMoveFeedback])
+  }, [setFen, applyOpponentMove, hideMoveFeedbackBadge, setMoveFeedback, enterOverview])
 
   const resolveWrongMove = useCallback((
     orig: string,
@@ -745,7 +847,7 @@ export function BoardPage(): React.ReactElement | null {
       setTimeout(() => {
         inputBlockedRef.current = false
         setInputBlocked(false)
-        navigateToOverview()
+        enterOverview()
       }, FAILED_TO_OVERVIEW_MS)
       return
     }
@@ -756,7 +858,7 @@ export function BoardPage(): React.ReactElement | null {
       inputBlockedRef.current = false
       setInputBlocked(false)
     }, 150)
-  }, [setFen, applyOpponentMove])
+  }, [setFen, applyOpponentMove, enterOverview])
 
   if (!puzzle || mode === 'loading') {
     return (
@@ -1032,5 +1134,187 @@ export function BoardPage(): React.ReactElement | null {
     )
   }
 
-  return null
+  const overviewAfterStats = overviewPuzzleList ? computeStats(overviewPuzzleList.puzzles) : null
+  const overviewBeforeStats = overviewPuzzleList ? computeStats(overviewPuzzleList.puzzles, runPuzzleId) : null
+
+  const accuracyDelta =
+    overviewAfterStats?.accuracy != null &&
+    overviewBeforeStats?.accuracy != null &&
+    overviewBeforeStats.resolvedCount > 0
+      ? overviewAfterStats.accuracy - overviewBeforeStats.accuracy
+      : null
+
+  const timeDelta =
+    overviewAfterStats?.avgTimeMs != null &&
+    overviewBeforeStats?.avgTimeMs != null &&
+    overviewBeforeStats.timeCount > 0
+      ? overviewAfterStats.avgTimeMs - overviewBeforeStats.avgTimeMs
+      : null
+
+  const overviewAttemptHistory = overviewFreshPuzzle && (
+    <div className="flex flex-col gap-1.5">
+      {overviewFreshPuzzle.tries.map((attempt, idx) => (
+        <React.Fragment key={attempt.id}>
+          {overviewFreshPuzzle.maxTriesPerPuzzle > 1 && idx === overviewFreshPuzzle.maxTriesPerPuzzle && (
+            <div className="my-1 flex items-center gap-2">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-xs text-muted-foreground">Practice</span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <span className="w-10 shrink-0 text-xs text-muted-foreground">Try {attempt.tryNumber}</span>
+            <Badge variant="outline" className={`text-xs ${ATTEMPT_STATUS_CLASS[attempt.status] ?? ''}`}>
+              {ATTEMPT_STATUS_LABEL[attempt.status] ?? attempt.status}
+            </Badge>
+            <span className="ml-auto tabular-nums text-xs text-muted-foreground">
+              {attempt.timeSpentMs !== null ? formatSolveTimeMs(attempt.timeSpentMs) : '—'}
+            </span>
+          </div>
+        </React.Fragment>
+      ))}
+    </div>
+  )
+
+  const overviewStatsSection = overviewAfterStats && (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Accuracy</span>
+        <div className="flex items-baseline gap-2">
+          <span className="tabular-nums text-2xl font-semibold">
+            {overviewAfterStats.accuracy !== null ? `${overviewAfterStats.accuracy.toFixed(1)}%` : '—'}
+          </span>
+          <DeltaBadge delta={accuracyDelta} goodWhenPositive={true} format={(n) => `${n.toFixed(1)}%`} />
+        </div>
+        {overviewAfterStats.resolvedCount > 0 && (
+          <span className="text-xs text-muted-foreground">
+            {overviewAfterStats.solvedCount} of {overviewAfterStats.resolvedCount} resolved
+          </span>
+        )}
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Avg solve time</span>
+        <div className="flex items-baseline gap-2">
+          <span className="tabular-nums text-2xl font-semibold">
+            {overviewAfterStats.avgTimeMs !== null ? formatSolveTimeMs(overviewAfterStats.avgTimeMs) : '—'}
+          </span>
+          <DeltaBadge delta={timeDelta} goodWhenPositive={false} format={formatSolveTimeMs} />
+        </div>
+        {overviewAfterStats.timeCount > 0 && (
+          <span className="text-xs text-muted-foreground">
+            across {overviewAfterStats.timeCount} solved puzzle{overviewAfterStats.timeCount !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+
+  const overviewActionsSection = overviewRun && (
+    <div className="mt-auto flex flex-col gap-3">
+      <Button
+        className="w-full bg-foreground text-background hover:bg-foreground/90"
+        disabled={overviewRun.status !== 'active'}
+        onClick={() => void navigate({ to: '/app/runs/$runId/solve', params: { runId: runIdStr } })}
+      >
+        Next puzzle
+      </Button>
+      {overviewRun.status === 'completed' && (
+        <p className="text-center text-xs text-muted-foreground">Run complete</p>
+      )}
+      {overviewRun.status === 'aborted' && (
+        <p className="text-center text-xs text-muted-foreground">Run aborted</p>
+      )}
+      <Button
+        variant="outline"
+        className="w-full"
+        disabled={overviewRun.status !== 'active'}
+        onClick={() =>
+          void navigate({
+            to: '/app/runs/$runId/puzzles/$runPuzzleId',
+            params: { runId: runIdStr, runPuzzleId: runPuzzleIdStr },
+          })
+        }
+      >
+        Retake
+      </Button>
+    </div>
+  )
+
+  return (
+    <div className={outerCls}>
+      <div className={innerCls}>
+        <aside className={sidebarCls} style={sidebarH}>
+          <div className="mb-6">{breadcrumb}</div>
+          {overviewFreshPuzzle ? (
+            <div className="flex flex-col gap-4">
+              <Badge
+                variant="outline"
+                className={`w-fit ${POSITION_STATUS_CLASS[overviewFreshPuzzle.positionStatus]}`}
+              >
+                {positionStatusLabel(overviewFreshPuzzle.positionStatus)}
+              </Badge>
+              {overviewAttemptHistory}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          )}
+        </aside>
+
+        <div className="flex shrink-0 flex-col">
+          <div className="mb-3 md:hidden">
+            {breadcrumb}
+            {overviewFreshPuzzle && (
+              <div className="mt-1">
+                <Badge
+                  variant="outline"
+                  className={`text-xs ${POSITION_STATUS_CLASS[overviewFreshPuzzle.positionStatus]}`}
+                >
+                  {positionStatusLabel(overviewFreshPuzzle.positionStatus)}
+                </Badge>
+              </div>
+            )}
+          </div>
+          {activeBoard}
+          {overviewFreshPuzzle && overviewAfterStats && overviewRun && (
+            <div className="mt-4 flex flex-col gap-6 md:hidden">
+              {overviewStatsSection}
+              <div className="flex flex-col gap-3">
+                <Button
+                  className="w-full bg-foreground text-background hover:bg-foreground/90"
+                  disabled={overviewRun.status !== 'active'}
+                  onClick={() => void navigate({ to: '/app/runs/$runId/solve', params: { runId: runIdStr } })}
+                >
+                  Next puzzle
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  disabled={overviewRun.status !== 'active'}
+                  onClick={() =>
+                    void navigate({
+                      to: '/app/runs/$runId/puzzles/$runPuzzleId',
+                      params: { runId: runIdStr, runPuzzleId: runPuzzleIdStr },
+                    })
+                  }
+                >
+                  Retake
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <aside className={sidebarCls} style={sidebarH}>
+          {overviewAfterStats && overviewRun ? (
+            <>
+              {overviewStatsSection}
+              {overviewActionsSection}
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          )}
+        </aside>
+      </div>
+    </div>
+  )
 }
