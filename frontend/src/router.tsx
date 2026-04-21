@@ -15,6 +15,7 @@ import { RunResolverPage } from './pages/RunResolverPage'
 import { PuzzleResolverPage } from './pages/PuzzleResolverPage'
 import { BoardPage } from './pages/BoardPage'
 import { RunPuzzleOverviewPage } from './pages/RunPuzzleOverviewPage'
+import { SolveFlowLayout } from './components/SolveFlowLayout'
 
 type RouterContext = {
   auth: AuthContextValue
@@ -94,26 +95,32 @@ const runRoute = createRoute({
   component: RunPage,
 })
 
-const runSolveRoute = createRoute({
+const solveFlowRoute = createRoute({
   getParentRoute: () => appRoute,
+  id: 'solve-flow',
+  component: SolveFlowLayout,
+})
+
+const runSolveRoute = createRoute({
+  getParentRoute: () => solveFlowRoute,
   path: '/runs/$runId/solve',
   component: RunResolverPage,
 })
 
 const puzzleResolverRoute = createRoute({
-  getParentRoute: () => appRoute,
+  getParentRoute: () => solveFlowRoute,
   path: '/runs/$runId/puzzles/$runPuzzleId',
   component: PuzzleResolverPage,
 })
 
 const attemptRoute = createRoute({
-  getParentRoute: () => appRoute,
+  getParentRoute: () => solveFlowRoute,
   path: '/runs/$runId/puzzles/$runPuzzleId/attempts/$attemptId',
   component: BoardPage,
 })
 
 const runPuzzleOverviewRoute = createRoute({
-  getParentRoute: () => appRoute,
+  getParentRoute: () => solveFlowRoute,
   path: '/runs/$runId/puzzles/$runPuzzleId/overview',
   component: RunPuzzleOverviewPage,
 })
@@ -130,10 +137,12 @@ const routeTree = rootRoute.addChildren([
     participationNewRoute,
     participationRoute,
     runRoute,
-    runSolveRoute,
-    puzzleResolverRoute,
-    attemptRoute,
-    runPuzzleOverviewRoute,
+    solveFlowRoute.addChildren([
+      runSolveRoute,
+      puzzleResolverRoute,
+      attemptRoute,
+      runPuzzleOverviewRoute,
+    ]),
   ]),
 ])
 

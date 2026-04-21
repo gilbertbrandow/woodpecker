@@ -31,7 +31,6 @@ const PAGE_SIZE = 25
 const POSITION_STATUS_LABELS: Record<PositionStatus, string> = {
   not_started: 'Not started',
   in_progress: 'In progress',
-  will_be_retried: 'Will retry',
   solved: 'Solved',
   solved_with_retries: 'Solved with retries',
   failed: 'Failed',
@@ -40,7 +39,6 @@ const POSITION_STATUS_LABELS: Record<PositionStatus, string> = {
 const POSITION_STATUS_CLASS: Record<PositionStatus, string> = {
   not_started: '',
   in_progress: 'border-amber-600/30 bg-amber-50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400',
-  will_be_retried: 'border-amber-600/30 bg-amber-50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400',
   solved: 'border-green-600/30 bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400',
   solved_with_retries: 'border-green-600/30 bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400',
   failed: 'border-red-600/30 bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400',

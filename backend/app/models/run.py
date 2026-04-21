@@ -7,10 +7,6 @@ from sqlalchemy.sql import func
 
 from app.extensions import Base
 
-POSITION_TERMINAL_STATUSES: frozenset[str] = frozenset({"solved", "solved_with_retries", "failed"})
-POSITION_FIRST_PASS_DONE: frozenset[str] = frozenset(
-    {"solved", "solved_with_retries", "failed", "will_be_retried"}
-)
 MAX_PUZZLE_TIME_MS: int = 600_000
 
 
@@ -46,7 +42,6 @@ class RunPuzzle(Base):
     run_id: Mapped[int] = mapped_column(Integer, ForeignKey("runs.id"), nullable=False)
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     puzzle_id: Mapped[int] = mapped_column(Integer, ForeignKey("puzzles.id"), nullable=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="not_started")
 
     attempts: Mapped[list["PuzzleAttempt"]] = relationship(
         "PuzzleAttempt", cascade="all, delete-orphan"

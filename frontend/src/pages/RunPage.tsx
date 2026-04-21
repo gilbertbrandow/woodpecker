@@ -118,7 +118,6 @@ function InsightsTab({ run, puzzleList }: { run: Run; puzzleList: RunPuzzleList 
                 ['Solved', run.solvedCount],
                 ['Solved with retries', run.solvedWithRetriesCount],
                 ['Failed', run.failedCount],
-                ['Will retry', run.willBeRetriedCount],
                 ['Remaining', run.inProgressCount],
                 ['Total', run.totalPuzzles],
               ] as [string, number][]

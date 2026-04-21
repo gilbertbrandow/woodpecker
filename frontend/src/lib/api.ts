@@ -233,7 +233,6 @@ export type RunStatus = 'active' | 'completed' | 'aborted'
 export type PositionStatus =
   | 'not_started'
   | 'in_progress'
-  | 'will_be_retried'
   | 'solved'
   | 'solved_with_retries'
   | 'failed'
@@ -249,7 +248,6 @@ export type Run = {
   totalPuzzles: number
   solvedCount: number
   solvedWithRetriesCount: number
-  willBeRetriedCount: number
   failedCount: number
   inProgressCount: number
   currentRunPuzzleId: number | null
