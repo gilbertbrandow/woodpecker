@@ -94,7 +94,7 @@ def _get_accessible_schedule(schedule_id: int, user_id: int) -> Schedule:
     schedule = db.session.get(Schedule, schedule_id)
     if schedule is None:
         raise LookupError("Schedule not found.")
-    if schedule.status == "draft" and schedule.user_id != user_id:
+    if schedule.locked_at is None and schedule.user_id != user_id:
         raise PermissionError("Access denied.")
     return schedule
 
@@ -106,9 +106,9 @@ def create_schedule(user_id: int, name: str, subset_id: int) -> Schedule:
     subset = db.session.get(Subset, subset_id)
     if subset is None:
         raise LookupError("Subset not found.")
-    if subset.status != "locked":
+    if subset.locked_at is None:
         raise ValueError("Subset must be locked before creating a schedule.")
-    schedule = Schedule(user_id=user_id, subset_id=subset_id, name=name, status="draft", config=DEFAULT_CONFIG)
+    schedule = Schedule(user_id=user_id, subset_id=subset_id, name=name, config=DEFAULT_CONFIG)
     db.session.add(schedule)
     db.session.commit()
     return schedule
@@ -120,7 +120,7 @@ def update_schedule(
     updates: dict[str, object],
 ) -> Schedule:
     schedule = _get_owned_schedule(schedule_id, user_id)
-    if schedule.status == "locked":
+    if schedule.locked_at is not None:
         raise PermissionError("Locked schedules cannot be edited.")
 
     if "name" in updates:
@@ -155,14 +155,13 @@ def update_schedule(
 
 def lock_schedule(schedule_id: int, user_id: int) -> Schedule:
     schedule = _get_owned_schedule(schedule_id, user_id)
-    if schedule.status == "locked":
+    if schedule.locked_at is not None:
         raise ValueError("Already locked.")
     if schedule.config is None:
         raise ValueError("Cannot lock a schedule without a config.")
     runs_raw = schedule.config.get("runs")
     if not isinstance(runs_raw, list) or not runs_raw:
         raise ValueError("Cannot lock a schedule with no runs defined.")
-    schedule.status = "locked"
     schedule.locked_at = datetime.now(timezone.utc)
     db.session.commit()
     return schedule
@@ -230,14 +229,14 @@ def list_schedules(user_id: int, subset_id: int | None = None) -> list[dict[str,
         params["subset_id"] = subset_id
     rows = db.session.execute(
         sa.text(f"""
-            SELECT s.id, s.name, s.description, s.status, s.config,
+            SELECT s.id, s.name, s.description, s.config,
                    s.created_at, s.locked_at, s.subset_id,
                    u.lichess_username, u.avatar_url,
                    sub.name AS subset_name
             FROM schedules s
             JOIN users u ON u.id = s.user_id
             JOIN subsets sub ON sub.id = s.subset_id
-            WHERE (s.status = 'locked' OR s.user_id = :uid)
+            WHERE (s.locked_at IS NOT NULL OR s.user_id = :uid)
             {subset_clause}
             ORDER BY s.created_at DESC
         """),
@@ -256,7 +255,7 @@ def list_schedules(user_id: int, subset_id: int | None = None) -> list[dict[str,
             "id": row.id,
             "name": row.name,
             "description": row.description,
-            "status": row.status,
+            "status": "locked" if row.locked_at is not None else "draft",
             "createdBy": {"username": row.lichess_username, "avatarUrl": row.avatar_url},
             "subsetId": row.subset_id,
             "subsetName": row.subset_name,

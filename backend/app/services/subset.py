@@ -20,6 +20,15 @@ VALID_SORT_COLUMNS: dict[str, str] = {
 }
 
 
+def subset_status(subset: Subset) -> str:
+    if subset.locked_at is not None:
+        return "locked"
+    count = db.session.scalar(
+        sa.select(sa.func.count()).where(SubsetPuzzle.subset_id == subset.id)
+    ) or 0
+    return "filled" if count > 0 else "draft"
+
+
 def _parse_config(config: dict[str, object]) -> tuple[
     int, int, float | None, float | None, str, list[str], float
 ]:
@@ -56,7 +65,6 @@ def _sample_puzzles(
     subset_id: int,
     config: dict[str, object],
     count: int,
-    discarded_only: bool,
 ) -> list[int]:
     rating_min, rating_max, mu, sigma, theme_weights_json, opening_items, opening_strength = (
         _parse_config(config)
@@ -83,7 +91,6 @@ def _sample_puzzles(
                   AND p.id NOT IN (
                       SELECT puzzle_id FROM subset_puzzles
                       WHERE subset_id = :sid
-                        AND (:discarded_only = FALSE OR is_discarded = TRUE)
                   )
             ),
             theme_scores AS (
@@ -118,7 +125,6 @@ def _sample_puzzles(
         """),
         {
             "sid": subset_id,
-            "discarded_only": discarded_only,
             "min_r": rating_min,
             "max_r": rating_max,
             "mu": mu,
@@ -137,9 +143,8 @@ def _sample_and_insert(
     subset_id: int,
     config: dict[str, object],
     count: int,
-    discarded_only: bool,
 ) -> int:
-    sampled_ids = _sample_puzzles(subset_id, config, count, discarded_only)
+    sampled_ids = _sample_puzzles(subset_id, config, count)
 
     if not sampled_ids:
         return 0
@@ -147,7 +152,6 @@ def _sample_and_insert(
     existing_max: int | None = db.session.execute(
         db.select(db.func.max(SubsetPuzzle.position)).where(
             SubsetPuzzle.subset_id == subset_id,
-            SubsetPuzzle.is_discarded.is_(False),
         )
     ).scalar()
     start_pos = (existing_max + 1) if existing_max is not None else 0
@@ -159,7 +163,6 @@ def _sample_and_insert(
                     "subset_id": subset_id,
                     "puzzle_id": pid,
                     "position": start_pos + i,
-                    "is_discarded": False,
                 }
                 for i, pid in enumerate(sampled_ids)
             ]
@@ -174,7 +177,7 @@ def create_subset(user_id: int, name: str, puzzle_count: int) -> Subset:
         raise ValueError("Name is required.")
     if not (5 <= puzzle_count <= 1000):
         raise ValueError("puzzle_count must be between 5 and 1000.")
-    subset = Subset(user_id=user_id, name=name, status="draft", puzzle_count=puzzle_count)
+    subset = Subset(user_id=user_id, name=name, puzzle_count=puzzle_count)
     db.session.add(subset)
     db.session.commit()
     return subset
@@ -187,18 +190,14 @@ def save_config(
     config: dict[str, object],
 ) -> Subset:
     subset = _get_owned_subset(subset_id, user_id)
-    if subset.status == "locked":
+    if subset.locked_at is not None:
         raise PermissionError("Subset is locked.")
     if not (5 <= puzzle_count <= 1000):
         raise ValueError("puzzle_count must be between 5 and 1000.")
 
-    if subset.status == "filled":
-        db.session.execute(
-            sa.delete(SubsetPuzzle).where(
-                SubsetPuzzle.subset_id == subset_id
-            )
-        )
-        subset.status = "draft"
+    db.session.execute(
+        sa.delete(SubsetPuzzle).where(SubsetPuzzle.subset_id == subset_id)
+    )
 
     subset.puzzle_count = puzzle_count
     subset.config = config
@@ -208,41 +207,33 @@ def save_config(
 
 def fill(subset_id: int, user_id: int) -> tuple[int, int]:
     subset = _get_owned_subset(subset_id, user_id)
-    if subset.status == "locked":
+    if subset.locked_at is not None:
         raise PermissionError("Subset is locked.")
     if subset.config is None or subset.puzzle_count is None:
         raise ValueError("Configuration is not set.")
 
     db.session.execute(
-        sa.delete(SubsetPuzzle).where(
-            SubsetPuzzle.subset_id == subset_id,
-            SubsetPuzzle.is_discarded.is_(False),
-        )
+        sa.delete(SubsetPuzzle).where(SubsetPuzzle.subset_id == subset_id)
     )
 
     filled = _sample_and_insert(
         subset_id=subset_id,
         config=subset.config,
         count=subset.puzzle_count,
-        discarded_only=True,
     )
-    subset.status = "filled"
     db.session.commit()
     return filled, subset.puzzle_count
 
 
 def refill(subset_id: int, user_id: int) -> tuple[int, int]:
     subset = _get_owned_subset(subset_id, user_id)
-    if subset.status == "locked":
+    if subset.locked_at is not None:
         raise PermissionError("Subset is locked.")
     if subset.config is None or subset.puzzle_count is None:
         raise ValueError("Configuration is not set.")
 
     active_count: int = db.session.execute(
-        db.select(db.func.count()).where(
-            SubsetPuzzle.subset_id == subset_id,
-            SubsetPuzzle.is_discarded.is_(False),
-        )
+        db.select(db.func.count()).where(SubsetPuzzle.subset_id == subset_id)
     ).scalar_one()
 
     needed = subset.puzzle_count - active_count
@@ -253,7 +244,6 @@ def refill(subset_id: int, user_id: int) -> tuple[int, int]:
         subset_id=subset_id,
         config=subset.config,
         count=needed,
-        discarded_only=False,
     )
     db.session.commit()
     return filled, needed
@@ -261,7 +251,7 @@ def refill(subset_id: int, user_id: int) -> tuple[int, int]:
 
 def discard_puzzle(subset_id: int, lichess_puzzle_id: str, user_id: int) -> None:
     subset = _get_owned_subset(subset_id, user_id)
-    if subset.status == "locked":
+    if subset.locked_at is not None:
         raise PermissionError("Subset is locked.")
 
     puzzle = db.session.execute(
@@ -274,31 +264,26 @@ def discard_puzzle(subset_id: int, lichess_puzzle_id: str, user_id: int) -> None
         db.select(SubsetPuzzle).where(
             SubsetPuzzle.subset_id == subset_id,
             SubsetPuzzle.puzzle_id == puzzle.id,
-            SubsetPuzzle.is_discarded.is_(False),
         )
     ).scalar_one_or_none()
     if row is None:
-        raise LookupError("Puzzle is not an active member of this subset.")
+        raise LookupError("Puzzle is not a member of this subset.")
 
-    row.is_discarded = True
+    db.session.delete(row)
     db.session.commit()
 
 
 def lock_subset(subset_id: int, user_id: int) -> Subset:
     subset = _get_owned_subset(subset_id, user_id)
-    if subset.status == "locked":
+    if subset.locked_at is not None:
         raise ValueError("Already locked.")
 
     active_count: int = db.session.execute(
-        db.select(db.func.count()).where(
-            SubsetPuzzle.subset_id == subset_id,
-            SubsetPuzzle.is_discarded.is_(False),
-        )
+        db.select(db.func.count()).where(SubsetPuzzle.subset_id == subset_id)
     ).scalar_one()
     if active_count == 0:
         raise ValueError("Cannot lock a subset with no active puzzles.")
 
-    subset.status = "locked"
     subset.locked_at = datetime.now(timezone.utc)
     subset.locked_puzzle_count = active_count
     db.session.commit()
@@ -315,10 +300,7 @@ def list_active_puzzles(
     _get_viewable_subset(subset_id, user_id)
 
     total: int = db.session.execute(
-        db.select(db.func.count()).where(
-            SubsetPuzzle.subset_id == subset_id,
-            SubsetPuzzle.is_discarded.is_(False),
-        )
+        db.select(db.func.count()).where(SubsetPuzzle.subset_id == subset_id)
     ).scalar_one()
 
     total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
@@ -333,7 +315,7 @@ def list_active_puzzles(
             SELECT p.id, p.puzzle_id, p.rating, p.popularity, p.nb_plays, p.game_url
             FROM subset_puzzles sp
             JOIN puzzles p ON p.id = sp.puzzle_id
-            WHERE sp.subset_id = :sid AND sp.is_discarded = FALSE
+            WHERE sp.subset_id = :sid
             ORDER BY {sort_col} {order_dir}
             LIMIT :limit OFFSET :offset
         """),
@@ -396,7 +378,7 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
         sa.text("""
             SELECT p.id, p.rating, p.popularity, p.nb_plays
             FROM subset_puzzles sp JOIN puzzles p ON p.id = sp.puzzle_id
-            WHERE sp.subset_id = :sid AND sp.is_discarded = FALSE
+            WHERE sp.subset_id = :sid
         """),
         {"sid": subset_id},
     ).all()
@@ -518,7 +500,7 @@ def list_subsets(user_id: int) -> list[tuple[Subset, User]]:
         .where(
             sa.or_(
                 Subset.user_id == user_id,
-                sa.and_(Subset.status == "locked", Subset.user_id != user_id),
+                sa.and_(Subset.locked_at.isnot(None), Subset.user_id != user_id),
             )
         )
         .order_by(Subset.created_at.desc())
@@ -558,6 +540,6 @@ def _get_viewable_subset(subset_id: int, user_id: int) -> Subset:
     subset = db.session.get(Subset, subset_id)
     if subset is None:
         raise LookupError("Subset not found.")
-    if subset.user_id != user_id and subset.status != "locked":
+    if subset.user_id != user_id and subset.locked_at is None:
         raise PermissionError("Access denied.")
     return subset

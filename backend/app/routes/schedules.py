@@ -124,7 +124,7 @@ def get_my_participation_for_schedule(schedule_id: int) -> tuple[Response, int] 
     return jsonify({
         "id": participation.id,
         "scheduleId": participation.schedule_id,
-        "status": participation.status,
+        "status": participation_svc.participation_status(participation),
         "startedAt": participation.started_at.isoformat(),
         "completedAt": participation.completed_at.isoformat() if participation.completed_at else None,
         "abortedAt": participation.aborted_at.isoformat() if participation.aborted_at else None,

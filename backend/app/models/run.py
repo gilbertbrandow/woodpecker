@@ -18,12 +18,19 @@ class Run(Base):
         Integer, ForeignKey("schedule_participations.id"), nullable=False
     )
     run_index: Mapped[int] = mapped_column(Integer, nullable=False)
-    status: Mapped[str] = mapped_column(String(10), nullable=False, default="active")
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     aborted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def status(self) -> str:
+        if self.aborted_at is not None:
+            return "aborted"
+        if self.completed_at is not None:
+            return "completed"
+        return "active"
 
     puzzles: Mapped[list["RunPuzzle"]] = relationship(
         "RunPuzzle", order_by="RunPuzzle.position", cascade="all, delete-orphan"
@@ -31,7 +38,6 @@ class Run(Base):
 
     __table_args__ = (
         Index("ix_runs_participation_id", "participation_id"),
-        Index("ix_runs_status", "status"),
     )
 
 

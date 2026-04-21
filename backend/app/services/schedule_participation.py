@@ -4,6 +4,7 @@ from typing import cast
 import sqlalchemy as sa
 
 from app.extensions import db
+from app.models.run import Run
 from app.models.schedule import Schedule
 from app.models.schedule_participation import ParticipationRunTarget, ScheduleParticipation
 from app.models.subset import Subset
@@ -75,7 +76,7 @@ def participation_full_dict(participation: ScheduleParticipation) -> dict[str, o
     return {
         "id": participation.id,
         "scheduleId": participation.schedule_id,
-        "status": participation.status,
+        "status": participation_status(participation),
         "startedAt": participation.started_at.isoformat(),
         "completedAt": participation.completed_at.isoformat() if participation.completed_at else None,
         "abortedAt": participation.aborted_at.isoformat() if participation.aborted_at else None,
@@ -107,7 +108,7 @@ def create_participation(user_id: int, schedule_id: int) -> ScheduleParticipatio
     schedule = db.session.get(Schedule, schedule_id)
     if schedule is None:
         raise LookupError("Schedule not found.")
-    if schedule.status != "locked":
+    if schedule.locked_at is None:
         raise ValueError("Schedule must be locked before enrolling.")
 
     existing = db.session.scalar(
@@ -122,7 +123,6 @@ def create_participation(user_id: int, schedule_id: int) -> ScheduleParticipatio
     participation = ScheduleParticipation(
         user_id=user_id,
         schedule_id=schedule_id,
-        status="draft",
     )
     db.session.add(participation)
     db.session.commit()
@@ -139,9 +139,15 @@ def get_participation(participation_id: int) -> ScheduleParticipation:
 def list_my_participations(user_id: int) -> list[dict[str, object]]:
     rows = db.session.execute(
         sa.text("""
-            SELECT sp.id, sp.schedule_id, sp.status,
+            SELECT sp.id, sp.schedule_id,
                    sp.started_at, sp.completed_at, sp.aborted_at,
-                   s.name AS schedule_name, s.subset_id, s.config
+                   s.name AS schedule_name, s.subset_id, s.config,
+                   CASE
+                     WHEN sp.aborted_at IS NOT NULL THEN 'aborted'
+                     WHEN sp.completed_at IS NOT NULL THEN 'completed'
+                     WHEN EXISTS (SELECT 1 FROM runs r WHERE r.participation_id = sp.id) THEN 'in_progress'
+                     ELSE 'draft'
+                   END AS status
             FROM schedule_participations sp
             JOIN schedules s ON s.id = sp.schedule_id
             WHERE sp.user_id = :uid
@@ -208,9 +214,8 @@ def set_run_target(
 
 def abort_participation(participation_id: int, user_id: int) -> ScheduleParticipation:
     participation = _get_owned_participation(participation_id, user_id)
-    if participation.status in ("completed", "aborted"):
+    if participation.completed_at is not None or participation.aborted_at is not None:
         raise ValueError("Participation is already terminal.")
-    participation.status = "aborted"
     participation.aborted_at = datetime.now(timezone.utc)
     db.session.commit()
     return participation
@@ -220,10 +225,16 @@ def list_all_participations(schedule_id: int | None = None) -> list[dict[str, ob
     where = "WHERE sp.schedule_id = :sid" if schedule_id is not None else ""
     rows = db.session.execute(
         sa.text(f"""
-            SELECT sp.id, sp.schedule_id, sp.status,
+            SELECT sp.id, sp.schedule_id,
                    sp.started_at, sp.completed_at, sp.aborted_at,
                    s.name AS schedule_name, s.subset_id, s.config,
-                   u.lichess_username, u.avatar_url
+                   u.lichess_username, u.avatar_url,
+                   CASE
+                     WHEN sp.aborted_at IS NOT NULL THEN 'aborted'
+                     WHEN sp.completed_at IS NOT NULL THEN 'completed'
+                     WHEN EXISTS (SELECT 1 FROM runs r WHERE r.participation_id = sp.id) THEN 'in_progress'
+                     ELSE 'draft'
+                   END AS status
             FROM schedule_participations sp
             JOIN schedules s ON s.id = sp.schedule_id
             JOIN users u ON u.id = sp.user_id
@@ -255,6 +266,17 @@ def list_all_participations(schedule_id: int | None = None) -> list[dict[str, ob
             },
         })
     return result
+
+
+def participation_status(participation: ScheduleParticipation) -> str:
+    if participation.aborted_at is not None:
+        return "aborted"
+    if participation.completed_at is not None:
+        return "completed"
+    run_count = db.session.scalar(
+        sa.select(sa.func.count()).where(Run.participation_id == participation.id)
+    ) or 0
+    return "in_progress" if run_count > 0 else "draft"
 
 
 def get_my_participation_for_schedule(

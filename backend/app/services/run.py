@@ -251,13 +251,14 @@ def start_run(participation_id: int, user_id: int, expected_run_index: int | Non
         raise LookupError("Participation not found.")
     if participation.user_id != user_id:
         raise PermissionError("Access denied.")
-    if participation.status in ("aborted", "completed"):
+    if participation.completed_at is not None or participation.aborted_at is not None:
         raise ValueError("Participation is already terminal.")
 
     active_run = db.session.scalar(
         sa.select(Run).where(
             Run.participation_id == participation_id,
-            Run.status == "active",
+            Run.completed_at.is_(None),
+            Run.aborted_at.is_(None),
         )
     )
     if active_run is not None:
@@ -275,7 +276,7 @@ def start_run(participation_id: int, user_id: int, expected_run_index: int | Non
     run_index = db.session.scalar(
         sa.select(sa.func.count()).where(
             Run.participation_id == participation_id,
-            Run.status == "completed",
+            Run.completed_at.isnot(None),
         )
     ) or 0
 
@@ -287,10 +288,7 @@ def start_run(participation_id: int, user_id: int, expected_run_index: int | Non
     puzzle_ids: list[int] = list(
         db.session.scalars(
             sa.select(SubsetPuzzle.puzzle_id)
-            .where(
-                SubsetPuzzle.subset_id == schedule.subset_id,
-                SubsetPuzzle.is_discarded == False,  # noqa: E712
-            )
+            .where(SubsetPuzzle.subset_id == schedule.subset_id)
             .order_by(SubsetPuzzle.position)
         ).all()
     )
@@ -298,7 +296,6 @@ def start_run(participation_id: int, user_id: int, expected_run_index: int | Non
     run = Run(
         participation_id=participation_id,
         run_index=run_index,
-        status="active",
     )
     db.session.add(run)
     db.session.flush()
@@ -318,9 +315,6 @@ def start_run(participation_id: int, user_id: int, expected_run_index: int | Non
             for idx, pid in enumerate(puzzle_ids)
         ],
     )
-
-    if participation.status == "draft":
-        participation.status = "in_progress"
 
     db.session.commit()
     return run
@@ -347,7 +341,7 @@ def get_run(run_id: int, user_id: int) -> Run:
 
 def continue_run(run_id: int, user_id: int) -> dict[str, object]:
     run = _get_owned_run(run_id, user_id)
-    if run.status != "active":
+    if run.completed_at is not None or run.aborted_at is not None:
         raise ValueError("Run is not active.")
 
     _, config = _get_schedule_config(run)
@@ -443,7 +437,7 @@ def get_run_puzzle(run_id: int, run_puzzle_id: int, user_id: int) -> dict[str, o
 
 def start_puzzle(run_id: int, run_puzzle_id: int, user_id: int) -> dict[str, object]:
     run = _get_owned_run(run_id, user_id)
-    if run.status != "active":
+    if run.completed_at is not None or run.aborted_at is not None:
         raise ValueError("Run is not active.")
     run_puzzle = db.session.get(RunPuzzle, run_puzzle_id)
     if run_puzzle is None or run_puzzle.run_id != run.id:
@@ -481,7 +475,7 @@ def complete_attempt(
 
     if attempt.status != "in_progress":
         raise ValueError("Attempt is already completed.")
-    if run.status != "active":
+    if run.completed_at is not None or run.aborted_at is not None:
         raise ValueError("Run is not active.")
 
     _, config = _get_schedule_config(run)
@@ -508,7 +502,6 @@ def complete_attempt(
     if is_queue_attempt and position_resolved:
         db.session.flush()
         if _all_puzzles_terminal(run.id, total_queue):
-            run.status = "completed"
             run.completed_at = now
             participation = db.session.get(ScheduleParticipation, run.participation_id)
             if participation is not None:
@@ -520,7 +513,6 @@ def complete_attempt(
                     runs_list = schedule_config.get("runs")
                     run_count = len(runs_list) if isinstance(runs_list, list) else 0
                     if run.run_index == run_count - 1:
-                        participation.status = "completed"
                         participation.completed_at = now
 
     db.session.commit()
@@ -583,9 +575,8 @@ def get_puzzle_history(run_id: int, puzzle_id: str, user_id: int) -> dict[str, o
 
 def abort_run(run_id: int, user_id: int) -> Run:
     run = _get_owned_run(run_id, user_id)
-    if run.status in ("completed", "aborted"):
+    if run.completed_at is not None or run.aborted_at is not None:
         raise ValueError("Run is already terminal.")
-    run.status = "aborted"
     run.aborted_at = datetime.now(timezone.utc)
     db.session.commit()
     return run

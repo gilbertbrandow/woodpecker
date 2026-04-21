@@ -16,9 +16,12 @@ class Schedule(Base):
     subset_id: Mapped[int] = mapped_column(Integer, ForeignKey("subsets.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(String(10), nullable=False, default="draft")
     config: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def status(self) -> str:
+        return "locked" if self.locked_at is not None else "draft"

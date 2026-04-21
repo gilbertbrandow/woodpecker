@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -14,7 +14,6 @@ class Subset(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
-    status: Mapped[str] = mapped_column(String(10), nullable=False, default="draft")
     puzzle_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     config: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -34,4 +33,3 @@ class SubsetPuzzle(Base):
     subset_id: Mapped[int] = mapped_column(Integer, ForeignKey("subsets.id"), primary_key=True)
     puzzle_id: Mapped[int] = mapped_column(Integer, ForeignKey("puzzles.id"), primary_key=True)
     position: Mapped[int] = mapped_column(Integer, nullable=False)
-    is_discarded: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
