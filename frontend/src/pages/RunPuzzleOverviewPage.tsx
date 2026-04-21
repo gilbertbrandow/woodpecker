@@ -134,7 +134,7 @@ export function RunPuzzleOverviewPage(): React.ReactElement {
   useChessTheme(user?.boardTheme, user?.pieceTheme)
 
   const { runId: runIdStr, runPuzzleId: runPuzzleIdStr } = useParams({
-    from: '/app/runs/$runId/puzzles/$runPuzzleId/overview',
+    from: '/app/solve-flow/runs/$runId/puzzles/$runPuzzleId/overview',
   })
   const runId = parseInt(runIdStr, 10)
   const runPuzzleId = parseInt(runPuzzleIdStr, 10)

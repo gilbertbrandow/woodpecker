@@ -9,7 +9,7 @@ const TERMINAL_STATUSES = new Set(['solved', 'solved_with_retries', 'failed'])
 export function PuzzleResolverPage(): React.ReactElement {
   const navigate = useNavigate()
   const { runId: runIdStr, runPuzzleId: runPuzzleIdStr } = useParams({
-    from: '/app/runs/$runId/puzzles/$runPuzzleId',
+    from: '/app/solve-flow/runs/$runId/puzzles/$runPuzzleId',
   })
   const runId = parseInt(runIdStr, 10)
   const runPuzzleId = parseInt(runPuzzleIdStr, 10)

@@ -22,9 +22,11 @@ import {
 } from '../components/ui/breadcrumb'
 import { Badge } from '../components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
+import { SessionAttemptStrip } from '../components/SessionAttemptStrip'
 import { Check, X } from 'lucide-react'
 import type { PositionStatus } from '../lib/api'
 import { formatSolveTimeMs } from '../lib/utils'
+import { useSolveSession } from '../context/solveSession'
 
 const HEADER_H = 57
 const FOOTER_H = 49
@@ -382,10 +384,11 @@ function TimerCard({ timerText, elapsedTenths, targetSolveTenths, muted = false 
 export function BoardPage(): React.ReactElement | null {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { attemptHistory, registerAttemptStart, markAttemptResolved } = useSolveSession()
   useChessTheme(user?.boardTheme, user?.pieceTheme)
 
   const { runId: runIdStr, runPuzzleId: runPuzzleIdStr, attemptId: attemptIdStr } = useParams({
-    from: '/app/runs/$runId/puzzles/$runPuzzleId/attempts/$attemptId',
+    from: '/app/solve-flow/runs/$runId/puzzles/$runPuzzleId/attempts/$attemptId',
   })
   const runId = parseInt(runIdStr, 10)
   const runPuzzleId = parseInt(runPuzzleIdStr, 10)
@@ -636,6 +639,17 @@ export function BoardPage(): React.ReactElement | null {
     })()
   }, [mode, runId, runPuzzleId])
 
+  useEffect(() => {
+    if (mode !== 'focus') return
+    if (!puzzle || currentAttemptId === null) return
+
+    registerAttemptStart({
+      attemptId: currentAttemptId,
+      runPuzzleId: puzzle.runPuzzleId,
+      puzzlePosition: puzzle.position + 1,
+    })
+  }, [mode, puzzle, currentAttemptId, registerAttemptStart])
+
   const enterOverview = useCallback((): void => {
     const data = puzzleRef.current
     if (!data) return
@@ -714,6 +728,69 @@ export function BoardPage(): React.ReactElement | null {
     }
   }, [navigate, runId, runIdStr, setFen, setBlocked, setPendingPromotionBoth, clearMoveFeedback])
 
+  const handleRetake = useCallback(async (): Promise<void> => {
+    setIsLoadingNextPuzzle(true)
+    try {
+      const data = await api.runs.startPuzzle(runId, runPuzzleId)
+      if (data.currentAttemptId === null) {
+        toast.error('Could not start puzzle', { description: 'Please try again.' })
+        return
+      }
+
+      const solutionMoves = data.solution.split(' ')
+      if (solutionMoves.length < 2) {
+        toast.error('Invalid puzzle', { description: 'Puzzle solution is too short.' })
+        return
+      }
+
+      const chess = new Chess(data.fen)
+      applyUci(chess, solutionMoves[0])
+      const initialLastMove: [string, string] = [solutionMoves[0].slice(0, 2), solutionMoves[0].slice(2, 4)]
+
+      chessRef.current = chess
+      solutionMovesRef.current = solutionMoves
+      moveIndexRef.current = 1
+      inputBlockedRef.current = false
+      movesPlayedRef.current = []
+      currentAttemptIdRef.current = data.currentAttemptId
+      puzzleRef.current = data
+      elapsedRef.current = 0
+      committedLastMoveRef.current = initialLastMove
+
+      setOverviewFreshPuzzle(null)
+      setOverviewRun(null)
+      setOverviewPuzzleList(null)
+      setPuzzle(data)
+      setCurrentAttemptId(data.currentAttemptId)
+      setOrientation(playerColor(data.fen))
+      setElapsedSeconds(0)
+      setPendingPromotionBoth(null)
+      setBlocked(false)
+      clearMoveFeedback()
+      setHintSquare(null)
+      setFen(chess.fen())
+      setDests(computeDests(chess))
+      setLastMove(initialLastMove)
+      modeRef.current = 'focus'
+      setMode('focus')
+      setBoardKey((k) => k + 1)
+
+      skipNextLoadRef.current = true
+      void navigate({
+        to: '/app/runs/$runId/puzzles/$runPuzzleId/attempts/$attemptId',
+        params: {
+          runId: runIdStr,
+          runPuzzleId: String(data.runPuzzleId),
+          attemptId: String(data.currentAttemptId),
+        },
+      })
+    } catch {
+      toast.error('Failed to start puzzle', { description: 'Please try again.' })
+    } finally {
+      setIsLoadingNextPuzzle(false)
+    }
+  }, [navigate, runId, runPuzzleId, runIdStr, setFen, setBlocked, setPendingPromotionBoth, clearMoveFeedback])
+
   const enterFailed = useCallback((): void => {
     modeRef.current = 'failed'
     setMode('failed')
@@ -732,6 +809,7 @@ export function BoardPage(): React.ReactElement | null {
     try {
       const result = await api.attempts.complete(id, status, movesPlayedRef.current)
       setCompleteResult(result)
+      markAttemptResolved(id, status)
       setCurrentAttemptId(null)
       currentAttemptIdRef.current = null
 
@@ -745,7 +823,7 @@ export function BoardPage(): React.ReactElement | null {
     } finally {
       concludingRef.current = false
     }
-  }, [enterFailed, enterOverview])
+  }, [enterFailed, enterOverview, markAttemptResolved])
 
   concludeFnRef.current = conclude
 
@@ -1115,6 +1193,8 @@ export function BoardPage(): React.ReactElement | null {
 
             {activeBoard}
 
+            <SessionAttemptStrip items={attemptHistory} />
+
             <div className="mt-3 flex items-center justify-between md:hidden">
               <span className="tabular-nums text-sm font-medium">
                 {formatTimer(elapsedSeconds)}
@@ -1169,6 +1249,8 @@ export function BoardPage(): React.ReactElement | null {
             </div>
 
             {activeBoard}
+
+            <SessionAttemptStrip items={attemptHistory} />
 
             <div className="mt-3 flex items-center justify-between md:hidden">
               <span className="tabular-nums text-sm text-muted-foreground">{elapsed}</span>
@@ -1298,13 +1380,8 @@ export function BoardPage(): React.ReactElement | null {
       <Button
         variant="outline"
         className="w-full"
-        disabled={overviewRun.status !== 'active'}
-        onClick={() =>
-          void navigate({
-            to: '/app/runs/$runId/puzzles/$runPuzzleId',
-            params: { runId: runIdStr, runPuzzleId: runPuzzleIdStr },
-          })
-        }
+        disabled={overviewRun.status !== 'active' || isLoadingNextPuzzle}
+        onClick={() => void handleRetake()}
       >
         Retake
       </Button>
@@ -1346,6 +1423,7 @@ export function BoardPage(): React.ReactElement | null {
             )}
           </div>
           {activeBoard}
+          <SessionAttemptStrip items={attemptHistory} />
           {overviewFreshPuzzle && overviewAfterStats && overviewRun && (
             <div className="mt-4 flex flex-col gap-6 md:hidden">
               {overviewStatsSection}
@@ -1360,13 +1438,8 @@ export function BoardPage(): React.ReactElement | null {
                 <Button
                   variant="outline"
                   className="w-full"
-                  disabled={overviewRun.status !== 'active'}
-                  onClick={() =>
-                    void navigate({
-                      to: '/app/runs/$runId/puzzles/$runPuzzleId',
-                      params: { runId: runIdStr, runPuzzleId: runPuzzleIdStr },
-                    })
-                  }
+                  disabled={overviewRun.status !== 'active' || isLoadingNextPuzzle}
+                  onClick={() => void handleRetake()}
                 >
                   Retake
                 </Button>

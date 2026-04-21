@@ -6,7 +6,7 @@ import { api } from '../lib/api'
 
 export function RunResolverPage(): React.ReactElement {
   const navigate = useNavigate()
-  const { runId: runIdStr } = useParams({ from: '/app/runs/$runId/solve' })
+  const { runId: runIdStr } = useParams({ from: '/app/solve-flow/runs/$runId/solve' })
   const runId = parseInt(runIdStr, 10)
 
   useEffect(() => {
