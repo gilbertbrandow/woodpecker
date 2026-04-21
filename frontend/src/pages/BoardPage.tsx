@@ -23,6 +23,7 @@ import {
 import { Badge } from '../components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
 import { Check, X } from 'lucide-react'
+import type { PositionStatus } from '../lib/api'
 
 const HEADER_H = 57
 const FOOTER_H = 49
@@ -36,7 +37,7 @@ const WRONG_REVERT_MS = 500
 const FAILED_TO_OVERVIEW_MS = 300
 const TIMER_UPDATE_MS = 50
 
-type Mode = 'loading' | 'focus' | 'failed' | 'overview'
+type Mode = 'loading' | 'focus' | 'failed'
 type Orientation = 'white' | 'black'
 type PendingPromotion = { orig: string; dest: string }
 type MoveFeedbackResult = 'correct' | 'wrong'
@@ -92,10 +93,66 @@ function formatTargetSolveTime(tenths: number): string {
   return `${minutes}m ${seconds}s`
 }
 
-function computeFinalFen(fen: string, solutionMoves: string[]): string {
-  const chess = new Chess(fen)
-  for (const uci of solutionMoves) applyUci(chess, uci)
-  return chess.fen()
+function positionStatusLabel(status: PositionStatus): string {
+  switch (status) {
+    case 'solved': return 'Solved'
+    case 'solved_with_retries': return 'Solved'
+    case 'failed': return 'Failed'
+    case 'will_be_retried': return 'Will retry'
+    case 'in_progress': return 'In progress'
+    case 'not_started': return 'Not started'
+  }
+}
+
+
+type AttemptScoringProps = {
+  currentTryNumber: number
+  maxTriesPerPuzzle: number
+  positionStatus: PositionStatus
+  attemptActive: boolean
+}
+
+function AttemptScoring({ currentTryNumber, maxTriesPerPuzzle, positionStatus, attemptActive }: AttemptScoringProps): React.ReactElement | null {
+  const withinWindow = currentTryNumber <= maxTriesPerPuzzle
+
+  if (!withinWindow) {
+    return (
+      <div className="flex flex-col gap-2">
+        <span className="text-xs font-medium text-muted-foreground">Practice attempt</span>
+        <Badge variant="outline" className="w-fit text-xs">{positionStatusLabel(positionStatus)}</Badge>
+        <span className="text-xs text-muted-foreground">Won't affect your score.</span>
+      </div>
+    )
+  }
+
+  if (maxTriesPerPuzzle <= 1) return null
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-xs font-medium text-muted-foreground">
+        Attempt {currentTryNumber} / {maxTriesPerPuzzle}
+      </span>
+      <div className="flex items-center gap-1.5">
+        {Array.from({ length: maxTriesPerPuzzle }).map((_, i) => {
+          const n = i + 1
+          const isUsed = n < currentTryNumber || (n === currentTryNumber && !attemptActive)
+          const isCurrent = n === currentTryNumber && attemptActive
+          return (
+            <div
+              key={i}
+              className={`rounded-full ${
+                isUsed
+                  ? 'h-2 w-2 bg-foreground/35'
+                  : isCurrent
+                    ? 'h-2.5 w-2.5 bg-foreground'
+                    : 'h-2 w-2 bg-foreground/10'
+              }`}
+            />
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 type PromotionPickerProps = {
@@ -248,7 +305,7 @@ function TimerCard({ timerText, elapsedTenths, targetSolveTenths, muted = false 
   )
 }
 
-export function BoardPage(): React.ReactElement {
+export function BoardPage(): React.ReactElement | null {
   const navigate = useNavigate()
   const { user } = useAuth()
   useChessTheme(user?.boardTheme, user?.pieceTheme)
@@ -280,7 +337,6 @@ export function BoardPage(): React.ReactElement {
   })
 
   const concludeFnRef = useRef<(status: 'solved' | 'failed') => Promise<void>>(async () => {})
-  const enterOverviewFnRef = useRef<() => void>(() => {})
   const concludingRef = useRef(false)
 
   const [mode, setMode] = useState<Mode>('loading')
@@ -297,7 +353,7 @@ export function BoardPage(): React.ReactElement {
 
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [targetSolveTenths, setTargetSolveTenths] = useState<number | null>(null)
-  const [overviewFen, setOverviewFen] = useState('')
+  const [participationId, setParticipationId] = useState<number | null>(null)
   const [boardKey, setBoardKey] = useState(0)
 
   const [, setCompleteResult] = useState<CompleteAttemptResult | null>(null)
@@ -366,6 +422,7 @@ export function BoardPage(): React.ReactElement {
   useEffect(() => {
     void (async () => {
       try {
+        setParticipationId(null)
         const [data, run] = await Promise.all([
           api.runs.getPuzzle(runId, runPuzzleId),
           api.runs.get(runId),
@@ -422,6 +479,7 @@ export function BoardPage(): React.ReactElement {
         ]
 
         setPuzzle(data)
+  setParticipationId(run.participationId)
         setTargetSolveTenths(resolvedTargetSolveTenths)
         setOrientation(playerColor(data.fen))
         setCurrentAttemptId(resolvedAttemptId)
@@ -432,17 +490,18 @@ export function BoardPage(): React.ReactElement {
         setHintSquare(null)
 
         if (targetMode === 'overview') {
-          const finalFen = computeFinalFen(data.fen, solutionMoves)
-          setOverviewFen(finalFen)
-          setFen(finalFen)
-          setDests(new Map())
-          setLastMove(undefined)
-        } else {
-          setFen(initialFen)
-          setDests(computeDests(chess))
-          setLastMove(initialLastMove)
-          committedLastMoveRef.current = initialLastMove
+          void navigate({
+            to: '/app/runs/$runId/puzzles/$runPuzzleId/overview',
+            params: { runId: runIdStr, runPuzzleId: runPuzzleIdStr },
+            replace: true,
+          })
+          return
         }
+
+        setFen(initialFen)
+        setDests(computeDests(chess))
+        setLastMove(initialLastMove)
+        committedLastMoveRef.current = initialLastMove
 
         modeRef.current = targetMode
         setMode(targetMode)
@@ -474,26 +533,19 @@ export function BoardPage(): React.ReactElement {
     return () => window.removeEventListener('beforeunload', handler)
   }, [currentAttemptId])
 
-  const enterOverview = useCallback((): void => {
-    const data = puzzleRef.current
-    if (!data) return
-    const finalFen = computeFinalFen(data.fen, solutionMovesRef.current)
-    setOverviewFen(finalFen)
-    setFen(finalFen)
-    setDests(new Map())
-    setLastMove(undefined)
-    setHintSquare(null)
-    modeRef.current = 'overview'
-    setMode('overview')
-  }, [setFen])
+  const navigateToOverview = useCallback((): void => {
+    void navigate({
+      to: '/app/runs/$runId/puzzles/$runPuzzleId/overview',
+      params: { runId: runIdStr, runPuzzleId: runPuzzleIdStr },
+      replace: true,
+    })
+  }, [navigate, runIdStr, runPuzzleIdStr])
 
   const enterFailed = useCallback((): void => {
     modeRef.current = 'failed'
     setMode('failed')
     setHintSquare(null)
   }, [])
-
-  enterOverviewFnRef.current = enterOverview
 
   const conclude = useCallback(async (status: 'solved' | 'failed'): Promise<void> => {
     if (timerRef.current !== null) {
@@ -511,7 +563,7 @@ export function BoardPage(): React.ReactElement {
       currentAttemptIdRef.current = null
 
       if (result.markedForRetry || status === 'solved') {
-        enterOverviewFnRef.current()
+        navigateToOverview()
       } else {
         enterFailed()
       }
@@ -558,7 +610,7 @@ export function BoardPage(): React.ReactElement {
         if (modeRef.current === 'focus') {
           void concludeFnRef.current('solved')
         } else {
-          setTimeout(() => enterOverviewFnRef.current(), FAILED_TO_OVERVIEW_MS)
+          setTimeout(() => navigateToOverview(), FAILED_TO_OVERVIEW_MS)
         }
       }, MOVE_FEEDBACK_SUCCESS_MS)
       return
@@ -693,7 +745,7 @@ export function BoardPage(): React.ReactElement {
       setTimeout(() => {
         inputBlockedRef.current = false
         setInputBlocked(false)
-        enterOverviewFnRef.current()
+        navigateToOverview()
       }, FAILED_TO_OVERVIEW_MS)
       return
     }
@@ -721,8 +773,26 @@ export function BoardPage(): React.ReactElement {
       <BreadcrumbList>
         <BreadcrumbItem>
           <BreadcrumbLink asChild>
-            <Link to="/app">Training</Link>
+            <Link to="/app">Dashboard</Link>
           </BreadcrumbLink>
+        </BreadcrumbItem>
+        <BreadcrumbSeparator />
+        <BreadcrumbItem>
+          {participationId !== null ? (
+            <BreadcrumbLink asChild>
+              <Link
+                to="/app/participations/$participationId"
+                params={{ participationId: String(participationId) }}
+                title={puzzle.scheduleName}
+              >
+                {puzzle.scheduleName.length > 8 ? `${puzzle.scheduleName.slice(0, 5)}...` : puzzle.scheduleName}
+              </Link>
+            </BreadcrumbLink>
+          ) : (
+            <BreadcrumbPage title={puzzle.scheduleName}>
+              {puzzle.scheduleName.length > 8 ? `${puzzle.scheduleName.slice(0, 5)}...` : puzzle.scheduleName}
+            </BreadcrumbPage>
+          )}
         </BreadcrumbItem>
         <BreadcrumbSeparator />
         <BreadcrumbItem>
@@ -738,16 +808,6 @@ export function BoardPage(): React.ReactElement {
         </BreadcrumbItem>
       </BreadcrumbList>
     </Breadcrumb>
-  )
-
-  const puzzleInfo = (
-    <div className="flex flex-col gap-0.5">
-      {puzzle.maxTriesPerPuzzle > 1 && (
-        <span className="text-xs text-muted-foreground">
-          Try {puzzle.currentTryNumber}
-        </span>
-      )}
-    </div>
   )
 
   const turnToMove: Orientation = displayFen.split(' ')[1] === 'b' ? 'black' : 'white'
@@ -846,31 +906,6 @@ export function BoardPage(): React.ReactElement {
     </div>
   )
 
-  const staticBoard = (
-    <div className="chess-board-container relative shrink-0" style={{ width: boardSize, height: boardSize }}>
-      <Chessground
-        width={boardSize}
-        height={boardSize}
-        fen={overviewFen}
-        orientation={orientation}
-        turnColor={orientation}
-        coordinates={true}
-        movable={{ color: undefined, free: false }}
-        lastMove={undefined}
-        animation={{ enabled: false }}
-        highlight={{ lastMove: false, check: false }}
-        premovable={{ enabled: false }}
-      />
-      {lastMoveResult === 'correct' && lastMoveSquare !== null && (
-        <MoveFeedbackBadge
-          result={lastMoveResult}
-          square={lastMoveSquare}
-          orientation={orientation}
-        />
-      )}
-    </div>
-  )
-
   const outerCls = 'flex flex-1 items-center justify-center overflow-hidden px-6'
   const innerCls = 'flex w-full items-start gap-6'
   const sidebarCls = 'hidden flex-1 flex-col md:flex'
@@ -881,13 +916,28 @@ export function BoardPage(): React.ReactElement {
         <div className={innerCls}>
           <aside className={sidebarCls} style={sidebarH}>
             <div className="mb-6">{breadcrumb}</div>
-            {puzzleInfo}
+            <AttemptScoring
+              currentTryNumber={puzzle.currentTryNumber}
+              maxTriesPerPuzzle={puzzle.maxTriesPerPuzzle}
+              positionStatus={puzzle.positionStatus}
+              attemptActive={true}
+            />
           </aside>
 
           <div className="flex shrink-0 flex-col">
             <div className="mb-3 md:hidden">
               {breadcrumb}
-              <div className="mt-1">{puzzleInfo}</div>
+              {puzzle.maxTriesPerPuzzle > 1 && (
+                <div className="mt-1">
+                  {puzzle.currentTryNumber <= puzzle.maxTriesPerPuzzle ? (
+                    <span className="text-xs text-muted-foreground">
+                      Attempt {puzzle.currentTryNumber} / {puzzle.maxTriesPerPuzzle}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Practice attempt</span>
+                  )}
+                </div>
+              )}
             </div>
 
             {activeBoard}
@@ -920,7 +970,14 @@ export function BoardPage(): React.ReactElement {
           <aside className={sidebarCls} style={sidebarH}>
             <div className="mb-6">{breadcrumb}</div>
             <Badge variant="outline" className="w-fit">Failed</Badge>
-            <div className="mt-4">{puzzleInfo}</div>
+            <div className="mt-4">
+              <AttemptScoring
+                currentTryNumber={puzzle.currentTryNumber}
+                maxTriesPerPuzzle={puzzle.maxTriesPerPuzzle}
+                positionStatus={puzzle.positionStatus}
+                attemptActive={false}
+              />
+            </div>
           </aside>
 
           <div className="flex shrink-0 flex-col">
@@ -928,8 +985,14 @@ export function BoardPage(): React.ReactElement {
               {breadcrumb}
               <div className="mt-1 flex items-center gap-2">
                 <Badge variant="outline">Failed</Badge>
+                {puzzle.maxTriesPerPuzzle > 1 && (
+                  <span className="text-xs text-muted-foreground">
+                    {puzzle.currentTryNumber <= puzzle.maxTriesPerPuzzle
+                      ? `Attempt ${puzzle.currentTryNumber} / ${puzzle.maxTriesPerPuzzle}`
+                      : 'Practice attempt'}
+                  </span>
+                )}
               </div>
-              <div className="mt-1">{puzzleInfo}</div>
             </div>
 
             {activeBoard}
@@ -969,26 +1032,5 @@ export function BoardPage(): React.ReactElement {
     )
   }
 
-  return (
-    <div className={outerCls}>
-      <div className={innerCls}>
-        <aside className={sidebarCls} style={sidebarH}>
-          <div className="mb-6">{breadcrumb}</div>
-          {puzzleInfo}
-        </aside>
-
-        <div className="flex shrink-0 flex-col">
-          <div className="mb-3 md:hidden">
-            {breadcrumb}
-            <div className="mt-1">{puzzleInfo}</div>
-          </div>
-          {staticBoard}
-        </div>
-
-        <aside className={sidebarCls} style={sidebarH}>
-          <p className="text-sm text-muted-foreground">Overview coming soon.</p>
-        </aside>
-      </div>
-    </div>
-  )
+  return null
 }

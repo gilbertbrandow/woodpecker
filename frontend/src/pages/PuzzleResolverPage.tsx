@@ -47,14 +47,9 @@ export function PuzzleResolverPage(): React.ReactElement {
           return
         }
 
-        const lastTry = puzzle.tries[puzzle.tries.length - 1]
-        if (!lastTry) {
-          void navigate({ to: '/app/runs/$runId', params: { runId: runIdStr }, replace: true })
-          return
-        }
         void navigate({
-          to: '/app/runs/$runId/puzzles/$runPuzzleId/attempts/$attemptId',
-          params: { ...base, attemptId: String(lastTry.id) },
+          to: '/app/runs/$runId/puzzles/$runPuzzleId/overview',
+          params: { runId: runIdStr, runPuzzleId: runPuzzleIdStr },
           replace: true,
         })
       })

@@ -14,6 +14,7 @@ import { RunPage } from './pages/RunPage'
 import { RunResolverPage } from './pages/RunResolverPage'
 import { PuzzleResolverPage } from './pages/PuzzleResolverPage'
 import { BoardPage } from './pages/BoardPage'
+import { RunPuzzleOverviewPage } from './pages/RunPuzzleOverviewPage'
 
 type RouterContext = {
   auth: AuthContextValue
@@ -111,6 +112,12 @@ const attemptRoute = createRoute({
   component: BoardPage,
 })
 
+const runPuzzleOverviewRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/runs/$runId/puzzles/$runPuzzleId/overview',
+  component: RunPuzzleOverviewPage,
+})
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   appRoute.addChildren([
@@ -126,6 +133,7 @@ const routeTree = rootRoute.addChildren([
     runSolveRoute,
     puzzleResolverRoute,
     attemptRoute,
+    runPuzzleOverviewRoute,
   ]),
 ])
 

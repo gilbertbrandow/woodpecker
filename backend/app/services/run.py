@@ -331,7 +331,7 @@ def list_run_puzzles(run_id: int, user_id: int) -> dict[str, object]:
                          AND pa2.status != 'in_progress'
                        ORDER BY pa2.try_number DESC
                        LIMIT 1
-                   ) AS time_ms
+                                     ) AS time_ms
             FROM run_puzzles rp
             JOIN puzzles p ON p.id = rp.puzzle_id
             LEFT JOIN puzzle_attempts pa ON pa.run_puzzle_id = rp.id

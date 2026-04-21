@@ -11,9 +11,10 @@ import {
   type SortingState,
   type Column,
 } from '@tanstack/react-table'
-import { ChevronUp, ChevronDown, ChevronsUpDown, ExternalLink } from 'lucide-react'
+import { ChevronUp, ChevronDown, ChevronsUpDown, ExternalLink, Play, Eye } from 'lucide-react'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 import {
   Table,
   TableHeader,
@@ -44,8 +45,6 @@ const POSITION_STATUS_CLASS: Record<PositionStatus, string> = {
   solved_with_retries: 'border-green-600/30 bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400',
   failed: 'border-red-600/30 bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400',
 }
-
-const ACTIONABLE_STATUSES: PositionStatus[] = ['not_started', 'in_progress', 'will_be_retried']
 
 type ColMeta = { className?: string }
 
@@ -81,17 +80,40 @@ function SortHeader({
   )
 }
 
+type ActionButtonProps = {
+  tooltip: string
+  onClick?: (e: React.MouseEvent) => void
+  disabled?: boolean
+  children: React.ReactNode
+}
+
+function ActionButton({ tooltip, onClick, disabled = false, children }: ActionButtonProps): React.ReactElement {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onClick}
+            className={`flex h-8 w-8 items-center justify-center rounded text-muted-foreground transition-colors ${
+              disabled
+                ? 'cursor-not-allowed opacity-35'
+                : 'hover:bg-accent hover:text-foreground'
+            }`}
+          >
+            {children}
+          </button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{tooltip}</TooltipContent>
+    </Tooltip>
+  )
+}
+
 export function RunPuzzleTable({ puzzles, runIdStr, isActive }: RunPuzzleTableProps): React.ReactElement {
   const navigate = useNavigate()
   const [sorting, setSorting] = useState<SortingState>([])
-
-  const handleRowClick = (item: RunPuzzleListItem): void => {
-    if (!isActive || !ACTIONABLE_STATUSES.includes(item.positionStatus)) return
-    void navigate({
-      to: '/app/runs/$runId/puzzles/$runPuzzleId',
-      params: { runId: runIdStr, runPuzzleId: String(item.runPuzzleId) },
-    })
-  }
 
   const columns: ColumnDef<RunPuzzleListItem>[] = [
     {
@@ -126,7 +148,7 @@ export function RunPuzzleTable({ puzzles, runIdStr, isActive }: RunPuzzleTablePr
     {
       accessorKey: 'timeMs',
       header: ({ column }) => <SortHeader column={column} label="Time" />,
-      meta: { className: 'min-w-28 text-right' } satisfies ColMeta,
+      meta: { className: 'min-w-28' } satisfies ColMeta,
       sortUndefined: 'last',
       cell: ({ row }) => (
         <span className="tabular-nums">
@@ -143,22 +165,54 @@ export function RunPuzzleTable({ puzzles, runIdStr, isActive }: RunPuzzleTablePr
       ),
     },
     {
-      id: 'game',
+      id: 'actions',
       header: '',
       enableSorting: false,
-      meta: { className: 'sticky right-0 bg-background' } satisfies ColMeta,
-      cell: ({ row }) => (
-        <a
-          href={`https://lichess.org/training/${row.original.puzzleId}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-          aria-label="Open puzzle on Lichess"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <ExternalLink className="h-4 w-4" />
-        </a>
-      ),
+      meta: { className: 'sticky right-0 bg-background w-28' } satisfies ColMeta,
+      cell: ({ row }) => {
+        const item = row.original
+        return (
+          <div className="flex items-center gap-0.5">
+            <ActionButton
+              tooltip="Open puzzle on Lichess"
+              onClick={(e) => {
+                e.stopPropagation()
+                window.open(`https://lichess.org/training/${item.puzzleId}`, '_blank', 'noopener,noreferrer')
+              }}
+            >
+              <ExternalLink className="h-4 w-4" />
+            </ActionButton>
+            <ActionButton
+              tooltip={isActive ? 'Solve this puzzle' : 'Run is not active'}
+              disabled={!isActive}
+              onClick={(e) => {
+                e.stopPropagation()
+                void navigate({
+                  to: '/app/runs/$runId/puzzles/$runPuzzleId',
+                  params: { runId: runIdStr, runPuzzleId: String(item.runPuzzleId) },
+                })
+              }}
+            >
+              <Play className="h-4 w-4" />
+            </ActionButton>
+            <ActionButton
+              tooltip="See overview"
+              onClick={(e) => {
+                e.stopPropagation()
+                void navigate({
+                  to: '/app/runs/$runId/puzzles/$runPuzzleId/overview',
+                  params: {
+                    runId: runIdStr,
+                    runPuzzleId: String(item.runPuzzleId),
+                  },
+                })
+              }}
+            >
+              <Eye className="h-4 w-4" />
+            </ActionButton>
+          </div>
+        )
+      },
     },
   ]
 
@@ -207,22 +261,15 @@ export function RunPuzzleTable({ puzzles, runIdStr, isActive }: RunPuzzleTablePr
                 </TableCell>
               </TableRow>
             ) : (
-              table.getRowModel().rows.map((row) => {
-                const clickable = isActive && ACTIONABLE_STATUSES.includes(row.original.positionStatus)
-                return (
-                  <TableRow
-                    key={row.id}
-                    className={clickable ? 'cursor-pointer' : ''}
-                    onClick={() => handleRowClick(row.original)}
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className={(cell.column.columnDef.meta as ColMeta | undefined)?.className}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                )
-              })
+              table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id}>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id} className={(cell.column.columnDef.meta as ColMeta | undefined)?.className}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>
