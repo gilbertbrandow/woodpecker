@@ -317,6 +317,13 @@ export type CompleteAttemptResult = {
   nextRunPuzzleId: number | null
 }
 
+export type PuzzleRunReference = {
+  runId: number
+  runIndex: number
+  runPuzzleId: number
+  hasAttempts: boolean
+}
+
 export const api = {
   auth: {
     me: (): Promise<AuthUser> => request('/auth/me'),
@@ -412,6 +419,8 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(target),
       }),
+    getCrossRunPuzzle: (participationId: number, puzzleId: string): Promise<PuzzleRunReference[]> =>
+      request(`/participations/${participationId}/cross-run-puzzle/${encodeURIComponent(puzzleId)}`),
     abort: (participationId: number): Promise<ScheduleParticipation> =>
       request(`/participations/${participationId}/abort`, { method: 'POST' }),
   },

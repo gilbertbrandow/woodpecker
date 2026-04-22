@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { useLocation, useNavigate } from '@tanstack/react-router'
 import { CheckCircle2, XCircle, Clock } from 'lucide-react'
+import { toast } from 'sonner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 import { ProgressBar } from '../../components/ProgressBar'
 import { BoardBreadcrumbs } from './BoardBreadcrumbs'
@@ -12,9 +13,12 @@ import { OverviewStatsSection } from './OverviewStatsSection'
 import { OverviewActionsSection } from './OverviewActionsSection'
 import { DeltaBadge } from './DeltaBadge'
 import { useOverviewSelectionModel } from './useOverviewSelectionModel'
+import { computeOverviewBoardState } from './boardOverview.helpers'
 import { formatTimer } from './boardPage.helpers'
 import { formatNumber } from '../../lib/utils'
-import type { BoardPageControllerResult } from './useBoardPageController'
+import { api } from '../../lib/api'
+import type { PuzzleRunReference } from '../../lib/api'
+import type { BoardPageControllerResult, BoardState } from './useBoardPageController'
 import type { RunPuzzleFull } from '../../lib/api'
 
 type BoardOverviewViewProps = {
@@ -38,6 +42,7 @@ export function BoardOverviewView({
   const { freshPuzzle, run, afterStats, accuracyDelta, timeDelta, participation } = overview
 
   const [selectedAttemptId, setSelectedAttemptId] = React.useState<number | null>(null)
+  const [crossRunRefs, setCrossRunRefs] = React.useState<PuzzleRunReference[]>([])
 
   const isOverviewPath = React.useMemo(
     () => /^\/app\/runs\/\d+\/puzzles\/\d+\/overview$/.test(location),
@@ -88,6 +93,23 @@ export function BoardOverviewView({
     setOverviewAttemptInUrl(attemptId, false)
   }, [selectedAttemptId, setOverviewAttemptInUrl])
 
+  React.useEffect(() => {
+    if (!freshPuzzle || !participation) return
+    setCrossRunRefs([])
+    void api.participations.getCrossRunPuzzle(participation.id, freshPuzzle.puzzleId)
+      .then(setCrossRunRefs)
+      .catch(() => {
+        toast.error('Could not load run switcher', { description: 'Run comparison unavailable.' })
+      })
+  }, [freshPuzzle?.puzzleId, participation?.id])
+
+  const handleSwitchRun = React.useCallback((targetRunId: number, targetRunPuzzleId: number): void => {
+    void navigate({
+      to: '/app/runs/$runId/puzzles/$runPuzzleId/overview',
+      params: { runId: String(targetRunId), runPuzzleId: String(targetRunPuzzleId) },
+    })
+  }, [navigate])
+
   const selectionModel = useOverviewSelectionModel(
     freshPuzzle,
     run,
@@ -99,6 +121,18 @@ export function BoardOverviewView({
   )
 
   const isLoading = freshPuzzle === null || run === null
+
+  const overviewBoard: BoardState = React.useMemo(() => {
+    if (!freshPuzzle || !selectionModel) return { ...board, dests: new Map() }
+    const derived = computeOverviewBoardState(freshPuzzle, selectionModel.selectedAttempt)
+    return {
+      ...board,
+      fen: derived.fen,
+      lastMove: derived.lastMove,
+      moveFeedback: derived.moveFeedback,
+      dests: new Map(),
+    }
+  }, [board, freshPuzzle, selectionModel])
 
   const loadingMobileHeader = (
     <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
@@ -113,7 +147,7 @@ export function BoardOverviewView({
             <p className="mt-4 text-sm text-muted-foreground">Loading…</p>
           </aside>
           <BoardCenterColumn
-            board={board}
+            board={overviewBoard}
             actions={actions}
             attemptHistory={session.attemptHistory}
             runId={runIdStr}
@@ -199,6 +233,28 @@ export function BoardOverviewView({
         selectedAttemptId={selectedAttemptId}
         onSelect={handleSelectAttempt}
       />
+      {crossRunRefs.length > 1 && (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            View run
+          </span>
+          <select
+            value={run.id}
+            onChange={(e) => {
+              const targetRunId = Number(e.target.value)
+              const ref = crossRunRefs.find((r) => r.runId === targetRunId)
+              if (ref) handleSwitchRun(ref.runId, ref.runPuzzleId)
+            }}
+            className="w-full rounded border border-border bg-background px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          >
+            {crossRunRefs.map((ref) => (
+              <option key={ref.runId} value={ref.runId}>
+                {`Run ${ref.runIndex + 1}${!ref.hasAttempts ? ' (no attempts)' : ''}`}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="flex flex-col gap-2">
         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Run progress
@@ -247,9 +303,11 @@ export function BoardOverviewView({
           runProgressDelta={runProgressDelta}
           onSelectAttempt={handleSelectAttempt}
           boardSize={board.boardSize}
+          crossRunRefs={crossRunRefs}
+          onSwitchRun={handleSwitchRun}
         />
         <BoardCenterColumn
-          board={board}
+          board={overviewBoard}
           actions={actions}
           attemptHistory={session.attemptHistory}
           runId={runIdStr}

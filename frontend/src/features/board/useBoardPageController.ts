@@ -393,6 +393,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
             return
           }
 
+          setOverviewFreshPuzzle(data)
+          setOverviewRun(run)
           applyOverviewDisplayState(data)
           return
         }
@@ -465,17 +467,14 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
   useEffect(() => {
     if (mode !== 'overview') return
-    clearOverviewState()
     void (async () => {
       try {
-        const [freshPuzzle, runData, listData] = await Promise.all([
-          api.runs.getPuzzle(runId, runPuzzleId),
-          api.runs.get(runId),
+        const [listData, runData] = await Promise.all([
           api.runs.puzzles(runId),
+          api.runs.get(runId),
         ])
-        setOverviewFreshPuzzle(freshPuzzle)
-        setOverviewRun(runData)
         setOverviewPuzzleList(listData)
+        setOverviewRun(runData)
         try {
           const participationData = await api.participations.get(runData.participationId)
           setOverviewParticipation(participationData)
@@ -486,7 +485,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
         toast.error('Failed to load overview', { description: 'Please try again.' })
       }
     })()
-  }, [mode, runId, runPuzzleId, clearOverviewState])
+  }, [mode, runId, runPuzzleId])
 
   useEffect(() => {
     if (mode !== 'focus') return

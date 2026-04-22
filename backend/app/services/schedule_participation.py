@@ -4,7 +4,8 @@ from typing import cast
 import sqlalchemy as sa
 
 from app.extensions import db
-from app.models.run import Run
+from app.models.puzzle import Puzzle
+from app.models.run import PuzzleAttempt, Run, RunPuzzle
 from app.models.schedule import Schedule
 from app.models.schedule_participation import ScheduleParticipation
 from app.models.subset import Subset
@@ -108,6 +109,42 @@ def participation_full_dict(participation: ScheduleParticipation) -> dict[str, o
             },
         },
     }
+
+
+def get_cross_run_puzzle_refs(
+    participation_id: int,
+    puzzle_id: str,
+    user_id: int,
+) -> list[dict[str, object]]:
+    _get_owned_participation(participation_id, user_id)
+
+    rows = db.session.execute(
+        sa.select(
+            RunPuzzle.id.label("run_puzzle_id"),
+            Run.id.label("run_id"),
+            Run.run_index,
+            sa.exists()
+            .where(PuzzleAttempt.run_puzzle_id == RunPuzzle.id)
+            .label("has_attempts"),
+        )
+        .join(Run, Run.id == RunPuzzle.run_id)
+        .join(Puzzle, Puzzle.id == RunPuzzle.puzzle_id)
+        .where(
+            Run.participation_id == participation_id,
+            Puzzle.puzzle_id == puzzle_id,
+        )
+        .order_by(Run.run_index)
+    ).all()
+
+    return [
+        {
+            "runId": int(row.run_id),
+            "runIndex": int(row.run_index),
+            "runPuzzleId": int(row.run_puzzle_id),
+            "hasAttempts": bool(row.has_attempts),
+        }
+        for row in rows
+    ]
 
 
 def create_participation(user_id: int, schedule_id: int) -> ScheduleParticipation:

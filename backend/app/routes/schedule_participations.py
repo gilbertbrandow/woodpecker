@@ -124,6 +124,20 @@ def list_runs(participation_id: int) -> tuple[Response, int] | Response:
     return jsonify([run_svc.run_dict(r) for r in runs])
 
 
+@participations_bp.get("/<int:participation_id>/cross-run-puzzle/<puzzle_id>")
+@login_required
+def get_cross_run_puzzle(participation_id: int, puzzle_id: str) -> tuple[Response, int] | Response:
+    try:
+        result = participation_svc.get_cross_run_puzzle_refs(
+            participation_id, puzzle_id, session["user_id"]
+        )
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    return jsonify(result)
+
+
 @participations_bp.post("/<int:participation_id>/abort")
 @login_required
 def abort_participation(participation_id: int) -> tuple[Response, int] | Response:

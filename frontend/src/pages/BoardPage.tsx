@@ -54,6 +54,18 @@ export function BoardPage(): React.ReactElement | null {
     )
   }
 
+  if (routeKind === 'overview') {
+    return (
+      <BoardOverviewView
+        puzzle={ctrl.puzzle}
+        ctrl={ctrl}
+        runIdStr={runIdStr}
+        runPuzzleIdStr={runPuzzleIdStr}
+        requestedAttemptId={requestedOverviewAttemptId}
+      />
+    )
+  }
+
   if (ctrl.mode === 'focus') return <BoardFocusView puzzle={ctrl.puzzle} ctrl={ctrl} runIdStr={runIdStr} />
   if (ctrl.mode === 'failed') return <BoardFailedView puzzle={ctrl.puzzle} ctrl={ctrl} runIdStr={runIdStr} />
   return (

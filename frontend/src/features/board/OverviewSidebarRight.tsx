@@ -84,6 +84,10 @@ export function OverviewSidebarRight({
           puzzleId={puzzle.puzzleId}
           rating={puzzle.rating}
           themes={puzzle.themes}
+          baseFen={puzzle.fen}
+          solutionMoves={puzzle.solution}
+          attemptMoves={selectedAttempt?.moves}
+          attemptStatus={selectedAttempt?.status === 'solved' || selectedAttempt?.status === 'failed' ? selectedAttempt.status : undefined}
         />
       </div>
       <OverviewActionsSection

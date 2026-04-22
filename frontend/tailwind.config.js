@@ -6,6 +6,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+        chess: ['"Lichess Chess"', 'sans-serif'],
       },
       colors: {
         'status-online': 'hsl(var(--status-online))',
