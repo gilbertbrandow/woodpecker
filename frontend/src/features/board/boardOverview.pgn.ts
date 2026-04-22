@@ -54,6 +54,7 @@ export function buildPgnDisplay(
   solutionMovesStr: string,
   attemptStatus: 'solved' | 'failed' | 'in_progress',
   retryPlies: string[] = [],
+  autoVariation: boolean = true,
 ): PuzzleMetaPgnDisplay {
   const solutionMoves = solutionMovesStr.split(' ').filter(Boolean)
   if (solutionMoves.length === 0) return { mainline: [], variation: null }
@@ -125,7 +126,7 @@ export function buildPgnDisplay(
       if (!move) break
       variation.push(move)
     }
-  } else {
+  } else if (autoVariation) {
     const correctStartIdx = actualFailedIdx * 2 + 1
     for (let i = correctStartIdx; i < solutionMoves.length; i++) {
       const status: DisplayMove['moveStatus'] = i % 2 === 0 ? 'opponent' : 'correct'

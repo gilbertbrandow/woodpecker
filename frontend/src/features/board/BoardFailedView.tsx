@@ -1,14 +1,18 @@
 import * as React from 'react'
+import { Clock, XCircle } from 'lucide-react'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 import { BoardBreadcrumbs } from './BoardBreadcrumbs'
 import { AttemptScoring } from './AttemptScoring'
+import { ProgressCard } from './ProgressCard'
 import { TimerCard } from './TimerCard'
 import { MoveStatusCard } from './MoveStatusCard'
 import { PuzzleMetaCard } from './PuzzleMetaCard'
 import { BoardCenterColumn } from './BoardCenterColumn'
 import { buildPgnDisplay } from './boardOverview.pgn'
-import { formatTimer } from './boardPage.helpers'
+import { formatTimer, computeRunProgressPct, computeTrainingProgressPct } from './boardPage.helpers'
+import { formatNumber } from '../../lib/utils'
 import type { BoardPageControllerResult, BoardState } from './useBoardPageController'
 import type { RunPuzzleFull } from '../../lib/api'
 import type { PlySelection } from './boardOverview.pgn'
@@ -20,8 +24,43 @@ type BoardFailedViewProps = {
 }
 
 export function BoardFailedView({ puzzle, ctrl, runIdStr }: BoardFailedViewProps): React.ReactElement {
-  const { board, timer, session, participationId, inputBlocked, actions } = ctrl
+  const { board, timer, session, participationId, inputBlocked, actions, run, allRuns, participation } = ctrl
   const elapsed = formatTimer(timer.elapsedTenths)
+
+  const metTargetTime = timer.targetSolveTenths !== null && timer.targetSolveTenths > 0
+    ? timer.elapsedTenths <= timer.targetSolveTenths
+    : null
+
+  const timerRightSlot = (
+    <>
+      {metTargetTime !== null && (
+        <Tooltip delayDuration={100}>
+          <TooltipTrigger asChild>
+            <span
+              className={`inline-flex cursor-default items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
+                metTargetTime
+                  ? 'border-green-600/20 bg-green-500/15 text-green-700 dark:text-green-400'
+                  : 'border-amber-600/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+              }`}
+            >
+              <Clock className="h-3 w-3" />
+              Time
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{metTargetTime ? 'Moved within target time' : 'Target time missed'}</TooltipContent>
+        </Tooltip>
+      )}
+      <Tooltip delayDuration={100}>
+        <TooltipTrigger asChild>
+          <span className="inline-flex cursor-default items-center gap-1 rounded-full border border-red-600/20 bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
+            <XCircle className="h-3 w-3" />
+            Failed
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>Not solved</TooltipContent>
+      </Tooltip>
+    </>
+  )
 
   const [selectedPly, setSelectedPly] = React.useState<PlySelection | null>(null)
 
@@ -30,7 +69,7 @@ export function BoardFailedView({ puzzle, ctrl, runIdStr }: BoardFailedViewProps
   }, [board.boardKey])
 
   const pgnDisplay = React.useMemo(
-    () => buildPgnDisplay(puzzle.fen, session.movesPlayed, puzzle.solution, 'failed', session.failedRetryPlies),
+    () => buildPgnDisplay(puzzle.fen, session.movesPlayed, puzzle.solution, 'failed', session.failedRetryPlies, false),
     [puzzle.fen, puzzle.solution, session.movesPlayed, session.failedRetryPlies],
   )
 
@@ -92,19 +131,40 @@ export function BoardFailedView({ puzzle, ctrl, runIdStr }: BoardFailedViewProps
   return (
     <div className="flex flex-1 items-center justify-center overflow-hidden px-6">
       <div className="flex w-full items-start gap-6">
-        <aside className="hidden flex-1 flex-col md:flex" style={{ height: board.boardSize }}>
-          <div className="mb-6">
-            <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
-          </div>
+        <aside className="hidden flex-1 flex-col gap-4 md:flex" style={{ height: board.boardSize }}>
+          <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
+          {run !== null && (() => {
+            const resolvedCount = run.solvedCount + run.solvedWithRetriesCount + run.failedCount
+            const trainingResolved = allRuns !== null
+              ? allRuns.reduce((s, r) => s + r.solvedCount + r.solvedWithRetriesCount + r.failedCount, 0)
+              : 0
+            const trainingTotal = allRuns !== null
+              ? allRuns.reduce((s, r) => s + r.totalPuzzles, 0)
+              : 0
+            return (
+              <ProgressCard
+                runProgress={{
+                  label: `Run ${run.runIndex + 1}`,
+                  value: computeRunProgressPct(run),
+                  tooltipLabel: `${formatNumber(resolvedCount)} of ${formatNumber(run.totalPuzzles)} puzzles completed`,
+                  delta: null,
+                }}
+                trainingProgress={allRuns !== null ? {
+                  label: `${participation?.schedule.name ?? 'Training'}`,
+                  value: computeTrainingProgressPct(allRuns),
+                  tooltipLabel: `${formatNumber(trainingResolved)} of ${formatNumber(trainingTotal)} puzzles completed across all runs`,
+                  delta: null,
+                } : null}
+              />
+            )
+          })()}
           <Badge variant="outline" className="w-fit">Failed</Badge>
-          <div className="mt-4">
-            <AttemptScoring
-              currentTryNumber={puzzle.currentTryNumber}
-              maxTriesPerPuzzle={puzzle.maxTriesPerPuzzle}
-              positionStatus={puzzle.positionStatus}
-              attemptActive={false}
-            />
-          </div>
+          <AttemptScoring
+            currentTryNumber={puzzle.currentTryNumber}
+            maxTriesPerPuzzle={puzzle.maxTriesPerPuzzle}
+            positionStatus={puzzle.positionStatus}
+            attemptActive={false}
+          />
         </aside>
 
         <BoardCenterColumn
@@ -120,8 +180,8 @@ export function BoardFailedView({ puzzle, ctrl, runIdStr }: BoardFailedViewProps
           <TimerCard
             timerText={elapsed}
             elapsedTenths={timer.elapsedTenths}
-            targetSolveTenths={timer.targetSolveTenths}
-            muted={true}
+            targetSolveTenths={null}
+            rightSlot={timerRightSlot}
           />
           <PuzzleMetaCard
             puzzleId={puzzle.puzzleId}
