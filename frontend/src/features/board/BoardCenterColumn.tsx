@@ -12,6 +12,7 @@ type BoardCenterColumnProps = {
   runId: string
   activeAttemptId?: number | null
   stripInteractive?: boolean
+  boardAnimationEnabled?: boolean
   mobileHeader?: React.ReactNode
   mobileExtras?: React.ReactNode
 }
@@ -23,6 +24,7 @@ export function BoardCenterColumn({
   runId,
   activeAttemptId,
   stripInteractive = true,
+  boardAnimationEnabled = true,
   mobileHeader,
   mobileExtras,
 }: BoardCenterColumnProps): React.ReactElement {
@@ -36,6 +38,7 @@ export function BoardCenterColumn({
     hintSquare: board.hintSquare,
     pendingPromotion: board.pendingPromotion,
     moveFeedback: board.moveFeedback,
+    animationEnabled: boardAnimationEnabled,
     onMove: actions.handleUserMove,
     onPromotionSelect: actions.onPromotionPieceSelected,
     onPromotionCancel: actions.onPromotionCancel,

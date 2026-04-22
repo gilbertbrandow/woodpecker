@@ -6,6 +6,8 @@ import { formatTimer } from './boardPage.helpers'
 import { TimerCard } from './TimerCard'
 import { PuzzleMetaCard } from './PuzzleMetaCard'
 import { OverviewActionsSection } from './OverviewActionsSection'
+import { OverviewAttemptHistoryTable } from './OverviewAttemptHistoryTable'
+import type { OverviewAttemptHistoryRow } from './OverviewAttemptHistoryTable'
 
 type OverviewSidebarRightProps = {
   puzzle: RunPuzzleFull
@@ -17,6 +19,9 @@ type OverviewSidebarRightProps = {
   onNextPuzzle: () => void
   onRetake: () => void
   boardSize: number
+  historyRows: OverviewAttemptHistoryRow[]
+  selectedAttemptId: number | null
+  onSelectAttempt: (attemptId: number) => void
 }
 
 export function OverviewSidebarRight({
@@ -29,17 +34,34 @@ export function OverviewSidebarRight({
   onNextPuzzle,
   onRetake,
   boardSize,
+  historyRows,
+  selectedAttemptId,
+  onSelectAttempt,
 }: OverviewSidebarRightProps): React.ReactElement {
-  const isSolved = selectedAttempt?.status === 'solved'
+  const ZERO_TIMER = formatTimer(0)
+  const lastTimerTextRef = React.useRef(ZERO_TIMER)
+  const currentTimerText = formatTimer(frozenTimerTenths)
+  if (currentTimerText !== ZERO_TIMER) lastTimerTextRef.current = currentTimerText
+  const displayedTimerText = currentTimerText !== ZERO_TIMER ? currentTimerText : lastTimerTextRef.current
+
+  const lastMetTargetTimeRef = React.useRef<boolean | null>(null)
+  if (metTargetTime !== null) lastMetTargetTimeRef.current = metTargetTime
+  const displayedMetTargetTime = metTargetTime ?? lastMetTargetTimeRef.current
+
+  const lastSelectedAttemptRef = React.useRef<typeof selectedAttempt>(null)
+  if (selectedAttempt !== null) lastSelectedAttemptRef.current = selectedAttempt
+  const displayedAttempt = selectedAttempt ?? lastSelectedAttemptRef.current
+
+  const isSolved = displayedAttempt?.status === 'solved'
 
   const timerRightSlot = (
     <>
-      {metTargetTime !== null && (
+      {displayedMetTargetTime !== null && (
         <Tooltip delayDuration={100}>
           <TooltipTrigger asChild>
             <span
               className={`inline-flex cursor-default items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
-                metTargetTime
+                displayedMetTargetTime
                   ? 'border-green-600/20 bg-green-500/15 text-green-700 dark:text-green-400'
                   : 'border-amber-600/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
               }`}
@@ -48,10 +70,10 @@ export function OverviewSidebarRight({
               Time
             </span>
           </TooltipTrigger>
-          <TooltipContent>{metTargetTime ? 'Moved within target time' : 'Target time missed'}</TooltipContent>
+          <TooltipContent>{displayedMetTargetTime ? 'Moved within target time' : 'Target time missed'}</TooltipContent>
         </Tooltip>
       )}
-      {selectedAttempt !== null && (
+      {displayedAttempt !== null && (
         <Tooltip delayDuration={100}>
           <TooltipTrigger asChild>
             <span
@@ -75,7 +97,7 @@ export function OverviewSidebarRight({
     <aside className="hidden flex-1 flex-col gap-4 md:flex" style={{ height: boardSize }}>
       <div className="flex flex-col gap-2">
         <TimerCard
-          timerText={formatTimer(frozenTimerTenths)}
+          timerText={displayedTimerText}
           elapsedTenths={frozenTimerTenths}
           targetSolveTenths={null}
           rightSlot={timerRightSlot}
@@ -90,6 +112,11 @@ export function OverviewSidebarRight({
           attemptStatus={selectedAttempt?.status === 'solved' || selectedAttempt?.status === 'failed' ? selectedAttempt.status : undefined}
         />
       </div>
+      <OverviewAttemptHistoryTable
+        rows={historyRows}
+        selectedAttemptId={selectedAttemptId}
+        onSelectAttempt={onSelectAttempt}
+      />
       <OverviewActionsSection
         run={run}
         isLoadingNextPuzzle={isLoadingNextPuzzle}

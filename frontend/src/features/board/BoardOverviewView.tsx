@@ -8,18 +8,18 @@ import { BoardBreadcrumbs } from './BoardBreadcrumbs'
 import { BoardCenterColumn } from './BoardCenterColumn'
 import { OverviewSidebarLeft } from './OverviewSidebarLeft'
 import { OverviewSidebarRight } from './OverviewSidebarRight'
-import { AttemptTable } from './AttemptTable'
 import { OverviewStatsSection } from './OverviewStatsSection'
 import { OverviewActionsSection } from './OverviewActionsSection'
+import { OverviewAttemptHistoryTable } from './OverviewAttemptHistoryTable'
 import { DeltaBadge } from './DeltaBadge'
 import { useOverviewSelectionModel } from './useOverviewSelectionModel'
 import { computeOverviewBoardState } from './boardOverview.helpers'
 import { formatTimer } from './boardPage.helpers'
 import { formatNumber } from '../../lib/utils'
 import { api } from '../../lib/api'
-import type { PuzzleRunReference } from '../../lib/api'
+import type { PuzzleRunReference, RunPuzzleFull } from '../../lib/api'
 import type { BoardPageControllerResult, BoardState } from './useBoardPageController'
-import type { RunPuzzleFull } from '../../lib/api'
+import type { OverviewAttemptHistoryRow } from './OverviewAttemptHistoryTable'
 
 type BoardOverviewViewProps = {
   puzzle: RunPuzzleFull
@@ -43,6 +43,7 @@ export function BoardOverviewView({
 
   const [selectedAttemptId, setSelectedAttemptId] = React.useState<number | null>(null)
   const [crossRunRefs, setCrossRunRefs] = React.useState<PuzzleRunReference[]>([])
+  const [crossRunPuzzles, setCrossRunPuzzles] = React.useState<Map<number, RunPuzzleFull>>(new Map())
 
   const isOverviewPath = React.useMemo(
     () => /^\/app\/runs\/\d+\/puzzles\/\d+\/overview$/.test(location),
@@ -95,23 +96,118 @@ export function BoardOverviewView({
 
   React.useEffect(() => {
     if (!freshPuzzle || !participation) return
+    let ignore = false
     setCrossRunRefs([])
     void api.participations.getCrossRunPuzzle(participation.id, freshPuzzle.puzzleId)
-      .then(setCrossRunRefs)
+      .then((refs) => { if (!ignore) setCrossRunRefs(refs) })
       .catch(() => {
-        toast.error('Could not load run switcher', { description: 'Run comparison unavailable.' })
+        if (!ignore) toast.error('Could not load run switcher', { description: 'Run comparison unavailable.' })
       })
+    return () => { ignore = true }
   }, [freshPuzzle?.puzzleId, participation?.id])
 
-  const handleSwitchRun = React.useCallback((targetRunId: number, targetRunPuzzleId: number): void => {
-    void navigate({
-      to: '/app/runs/$runId/puzzles/$runPuzzleId/overview',
-      params: { runId: String(targetRunId), runPuzzleId: String(targetRunPuzzleId) },
-    })
-  }, [navigate])
+  React.useEffect(() => {
+    let ignore = false
+    const refsToFetch = crossRunRefs.filter((ref) => ref.hasAttempts)
+    if (refsToFetch.length === 0) {
+      setCrossRunPuzzles(new Map())
+      return
+    }
+    void Promise.all(
+      refsToFetch.map((ref) =>
+        api.runs.getPuzzle(ref.runId, ref.runPuzzleId).then((puzzle) => ({ runId: ref.runId, puzzle })),
+      ),
+    )
+      .then((results) => {
+        if (ignore) return
+        const map = new Map<number, RunPuzzleFull>()
+        for (const { runId, puzzle } of results) {
+          map.set(runId, puzzle)
+        }
+        setCrossRunPuzzles(map)
+      })
+      .catch(() => undefined)
+    return () => { ignore = true }
+  }, [crossRunRefs])
+
+  const historyRows = React.useMemo((): OverviewAttemptHistoryRow[] => {
+    if (!run) return []
+    const currentRunId = Number(runIdStr)
+    const freshIsForCurrentRun =
+      freshPuzzle !== null && freshPuzzle.runPuzzleId === Number(runPuzzleIdStr)
+    const rows: OverviewAttemptHistoryRow[] = []
+
+    if (freshIsForCurrentRun && freshPuzzle) {
+      for (const attempt of freshPuzzle.tries) {
+        if (attempt.status === 'in_progress') continue
+        rows.push({
+          attemptId: attempt.id,
+          runId: run.id,
+          runLabel: `Run ${run.runIndex + 1}`,
+          runOrder: run.runIndex,
+          runPuzzleId: freshPuzzle.runPuzzleId,
+          tryNumber: attempt.tryNumber,
+          countsTowardsTraining: attempt.tryNumber <= freshPuzzle.maxTriesPerPuzzle,
+          result: attempt.status as 'solved' | 'failed',
+          timeSpentMs: attempt.timeSpentMs,
+        })
+      }
+    }
+
+    for (const [runId, puzzle] of crossRunPuzzles) {
+      const isCurrent = runId === currentRunId
+      if (freshIsForCurrentRun && isCurrent) continue
+      const ref = crossRunRefs.find((r) => r.runId === runId)
+      if (!ref) continue
+      for (const attempt of puzzle.tries) {
+        if (attempt.status === 'in_progress') continue
+        rows.push({
+          attemptId: attempt.id,
+          runId,
+          runLabel: `Run ${ref.runIndex + 1}`,
+          runOrder: ref.runIndex,
+          runPuzzleId: ref.runPuzzleId,
+          tryNumber: attempt.tryNumber,
+          countsTowardsTraining: attempt.tryNumber <= puzzle.maxTriesPerPuzzle,
+          result: attempt.status as 'solved' | 'failed',
+          timeSpentMs: attempt.timeSpentMs,
+        })
+      }
+    }
+
+    return rows
+  }, [freshPuzzle, run, crossRunPuzzles, crossRunRefs, runIdStr, runPuzzleIdStr])
+
+  const handleSelectAttemptForTable = React.useCallback(
+    (attemptId: number): void => {
+      const row = historyRows.find((r) => r.attemptId === attemptId)
+      if (!row) return
+      if (row.runId === Number(runIdStr)) {
+        handleSelectAttempt(attemptId)
+      } else {
+        setSelectedAttemptId(attemptId)
+        void navigate({
+          to: '/app/runs/$runId/puzzles/$runPuzzleId/overview',
+          params: { runId: String(row.runId), runPuzzleId: String(row.runPuzzleId) },
+          search: { attempt: attemptId },
+        })
+      }
+    },
+    [historyRows, runIdStr, handleSelectAttempt, navigate],
+  )
+
+  const currentRunIdNum = Number(runIdStr)
+  const currentRunPuzzleIdNum = Number(runPuzzleIdStr)
+
+  const effectivePuzzle = React.useMemo((): RunPuzzleFull | null => {
+    if (freshPuzzle !== null && freshPuzzle.runPuzzleId === currentRunPuzzleIdNum) {
+      return freshPuzzle
+    }
+    return crossRunPuzzles.get(currentRunIdNum) ?? null
+  }, [freshPuzzle, currentRunPuzzleIdNum, crossRunPuzzles, currentRunIdNum])
 
   const selectionModel = useOverviewSelectionModel(
-    freshPuzzle,
+    effectivePuzzle,
     run,
     participation,
     selectedAttemptId,
@@ -120,19 +216,34 @@ export function BoardOverviewView({
     timeDelta,
   )
 
-  const isLoading = freshPuzzle === null || run === null
+  const isLoading = effectivePuzzle === null || run === null
+
+  const lastOverviewBoardRef = React.useRef<BoardState | null>(null)
+  const lastMoveFeedbackRef = React.useRef<BoardState['moveFeedback']>({
+    result: null,
+    square: null,
+    visible: false,
+  })
 
   const overviewBoard: BoardState = React.useMemo(() => {
-    if (!freshPuzzle || !selectionModel) return { ...board, dests: new Map() }
-    const derived = computeOverviewBoardState(freshPuzzle, selectionModel.selectedAttempt)
-    return {
+    if (!effectivePuzzle || !selectionModel) {
+      return lastOverviewBoardRef.current ?? { ...board, dests: new Map() }
+    }
+    const derived = computeOverviewBoardState(effectivePuzzle, selectionModel.selectedAttempt)
+    const moveFeedback = derived.moveFeedback.visible
+      ? derived.moveFeedback
+      : lastMoveFeedbackRef.current
+    if (derived.moveFeedback.visible) lastMoveFeedbackRef.current = derived.moveFeedback
+    const next: BoardState = {
       ...board,
       fen: derived.fen,
       lastMove: derived.lastMove,
-      moveFeedback: derived.moveFeedback,
+      moveFeedback,
       dests: new Map(),
     }
-  }, [board, freshPuzzle, selectionModel])
+    lastOverviewBoardRef.current = next
+    return next
+  }, [board, effectivePuzzle, selectionModel])
 
   const loadingMobileHeader = (
     <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
@@ -151,6 +262,7 @@ export function BoardOverviewView({
             actions={actions}
             attemptHistory={session.attemptHistory}
             runId={runIdStr}
+            boardAnimationEnabled={false}
             mobileHeader={loadingMobileHeader}
             mobileExtras={null}
           />
@@ -227,34 +339,11 @@ export function BoardOverviewView({
 
   const mobileExtras = (
     <div className="mt-4 flex flex-col gap-5">
-      <AttemptTable
-        tries={freshPuzzle.tries}
-        maxTriesPerPuzzle={freshPuzzle.maxTriesPerPuzzle}
+      <OverviewAttemptHistoryTable
+        rows={historyRows}
         selectedAttemptId={selectedAttemptId}
-        onSelect={handleSelectAttempt}
+        onSelectAttempt={handleSelectAttemptForTable}
       />
-      {crossRunRefs.length > 1 && (
-        <div className="flex flex-col gap-1">
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            View run
-          </span>
-          <select
-            value={run.id}
-            onChange={(e) => {
-              const targetRunId = Number(e.target.value)
-              const ref = crossRunRefs.find((r) => r.runId === targetRunId)
-              if (ref) handleSwitchRun(ref.runId, ref.runPuzzleId)
-            }}
-            className="w-full rounded border border-border bg-background px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-          >
-            {crossRunRefs.map((ref) => (
-              <option key={ref.runId} value={ref.runId}>
-                {`Run ${ref.runIndex + 1}${!ref.hasAttempts ? ' (no attempts)' : ''}`}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
       <div className="flex flex-col gap-2">
         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Run progress
@@ -280,7 +369,7 @@ export function BoardOverviewView({
       <OverviewActionsSection
         run={run}
         isLoadingNextPuzzle={isLoadingNextPuzzle}
-        gameUrl={freshPuzzle.gameUrl}
+        gameUrl={effectivePuzzle.gameUrl}
         onNextPuzzle={() => void actions.handleNextPuzzle()}
         onRetake={() => void actions.handleRetake()}
       />
@@ -291,20 +380,16 @@ export function BoardOverviewView({
     <div className="flex flex-1 items-center justify-center overflow-hidden px-6">
       <div className="flex w-full items-start gap-6">
         <OverviewSidebarLeft
-          puzzle={freshPuzzle}
-          participationId={participationId}
+          puzzle={effectivePuzzle}
+          participationId={participation?.id ?? null}
           runIdStr={runIdStr}
           run={run}
           afterStats={afterStats}
           accuracyDelta={displayedAccuracyDelta}
           timeDelta={displayedTimeDelta}
-          selectedAttemptId={selectedAttemptId}
           runProgressPct={runProgressPct}
           runProgressDelta={runProgressDelta}
-          onSelectAttempt={handleSelectAttempt}
           boardSize={board.boardSize}
-          crossRunRefs={crossRunRefs}
-          onSwitchRun={handleSwitchRun}
         />
         <BoardCenterColumn
           board={overviewBoard}
@@ -312,11 +397,12 @@ export function BoardOverviewView({
           attemptHistory={session.attemptHistory}
           runId={runIdStr}
           activeAttemptId={selectedAttemptId}
+          boardAnimationEnabled={false}
           mobileHeader={mobileHeader}
           mobileExtras={mobileExtras}
         />
         <OverviewSidebarRight
-          puzzle={freshPuzzle}
+          puzzle={effectivePuzzle}
           run={run}
           frozenTimerTenths={frozenTimerTenths}
           selectedAttempt={selectedAttempt}
@@ -325,6 +411,9 @@ export function BoardOverviewView({
           onNextPuzzle={() => void actions.handleNextPuzzle()}
           onRetake={() => void actions.handleRetake()}
           boardSize={board.boardSize}
+          historyRows={historyRows}
+          selectedAttemptId={selectedAttemptId}
+          onSelectAttempt={handleSelectAttemptForTable}
         />
       </div>
     </div>

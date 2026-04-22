@@ -112,6 +112,7 @@ export type BoardSurfaceProps = {
     square: string | null
     visible: boolean
   }
+  animationEnabled?: boolean
   onMove: (orig: string, dest: string) => void
   onPromotionSelect: (piece: 'q' | 'r' | 'b' | 'n') => void
   onPromotionCancel: () => void
@@ -127,6 +128,7 @@ export function BoardSurface({
   hintSquare,
   pendingPromotion,
   moveFeedback,
+  animationEnabled = true,
   onMove,
   onPromotionSelect,
   onPromotionCancel,
@@ -157,7 +159,7 @@ export function BoardSurface({
         draggable={{ showGhost: true }}
         lastMove={lastMove}
         check={check}
-        animation={{ enabled: true, duration: 150 }}
+        animation={{ enabled: animationEnabled, duration: 150 }}
         highlight={{ lastMove: true, check: true }}
         premovable={{ enabled: false }}
         drawable={{

@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { RotateCcw, ExternalLink, SkipForward } from 'lucide-react'
 import { Button, buttonVariants } from '../../components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 import { cn } from '../../lib/utils'
 import type { Run } from '../../lib/api'
 
@@ -13,6 +14,13 @@ type OverviewActionsSectionProps = {
 }
 
 export function OverviewActionsSection({ run, isLoadingNextPuzzle, gameUrl, onNextPuzzle, onRetake }: OverviewActionsSectionProps): React.ReactElement {
+  const nextPuzzleDisabledReason =
+    run.status === 'completed'
+      ? 'Run complete'
+      : run.status === 'aborted'
+        ? 'Run aborted'
+        : null
+
   return (
     <div className="mt-auto flex flex-col gap-3">
       <div className="flex gap-3">
@@ -35,20 +43,23 @@ export function OverviewActionsSection({ run, isLoadingNextPuzzle, gameUrl, onNe
           Analyze
         </a>
       </div>
-      {run.status === 'completed' && (
-        <p className="text-center text-xs text-muted-foreground">Run complete</p>
-      )}
-      {run.status === 'aborted' && (
-        <p className="text-center text-xs text-muted-foreground">Run aborted</p>
-      )}
-      <Button
-        className="w-full bg-foreground text-background hover:bg-foreground/90"
-        disabled={run.status !== 'active' || isLoadingNextPuzzle}
-        onClick={onNextPuzzle}
-      >
-        <SkipForward className="mr-2 h-4 w-4" />
-        Next puzzle
-      </Button>
+      <Tooltip delayDuration={100}>
+        <TooltipTrigger asChild>
+          <span className="w-full">
+            <Button
+              className="w-full bg-foreground text-background hover:bg-foreground/90"
+              disabled={run.status !== 'active' || isLoadingNextPuzzle}
+              onClick={onNextPuzzle}
+            >
+              <SkipForward className="mr-2 h-4 w-4" />
+              Next puzzle
+            </Button>
+          </span>
+        </TooltipTrigger>
+        {nextPuzzleDisabledReason !== null && (
+          <TooltipContent>{nextPuzzleDisabledReason}</TooltipContent>
+        )}
+      </Tooltip>
     </div>
   )
 }

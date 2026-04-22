@@ -51,6 +51,10 @@ export function PuzzleMetaCard({
     return buildPgnDisplay(baseFen, attemptMoves ?? [], solutionMoves, attemptStatus)
   }, [baseFen, attemptMoves, solutionMoves, attemptStatus])
 
+  const lastPgnDisplayRef = React.useRef(pgnDisplay)
+  if (pgnDisplay !== null) lastPgnDisplayRef.current = pgnDisplay
+  const displayedPgn = pgnDisplay ?? lastPgnDisplayRef.current
+
   return (
     <div className="flex flex-col gap-3 rounded-md border border-border px-3 py-3">
       <div className="flex items-start gap-3">
@@ -85,13 +89,13 @@ export function PuzzleMetaCard({
         </div>
       </div>
 
-      {pgnDisplay !== null && pgnDisplay.mainline.length > 0 && (
+      {displayedPgn !== null && displayedPgn.mainline.length > 0 && (
         <div className="flex flex-wrap items-baseline gap-x-1 border-t border-border pt-2 text-sm leading-relaxed">
-          <MoveSequence moves={pgnDisplay.mainline} />
-          {pgnDisplay.variation !== null && (
+          <MoveSequence moves={displayedPgn.mainline} />
+          {displayedPgn.variation !== null && (
             <span className="text-muted-foreground">
               {'('}
-              <MoveSequence moves={pgnDisplay.variation} />
+              <MoveSequence moves={displayedPgn.variation} />
               {')'}
             </span>
           )}
