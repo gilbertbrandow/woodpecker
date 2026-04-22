@@ -134,7 +134,7 @@ export function BoardFocusView({ puzzle, ctrl, runIdStr }: BoardFocusViewProps):
           stripInteractive={false}
           mobileHeader={mobileHeader}
           mobileExtras={mobileExtras}
-          timerBar={(() => {
+          timerBar={session.allPliesPlayed.length === 0 ? null : (() => {
             const { elapsedTenths, targetSolveTenths } = timer
             if (targetSolveTenths === null || targetSolveTenths <= 0 || elapsedTenths >= targetSolveTenths) return null
             const leftPct = Math.max(0, Math.min(100, ((targetSolveTenths - elapsedTenths) / targetSolveTenths) * 100))
@@ -150,15 +150,17 @@ export function BoardFocusView({ puzzle, ctrl, runIdStr }: BoardFocusViewProps):
             elapsedTenths={timer.elapsedTenths}
             targetSolveTenths={timer.targetSolveTenths}
           />
-          <PuzzleMetaCard
-            puzzleId={puzzle.puzzleId}
-            rating={puzzle.rating}
-            themes={puzzle.themes}
-            pgnDisplay={pgnDisplay}
-            focusMode={true}
-            selectedPly={selectedPly}
-            onPlyClick={setSelectedPly}
-          />
+          {session.allPliesPlayed.length > 0 && (
+            <PuzzleMetaCard
+              puzzleId={puzzle.puzzleId}
+              rating={puzzle.rating}
+              themes={puzzle.themes}
+              pgnDisplay={pgnDisplay}
+              focusMode={true}
+              selectedPly={selectedPly}
+              onPlyClick={setSelectedPly}
+            />
+          )}
           <div className="mt-auto">
             <MoveStatusCard
               lastMoveResult={displayBoard.moveFeedback.result}
