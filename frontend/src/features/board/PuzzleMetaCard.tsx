@@ -1,14 +1,56 @@
 import * as React from 'react'
 import { Badge } from '../../components/ui/badge'
 import type { PuzzleLabel } from '../../lib/api'
+import { buildPgnDisplay } from './boardOverview.pgn'
+import type { DisplayMove } from './boardOverview.pgn'
+
+function MoveToken({ move }: { move: DisplayMove }): React.ReactElement {
+  return <span className="font-chess">{move.san}</span>
+}
+
+function MoveSequence({ moves }: { moves: DisplayMove[] }): React.ReactElement {
+  const items: React.ReactNode[] = []
+  for (let i = 0; i < moves.length; i++) {
+    const move = moves[i]
+    const showNumber = move.isWhite || i === 0
+    if (showNumber) {
+      items.push(
+        <span key={`n${i}`} className="text-muted-foreground/60 tabular-nums">
+          {move.moveNumber}{move.isWhite ? '.' : '...'}
+        </span>,
+        <span key={`s${i}`}> </span>,
+      )
+    }
+    items.push(<MoveToken key={`m${i}`} move={move} />)
+    if (i < moves.length - 1) items.push(<span key={`sep${i}`}> </span>)
+  }
+  return <span>{items}</span>
+}
 
 type PuzzleMetaCardProps = {
   puzzleId: string
   rating: number
   themes: PuzzleLabel[]
+  baseFen?: string
+  attemptMoves?: string[]
+  solutionMoves?: string
+  attemptStatus?: 'solved' | 'failed'
 }
 
-export function PuzzleMetaCard({ puzzleId, rating, themes }: PuzzleMetaCardProps): React.ReactElement {
+export function PuzzleMetaCard({
+  puzzleId,
+  rating,
+  themes,
+  baseFen,
+  attemptMoves,
+  solutionMoves,
+  attemptStatus,
+}: PuzzleMetaCardProps): React.ReactElement {
+  const pgnDisplay = React.useMemo(() => {
+    if (!baseFen || !solutionMoves || !attemptStatus) return null
+    return buildPgnDisplay(baseFen, attemptMoves ?? [], solutionMoves, attemptStatus)
+  }, [baseFen, attemptMoves, solutionMoves, attemptStatus])
+
   return (
     <div className="flex flex-col gap-3 rounded-md border border-border px-3 py-3">
       <div className="flex items-start gap-3">
@@ -42,6 +84,19 @@ export function PuzzleMetaCard({ puzzleId, rating, themes }: PuzzleMetaCardProps
           )}
         </div>
       </div>
+
+      {pgnDisplay !== null && pgnDisplay.mainline.length > 0 && (
+        <div className="flex flex-wrap items-baseline gap-x-1 border-t border-border pt-2 text-sm leading-relaxed">
+          <MoveSequence moves={pgnDisplay.mainline} />
+          {pgnDisplay.variation !== null && (
+            <span className="text-muted-foreground">
+              {'('}
+              <MoveSequence moves={pgnDisplay.variation} />
+              {')'}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   )
 }
