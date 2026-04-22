@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useLocation } from '@tanstack/react-router'
+import { useLocation, useParams, useSearch } from '@tanstack/react-router'
 import { useBoardPageController } from '../features/board/useBoardPageController'
 import { BoardFocusView } from '../features/board/BoardFocusView'
 import { BoardFailedView } from '../features/board/BoardFailedView'
@@ -19,24 +19,23 @@ function parsePositiveInt(value: unknown): number | null {
 }
 
 export function BoardPage(): React.ReactElement | null {
+  const params = useParams({ strict: false })
+  const search = useSearch({ strict: false })
   const location = useLocation({
     select: (loc) => ({ pathname: loc.pathname, searchStr: loc.searchStr }),
   })
 
-  const attemptMatch = location.pathname.match(/^\/app\/runs\/(\d+)\/puzzles\/(\d+)\/attempts\/(\d+)$/)
-  const overviewMatch = location.pathname.match(/^\/app\/runs\/(\d+)\/puzzles\/(\d+)\/overview$/)
-
-  const routeKind = attemptMatch ? 'attempt' : 'overview'
-  const runIdStr = attemptMatch?.[1] ?? overviewMatch?.[1] ?? ''
-  const runPuzzleIdStr = attemptMatch?.[2] ?? overviewMatch?.[2] ?? ''
+  const runIdStr = typeof params.runId === 'string' ? params.runId : ''
+  const runPuzzleIdStr = typeof params.runPuzzleId === 'string' ? params.runPuzzleId : ''
+  const isAttemptRoute = /\/attempts\//.test(location.pathname)
+  const routeKind = isAttemptRoute ? 'attempt' : 'overview'
   const runId = parsePositiveInt(runIdStr) ?? Number.NaN
   const runPuzzleId = parsePositiveInt(runPuzzleIdStr) ?? Number.NaN
-  const attemptId = parsePositiveInt(attemptMatch?.[3])
+  const attemptId = routeKind === 'attempt' ? parsePositiveInt(params.attemptId) : null
   const requestedOverviewAttemptId = React.useMemo(() => {
     if (routeKind !== 'overview') return null
-    const searchParams = new URLSearchParams(location.searchStr)
-    return parsePositiveInt(searchParams.get('attempt'))
-  }, [location.searchStr, routeKind])
+    return parsePositiveInt(search.attempt)
+  }, [routeKind, search.attempt])
 
   const ctrl = useBoardPageController({
     runId,

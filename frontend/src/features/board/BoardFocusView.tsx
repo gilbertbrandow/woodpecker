@@ -20,7 +20,7 @@ export function BoardFocusView({ puzzle, ctrl, runIdStr }: BoardFocusViewProps):
 
   const mobileHeader = (
     <>
-      <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
+      <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} linksDisabled={true} />
       {puzzle.maxTriesPerPuzzle > 1 && (
         <div className="mt-1">
           {puzzle.currentTryNumber <= puzzle.maxTriesPerPuzzle ? (
@@ -45,7 +45,7 @@ export function BoardFocusView({ puzzle, ctrl, runIdStr }: BoardFocusViewProps):
     <div className="flex flex-1 items-center justify-center overflow-hidden px-6">
       <div className="flex w-full items-start gap-6">
         <aside className="hidden flex-1 flex-col md:flex" style={{ height: board.boardSize }}>
-          <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
+          <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} linksDisabled={true} />
           <div className="mb-6" />
           <AttemptScoring
             currentTryNumber={puzzle.currentTryNumber}
