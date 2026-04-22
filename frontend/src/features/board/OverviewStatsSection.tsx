@@ -11,7 +11,7 @@ type OverviewStatsSectionProps = {
 
 export function OverviewStatsSection({ afterStats, accuracyDelta, timeDelta }: OverviewStatsSectionProps): React.ReactElement {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex gap-6">
       <div className="flex flex-col gap-1">
         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Accuracy</span>
         <div className="flex items-baseline gap-2">

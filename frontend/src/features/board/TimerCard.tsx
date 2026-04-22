@@ -8,9 +8,10 @@ type TimerCardProps = {
   elapsedTenths: number
   targetSolveTenths: number | null
   muted?: boolean
+  rightSlot?: React.ReactNode
 }
 
-export function TimerCard({ timerText, elapsedTenths, targetSolveTenths, muted = false }: TimerCardProps): React.ReactElement {
+export function TimerCard({ timerText, elapsedTenths, targetSolveTenths, muted = false, rightSlot }: TimerCardProps): React.ReactElement {
   const hasTarget = targetSolveTenths !== null && targetSolveTenths > 0
   const isExpired = hasTarget && elapsedTenths >= targetSolveTenths
   const shouldShowBar = hasTarget && !isExpired
@@ -25,8 +26,8 @@ export function TimerCard({ timerText, elapsedTenths, targetSolveTenths, muted =
   const progressColor = `hsl(${progressHue} 55% 48%)`
 
   return (
-    <div className="min-h-24 rounded-md px-3 py-3">
-      <div className="flex min-h-16 flex-col items-start justify-center">
+    <div className={`rounded-md px-3 py-3 ${hasTarget ? 'min-h-24' : ''}`}>
+      <div className={`flex flex-col items-start justify-center ${hasTarget ? 'min-h-16' : ''}`}>
         <div className="inline-flex flex-col items-start">
           <div className="flex items-center gap-2">
             <span className={`tabular-nums text-3xl font-semibold leading-none ${muted ? 'text-muted-foreground' : 'text-foreground'}`}>
@@ -37,6 +38,7 @@ export function TimerCard({ timerText, elapsedTenths, targetSolveTenths, muted =
                 Target time missed
               </Badge>
             )}
+            {rightSlot}
           </div>
           {hasTarget && (
             <div className="mt-3 h-1.5 w-full max-w-full">

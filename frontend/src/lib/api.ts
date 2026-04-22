@@ -307,6 +307,7 @@ export type RunPuzzleFull = {
   totalPuzzles: number
   scheduleName: string
   runIndex: number
+  themes: PuzzleLabel[]
 }
 
 export type CompleteAttemptResult = {

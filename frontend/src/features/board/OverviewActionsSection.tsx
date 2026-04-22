@@ -1,24 +1,40 @@
 import * as React from 'react'
-import { Button } from '../../components/ui/button'
+import { RotateCcw, ExternalLink, SkipForward } from 'lucide-react'
+import { Button, buttonVariants } from '../../components/ui/button'
+import { cn } from '../../lib/utils'
 import type { Run } from '../../lib/api'
 
 type OverviewActionsSectionProps = {
   run: Run
   isLoadingNextPuzzle: boolean
+  puzzleId: string
   onNextPuzzle: () => void
   onRetake: () => void
 }
 
-export function OverviewActionsSection({ run, isLoadingNextPuzzle, onNextPuzzle, onRetake }: OverviewActionsSectionProps): React.ReactElement {
+export function OverviewActionsSection({ run, isLoadingNextPuzzle, puzzleId, onNextPuzzle, onRetake }: OverviewActionsSectionProps): React.ReactElement {
   return (
     <div className="mt-auto flex flex-col gap-3">
-      <Button
-        className="w-full bg-foreground text-background hover:bg-foreground/90"
-        disabled={run.status !== 'active' || isLoadingNextPuzzle}
-        onClick={onNextPuzzle}
-      >
-        Next puzzle
-      </Button>
+      <div className="flex gap-3">
+        <Button
+          variant="outline"
+          className="flex-1"
+          disabled={run.status !== 'active' || isLoadingNextPuzzle}
+          onClick={onRetake}
+        >
+          <RotateCcw className="mr-2 h-4 w-4" />
+          Retake
+        </Button>
+        <a
+          href={`https://lichess.org/training/${puzzleId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(buttonVariants({ variant: 'outline' }), 'flex-1')}
+        >
+          <ExternalLink className="mr-2 h-4 w-4" />
+          Analyze
+        </a>
+      </div>
       {run.status === 'completed' && (
         <p className="text-center text-xs text-muted-foreground">Run complete</p>
       )}
@@ -26,12 +42,12 @@ export function OverviewActionsSection({ run, isLoadingNextPuzzle, onNextPuzzle,
         <p className="text-center text-xs text-muted-foreground">Run aborted</p>
       )}
       <Button
-        variant="outline"
-        className="w-full"
+        className="w-full bg-foreground text-background hover:bg-foreground/90"
         disabled={run.status !== 'active' || isLoadingNextPuzzle}
-        onClick={onRetake}
+        onClick={onNextPuzzle}
       >
-        Retake
+        <SkipForward className="mr-2 h-4 w-4" />
+        Next puzzle
       </Button>
     </div>
   )

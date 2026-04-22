@@ -1,12 +1,19 @@
 import * as React from 'react'
+import { CheckCircle2, XCircle, Clock } from 'lucide-react'
 import { Badge } from '../../components/ui/badge'
-import { Button } from '../../components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
+import { ProgressBar } from '../../components/ProgressBar'
 import { BoardBreadcrumbs } from './BoardBreadcrumbs'
 import { BoardCenterColumn } from './BoardCenterColumn'
-import { OverviewAttemptHistory } from './OverviewAttemptHistory'
+import { OverviewSidebarLeft } from './OverviewSidebarLeft'
+import { OverviewSidebarRight } from './OverviewSidebarRight'
+import { AttemptTable } from './AttemptTable'
 import { OverviewStatsSection } from './OverviewStatsSection'
 import { OverviewActionsSection } from './OverviewActionsSection'
-import { POSITION_STATUS_CLASS, positionStatusLabel } from './boardPage.helpers'
+import { DeltaBadge } from './DeltaBadge'
+import { useOverviewSelectionModel } from './useOverviewSelectionModel'
+import { POSITION_STATUS_CLASS, positionStatusLabel, formatTimer } from './boardPage.helpers'
+import { formatNumber } from '../../lib/utils'
 import type { BoardPageControllerResult } from './useBoardPageController'
 import type { RunPuzzleFull } from '../../lib/api'
 
@@ -17,80 +24,184 @@ type BoardOverviewViewProps = {
 }
 
 export function BoardOverviewView({ puzzle, ctrl, runIdStr }: BoardOverviewViewProps): React.ReactElement {
-  const { board, session, participationId, overview, isLoadingNextPuzzle, actions } = ctrl
-  const { freshPuzzle, run, afterStats, accuracyDelta, timeDelta } = overview
+  const { board, session, participationId, overview, timer, isLoadingNextPuzzle, actions } = ctrl
+  const { freshPuzzle, run, afterStats, accuracyDelta, timeDelta, participation } = overview
+
+  const [selectedAttemptId, setSelectedAttemptId] = React.useState<number | null>(null)
+
+  React.useEffect(() => {
+    if (!freshPuzzle) return
+    const latest = [...freshPuzzle.tries]
+      .filter((a) => a.status !== 'in_progress')
+      .sort((a, b) => b.tryNumber - a.tryNumber)[0]
+    setSelectedAttemptId(latest?.id ?? null)
+  }, [freshPuzzle?.tries])
+
+  const selectionModel = useOverviewSelectionModel(
+    freshPuzzle,
+    run,
+    participation,
+    selectedAttemptId,
+    timer.targetSolveTenths,
+    accuracyDelta,
+    timeDelta,
+  )
+
+  const isLoading = freshPuzzle === null || run === null
+
+  const loadingMobileHeader = (
+    <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
+  )
+
+  if (isLoading || selectionModel === null) {
+    return (
+      <div className="flex flex-1 items-center justify-center overflow-hidden px-6">
+        <div className="flex w-full items-start gap-6">
+          <aside className="hidden flex-1 flex-col md:flex" style={{ height: board.boardSize }}>
+            <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
+            <p className="mt-4 text-sm text-muted-foreground">Loading…</p>
+          </aside>
+          <BoardCenterColumn
+            board={board}
+            actions={actions}
+            attemptHistory={session.attemptHistory}
+            mobileHeader={loadingMobileHeader}
+            mobileExtras={null}
+          />
+          <aside className="hidden flex-1 flex-col md:flex" style={{ height: board.boardSize }}>
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          </aside>
+        </div>
+      </div>
+    )
+  }
+
+  const {
+    selectedAttempt,
+    frozenTimerTenths,
+    metTargetTime,
+    runProgressPct,
+    runProgressDelta,
+    displayedAccuracyDelta,
+    displayedTimeDelta,
+  } = selectionModel
+
+  const resolvedCount = run.solvedCount + run.solvedWithRetriesCount + run.failedCount
 
   const mobileHeader = (
     <>
       <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
-      {freshPuzzle && (
-        <div className="mt-1">
-          <Badge
-            variant="outline"
-            className={`text-xs ${POSITION_STATUS_CLASS[freshPuzzle.positionStatus]}`}
-          >
-            {positionStatusLabel(freshPuzzle.positionStatus)}
-          </Badge>
-        </div>
-      )}
+      <div className="mt-1 flex items-center gap-2">
+        <Badge
+          variant="outline"
+          className={`text-xs ${POSITION_STATUS_CLASS[freshPuzzle.positionStatus] ?? ''}`}
+        >
+          {positionStatusLabel(freshPuzzle.positionStatus)}
+        </Badge>
+        <span className="tabular-nums text-sm font-medium">
+          {formatTimer(frozenTimerTenths)}
+        </span>
+        {selectedAttempt !== null && (
+          <Tooltip delayDuration={100}>
+            <TooltipTrigger asChild>
+              <span
+                className={`inline-flex cursor-default items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
+                  selectedAttempt.status === 'solved'
+                    ? 'border-green-600/20 bg-green-500/15 text-green-700 dark:text-green-400'
+                    : 'border-red-600/20 bg-red-500/15 text-red-700 dark:text-red-400'
+                }`}
+              >
+                {selectedAttempt.status === 'solved'
+                  ? <CheckCircle2 className="h-3 w-3" />
+                  : <XCircle className="h-3 w-3" />}
+                {selectedAttempt.status === 'solved' ? 'Solved' : 'Failed'}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              {selectedAttempt.status === 'solved' ? 'Correctly solved' : 'Not solved'}
+            </TooltipContent>
+          </Tooltip>
+        )}
+        {metTargetTime !== null && (
+          <Tooltip delayDuration={100}>
+            <TooltipTrigger asChild>
+              <span
+                className={`inline-flex cursor-default items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
+                  metTargetTime
+                    ? 'border-green-600/20 bg-green-500/15 text-green-700 dark:text-green-400'
+                    : 'border-amber-600/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                }`}
+              >
+                <Clock className="h-3 w-3" />
+                Time
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              {metTargetTime ? 'Solved within target time' : 'Target time missed'}
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
     </>
   )
 
-  const mobileExtras = freshPuzzle && afterStats && run ? (
-    <div className="mt-4 flex flex-col gap-6">
-      <OverviewStatsSection
-        afterStats={afterStats}
-        accuracyDelta={accuracyDelta}
-        timeDelta={timeDelta}
+  const mobileExtras = (
+    <div className="mt-4 flex flex-col gap-5">
+      <AttemptTable
+        tries={freshPuzzle.tries}
+        maxTriesPerPuzzle={freshPuzzle.maxTriesPerPuzzle}
+        selectedAttemptId={selectedAttemptId}
+        onSelect={setSelectedAttemptId}
       />
-      <div className="flex flex-col gap-3">
-        <Button
-          className="w-full bg-foreground text-background hover:bg-foreground/90"
-          disabled={run.status !== 'active' || isLoadingNextPuzzle}
-          onClick={() => void actions.handleNextPuzzle()}
-        >
-          Next puzzle
-        </Button>
-        {run.status === 'completed' && (
-          <p className="text-center text-xs text-muted-foreground">Run complete</p>
-        )}
-        {run.status === 'aborted' && (
-          <p className="text-center text-xs text-muted-foreground">Run aborted</p>
-        )}
-        <Button
-          variant="outline"
+      <div className="flex flex-col gap-2">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Run progress
+        </span>
+        <ProgressBar
+          value={runProgressPct}
+          tooltipLabel={`${formatNumber(resolvedCount)} of ${formatNumber(run.totalPuzzles)} puzzles resolved`}
           className="w-full"
-          disabled={run.status !== 'active' || isLoadingNextPuzzle}
-          onClick={() => void actions.handleRetake()}
-        >
-          Retake
-        </Button>
+        />
+        <DeltaBadge
+          delta={runProgressDelta}
+          goodWhenPositive={true}
+          format={(n) => `${n.toFixed(1)}%`}
+        />
       </div>
+      {afterStats !== null && (
+        <OverviewStatsSection
+          afterStats={afterStats}
+          accuracyDelta={displayedAccuracyDelta}
+          timeDelta={displayedTimeDelta}
+        />
+      )}
+      <OverviewActionsSection
+        run={run}
+        isLoadingNextPuzzle={isLoadingNextPuzzle}
+        puzzleId={freshPuzzle.puzzleId}
+        onNextPuzzle={() => void actions.handleNextPuzzle()}
+        onRetake={() => void actions.handleRetake()}
+      />
     </div>
-  ) : null
+  )
 
   return (
     <div className="flex flex-1 items-center justify-center overflow-hidden px-6">
       <div className="flex w-full items-start gap-6">
-        <aside className="hidden flex-1 flex-col md:flex" style={{ height: board.boardSize }}>
-          <div className="mb-6">
-            <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
-          </div>
-          {freshPuzzle ? (
-            <div className="flex flex-col gap-4">
-              <Badge
-                variant="outline"
-                className={`w-fit ${POSITION_STATUS_CLASS[freshPuzzle.positionStatus]}`}
-              >
-                {positionStatusLabel(freshPuzzle.positionStatus)}
-              </Badge>
-              <OverviewAttemptHistory freshPuzzle={freshPuzzle} />
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Loading…</p>
-          )}
-        </aside>
-
+        <OverviewSidebarLeft
+          puzzle={freshPuzzle}
+          participationId={participationId}
+          runIdStr={runIdStr}
+          run={run}
+          afterStats={afterStats}
+          accuracyDelta={displayedAccuracyDelta}
+          timeDelta={displayedTimeDelta}
+          selectedAttemptId={selectedAttemptId}
+          runProgressPct={runProgressPct}
+          runProgressDelta={runProgressDelta}
+          onSelectAttempt={setSelectedAttemptId}
+          boardSize={board.boardSize}
+        />
         <BoardCenterColumn
           board={board}
           actions={actions}
@@ -98,26 +209,17 @@ export function BoardOverviewView({ puzzle, ctrl, runIdStr }: BoardOverviewViewP
           mobileHeader={mobileHeader}
           mobileExtras={mobileExtras}
         />
-
-        <aside className="hidden flex-1 flex-col md:flex" style={{ height: board.boardSize }}>
-          {afterStats && run ? (
-            <>
-              <OverviewStatsSection
-                afterStats={afterStats}
-                accuracyDelta={accuracyDelta}
-                timeDelta={timeDelta}
-              />
-              <OverviewActionsSection
-                run={run}
-                isLoadingNextPuzzle={isLoadingNextPuzzle}
-                onNextPuzzle={() => void actions.handleNextPuzzle()}
-                onRetake={() => void actions.handleRetake()}
-              />
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">Loading…</p>
-          )}
-        </aside>
+        <OverviewSidebarRight
+          puzzle={freshPuzzle}
+          run={run}
+          frozenTimerTenths={frozenTimerTenths}
+          selectedAttempt={selectedAttempt}
+          metTargetTime={metTargetTime}
+          isLoadingNextPuzzle={isLoadingNextPuzzle}
+          onNextPuzzle={() => void actions.handleNextPuzzle()}
+          onRetake={() => void actions.handleRetake()}
+          boardSize={board.boardSize}
+        />
       </div>
     </div>
   )

@@ -1,5 +1,5 @@
 import { Chess } from 'chess.js'
-import type { RunPuzzleListItem, PositionStatus } from '../../lib/api'
+import type { RunPuzzleListItem, PositionStatus, AttemptSummary, Run } from '../../lib/api'
 
 export type Mode = 'loading' | 'focus' | 'failed' | 'overview'
 export type Orientation = 'white' | 'black'
@@ -30,6 +30,8 @@ export const MOVE_FEEDBACK_SUCCESS_MS = 200
 export const WRONG_REVERT_MS = 500
 export const FAILED_TO_OVERVIEW_MS = 300
 export const TIMER_UPDATE_MS = 50
+export const INITIAL_OPPONENT_MOVE_DELAY_MS = 250
+export const OPPONENT_MOVE_ANIM_MS = 150
 
 export const POSITION_STATUS_CLASS: Record<PositionStatus, string> = {
   not_started: '',
@@ -129,4 +131,51 @@ export function computeStats(puzzles: RunPuzzleListItem[], excludeId?: number): 
     resolvedCount: resolved.length,
     timeCount: times.length,
   }
+}
+
+// TEMPORARY: frontend reconstruction of backend semantics.
+// If backend training logic evolves, this derivation can silently become wrong.
+// Preferred long-term solution: backend provides per-attempt flags (isQualifyingAttempt, countsTowardTraining, etc.).
+export function computeQualifyingAttemptId(
+  tries: AttemptSummary[],
+  maxTriesPerPuzzle: number,
+): number | null {
+  const queueAttempts = tries
+    .filter((a) => a.tryNumber <= maxTriesPerPuzzle && a.status !== 'in_progress')
+    .sort((a, b) => a.tryNumber - b.tryNumber)
+
+  const firstSolved = queueAttempts.find((a) => a.status === 'solved')
+  if (firstSolved) return firstSolved.id
+
+  if (queueAttempts.length >= maxTriesPerPuzzle) {
+    return queueAttempts[queueAttempts.length - 1].id
+  }
+
+  return null
+}
+
+export function computeFrozenTimerTenths(attempt: AttemptSummary): number {
+  return attempt.timeSpentMs !== null ? Math.round(attempt.timeSpentMs / 100) : 0
+}
+
+export function computeMetTargetTime(
+  attempt: AttemptSummary,
+  targetSolveTenths: number | null,
+): boolean | null {
+  if (attempt.timeSpentMs === null || targetSolveTenths === null || targetSolveTenths <= 0) return null
+  return Math.round(attempt.timeSpentMs / 100) <= targetSolveTenths
+}
+
+export function computeRunProgressPct(run: Run): number {
+  const resolved = run.solvedCount + run.solvedWithRetriesCount + run.failedCount
+  return run.totalPuzzles > 0 ? (resolved / run.totalPuzzles) * 100 : 0
+}
+
+export function computeRunProgressDelta(
+  selectedAttemptId: number,
+  qualifyingAttemptId: number | null,
+  totalPuzzles: number,
+): number | null {
+  if (qualifyingAttemptId !== selectedAttemptId) return null
+  return totalPuzzles > 0 ? (1 / totalPuzzles) * 100 : null
 }

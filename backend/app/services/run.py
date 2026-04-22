@@ -195,6 +195,10 @@ def _run_puzzle_full_dict(run_puzzle: RunPuzzle) -> dict[str, object]:
         "totalPuzzles": total_puzzles,
         "scheduleName": schedule.name,
         "runIndex": run.run_index,
+        "themes": [
+            {"name": t.name, "displayName": t.display_name}
+            for t in puzzle.themes
+        ],
     }
 
 
