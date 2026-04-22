@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Link } from '@tanstack/react-router'
-import woodpeckerLogo from '../assets/woodpecker-minimal.svg'
+import woodpeckerLogo from '../assets/woodpecker.svg'
 import { ThemeToggle } from './ThemeToggle'
 import { UserMenu } from './UserMenu'
 
@@ -11,7 +11,7 @@ export function Header(): React.ReactElement {
         <img
           src={woodpeckerLogo}
           alt="Woodpecker logo"
-          className="h-7 w-7 dark:invert"
+          className="h-6 w-6 dark:invert"
         />
         <span className="text-base font-semibold tracking-tight text-foreground">Woodpecker</span>
       </Link>
