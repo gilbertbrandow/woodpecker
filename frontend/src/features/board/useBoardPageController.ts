@@ -64,6 +64,7 @@ export type OverviewState = {
   accuracyDelta: number | null
   timeDelta: number | null
   participation: ScheduleParticipation | null
+  allRuns: Run[] | null
 }
 
 export type BoardPageActions = {
@@ -79,6 +80,9 @@ export type BoardPageActions = {
 export type BoardPageControllerResult = {
   mode: Mode
   puzzle: RunPuzzleFull | null
+  run: Run | null
+  allRuns: Run[] | null
+  participation: ScheduleParticipation | null
   board: BoardState
   timer: TimerState
   session: { attemptHistory: SessionAttemptHistoryItem[] }
@@ -151,6 +155,10 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const [overviewPuzzleList, setOverviewPuzzleList] = useState<RunPuzzleList | null>(null)
   const [overviewFreshPuzzle, setOverviewFreshPuzzle] = useState<RunPuzzleFull | null>(null)
   const [overviewParticipation, setOverviewParticipation] = useState<ScheduleParticipation | null>(null)
+  const [overviewAllRuns, setOverviewAllRuns] = useState<Run[] | null>(null)
+  const [focusRun, setFocusRun] = useState<Run | null>(null)
+  const [focusAllRuns, setFocusAllRuns] = useState<Run[] | null>(null)
+  const [focusParticipation, setFocusParticipation] = useState<ScheduleParticipation | null>(null)
   const [, setCompleteResult] = useState<CompleteAttemptResult | null>(null)
   const [lastMoveResult, setLastMoveResult] = useState<MoveFeedbackResult | null>(null)
   const [lastMoveSquare, setLastMoveSquare] = useState<string | null>(null)
@@ -213,6 +221,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     setOverviewRun(null)
     setOverviewPuzzleList(null)
     setOverviewParticipation(null)
+    setOverviewAllRuns(null)
   }, [])
 
   const clearPendingTimeouts = useCallback((): void => {
@@ -356,14 +365,21 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
         const solutionMoves = data.solution.split(' ')
 
         let resolvedTargetSolveTenths: number | null = null
+        let resolvedFocusAllRuns: Run[] | null = null
         try {
-          const participation = await api.participations.get(run.participationId)
+          const [participation, allRuns] = await Promise.all([
+            api.participations.get(run.participationId),
+            api.runs.list(run.participationId),
+          ])
           const runTarget = participation.runTargets.find((t) => t.runIndex === data.runIndex)
           resolvedTargetSolveTenths = runTarget?.targetSolveSeconds !== null && runTarget?.targetSolveSeconds !== undefined
             ? Math.max(0, Math.round(runTarget.targetSolveSeconds * 10))
             : null
+          resolvedFocusAllRuns = allRuns
+          setFocusParticipation(participation)
         } catch {
           resolvedTargetSolveTenths = null
+          setFocusParticipation(null)
         }
 
         if (requestId !== loadRequestIdRef.current) {
@@ -378,6 +394,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
         setParticipationId(run.participationId)
         setTargetSolveTenths(resolvedTargetSolveTenths)
+        setFocusRun(run)
+        setFocusAllRuns(resolvedFocusAllRuns)
 
         if (routeKind === 'overview') {
           if (modeRef.current === 'focus' && currentAttemptIdRef.current !== null) {
@@ -476,8 +494,12 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
         setOverviewPuzzleList(listData)
         setOverviewRun(runData)
         try {
-          const participationData = await api.participations.get(runData.participationId)
+          const [participationData, allRunsData] = await Promise.all([
+            api.participations.get(runData.participationId),
+            api.runs.list(runData.participationId),
+          ])
           setOverviewParticipation(participationData)
+          setOverviewAllRuns(allRunsData)
         } catch {
           setOverviewParticipation(null)
         }
@@ -833,6 +855,9 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       targetSolveTenths,
     },
     session: { attemptHistory },
+    run: focusRun,
+    allRuns: focusAllRuns,
+    participation: focusParticipation,
     overview: {
       run: overviewRun,
       puzzleList: overviewPuzzleList,
@@ -842,6 +867,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       accuracyDelta,
       timeDelta,
       participation: overviewParticipation,
+      allRuns: overviewAllRuns,
     },
     isLoadingNextPuzzle,
     participationId,

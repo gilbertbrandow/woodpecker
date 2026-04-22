@@ -1,9 +1,9 @@
 import * as React from 'react'
-import { ProgressBar } from '../../components/ProgressBar'
+import { ProgressCard } from './ProgressCard'
 import type { RunPuzzleFull, Run } from '../../lib/api'
 import type { StatsResult } from './boardPage.helpers'
+import { computeTrainingProgressPct } from './boardPage.helpers'
 import { formatNumber } from '../../lib/utils'
-import { DeltaBadge } from './DeltaBadge'
 import { BoardBreadcrumbs } from './BoardBreadcrumbs'
 import { OverviewStatsSection } from './OverviewStatsSection'
 
@@ -17,6 +17,9 @@ type OverviewSidebarLeftProps = {
   timeDelta: number | null
   runProgressPct: number
   runProgressDelta: number | null
+  allRuns: Run[] | null
+  trainingProgressDelta: number | null
+  scheduleName: string | null
   boardSize: number
 }
 
@@ -30,28 +33,37 @@ export function OverviewSidebarLeft({
   timeDelta,
   runProgressPct,
   runProgressDelta,
+  allRuns,
+  trainingProgressDelta,
+  scheduleName,
   boardSize,
 }: OverviewSidebarLeftProps): React.ReactElement {
   const resolvedCount = run.solvedCount + run.solvedWithRetriesCount + run.failedCount
 
+  const trainingResolved = allRuns !== null
+    ? allRuns.reduce((s, r) => s + r.solvedCount + r.solvedWithRetriesCount + r.failedCount, 0)
+    : 0
+  const trainingTotal = allRuns !== null
+    ? allRuns.reduce((s, r) => s + r.totalPuzzles, 0)
+    : 0
+
   return (
     <aside className="hidden flex-1 flex-col gap-4 md:flex" style={{ height: boardSize }}>
       <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
-      <div className="flex flex-col gap-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Run progress
-        </span>
-        <ProgressBar
-          value={runProgressPct}
-          tooltipLabel={`${formatNumber(resolvedCount)} of ${formatNumber(run.totalPuzzles)} puzzles resolved`}
-          className="w-full"
-        />
-        <DeltaBadge
-          delta={runProgressDelta}
-          goodWhenPositive={true}
-          format={(n) => `${n.toFixed(1)}%`}
-        />
-      </div>
+      <ProgressCard
+        runProgress={{
+          label: `Run ${run.runIndex + 1}`,
+          value: runProgressPct,
+          tooltipLabel: `${formatNumber(resolvedCount)} of ${formatNumber(run.totalPuzzles)} puzzles completed`,
+          delta: runProgressDelta,
+        }}
+        trainingProgress={allRuns !== null ? {
+          label: scheduleName ?? 'Training',
+          value: computeTrainingProgressPct(allRuns),
+          tooltipLabel: `${formatNumber(trainingResolved)} of ${formatNumber(trainingTotal)} puzzles completed across all runs`,
+          delta: trainingProgressDelta,
+        } : null}
+      />
       {afterStats !== null && (
         <OverviewStatsSection
           afterStats={afterStats}
@@ -62,3 +74,4 @@ export function OverviewSidebarLeft({
     </aside>
   )
 }
+

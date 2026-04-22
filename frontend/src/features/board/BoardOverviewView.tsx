@@ -14,7 +14,7 @@ import { OverviewAttemptHistoryTable } from './OverviewAttemptHistoryTable'
 import { DeltaBadge } from './DeltaBadge'
 import { useOverviewSelectionModel } from './useOverviewSelectionModel'
 import { computeOverviewBoardState } from './boardOverview.helpers'
-import { formatTimer } from './boardPage.helpers'
+import { formatTimer, computeTrainingProgressDelta } from './boardPage.helpers'
 import { formatNumber } from '../../lib/utils'
 import { api } from '../../lib/api'
 import type { PuzzleRunReference, RunPuzzleFull } from '../../lib/api'
@@ -227,6 +227,8 @@ export function BoardOverviewView({
   const isLoading = effectivePuzzle === null || run === null
 
   const lastOverviewBoardRef = React.useRef<BoardState | null>(null)
+  const lastOverviewAllRunsRef = React.useRef<import('../../lib/api').Run[] | null>(null)
+  if (overview.allRuns !== null) lastOverviewAllRunsRef.current = overview.allRuns
   const lastMoveFeedbackRef = React.useRef<BoardState['moveFeedback']>({
     result: null,
     square: null,
@@ -291,6 +293,9 @@ export function BoardOverviewView({
     displayedAccuracyDelta,
     displayedTimeDelta,
   } = selectionModel
+
+  const stableAllRuns = overview.allRuns ?? lastOverviewAllRunsRef.current
+  const trainingProgressDelta = computeTrainingProgressDelta(runProgressDelta, stableAllRuns ?? [])
 
   const resolvedCount = run.solvedCount + run.solvedWithRetriesCount + run.failedCount
 
@@ -358,7 +363,7 @@ export function BoardOverviewView({
         </span>
         <ProgressBar
           value={runProgressPct}
-          tooltipLabel={`${formatNumber(resolvedCount)} of ${formatNumber(run.totalPuzzles)} puzzles resolved`}
+          tooltipLabel={`${formatNumber(resolvedCount)} of ${formatNumber(run.totalPuzzles)} puzzles completed`}
           className="w-full"
         />
         <DeltaBadge
@@ -397,6 +402,9 @@ export function BoardOverviewView({
           timeDelta={displayedTimeDelta}
           runProgressPct={runProgressPct}
           runProgressDelta={runProgressDelta}
+          allRuns={stableAllRuns}
+          trainingProgressDelta={trainingProgressDelta}
+          scheduleName={participation?.schedule.name ?? null}
           boardSize={board.boardSize}
         />
         <BoardCenterColumn

@@ -316,7 +316,7 @@ export function ParticipationPage(): React.ReactElement | null {
                   const resolved = run !== null ? run.solvedCount + run.solvedWithRetriesCount + run.failedCount : 0
                   const progressValue = run !== null && run.totalPuzzles > 0 ? (resolved / run.totalPuzzles) * 100 : 0
                   const progressTooltip = run !== null
-                    ? `${resolved} / ${run.totalPuzzles} puzzles resolved`
+                    ? `${resolved} / ${run.totalPuzzles} puzzles completed`
                     : 'Not started yet'
 
                   return (

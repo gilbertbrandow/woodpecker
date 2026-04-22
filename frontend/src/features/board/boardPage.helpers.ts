@@ -179,3 +179,23 @@ export function computeRunProgressDelta(
   if (qualifyingAttemptId !== selectedAttemptId) return null
   return totalPuzzles > 0 ? (1 / totalPuzzles) * 100 : null
 }
+
+export function computeTrainingProgressPct(allRuns: Run[]): number {
+  const totalPuzzles = allRuns.reduce((s, r) => s + r.totalPuzzles, 0)
+  if (totalPuzzles === 0) return 0
+  const resolved = allRuns.reduce(
+    (s, r) => s + r.solvedCount + r.solvedWithRetriesCount + r.failedCount,
+    0,
+  )
+  return (resolved / totalPuzzles) * 100
+}
+
+export function computeTrainingProgressDelta(
+  runProgressDelta: number | null,
+  allRuns: Run[],
+): number | null {
+  if (runProgressDelta === null) return null
+  const totalPuzzles = allRuns.reduce((s, r) => s + r.totalPuzzles, 0)
+  if (totalPuzzles === 0) return null
+  return (1 / totalPuzzles) * 100
+}

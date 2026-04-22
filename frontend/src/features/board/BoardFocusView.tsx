@@ -4,7 +4,9 @@ import { AttemptScoring } from './AttemptScoring'
 import { TimerCard } from './TimerCard'
 import { MoveStatusCard } from './MoveStatusCard'
 import { BoardCenterColumn } from './BoardCenterColumn'
-import { formatTimer } from './boardPage.helpers'
+import { ProgressCard } from './ProgressCard'
+import { formatTimer, computeRunProgressPct, computeTrainingProgressPct } from './boardPage.helpers'
+import { formatNumber } from '../../lib/utils'
 import type { BoardPageControllerResult } from './useBoardPageController'
 import type { RunPuzzleFull } from '../../lib/api'
 
@@ -15,7 +17,7 @@ type BoardFocusViewProps = {
 }
 
 export function BoardFocusView({ puzzle, ctrl, runIdStr }: BoardFocusViewProps): React.ReactElement {
-  const { board, timer, session, participationId, actions } = ctrl
+  const { board, timer, session, participationId, actions, run, allRuns, participation } = ctrl
   const timerText = formatTimer(timer.elapsedTenths)
 
   const mobileHeader = (
@@ -41,12 +43,40 @@ export function BoardFocusView({ puzzle, ctrl, runIdStr }: BoardFocusViewProps):
     </div>
   )
 
+  const progressCard = run !== null ? (
+    (() => {
+      const resolvedCount = run.solvedCount + run.solvedWithRetriesCount + run.failedCount
+      const trainingResolved = allRuns !== null
+        ? allRuns.reduce((s, r) => s + r.solvedCount + r.solvedWithRetriesCount + r.failedCount, 0)
+        : 0
+      const trainingTotal = allRuns !== null
+        ? allRuns.reduce((s, r) => s + r.totalPuzzles, 0)
+        : 0
+      return (
+        <ProgressCard
+          runProgress={{
+            label: `Run ${run.runIndex + 1}`,
+            value: computeRunProgressPct(run),
+            tooltipLabel: `${formatNumber(resolvedCount)} of ${formatNumber(run.totalPuzzles)} puzzles completed`,
+            delta: null,
+          }}
+          trainingProgress={allRuns !== null ? {
+            label: participation?.schedule.name ?? 'Training',
+            value: computeTrainingProgressPct(allRuns),
+            tooltipLabel: `${formatNumber(trainingResolved)} of ${formatNumber(trainingTotal)} puzzles completed across all runs`,
+            delta: null,
+          } : null}
+        />
+      )
+    })()
+  ) : null
+
   return (
     <div className="flex flex-1 items-center justify-center overflow-hidden px-6">
       <div className="flex w-full items-start gap-6">
-        <aside className="hidden flex-1 flex-col md:flex" style={{ height: board.boardSize }}>
+        <aside className="hidden flex-1 flex-col gap-4 md:flex" style={{ height: board.boardSize }}>
           <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} linksDisabled={true} />
-          <div className="mb-6" />
+          {progressCard}
           <AttemptScoring
             currentTryNumber={puzzle.currentTryNumber}
             maxTriesPerPuzzle={puzzle.maxTriesPerPuzzle}
