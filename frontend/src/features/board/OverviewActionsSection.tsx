@@ -27,7 +27,7 @@ export function OverviewActionsSection({ run, isLoadingNextPuzzle, gameUrl, onNe
         <Button
           variant="outline"
           className="flex-1"
-          disabled={run.status !== 'active' || isLoadingNextPuzzle}
+          disabled={isLoadingNextPuzzle}
           onClick={onRetake}
         >
           <RotateCcw className="mr-2 h-4 w-4" />

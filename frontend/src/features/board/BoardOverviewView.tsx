@@ -140,6 +140,9 @@ export function BoardOverviewView({
     if (freshIsForCurrentRun && freshPuzzle) {
       for (const attempt of freshPuzzle.tries) {
         if (attempt.status === 'in_progress') continue
+        const hasPriorSolve = freshPuzzle.tries.some(
+          (a) => a.tryNumber < attempt.tryNumber && a.status === 'solved',
+        )
         rows.push({
           attemptId: attempt.id,
           runId: run.id,
@@ -147,7 +150,8 @@ export function BoardOverviewView({
           runOrder: run.runIndex,
           runPuzzleId: freshPuzzle.runPuzzleId,
           tryNumber: attempt.tryNumber,
-          countsTowardsTraining: attempt.tryNumber <= freshPuzzle.maxTriesPerPuzzle,
+          countsTowardsTraining:
+            attempt.tryNumber <= freshPuzzle.maxTriesPerPuzzle && !hasPriorSolve,
           result: attempt.status as 'solved' | 'failed',
           timeSpentMs: attempt.timeSpentMs,
         })
@@ -161,6 +165,9 @@ export function BoardOverviewView({
       if (!ref) continue
       for (const attempt of puzzle.tries) {
         if (attempt.status === 'in_progress') continue
+        const hasPriorSolve = puzzle.tries.some(
+          (a) => a.tryNumber < attempt.tryNumber && a.status === 'solved',
+        )
         rows.push({
           attemptId: attempt.id,
           runId,
@@ -168,7 +175,8 @@ export function BoardOverviewView({
           runOrder: ref.runIndex,
           runPuzzleId: ref.runPuzzleId,
           tryNumber: attempt.tryNumber,
-          countsTowardsTraining: attempt.tryNumber <= puzzle.maxTriesPerPuzzle,
+          countsTowardsTraining:
+            attempt.tryNumber <= puzzle.maxTriesPerPuzzle && !hasPriorSolve,
           result: attempt.status as 'solved' | 'failed',
           timeSpentMs: attempt.timeSpentMs,
         })

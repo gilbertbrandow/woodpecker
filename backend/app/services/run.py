@@ -482,8 +482,6 @@ def get_run_puzzle(run_id: int, run_puzzle_id: int, user_id: int) -> dict[str, o
 
 def start_puzzle(run_id: int, run_puzzle_id: int, user_id: int) -> dict[str, object]:
     run = _get_owned_run(run_id, user_id)
-    if run.completed_at is not None or run.aborted_at is not None:
-        raise ValueError("Run is not active.")
     run_puzzle = db.session.get(RunPuzzle, run_puzzle_id)
     if run_puzzle is None or run_puzzle.run_id != run.id:
         raise LookupError("Run puzzle not found.")
@@ -520,8 +518,6 @@ def complete_attempt(
 
     if attempt.status != "in_progress":
         raise ValueError("Attempt is already completed.")
-    if run.completed_at is not None or run.aborted_at is not None:
-        raise ValueError("Run is not active.")
 
     _, config = _get_schedule_config(run)
     total_queue = _total_queue_attempts(config)
@@ -544,7 +540,7 @@ def complete_attempt(
     )
     tries_remaining = max(0, total_queue - tries_in_window) if not position_resolved else 0
 
-    if is_queue_attempt and position_resolved:
+    if is_queue_attempt and position_resolved and run.completed_at is None and run.aborted_at is None:
         db.session.flush()
         if _all_puzzles_terminal(run.id, total_queue):
             run.completed_at = now
