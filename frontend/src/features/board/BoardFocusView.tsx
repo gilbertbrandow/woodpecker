@@ -59,6 +59,8 @@ export function BoardFocusView({ puzzle, ctrl, runIdStr }: BoardFocusViewProps):
           board={board}
           actions={actions}
           attemptHistory={session.attemptHistory}
+          runId={runIdStr}
+          stripInteractive={false}
           mobileHeader={mobileHeader}
           mobileExtras={mobileExtras}
         />

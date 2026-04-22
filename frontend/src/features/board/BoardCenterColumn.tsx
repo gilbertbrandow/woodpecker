@@ -9,6 +9,9 @@ type BoardCenterColumnProps = {
   board: BoardState
   actions: BoardPageActions
   attemptHistory: SessionAttemptHistoryItem[]
+  runId: string
+  activeAttemptId?: number | null
+  stripInteractive?: boolean
   mobileHeader?: React.ReactNode
   mobileExtras?: React.ReactNode
 }
@@ -17,6 +20,9 @@ export function BoardCenterColumn({
   board,
   actions,
   attemptHistory,
+  runId,
+  activeAttemptId,
+  stripInteractive = true,
   mobileHeader,
   mobileExtras,
 }: BoardCenterColumnProps): React.ReactElement {
@@ -43,7 +49,7 @@ export function BoardCenterColumn({
         </div>
       )}
       <BoardSurface {...boardSurfaceProps} />
-      <SessionAttemptStrip items={attemptHistory} />
+      <SessionAttemptStrip items={attemptHistory} runId={runId} activeAttemptId={activeAttemptId} interactive={stripInteractive} />
       {mobileExtras && (
         <div className="md:hidden">
           {mobileExtras}

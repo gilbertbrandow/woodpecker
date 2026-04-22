@@ -56,6 +56,7 @@ export function BoardOverviewView({
 
   React.useEffect(() => {
     if (!freshPuzzle) return
+    if (freshPuzzle.runPuzzleId !== Number(runPuzzleIdStr)) return
     const sortedAttempts = [...freshPuzzle.tries]
       .filter((a) => a.status !== 'in_progress')
       .sort((a, b) => b.tryNumber - a.tryNumber)
@@ -79,7 +80,7 @@ export function BoardOverviewView({
     if (requestedAttemptId !== nextSelectedAttemptId) {
       setOverviewAttemptInUrl(nextSelectedAttemptId, true)
     }
-  }, [freshPuzzle, requestedAttemptId, selectedAttemptId, setOverviewAttemptInUrl])
+  }, [freshPuzzle, runPuzzleIdStr, requestedAttemptId, selectedAttemptId, setOverviewAttemptInUrl])
 
   const handleSelectAttempt = React.useCallback((attemptId: number): void => {
     if (attemptId === selectedAttemptId) return
@@ -115,6 +116,7 @@ export function BoardOverviewView({
             board={board}
             actions={actions}
             attemptHistory={session.attemptHistory}
+            runId={runIdStr}
             mobileHeader={loadingMobileHeader}
             mobileExtras={null}
           />
@@ -250,6 +252,8 @@ export function BoardOverviewView({
           board={board}
           actions={actions}
           attemptHistory={session.attemptHistory}
+          runId={runIdStr}
+          activeAttemptId={selectedAttemptId}
           mobileHeader={mobileHeader}
           mobileExtras={mobileExtras}
         />

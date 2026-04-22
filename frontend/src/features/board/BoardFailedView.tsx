@@ -72,6 +72,7 @@ export function BoardFailedView({ puzzle, ctrl, runIdStr }: BoardFailedViewProps
           board={board}
           actions={actions}
           attemptHistory={session.attemptHistory}
+          runId={runIdStr}
           mobileHeader={mobileHeader}
           mobileExtras={mobileExtras}
         />
