@@ -1,9 +1,7 @@
 import * as React from 'react'
-import { Badge } from '../../components/ui/badge'
 import { ProgressBar } from '../../components/ProgressBar'
 import type { RunPuzzleFull, Run } from '../../lib/api'
 import type { StatsResult } from './boardPage.helpers'
-import { POSITION_STATUS_CLASS, positionStatusLabel } from './boardPage.helpers'
 import { formatNumber } from '../../lib/utils'
 import { DeltaBadge } from './DeltaBadge'
 import { BoardBreadcrumbs } from './BoardBreadcrumbs'
@@ -44,12 +42,6 @@ export function OverviewSidebarLeft({
   return (
     <aside className="hidden flex-1 flex-col gap-4 md:flex" style={{ height: boardSize }}>
       <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
-      <Badge
-        variant="outline"
-        className={`w-fit text-xs ${POSITION_STATUS_CLASS[puzzle.positionStatus] ?? ''}`}
-      >
-        {positionStatusLabel(puzzle.positionStatus)}
-      </Badge>
       <AttemptTable
         tries={puzzle.tries}
         maxTriesPerPuzzle={puzzle.maxTriesPerPuzzle}

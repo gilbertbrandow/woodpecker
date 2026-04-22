@@ -1,10 +1,8 @@
 import * as React from 'react'
 import { CircleOff } from 'lucide-react'
-import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 import { formatSolveTimeMs } from '../../lib/utils'
-import { ATTEMPT_STATUS_CLASS, ATTEMPT_STATUS_LABEL } from './boardPage.helpers'
 import type { AttemptSummary } from '../../lib/api'
 
 const PAGE_SIZE = 3
@@ -53,14 +51,13 @@ export function AttemptTable({
             key={attempt.id}
             role="button"
             tabIndex={0}
-            className={`flex h-10 cursor-pointer items-center gap-2 rounded-sm px-2 transition-colors hover:bg-muted/50 ${isSelected ? 'bg-muted/50' : ''}`}
+            className={`flex h-10 cursor-pointer items-center gap-2 rounded-sm border px-2 transition-colors hover:bg-muted/50 ${isSelected ? 'border-foreground/40 bg-muted/50' : 'border-transparent'}`}
             onClick={() => onSelect(attempt.id)}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(attempt.id) }}
           >
-            <span className="w-14 shrink-0 text-xs text-muted-foreground">{label}</span>
-            <Badge variant="outline" className={`text-xs ${ATTEMPT_STATUS_CLASS[attempt.status] ?? ''}`}>
-              {ATTEMPT_STATUS_LABEL[attempt.status] ?? attempt.status}
-            </Badge>
+            <span className={`w-14 shrink-0 text-xs ${isSelected ? 'text-foreground' : 'text-muted-foreground'}`}>
+              {label}
+            </span>
             {!counts && (
               <Tooltip delayDuration={100}>
                 <TooltipTrigger asChild>
@@ -71,7 +68,7 @@ export function AttemptTable({
                 <TooltipContent>This attempt does not affect your score.</TooltipContent>
               </Tooltip>
             )}
-            <span className="ml-auto tabular-nums text-xs text-muted-foreground">
+            <span className={`ml-auto tabular-nums text-xs ${isSelected ? 'text-foreground' : 'text-muted-foreground'}`}>
               {attempt.timeSpentMs !== null ? formatSolveTimeMs(attempt.timeSpentMs) : '—'}
             </span>
           </div>

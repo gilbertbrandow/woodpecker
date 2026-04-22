@@ -1,6 +1,5 @@
 import * as React from 'react'
 import { CheckCircle2, XCircle, Clock } from 'lucide-react'
-import { Badge } from '../../components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 import { ProgressBar } from '../../components/ProgressBar'
 import { BoardBreadcrumbs } from './BoardBreadcrumbs'
@@ -12,7 +11,7 @@ import { OverviewStatsSection } from './OverviewStatsSection'
 import { OverviewActionsSection } from './OverviewActionsSection'
 import { DeltaBadge } from './DeltaBadge'
 import { useOverviewSelectionModel } from './useOverviewSelectionModel'
-import { POSITION_STATUS_CLASS, positionStatusLabel, formatTimer } from './boardPage.helpers'
+import { formatTimer } from './boardPage.helpers'
 import { formatNumber } from '../../lib/utils'
 import type { BoardPageControllerResult } from './useBoardPageController'
 import type { RunPuzzleFull } from '../../lib/api'
@@ -92,12 +91,6 @@ export function BoardOverviewView({ puzzle, ctrl, runIdStr }: BoardOverviewViewP
     <>
       <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
       <div className="mt-1 flex items-center gap-2">
-        <Badge
-          variant="outline"
-          className={`text-xs ${POSITION_STATUS_CLASS[freshPuzzle.positionStatus] ?? ''}`}
-        >
-          {positionStatusLabel(freshPuzzle.positionStatus)}
-        </Badge>
         <span className="tabular-nums text-sm font-medium">
           {formatTimer(frozenTimerTenths)}
         </span>
