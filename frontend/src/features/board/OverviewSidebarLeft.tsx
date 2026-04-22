@@ -58,7 +58,7 @@ export function OverviewSidebarLeft({
           delta: runProgressDelta,
         }}
         trainingProgress={allRuns !== null ? {
-          label: scheduleName ?? 'Training',
+          label: `${scheduleName ?? 'Training'}`,
           value: computeTrainingProgressPct(allRuns),
           tooltipLabel: `${formatNumber(trainingResolved)} of ${formatNumber(trainingTotal)} puzzles completed across all runs`,
           delta: trainingProgressDelta,

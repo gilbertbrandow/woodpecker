@@ -14,12 +14,14 @@ import { OverviewAttemptHistoryTable } from './OverviewAttemptHistoryTable'
 import { DeltaBadge } from './DeltaBadge'
 import { useOverviewSelectionModel } from './useOverviewSelectionModel'
 import { computeOverviewBoardState } from './boardOverview.helpers'
+import { buildPgnDisplay } from './boardOverview.pgn'
 import { formatTimer, computeTrainingProgressDelta } from './boardPage.helpers'
 import { formatNumber } from '../../lib/utils'
 import { api } from '../../lib/api'
 import type { PuzzleRunReference, RunPuzzleFull } from '../../lib/api'
 import type { BoardPageControllerResult, BoardState } from './useBoardPageController'
 import type { OverviewAttemptHistoryRow } from './OverviewAttemptHistoryTable'
+import type { PlySelection, PuzzleMetaPgnDisplay } from './boardOverview.pgn'
 
 type BoardOverviewViewProps = {
   puzzle: RunPuzzleFull
@@ -42,6 +44,7 @@ export function BoardOverviewView({
   const { freshPuzzle, run, afterStats, accuracyDelta, timeDelta, participation } = overview
 
   const [selectedAttemptId, setSelectedAttemptId] = React.useState<number | null>(null)
+  const [selectedPly, setSelectedPly] = React.useState<PlySelection | null>(null)
   const [crossRunRefs, setCrossRunRefs] = React.useState<PuzzleRunReference[]>([])
   const [crossRunPuzzles, setCrossRunPuzzles] = React.useState<Map<number, RunPuzzleFull>>(new Map())
 
@@ -226,6 +229,22 @@ export function BoardOverviewView({
 
   const isLoading = effectivePuzzle === null || run === null
 
+  const pgnDisplay = React.useMemo((): PuzzleMetaPgnDisplay | null => {
+    const attempt = selectionModel?.selectedAttempt
+    if (!attempt || !effectivePuzzle) return null
+    const status = attempt.status === 'solved' || attempt.status === 'failed' ? attempt.status : null
+    if (!status) return null
+    return buildPgnDisplay(effectivePuzzle.fen, attempt.moves, effectivePuzzle.solution, status)
+  }, [selectionModel, effectivePuzzle])
+
+  React.useEffect(() => {
+    if (pgnDisplay === null || pgnDisplay.mainline.length === 0) {
+      setSelectedPly(null)
+      return
+    }
+    setSelectedPly({ line: 'main', index: pgnDisplay.mainline.length - 1 })
+  }, [pgnDisplay])
+
   const lastOverviewBoardRef = React.useRef<BoardState | null>(null)
   const lastOverviewAllRunsRef = React.useRef<import('../../lib/api').Run[] | null>(null)
   if (overview.allRuns !== null) lastOverviewAllRunsRef.current = overview.allRuns
@@ -244,6 +263,30 @@ export function BoardOverviewView({
       ? derived.moveFeedback
       : lastMoveFeedbackRef.current
     if (derived.moveFeedback.visible) lastMoveFeedbackRef.current = derived.moveFeedback
+
+    if (selectedPly !== null && pgnDisplay !== null) {
+      const plyList = selectedPly.line === 'main' ? pgnDisplay.mainline : (pgnDisplay.variation ?? [])
+      const ply = plyList[selectedPly.index]
+      if (ply) {
+        const plyFeedbackResult =
+          ply.moveStatus === 'correct' ? 'correct' :
+          ply.moveStatus === 'wrong' ? 'wrong' : null
+        const next: BoardState = {
+          ...board,
+          fen: ply.fen,
+          lastMove: [ply.from, ply.to],
+          moveFeedback: {
+            result: plyFeedbackResult,
+            square: plyFeedbackResult !== null ? ply.to : null,
+            visible: plyFeedbackResult !== null,
+          },
+          dests: new Map(),
+        }
+        lastOverviewBoardRef.current = next
+        return next
+      }
+    }
+
     const next: BoardState = {
       ...board,
       fen: derived.fen,
@@ -253,7 +296,7 @@ export function BoardOverviewView({
     }
     lastOverviewBoardRef.current = next
     return next
-  }, [board, effectivePuzzle, selectionModel])
+  }, [board, effectivePuzzle, selectionModel, selectedPly, pgnDisplay])
 
   const loadingMobileHeader = (
     <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
@@ -430,6 +473,9 @@ export function BoardOverviewView({
           historyRows={historyRows}
           selectedAttemptId={selectedAttemptId}
           onSelectAttempt={handleSelectAttemptForTable}
+          pgnDisplay={pgnDisplay}
+          selectedPly={selectedPly}
+          onPlyClick={setSelectedPly}
         />
       </div>
     </div>

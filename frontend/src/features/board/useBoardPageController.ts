@@ -85,7 +85,13 @@ export type BoardPageControllerResult = {
   participation: ScheduleParticipation | null
   board: BoardState
   timer: TimerState
-  session: { attemptHistory: SessionAttemptHistoryItem[] }
+  session: {
+    attemptHistory: SessionAttemptHistoryItem[]
+    movesPlayed: string[]
+    allPliesPlayed: string[]
+    failedRetryPlies: string[]
+    liveFocusStatus: 'in_progress' | 'solved' | 'failed'
+  }
   overview: OverviewState
   isLoadingNextPuzzle: boolean
   participationId: number | null
@@ -114,6 +120,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const moveIndexRef = useRef(1)
   const inputBlockedRef = useRef(false)
   const movesPlayedRef = useRef<string[]>([])
+  const allPliesRef = useRef<string[]>([])
+  const failedRetryPliesRef = useRef<string[]>([])
   const solutionMovesRef = useRef<string[]>([])
   const currentAttemptIdRef = useRef<number | null>(null)
   const displayFenRef = useRef('')
@@ -150,6 +158,10 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const [participationId, setParticipationId] = useState<number | null>(null)
   const [boardKey, setBoardKey] = useState(0)
   const [isLoadingNextPuzzle, setIsLoadingNextPuzzle] = useState(false)
+  const [movesPlayed, setMovesPlayed] = useState<string[]>([])
+  const [allPliesPlayed, setAllPliesPlayed] = useState<string[]>([])
+  const [failedRetryPlies, setFailedRetryPlies] = useState<string[]>([])
+  const [liveFocusStatus, setLiveFocusStatus] = useState<'in_progress' | 'solved' | 'failed'>('in_progress')
   const [isAttemptReady, setIsAttemptReady] = useState(false)
   const [overviewRun, setOverviewRun] = useState<Run | null>(null)
   const [overviewPuzzleList, setOverviewPuzzleList] = useState<RunPuzzleList | null>(null)
@@ -269,6 +281,10 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     moveIndexRef.current = 0
     inputBlockedRef.current = true
     movesPlayedRef.current = []
+    allPliesRef.current = []
+    setMovesPlayed([])
+    setAllPliesPlayed([])
+    setLiveFocusStatus('in_progress')
     currentAttemptIdRef.current = resolvedAttemptId
     concludingRef.current = false
     latestResolvedAttemptIdRef.current = null
@@ -296,6 +312,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       if (!ch) return
       const firstMove = solutionMovesRef.current[0]
       applyUci(ch, firstMove)
+      allPliesRef.current = [firstMove]
+      setAllPliesPlayed([firstMove])
       const lm: [string, string] = [firstMove.slice(0, 2), firstMove.slice(2, 4)]
       committedLastMoveRef.current = lm
       setFen(ch.fen())
@@ -523,6 +541,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     modeRef.current = 'failed'
     setMode('failed')
     setHintSquare(null)
+    failedRetryPliesRef.current = []
+    setFailedRetryPlies([])
   }, [])
 
   const conclude = useCallback(async (status: 'solved' | 'failed'): Promise<void> => {
@@ -567,6 +587,13 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     const chess = chessRef.current
     if (!chess) return
     applyUci(chess, uci)
+    if (modeRef.current === 'focus') {
+      allPliesRef.current = [...allPliesRef.current, uci]
+      setAllPliesPlayed(allPliesRef.current)
+    } else if (modeRef.current === 'failed') {
+      failedRetryPliesRef.current = [...failedRetryPliesRef.current, uci]
+      setFailedRetryPlies(failedRetryPliesRef.current)
+    }
     setFen(chess.fen())
     const lm: [string, string] = [uci.slice(0, 2), uci.slice(2, 4)]
     setLastMove(lm)
@@ -582,6 +609,12 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     applyUci(chess, uci)
     if (modeRef.current === 'focus') {
       movesPlayedRef.current = [...movesPlayedRef.current, uci]
+      setMovesPlayed(movesPlayedRef.current)
+      allPliesRef.current = [...allPliesRef.current, uci]
+      setAllPliesPlayed(allPliesRef.current)
+    } else if (modeRef.current === 'failed') {
+      failedRetryPliesRef.current = [...failedRetryPliesRef.current, uci]
+      setFailedRetryPlies(failedRetryPliesRef.current)
     }
     setFen(chess.fen())
     setLastMove([orig, dest])
@@ -593,6 +626,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
     const solutionMoves = solutionMovesRef.current
     if (moveIndexRef.current >= solutionMoves.length) {
+      if (modeRef.current === 'focus') setLiveFocusStatus('solved')
       scheduleTimeout(() => {
         if (modeRef.current === 'focus') {
           void concludeFnRef.current('solved')
@@ -626,6 +660,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     const uci = orig + dest + (promotionPiece ?? '')
     if (modeRef.current === 'focus') {
       movesPlayedRef.current = [...movesPlayedRef.current, uci]
+      setMovesPlayed(movesPlayedRef.current)
+      setLiveFocusStatus('failed')
     }
 
     chess.move({ from: orig, to: dest, promotion: promotionPiece ?? 'q' })
@@ -854,7 +890,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       elapsedTenths: elapsedSeconds,
       targetSolveTenths,
     },
-    session: { attemptHistory },
+    session: { attemptHistory, movesPlayed, allPliesPlayed, failedRetryPlies, liveFocusStatus },
     run: focusRun,
     allRuns: focusAllRuns,
     participation: focusParticipation,

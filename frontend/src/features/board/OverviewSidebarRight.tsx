@@ -8,6 +8,7 @@ import { PuzzleMetaCard } from './PuzzleMetaCard'
 import { OverviewActionsSection } from './OverviewActionsSection'
 import { OverviewAttemptHistoryTable } from './OverviewAttemptHistoryTable'
 import type { OverviewAttemptHistoryRow } from './OverviewAttemptHistoryTable'
+import type { PlySelection, PuzzleMetaPgnDisplay } from './boardOverview.pgn'
 
 type OverviewSidebarRightProps = {
   puzzle: RunPuzzleFull
@@ -22,6 +23,9 @@ type OverviewSidebarRightProps = {
   historyRows: OverviewAttemptHistoryRow[]
   selectedAttemptId: number | null
   onSelectAttempt: (attemptId: number) => void
+  pgnDisplay: PuzzleMetaPgnDisplay | null
+  selectedPly: PlySelection | null
+  onPlyClick: (ply: PlySelection) => void
 }
 
 export function OverviewSidebarRight({
@@ -37,6 +41,9 @@ export function OverviewSidebarRight({
   historyRows,
   selectedAttemptId,
   onSelectAttempt,
+  pgnDisplay,
+  selectedPly,
+  onPlyClick,
 }: OverviewSidebarRightProps): React.ReactElement {
   const ZERO_TIMER = formatTimer(0)
   const lastTimerTextRef = React.useRef(ZERO_TIMER)
@@ -106,10 +113,9 @@ export function OverviewSidebarRight({
           puzzleId={puzzle.puzzleId}
           rating={puzzle.rating}
           themes={puzzle.themes}
-          baseFen={puzzle.fen}
-          solutionMoves={puzzle.solution}
-          attemptMoves={selectedAttempt?.moves}
-          attemptStatus={selectedAttempt?.status === 'solved' || selectedAttempt?.status === 'failed' ? selectedAttempt.status : undefined}
+          pgnDisplay={pgnDisplay}
+          selectedPly={selectedPly}
+          onPlyClick={onPlyClick}
         />
       </div>
       <OverviewAttemptHistoryTable

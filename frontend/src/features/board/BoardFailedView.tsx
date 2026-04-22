@@ -5,10 +5,13 @@ import { BoardBreadcrumbs } from './BoardBreadcrumbs'
 import { AttemptScoring } from './AttemptScoring'
 import { TimerCard } from './TimerCard'
 import { MoveStatusCard } from './MoveStatusCard'
+import { PuzzleMetaCard } from './PuzzleMetaCard'
 import { BoardCenterColumn } from './BoardCenterColumn'
+import { buildPgnDisplay } from './boardOverview.pgn'
 import { formatTimer } from './boardPage.helpers'
-import type { BoardPageControllerResult } from './useBoardPageController'
+import type { BoardPageControllerResult, BoardState } from './useBoardPageController'
 import type { RunPuzzleFull } from '../../lib/api'
+import type { PlySelection } from './boardOverview.pgn'
 
 type BoardFailedViewProps = {
   puzzle: RunPuzzleFull
@@ -19,6 +22,42 @@ type BoardFailedViewProps = {
 export function BoardFailedView({ puzzle, ctrl, runIdStr }: BoardFailedViewProps): React.ReactElement {
   const { board, timer, session, participationId, inputBlocked, actions } = ctrl
   const elapsed = formatTimer(timer.elapsedTenths)
+
+  const [selectedPly, setSelectedPly] = React.useState<PlySelection | null>(null)
+
+  React.useEffect(() => {
+    setSelectedPly(null)
+  }, [board.boardKey])
+
+  const pgnDisplay = React.useMemo(
+    () => buildPgnDisplay(puzzle.fen, session.movesPlayed, puzzle.solution, 'failed', session.failedRetryPlies),
+    [puzzle.fen, puzzle.solution, session.movesPlayed, session.failedRetryPlies],
+  )
+
+  const isAtHead =
+    selectedPly === null ||
+    (selectedPly.line === 'main' && selectedPly.index === pgnDisplay.mainline.length - 1)
+
+  const displayBoard = React.useMemo((): BoardState => {
+    if (isAtHead) return board
+    const plyList = selectedPly?.line === 'main' ? pgnDisplay.mainline : (pgnDisplay.variation ?? [])
+    const ply = selectedPly !== null ? plyList[selectedPly.index] : undefined
+    if (!ply) return board
+    const feedbackResult =
+      ply.moveStatus === 'correct' ? 'correct' :
+      ply.moveStatus === 'wrong' ? 'wrong' : null
+    return {
+      ...board,
+      fen: ply.fen,
+      lastMove: [ply.from, ply.to],
+      dests: new Map(),
+      moveFeedback: {
+        result: feedbackResult,
+        square: feedbackResult !== null ? ply.to : null,
+        visible: feedbackResult !== null,
+      },
+    }
+  }, [board, selectedPly, pgnDisplay, isAtHead])
 
   const mobileHeader = (
     <>
@@ -69,7 +108,7 @@ export function BoardFailedView({ puzzle, ctrl, runIdStr }: BoardFailedViewProps
         </aside>
 
         <BoardCenterColumn
-          board={board}
+          board={displayBoard}
           actions={actions}
           attemptHistory={session.attemptHistory}
           runId={runIdStr}
@@ -77,22 +116,31 @@ export function BoardFailedView({ puzzle, ctrl, runIdStr }: BoardFailedViewProps
           mobileExtras={mobileExtras}
         />
 
-        <aside className="hidden flex-1 flex-col md:flex" style={{ height: board.boardSize }}>
+        <aside className="hidden flex-1 flex-col gap-2 md:flex" style={{ height: board.boardSize }}>
           <TimerCard
             timerText={elapsed}
             elapsedTenths={timer.elapsedTenths}
             targetSolveTenths={timer.targetSolveTenths}
             muted={true}
           />
+          <PuzzleMetaCard
+            puzzleId={puzzle.puzzleId}
+            rating={puzzle.rating}
+            themes={puzzle.themes}
+            pgnDisplay={pgnDisplay}
+            focusMode={true}
+            selectedPly={selectedPly}
+            onPlyClick={setSelectedPly}
+          />
           <div className="mt-auto flex flex-col gap-3">
-            <Button variant="outline" size="sm" onClick={actions.handleShowHint} disabled={inputBlocked}>
+            <Button variant="outline" size="sm" onClick={actions.handleShowHint} disabled={inputBlocked || !isAtHead}>
               Show Hint
             </Button>
-            <Button variant="outline" size="sm" onClick={actions.handleShowSolution} disabled={inputBlocked}>
+            <Button variant="outline" size="sm" onClick={actions.handleShowSolution} disabled={inputBlocked || !isAtHead}>
               Show Solution
             </Button>
             <MoveStatusCard
-              lastMoveResult={board.moveFeedback.result}
+              lastMoveResult={displayBoard.moveFeedback.result}
               turnToMove={board.turnToMove}
               kingPieceUrl={board.kingPieceUrl}
             />
