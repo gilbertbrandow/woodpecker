@@ -145,6 +145,25 @@ export function BoardOverviewView({
         <span className="tabular-nums text-sm font-medium">
           {formatTimer(frozenTimerTenths)}
         </span>
+        {metTargetTime !== null && (
+          <Tooltip delayDuration={100}>
+            <TooltipTrigger asChild>
+              <span
+                className={`inline-flex cursor-default items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
+                  metTargetTime
+                    ? 'border-green-600/20 bg-green-500/15 text-green-700 dark:text-green-400'
+                    : 'border-amber-600/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                }`}
+              >
+                <Clock className="h-3 w-3" />
+                Time
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              {metTargetTime ? 'Moved within target time' : 'Target time missed'}
+            </TooltipContent>
+          </Tooltip>
+        )}
         {selectedAttempt !== null && (
           <Tooltip delayDuration={100}>
             <TooltipTrigger asChild>
@@ -163,25 +182,6 @@ export function BoardOverviewView({
             </TooltipTrigger>
             <TooltipContent>
               {selectedAttempt.status === 'solved' ? 'Correctly solved' : 'Not solved'}
-            </TooltipContent>
-          </Tooltip>
-        )}
-        {metTargetTime !== null && (
-          <Tooltip delayDuration={100}>
-            <TooltipTrigger asChild>
-              <span
-                className={`inline-flex cursor-default items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
-                  metTargetTime
-                    ? 'border-green-600/20 bg-green-500/15 text-green-700 dark:text-green-400'
-                    : 'border-amber-600/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
-                }`}
-              >
-                <Clock className="h-3 w-3" />
-                Time
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>
-              {metTargetTime ? 'Solved within target time' : 'Target time missed'}
             </TooltipContent>
           </Tooltip>
         )}

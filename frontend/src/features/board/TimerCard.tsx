@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Badge } from '../../components/ui/badge'
+import { Clock } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 import { formatTargetSolveTime } from './boardPage.helpers'
 
@@ -34,9 +34,15 @@ export function TimerCard({ timerText, elapsedTenths, targetSolveTenths, muted =
               {timerText}
             </span>
             {isExpired && (
-              <Badge variant="secondary" className="h-6 rounded-sm px-2 text-[11px] font-medium">
-                Target time missed
-              </Badge>
+              <Tooltip delayDuration={100}>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex cursor-default items-center gap-1 rounded-full border border-amber-600/30 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                    <Clock className="h-3 w-3" />
+                    Time
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Target time missed</TooltipContent>
+              </Tooltip>
             )}
             {rightSlot}
           </div>
