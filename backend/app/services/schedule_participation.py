@@ -6,7 +6,7 @@ import sqlalchemy as sa
 from app.extensions import db
 from app.models.run import Run
 from app.models.schedule import Schedule
-from app.models.schedule_participation import ParticipationRunTarget, ScheduleParticipation
+from app.models.schedule_participation import ScheduleParticipation
 from app.models.subset import Subset
 from app.models.user import User
 
@@ -64,13 +64,19 @@ def participation_full_dict(participation: ScheduleParticipation) -> dict[str, o
         else subset.puzzle_count
     ) or 0
 
+    runs = db.session.scalars(
+        sa.select(Run)
+        .where(Run.participation_id == participation.id)
+        .order_by(Run.run_index)
+    ).all()
     run_targets: list[dict[str, object]] = [
         {
-            "runIndex": rt.run_index,
-            "targetAccuracy": rt.target_accuracy,
-            "targetSolveSeconds": rt.target_solve_seconds,
+            "runIndex": r.run_index,
+            "targetAccuracy": r.target_accuracy,
+            "targetSolveSeconds": r.target_solve_seconds,
         }
-        for rt in sorted(participation.run_targets, key=lambda t: t.run_index)
+        for r in runs
+        if r.target_accuracy is not None or r.target_solve_seconds is not None
     ]
 
     return {
@@ -182,34 +188,26 @@ def set_run_target(
     run_index: int,
     target_accuracy: float | None,
     target_solve_seconds: int | None,
-) -> ParticipationRunTarget:
+) -> Run:
     participation = _get_owned_participation(participation_id, user_id)
-
-    schedule = db.session.get(Schedule, participation.schedule_id)
-    if schedule is None:
-        raise LookupError("Schedule not found.")
-    config = schedule.config if isinstance(schedule.config, dict) else {}
-    runs_raw = config.get("runs")
-    run_count = len(runs_raw) if isinstance(runs_raw, list) else 0
-    if run_index < 0 or run_index >= run_count:
-        raise ValueError(f"run_index must be between 0 and {run_count - 1}.")
 
     if target_accuracy is not None and not (0.0 <= target_accuracy <= 100.0):
         raise ValueError("targetAccuracy must be between 0 and 100.")
     if target_solve_seconds is not None and target_solve_seconds < 1:
         raise ValueError("targetSolveSeconds must be at least 1.")
 
-    target = db.session.get(ParticipationRunTarget, (participation_id, run_index))
-    if target is None:
-        target = ParticipationRunTarget(
-            participation_id=participation_id,
-            run_index=run_index,
+    run = db.session.scalar(
+        sa.select(Run).where(
+            Run.participation_id == participation_id,
+            Run.run_index == run_index,
         )
-        db.session.add(target)
-    target.target_accuracy = target_accuracy
-    target.target_solve_seconds = target_solve_seconds
+    )
+    if run is None:
+        raise LookupError("Run not found.")
+    run.target_accuracy = target_accuracy
+    run.target_solve_seconds = target_solve_seconds
     db.session.commit()
-    return target
+    return run
 
 
 def abort_participation(participation_id: int, user_id: int) -> ScheduleParticipation:

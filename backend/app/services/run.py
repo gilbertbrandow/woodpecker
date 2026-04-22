@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from typing import cast
 
 import sqlalchemy as sa
+from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
 from app.models.puzzle import Puzzle
@@ -203,19 +204,57 @@ def _run_puzzle_full_dict(run_puzzle: RunPuzzle) -> dict[str, object]:
 
 
 def _create_attempt_for_puzzle(run_puzzle: RunPuzzle) -> PuzzleAttempt:
-    existing_count = db.session.scalar(
-        sa.select(sa.func.count()).where(PuzzleAttempt.run_puzzle_id == run_puzzle.id)
-    ) or 0
+    db.session.execute(
+        sa.select(RunPuzzle.id)
+        .where(RunPuzzle.id == run_puzzle.id)
+        .with_for_update()
+    )
+
+    existing_in_progress = db.session.scalar(
+        sa.select(PuzzleAttempt)
+        .where(
+            PuzzleAttempt.run_puzzle_id == run_puzzle.id,
+            PuzzleAttempt.status == "in_progress",
+        )
+        .order_by(PuzzleAttempt.try_number.desc())
+        .limit(1)
+    )
+    if existing_in_progress is not None:
+        return existing_in_progress
+
+    max_try_number = db.session.scalar(
+        sa.select(sa.func.max(PuzzleAttempt.try_number)).where(
+            PuzzleAttempt.run_puzzle_id == run_puzzle.id
+        )
+    )
+    next_try_number = int(max_try_number) + 1 if max_try_number is not None else 1
+
     attempt = PuzzleAttempt(
         run_puzzle_id=run_puzzle.id,
-        try_number=existing_count + 1,
+        try_number=next_try_number,
         status="in_progress",
         started_at=datetime.now(timezone.utc),
         moves=[],
     )
     db.session.add(attempt)
-    db.session.commit()
-    return attempt
+
+    try:
+        db.session.commit()
+        return attempt
+    except IntegrityError:
+        db.session.rollback()
+        existing_after_race = db.session.scalar(
+            sa.select(PuzzleAttempt)
+            .where(
+                PuzzleAttempt.run_puzzle_id == run_puzzle.id,
+                PuzzleAttempt.status == "in_progress",
+            )
+            .order_by(PuzzleAttempt.try_number.desc())
+            .limit(1)
+        )
+        if existing_after_race is not None:
+            return existing_after_race
+        raise
 
 
 def run_dict(run: Run) -> dict[str, object]:
@@ -246,6 +285,8 @@ def run_dict(run: Run) -> dict[str, object]:
         "failedCount": counts.get("failed", 0),
         "inProgressCount": counts.get("in_progress", 0) + counts.get("not_started", 0),
         "currentRunPuzzleId": _current_run_puzzle_id(run.id, total_queue),
+        "targetAccuracy": run.target_accuracy,
+        "targetSolveSeconds": run.target_solve_seconds,
     }
 
 

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, UniqueConstraint
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -23,6 +23,8 @@ class Run(Base):
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     aborted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    target_accuracy: Mapped[float | None] = mapped_column(Float, nullable=True)
+    target_solve_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     @property
     def status(self) -> str:
