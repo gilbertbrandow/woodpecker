@@ -142,9 +142,12 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const latestResolvedAttemptIdRef = useRef<number | null>(null)
   const primeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
+  const puzzleRef = useRef<RunPuzzleFull | null>(null)
+  const focusRunRef = useRef<Run | null>(null)
 
   const [mode, setMode] = useState<Mode>('loading')
   const [puzzle, setPuzzle] = useState<RunPuzzleFull | null>(null)
+  puzzleRef.current = puzzle
   const [orientation, setOrientation] = useState<Orientation>('white')
   const [currentAttemptId, setCurrentAttemptId] = useState<number | null>(null)
   const [displayFen, setDisplayFen] = useState('')
@@ -169,6 +172,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const [overviewParticipation, setOverviewParticipation] = useState<ScheduleParticipation | null>(null)
   const [overviewAllRuns, setOverviewAllRuns] = useState<Run[] | null>(null)
   const [focusRun, setFocusRun] = useState<Run | null>(null)
+  focusRunRef.current = focusRun
   const [focusAllRuns, setFocusAllRuns] = useState<Run[] | null>(null)
   const [focusParticipation, setFocusParticipation] = useState<ScheduleParticipation | null>(null)
   const [, setCompleteResult] = useState<CompleteAttemptResult | null>(null)
@@ -570,6 +574,21 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       currentAttemptIdRef.current = null
 
       if (result.markedForRetry || status === 'solved') {
+        const currentPuzzle = puzzleRef.current
+        const currentRun = focusRunRef.current
+        if (currentPuzzle !== null && currentRun !== null) {
+          const optimisticPuzzle: RunPuzzleFull = {
+            ...currentPuzzle,
+            currentAttemptId: null,
+            tries: currentPuzzle.tries.map((t) =>
+              t.id === id
+                ? { ...t, status, timeSpentMs: Math.round(elapsedRef.current * 100), completedAt: new Date().toISOString() }
+                : t
+            ),
+          }
+          setOverviewFreshPuzzle(optimisticPuzzle)
+          setOverviewRun(currentRun)
+        }
         navigateToOverview(id, false)
       } else {
         enterFailed()
@@ -631,7 +650,25 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
         if (modeRef.current === 'focus') {
           void concludeFnRef.current('solved')
         } else {
-          scheduleTimeout(() => navigateToOverview(latestResolvedAttemptIdRef.current, false), FAILED_TO_OVERVIEW_MS)
+          scheduleTimeout(() => {
+            const currentPuzzle = puzzleRef.current
+            const currentRun = focusRunRef.current
+            const resolvedId = latestResolvedAttemptIdRef.current
+            if (currentPuzzle !== null && currentRun !== null) {
+              const optimisticPuzzle: RunPuzzleFull = {
+                ...currentPuzzle,
+                currentAttemptId: null,
+                tries: currentPuzzle.tries.map((t) =>
+                  t.id === resolvedId
+                    ? { ...t, status: 'failed' as const, timeSpentMs: Math.round(elapsedRef.current * 100), completedAt: new Date().toISOString() }
+                    : t
+                ),
+              }
+              setOverviewFreshPuzzle(optimisticPuzzle)
+              setOverviewRun(currentRun)
+            }
+            navigateToOverview(resolvedId, false)
+          }, FAILED_TO_OVERVIEW_MS)
         }
       }, MOVE_FEEDBACK_SUCCESS_MS)
       return

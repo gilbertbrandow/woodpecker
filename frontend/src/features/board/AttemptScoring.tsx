@@ -1,6 +1,4 @@
 import * as React from 'react'
-import { Badge } from '../../components/ui/badge'
-import { positionStatusLabel } from './boardPage.helpers'
 import type { PositionStatus } from '../../lib/api'
 
 type AttemptScoringProps = {
@@ -11,17 +9,6 @@ type AttemptScoringProps = {
 }
 
 export function AttemptScoring({ currentTryNumber, maxTriesPerPuzzle, positionStatus, attemptActive }: AttemptScoringProps): React.ReactElement | null {
-  const withinWindow = currentTryNumber <= maxTriesPerPuzzle
-
-  if (!withinWindow) {
-    return (
-      <div className="flex flex-col gap-2">
-        <span className="text-xs font-medium text-muted-foreground">Practice attempt</span>
-        <Badge variant="outline" className="w-fit text-xs">{positionStatusLabel(positionStatus)}</Badge>
-        <span className="text-xs text-muted-foreground">Won't affect your score.</span>
-      </div>
-    )
-  }
 
   if (maxTriesPerPuzzle <= 1) return null
 
