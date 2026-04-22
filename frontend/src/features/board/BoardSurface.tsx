@@ -1,11 +1,14 @@
 import 'chessground/assets/chessground.base.css'
 import * as React from 'react'
 import { useEffect } from 'react'
+import { Chess } from 'chess.js'
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore — react-chessground ships no bundled type declarations
 import Chessground from 'react-chessground'
 import { Check, X } from 'lucide-react'
 import type { Orientation, PendingPromotion, MoveFeedbackResult } from './boardPage.helpers'
+
+type CheckColor = 'white' | 'black' | false
 
 type PromotionPickerProps = {
   pending: PendingPromotion
@@ -128,6 +131,12 @@ export function BoardSurface({
   onPromotionSelect,
   onPromotionCancel,
 }: BoardSurfaceProps): React.ReactElement {
+  const check = React.useMemo((): CheckColor => {
+    const chess = new Chess(fen)
+    if (!chess.inCheck()) return false
+    return chess.turn() === 'w' ? 'white' : 'black'
+  }, [fen])
+
   return (
     <div className="chess-board-container relative shrink-0" style={{ width: boardSize, height: boardSize }}>
       <Chessground
@@ -147,6 +156,7 @@ export function BoardSurface({
         }}
         draggable={{ showGhost: true }}
         lastMove={lastMove}
+        check={check}
         animation={{ enabled: true, duration: 150 }}
         highlight={{ lastMove: true, check: true }}
         premovable={{ enabled: false }}

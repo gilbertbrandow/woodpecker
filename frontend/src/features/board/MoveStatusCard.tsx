@@ -12,15 +12,15 @@ export function MoveStatusCard({ lastMoveResult, turnToMove, kingPieceUrl }: Mov
   const turnLabel = turnToMove === 'white' ? 'White' : 'Black'
 
   const title = lastMoveResult === 'correct'
-    ? 'Correct, continue'
+    ? 'Correct move'
     : lastMoveResult === 'wrong'
       ? 'Wrong, try again'
       : `${turnLabel} to move`
 
   const help = lastMoveResult === 'correct'
-    ? 'Great move. Stay sharp for the next position.'
+    ? 'Find the next move...'
     : lastMoveResult === 'wrong'
-      ? 'Try another idea from this position.'
+      ? 'Try another move in the position.'
       : `Find the best move for ${turnToMove}.`
 
   const icon = lastMoveResult === 'correct'
