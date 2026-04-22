@@ -128,7 +128,8 @@ export function buildPgnDisplay(
   } else {
     const correctStartIdx = actualFailedIdx * 2 + 1
     for (let i = correctStartIdx; i < solutionMoves.length; i++) {
-      const move = applyUciDisplay(variationChess, solutionMoves[i], null)
+      const status: DisplayMove['moveStatus'] = i % 2 === 0 ? 'opponent' : 'correct'
+      const move = applyUciDisplay(variationChess, solutionMoves[i], status)
       if (!move) break
       variation.push(move)
     }

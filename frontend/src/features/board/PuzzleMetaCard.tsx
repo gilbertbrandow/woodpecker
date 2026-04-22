@@ -67,7 +67,7 @@ function MoveSequence({
         <span key={`n${i}`} className="text-muted-foreground/60 tabular-nums">
           {move.moveNumber}{move.isWhite ? '.' : '...'}
         </span>,
-        ' ',
+        '',
       )
     }
     items.push(
@@ -134,7 +134,7 @@ export function PuzzleMetaCard({
         <div className={cn('text-sm leading-relaxed', !focusMode && 'border-t border-border pt-2')}>
           <MoveSequence moves={pgnDisplay.mainline} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />
           {pgnDisplay.variation !== null && (
-            <> <span className="text-muted-foreground">(<MoveSequence moves={pgnDisplay.variation} line="variation" selectedPly={selectedPly} onPlyClick={onPlyClick} />)</span></>
+            <>(<MoveSequence moves={pgnDisplay.variation} line="variation" selectedPly={selectedPly} onPlyClick={onPlyClick} />)</>
           )}
         </div>
       )}
