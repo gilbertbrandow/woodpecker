@@ -23,7 +23,7 @@ export function PuzzleMetaCard({ puzzleId, rating, themes }: PuzzleMetaCardProps
             #{puzzleId}
           </a>
         </div>
-        <span className="tabular-nums text-xs text-muted-foreground">Rating: {rating}</span>
+        <span className="tabular-nums text-xs"> <span className="text-muted-foreground">Rating: </span> {rating}</span>
       </div>
       {themes.length > 0 && (
         <div className="flex flex-wrap gap-1.5">

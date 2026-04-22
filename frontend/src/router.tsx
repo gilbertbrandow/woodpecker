@@ -14,11 +14,31 @@ import { RunPage } from './pages/RunPage'
 import { RunResolverPage } from './pages/RunResolverPage'
 import { PuzzleResolverPage } from './pages/PuzzleResolverPage'
 import { BoardPage } from './pages/BoardPage'
-import { RunPuzzleOverviewPage } from './pages/RunPuzzleOverviewPage'
 import { SolveFlowLayout } from './components/SolveFlowLayout'
 
 type RouterContext = {
   auth: AuthContextValue
+}
+
+export type RunPuzzleOverviewSearch = {
+  attempt?: number
+}
+
+function validateRunPuzzleOverviewSearch(search: Record<string, unknown>): RunPuzzleOverviewSearch {
+  const rawAttempt = search.attempt
+  if (rawAttempt === undefined || rawAttempt === null || rawAttempt === '') {
+    return {}
+  }
+
+  const parsedAttempt = typeof rawAttempt === 'number'
+    ? rawAttempt
+    : Number.parseInt(String(rawAttempt), 10)
+
+  if (!Number.isInteger(parsedAttempt) || parsedAttempt <= 0) {
+    return {}
+  }
+
+  return { attempt: parsedAttempt }
 }
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
@@ -122,7 +142,8 @@ const attemptRoute = createRoute({
 const runPuzzleOverviewRoute = createRoute({
   getParentRoute: () => solveFlowRoute,
   path: '/runs/$runId/puzzles/$runPuzzleId/overview',
-  component: RunPuzzleOverviewPage,
+  validateSearch: validateRunPuzzleOverviewSearch,
+  component: BoardPage,
 })
 
 const routeTree = rootRoute.addChildren([

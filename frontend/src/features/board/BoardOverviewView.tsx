@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useLocation, useNavigate } from '@tanstack/react-router'
 import { CheckCircle2, XCircle, Clock } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 import { ProgressBar } from '../../components/ProgressBar'
@@ -20,21 +21,71 @@ type BoardOverviewViewProps = {
   puzzle: RunPuzzleFull
   ctrl: BoardPageControllerResult
   runIdStr: string
+  runPuzzleIdStr: string
+  requestedAttemptId: number | null
 }
 
-export function BoardOverviewView({ puzzle, ctrl, runIdStr }: BoardOverviewViewProps): React.ReactElement {
+export function BoardOverviewView({
+  puzzle,
+  ctrl,
+  runIdStr,
+  runPuzzleIdStr,
+  requestedAttemptId,
+}: BoardOverviewViewProps): React.ReactElement {
+  const navigate = useNavigate()
+  const location = useLocation({ select: (loc) => loc.pathname })
   const { board, session, participationId, overview, timer, isLoadingNextPuzzle, actions } = ctrl
   const { freshPuzzle, run, afterStats, accuracyDelta, timeDelta, participation } = overview
 
   const [selectedAttemptId, setSelectedAttemptId] = React.useState<number | null>(null)
 
+  const isOverviewPath = React.useMemo(
+    () => /^\/app\/runs\/\d+\/puzzles\/\d+\/overview$/.test(location),
+    [location],
+  )
+
+  const setOverviewAttemptInUrl = React.useCallback((attemptId: number | null, replace: boolean): void => {
+    if (!isOverviewPath) return
+    void navigate({
+      to: '/app/runs/$runId/puzzles/$runPuzzleId/overview',
+      params: { runId: runIdStr, runPuzzleId: runPuzzleIdStr },
+      search: attemptId === null ? {} : { attempt: attemptId },
+      replace,
+    })
+  }, [isOverviewPath, navigate, runIdStr, runPuzzleIdStr])
+
   React.useEffect(() => {
     if (!freshPuzzle) return
-    const latest = [...freshPuzzle.tries]
+    const sortedAttempts = [...freshPuzzle.tries]
       .filter((a) => a.status !== 'in_progress')
-      .sort((a, b) => b.tryNumber - a.tryNumber)[0]
-    setSelectedAttemptId(latest?.id ?? null)
-  }, [freshPuzzle?.tries])
+      .sort((a, b) => b.tryNumber - a.tryNumber)
+    const latestAttemptId = sortedAttempts[0]?.id ?? null
+    const validRequestedAttemptId = requestedAttemptId !== null && sortedAttempts.some((item) => item.id === requestedAttemptId)
+      ? requestedAttemptId
+      : null
+    const nextSelectedAttemptId = latestAttemptId === null ? null : (validRequestedAttemptId ?? latestAttemptId)
+
+    if (nextSelectedAttemptId !== selectedAttemptId) {
+      setSelectedAttemptId(nextSelectedAttemptId)
+    }
+
+    if (nextSelectedAttemptId === null) {
+      if (requestedAttemptId !== null) {
+        setOverviewAttemptInUrl(null, true)
+      }
+      return
+    }
+
+    if (requestedAttemptId !== nextSelectedAttemptId) {
+      setOverviewAttemptInUrl(nextSelectedAttemptId, true)
+    }
+  }, [freshPuzzle, requestedAttemptId, selectedAttemptId, setOverviewAttemptInUrl])
+
+  const handleSelectAttempt = React.useCallback((attemptId: number): void => {
+    if (attemptId === selectedAttemptId) return
+    setSelectedAttemptId(attemptId)
+    setOverviewAttemptInUrl(attemptId, false)
+  }, [selectedAttemptId, setOverviewAttemptInUrl])
 
   const selectionModel = useOverviewSelectionModel(
     freshPuzzle,
@@ -144,7 +195,7 @@ export function BoardOverviewView({ puzzle, ctrl, runIdStr }: BoardOverviewViewP
         tries={freshPuzzle.tries}
         maxTriesPerPuzzle={freshPuzzle.maxTriesPerPuzzle}
         selectedAttemptId={selectedAttemptId}
-        onSelect={setSelectedAttemptId}
+        onSelect={handleSelectAttempt}
       />
       <div className="flex flex-col gap-2">
         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -192,7 +243,7 @@ export function BoardOverviewView({ puzzle, ctrl, runIdStr }: BoardOverviewViewP
           selectedAttemptId={selectedAttemptId}
           runProgressPct={runProgressPct}
           runProgressDelta={runProgressDelta}
-          onSelectAttempt={setSelectedAttemptId}
+          onSelectAttempt={handleSelectAttempt}
           boardSize={board.boardSize}
         />
         <BoardCenterColumn

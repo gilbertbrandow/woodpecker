@@ -22,8 +22,6 @@ type SessionAttemptStripProps = {
 }
 
 export function SessionAttemptStrip({ items, maxVisible = 20 }: SessionAttemptStripProps): React.ReactElement | null {
-  if (items.length === 0) return null
-
   const visibleItems = items.slice(-maxVisible)
   const [now, setNow] = React.useState<number>(() => Date.now())
 
@@ -45,6 +43,10 @@ export function SessionAttemptStrip({ items, maxVisible = 20 }: SessionAttemptSt
       window.clearTimeout(timeoutId)
     }
   }, [visibleItems, now])
+
+  if (visibleItems.length === 0) {
+    return null
+  }
 
   return (
     <div className="mt-3 h-6 w-full">
