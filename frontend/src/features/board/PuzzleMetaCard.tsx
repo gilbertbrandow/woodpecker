@@ -12,15 +12,18 @@ export function PuzzleMetaCard({ puzzleId, rating, themes }: PuzzleMetaCardProps
   return (
     <div className="flex flex-col gap-3 rounded-md border border-border px-3 py-3">
       <div className="flex items-center justify-between">
-        <a
-          href={`https://lichess.org/training/${puzzleId}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-mono text-sm text-foreground hover:underline"
-        >
-          {puzzleId}
-        </a>
-        <span className="tabular-nums text-xs text-muted-foreground">{rating}</span>
+        <div className="text-sm text-muted-foreground">
+          <span>Puzzle: </span>
+          <a
+            href={`https://lichess.org/training/${puzzleId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+          >
+            #{puzzleId}
+          </a>
+        </div>
+        <span className="tabular-nums text-xs text-muted-foreground">Rating: {rating}</span>
       </div>
       {themes.length > 0 && (
         <div className="flex flex-wrap gap-1.5">

@@ -178,7 +178,7 @@ export function BoardOverviewView({ puzzle, ctrl, runIdStr }: BoardOverviewViewP
       <OverviewActionsSection
         run={run}
         isLoadingNextPuzzle={isLoadingNextPuzzle}
-        puzzleId={freshPuzzle.puzzleId}
+        gameUrl={freshPuzzle.gameUrl}
         onNextPuzzle={() => void actions.handleNextPuzzle()}
         onRetake={() => void actions.handleRetake()}
       />

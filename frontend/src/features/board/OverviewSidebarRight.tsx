@@ -89,7 +89,7 @@ export function OverviewSidebarRight({
       <OverviewActionsSection
         run={run}
         isLoadingNextPuzzle={isLoadingNextPuzzle}
-        puzzleId={puzzle.puzzleId}
+        gameUrl={puzzle.gameUrl}
         onNextPuzzle={onNextPuzzle}
         onRetake={onRetake}
       />

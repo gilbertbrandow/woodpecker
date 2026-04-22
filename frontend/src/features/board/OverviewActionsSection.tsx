@@ -7,12 +7,12 @@ import type { Run } from '../../lib/api'
 type OverviewActionsSectionProps = {
   run: Run
   isLoadingNextPuzzle: boolean
-  puzzleId: string
+  gameUrl: string
   onNextPuzzle: () => void
   onRetake: () => void
 }
 
-export function OverviewActionsSection({ run, isLoadingNextPuzzle, puzzleId, onNextPuzzle, onRetake }: OverviewActionsSectionProps): React.ReactElement {
+export function OverviewActionsSection({ run, isLoadingNextPuzzle, gameUrl, onNextPuzzle, onRetake }: OverviewActionsSectionProps): React.ReactElement {
   return (
     <div className="mt-auto flex flex-col gap-3">
       <div className="flex gap-3">
@@ -26,7 +26,7 @@ export function OverviewActionsSection({ run, isLoadingNextPuzzle, puzzleId, onN
           Retake
         </Button>
         <a
-          href={`https://lichess.org/training/${puzzleId}`}
+          href={gameUrl}
           target="_blank"
           rel="noopener noreferrer"
           className={cn(buttonVariants({ variant: 'outline' }), 'flex-1')}
