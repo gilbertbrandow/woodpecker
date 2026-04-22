@@ -7,7 +7,7 @@ import { BoardCenterColumn } from './BoardCenterColumn'
 import { ProgressCard } from './ProgressCard'
 import { PuzzleMetaCard } from './PuzzleMetaCard'
 import { buildPgnDisplay } from './boardOverview.pgn'
-import { formatTimer, computeRunProgressPct, computeTrainingProgressPct } from './boardPage.helpers'
+import { formatTimer, computeRunProgressPct, computeTrainingProgressPct, formatTargetSolveTime } from './boardPage.helpers'
 import { formatNumber } from '../../lib/utils'
 import type { BoardPageControllerResult, BoardState } from './useBoardPageController'
 import type { RunPuzzleFull } from '../../lib/api'
@@ -134,6 +134,14 @@ export function BoardFocusView({ puzzle, ctrl, runIdStr }: BoardFocusViewProps):
           stripInteractive={false}
           mobileHeader={mobileHeader}
           mobileExtras={mobileExtras}
+          timerBar={(() => {
+            const { elapsedTenths, targetSolveTenths } = timer
+            if (targetSolveTenths === null || targetSolveTenths <= 0 || elapsedTenths >= targetSolveTenths) return null
+            const leftPct = Math.max(0, Math.min(100, ((targetSolveTenths - elapsedTenths) / targetSolveTenths) * 100))
+            const hue = leftPct >= 60 ? 60 + ((leftPct - 60) / 40) * 60 : leftPct >= 20 ? ((leftPct - 20) / 40) * 60 : 0
+            const targetText = formatTargetSolveTime(targetSolveTenths)
+            return { leftPct, color: `hsl(${hue} 55% 48%)`, tooltipText: `Target solve time: ${targetText}. This bar shows how much of that time is remaining.` }
+          })()}
         />
 
         <aside className="hidden flex-1 flex-col gap-2 md:flex" style={{ height: board.boardSize }}>

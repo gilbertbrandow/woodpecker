@@ -77,7 +77,7 @@ export function OverviewSidebarRight({
               Time
             </span>
           </TooltipTrigger>
-          <TooltipContent>{displayedMetTargetTime ? 'Moved within target time' : 'Target time missed'}</TooltipContent>
+          <TooltipContent>{displayedMetTargetTime ? 'Completed within target time' : 'Target time missed'}</TooltipContent>
         </Tooltip>
       )}
       {displayedAttempt !== null && (

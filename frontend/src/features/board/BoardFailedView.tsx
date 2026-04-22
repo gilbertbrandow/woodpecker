@@ -47,7 +47,7 @@ export function BoardFailedView({ puzzle, ctrl, runIdStr }: BoardFailedViewProps
               Time
             </span>
           </TooltipTrigger>
-          <TooltipContent>{metTargetTime ? 'Moved within target time' : 'Target time missed'}</TooltipContent>
+          <TooltipContent>{metTargetTime ? 'Completed within target time' : 'Target time missed'}</TooltipContent>
         </Tooltip>
       )}
       <Tooltip delayDuration={100}>

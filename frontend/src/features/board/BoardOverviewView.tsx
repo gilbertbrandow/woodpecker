@@ -364,7 +364,7 @@ export function BoardOverviewView({
               </span>
             </TooltipTrigger>
             <TooltipContent>
-              {metTargetTime ? 'Moved within target time' : 'Target time missed'}
+              {metTargetTime ? 'Completed within target time' : 'Target time missed'}
             </TooltipContent>
           </Tooltip>
         )}
