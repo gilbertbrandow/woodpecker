@@ -1,11 +1,12 @@
 import * as React from 'react'
 import { ProgressCard } from './ProgressCard'
-import type { RunPuzzleFull, Run } from '../../lib/api'
+import type { RunPuzzleFull, Run, ScheduleParticipation } from '../../lib/api'
 import type { StatsResult } from './boardPage.helpers'
-import { computeTrainingProgressPct } from './boardPage.helpers'
+import { computeTrainingProgressPct, computeRunPace } from './boardPage.helpers'
 import { formatNumber } from '../../lib/utils'
 import { BoardBreadcrumbs } from './BoardBreadcrumbs'
 import { OverviewStatsSection } from './OverviewStatsSection'
+import { RunPaceCard } from './RunPaceCard'
 
 type OverviewSidebarLeftProps = {
   puzzle: RunPuzzleFull
@@ -21,6 +22,7 @@ type OverviewSidebarLeftProps = {
   trainingProgressDelta: number | null
   scheduleName: string | null
   boardSize: number
+  participation: ScheduleParticipation | null
 }
 
 export function OverviewSidebarLeft({
@@ -37,8 +39,19 @@ export function OverviewSidebarLeft({
   trainingProgressDelta,
   scheduleName,
   boardSize,
+  participation,
 }: OverviewSidebarLeftProps): React.ReactElement {
   const resolvedCount = run.solvedCount + run.solvedWithRetriesCount + run.failedCount
+
+  const targetHours = participation?.schedule.runs[run.runIndex]?.target_hours ?? 0
+  const pace = targetHours > 0
+    ? computeRunPace({
+        startedAt: run.startedAt,
+        targetHours,
+        totalPuzzles: run.totalPuzzles,
+        resolvedCount,
+      })
+    : null
 
   const trainingResolved = allRuns !== null
     ? allRuns.reduce((s, r) => s + r.solvedCount + r.solvedWithRetriesCount + r.failedCount, 0)
@@ -72,6 +85,7 @@ export function OverviewSidebarLeft({
           runIndex={run.runIndex}
         />
       )}
+      {pace !== null && <RunPaceCard pace={pace} />}
     </aside>
   )
 }

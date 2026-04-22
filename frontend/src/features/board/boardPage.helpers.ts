@@ -199,3 +199,50 @@ export function computeTrainingProgressDelta(
   if (totalPuzzles === 0) return null
   return (1 / totalPuzzles) * 100
 }
+
+export type RunPaceInput = {
+  startedAt: string
+  targetHours: number
+  totalPuzzles: number
+  resolvedCount: number
+  nowMs?: number
+}
+
+export type RunPaceResult = {
+  status: 'ahead' | 'on_pace' | 'behind'
+  puzzleDelta: number
+  timeRemainingHours: number
+  deadlineIso: string
+  expectedResolved: number
+}
+
+export function computeRunPace(input: RunPaceInput): RunPaceResult {
+  const now = input.nowMs ?? Date.now()
+  const startMs = Date.parse(input.startedAt)
+  const elapsedMs = now - startMs
+  const elapsedHours = elapsedMs / 3_600_000
+  const progressFraction = Math.min(1, Math.max(0, elapsedHours / input.targetHours))
+  const expectedResolved = Math.round(progressFraction * input.totalPuzzles)
+  const rawDelta = input.resolvedCount - expectedResolved
+  const puzzleDelta = Math.abs(rawDelta)
+  const timeRemainingHours = input.targetHours - elapsedHours
+  const deadlineMs = startMs + input.targetHours * 3_600_000
+  const deadlineIso = new Date(deadlineMs).toISOString()
+
+  const status: RunPaceResult['status'] =
+    puzzleDelta <= 1 ? 'on_pace' : rawDelta > 0 ? 'ahead' : 'behind'
+
+  return { status, puzzleDelta, timeRemainingHours, deadlineIso, expectedResolved }
+}
+
+export function formatTimeRemaining(hours: number): string {
+  if (hours <= 0) return 'Overdue'
+  const months = Math.floor(hours / 720)
+  if (months >= 1) return `${months} month${months === 1 ? '' : 's'}`
+  const weeks = Math.floor(hours / 168)
+  if (weeks >= 1) return `${weeks} week${weeks === 1 ? '' : 's'}`
+  const days = Math.floor(hours / 24)
+  if (days >= 1) return `${days} day${days === 1 ? '' : 's'}`
+  const h = Math.ceil(hours)
+  return `${h} hour${h === 1 ? '' : 's'}`
+}

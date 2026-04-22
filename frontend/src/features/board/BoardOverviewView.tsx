@@ -450,6 +450,7 @@ export function BoardOverviewView({
           trainingProgressDelta={trainingProgressDelta}
           scheduleName={participation?.schedule.name ?? null}
           boardSize={board.boardSize}
+          participation={participation ?? null}
         />
         <BoardCenterColumn
           board={overviewBoard}
