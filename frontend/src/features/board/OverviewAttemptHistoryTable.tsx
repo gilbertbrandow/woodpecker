@@ -134,7 +134,7 @@ export function OverviewAttemptHistoryTable({
                   <SortIndicator active={sortKey === 'tryNumber'} dir={sortDir} />
                 </button>
               </TableHead>
-              <TableHead className="px-2 py-0 text-xs">Result</TableHead>
+              <TableHead className="px-2 py-0 text-xs">Solved</TableHead>
               <TableHead className="px-2 py-0">
                 <button
                   type="button"

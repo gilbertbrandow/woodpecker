@@ -57,10 +57,10 @@ export function PuzzleMetaCard({
 
   return (
     <div className="flex flex-col gap-3 rounded-md border border-border px-3 py-3">
-      <div className="flex items-start gap-3">
-        <div className="flex shrink-0 flex-col gap-1">
-          <div className="text-muted-foreground">
-            <span className="text-xs">Puzzle </span>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-baseline gap-4">
+          <div>
+            <span className="text-xs text-muted-foreground">Puzzle </span>
             <a
               href={`https://lichess.org/training/${puzzleId}`}
               target="_blank"
@@ -76,17 +76,15 @@ export function PuzzleMetaCard({
           </span>
         </div>
 
-        <div className="min-w-0 flex-1">
-          {themes.length > 0 && (
-            <div className="flex flex-wrap justify-end gap-1.5">
-              {themes.map((t) => (
-                <Badge key={t.name} variant="outline" className="text-xs font-normal">
-                  {t.displayName}
-                </Badge>
-              ))}
-            </div>
-          )}
-        </div>
+        {themes.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {themes.map((t) => (
+              <Badge key={t.name} variant="outline" className="text-xs font-normal">
+                {t.displayName}
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
 
       {displayedPgn !== null && displayedPgn.mainline.length > 0 && (
