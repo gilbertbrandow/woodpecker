@@ -415,11 +415,12 @@ export function BoardOverviewView({
           format={(n) => `${n.toFixed(1)}%`}
         />
       </div>
-      {afterStats !== null && (
+      {afterStats !== null && run !== null && (
         <OverviewStatsSection
           afterStats={afterStats}
           accuracyDelta={displayedAccuracyDelta}
           timeDelta={displayedTimeDelta}
+          runIndex={run.runIndex}
         />
       )}
       <OverviewActionsSection

@@ -8,12 +8,13 @@ type OverviewStatsSectionProps = {
   afterStats: StatsResult
   accuracyDelta: number | null
   timeDelta: number | null
+  runIndex: number
 }
 
-export function OverviewStatsSection({ afterStats, accuracyDelta, timeDelta }: OverviewStatsSectionProps): React.ReactElement {
+export function OverviewStatsSection({ afterStats, accuracyDelta, timeDelta, runIndex }: OverviewStatsSectionProps): React.ReactElement {
   return (
     <div className="flex flex-col gap-4 rounded-lg border bg-card p-4">
-      <span>Current run stats</span>
+      <span>Run {runIndex + 1} stats</span>
       <div className="flex gap-6">
         <Tooltip>
           <TooltipTrigger asChild>

@@ -69,6 +69,7 @@ export function OverviewSidebarLeft({
           afterStats={afterStats}
           accuracyDelta={accuracyDelta}
           timeDelta={timeDelta}
+          runIndex={run.runIndex}
         />
       )}
     </aside>
