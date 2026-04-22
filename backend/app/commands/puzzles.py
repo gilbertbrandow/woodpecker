@@ -2,6 +2,7 @@ import csv
 import io
 import time
 from typing import IO, cast
+from urllib.parse import urlsplit, urlunsplit
 
 import click
 import sqlalchemy as sa
@@ -18,6 +19,27 @@ from app.models.opening import Opening
 puzzles_cli = AppGroup("puzzles")
 
 PROGRESS_INTERVAL = 10_000
+
+
+def _player_oriented_game_url(game_url: str, fen: str) -> str:
+    fen_parts = fen.split(" ")
+    if len(fen_parts) < 2:
+        return game_url
+
+    side_to_move = fen_parts[1]
+    if side_to_move not in {"w", "b"}:
+        return game_url
+
+    parsed = urlsplit(game_url)
+    path_parts = [part for part in parsed.path.split("/") if part]
+    if not path_parts:
+        return game_url
+
+    game_id = path_parts[0]
+    wants_black = side_to_move == "w"
+    normalized_path = f"/{game_id}/black" if wants_black else f"/{game_id}"
+
+    return urlunsplit((parsed.scheme, parsed.netloc, normalized_path, parsed.query, parsed.fragment))
 
 
 def _load_cache(model: type[Theme] | type[Opening]) -> dict[str, int]:
@@ -132,15 +154,16 @@ def import_puzzles(
             if rating < min_rating or rating > max_rating:
                 rows_skipped += 1
             else:
+                fen = row["FEN"]
                 puzzle_batch.append({
                     "puzzle_id": row["PuzzleId"],
-                    "fen": row["FEN"],
+                    "fen": fen,
                     "moves": row["Moves"],
                     "rating": rating,
                     "rating_deviation": int(row["RatingDeviation"]),
                     "popularity": int(row["Popularity"]),
                     "nb_plays": int(row["NbPlays"]),
-                    "game_url": row["GameUrl"],
+                    "game_url": _player_oriented_game_url(row["GameUrl"], fen),
                 })
                 batch_themes.append(row["Themes"].split() if row["Themes"] else [])
                 batch_openings.append(row["OpeningTags"].split() if row["OpeningTags"] else [])
