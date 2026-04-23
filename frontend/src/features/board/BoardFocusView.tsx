@@ -61,26 +61,15 @@ export function BoardFocusView({ puzzle, ctrl, runIdStr }: BoardFocusViewProps):
     }
   }, [board, selectedPly, pgnDisplay, isAtHead])
 
-  const mobileHeader = (
-    <>
-      <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} linksDisabled={true} />
-      {puzzle.maxTriesPerPuzzle > 1 && (
-        <div className="mt-1">
-          {puzzle.currentTryNumber <= puzzle.maxTriesPerPuzzle ? (
-            <span className="text-xs text-muted-foreground">
-              Attempt {puzzle.currentTryNumber} / {puzzle.maxTriesPerPuzzle}
-            </span>
-          ) : (
-            <span className="text-xs text-muted-foreground">Practice attempt</span>
-          )}
-        </div>
-      )}
-    </>
-  )
-
   const mobileExtras = (
     <div className="mt-3 flex items-center justify-between">
       <span className="tabular-nums text-sm font-medium">{timerText}</span>
+      <MoveStatusCard
+        lastMoveResult={displayBoard.moveFeedback.result}
+        turnToMove={board.turnToMove}
+        kingPieceUrl={board.kingPieceUrl}
+        compact={true}
+      />
     </div>
   )
 
@@ -113,62 +102,77 @@ export function BoardFocusView({ puzzle, ctrl, runIdStr }: BoardFocusViewProps):
   ) : null
 
   return (
-    <div className="flex flex-1 items-center justify-center overflow-hidden px-6">
-      <div className="flex w-full items-start gap-6">
-        <aside className="hidden flex-1 flex-col gap-4 md:flex" style={{ height: board.boardSize }}>
-          <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} linksDisabled={true} />
-          {progressCard}
-          <AttemptScoring
-            currentTryNumber={puzzle.currentTryNumber}
-            maxTriesPerPuzzle={puzzle.maxTriesPerPuzzle}
-            positionStatus={puzzle.positionStatus}
-            attemptActive={true}
-          />
-        </aside>
-
-        <BoardCenterColumn
-          board={displayBoard}
-          actions={actions}
-          attemptHistory={session.attemptHistory}
-          runId={runIdStr}
-          stripInteractive={false}
-          mobileHeader={mobileHeader}
-          mobileExtras={mobileExtras}
-          timerBar={session.allPliesPlayed.length === 0 ? null : (() => {
-            const { elapsedTenths, targetSolveTenths } = timer
-            if (targetSolveTenths === null || targetSolveTenths <= 0 || elapsedTenths >= targetSolveTenths) return null
-            const leftPct = Math.max(0, Math.min(100, ((targetSolveTenths - elapsedTenths) / targetSolveTenths) * 100))
-            const hue = leftPct >= 60 ? 60 + ((leftPct - 60) / 40) * 60 : leftPct >= 20 ? ((leftPct - 20) / 40) * 60 : 0
-            const targetText = formatTargetSolveTime(targetSolveTenths)
-            return { leftPct, color: `hsl(${hue} 55% 48%)`, tooltipText: `Target solve time: ${targetText}. This bar shows how much of that time is remaining.` }
-          })()}
-        />
-
-        <aside className="hidden flex-1 flex-col gap-2 md:flex" style={{ height: board.boardSize }}>
-          <TimerCard
-            timerText={timerText}
-            elapsedTenths={timer.elapsedTenths}
-            targetSolveTenths={timer.targetSolveTenths}
-          />
-          {session.allPliesPlayed.length > 0 && (
-            <PuzzleMetaCard
-              puzzleId={puzzle.puzzleId}
-              rating={puzzle.rating}
-              themes={puzzle.themes}
-              pgnDisplay={pgnDisplay}
-              focusMode={true}
-              selectedPly={selectedPly}
-              onPlyClick={setSelectedPly}
-            />
-          )}
-          <div className="mt-auto">
-            <MoveStatusCard
-              lastMoveResult={displayBoard.moveFeedback.result}
-              turnToMove={board.turnToMove}
-              kingPieceUrl={board.kingPieceUrl}
-            />
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex-none px-4 pt-3 pb-2 lg:hidden">
+        <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} linksDisabled={true} />
+        {puzzle.maxTriesPerPuzzle > 1 && (
+          <div className="mt-1">
+            {puzzle.currentTryNumber <= puzzle.maxTriesPerPuzzle ? (
+              <span className="text-xs text-muted-foreground">
+                Attempt {puzzle.currentTryNumber} / {puzzle.maxTriesPerPuzzle}
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">Practice attempt</span>
+            )}
           </div>
-        </aside>
+        )}
+      </div>
+      <div className="flex flex-1 items-center justify-center overflow-hidden lg:px-6">
+        <div className="flex w-full items-center justify-center gap-6">
+          <aside className="hidden flex-1 flex-col gap-4 lg:flex" style={{ height: board.boardSize }}>
+            <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} linksDisabled={true} />
+            {progressCard}
+            <AttemptScoring
+              currentTryNumber={puzzle.currentTryNumber}
+              maxTriesPerPuzzle={puzzle.maxTriesPerPuzzle}
+              positionStatus={puzzle.positionStatus}
+              attemptActive={true}
+            />
+          </aside>
+
+          <BoardCenterColumn
+            board={displayBoard}
+            actions={actions}
+            attemptHistory={session.attemptHistory}
+            runId={runIdStr}
+            stripInteractive={false}
+            mobileExtras={mobileExtras}
+            timerBar={session.allPliesPlayed.length === 0 ? null : (() => {
+              const { elapsedTenths, targetSolveTenths } = timer
+              if (targetSolveTenths === null || targetSolveTenths <= 0 || elapsedTenths >= targetSolveTenths) return null
+              const leftPct = Math.max(0, Math.min(100, ((targetSolveTenths - elapsedTenths) / targetSolveTenths) * 100))
+              const hue = leftPct >= 60 ? 60 + ((leftPct - 60) / 40) * 60 : leftPct >= 20 ? ((leftPct - 20) / 40) * 60 : 0
+              const targetText = formatTargetSolveTime(targetSolveTenths)
+              return { leftPct, color: `hsl(${hue} 55% 48%)`, tooltipText: `Target solve time: ${targetText}. This bar shows how much of that time is remaining.` }
+            })()}
+          />
+
+          <aside className="hidden flex-1 flex-col gap-2 lg:flex" style={{ height: board.boardSize }}>
+            <TimerCard
+              timerText={timerText}
+              elapsedTenths={timer.elapsedTenths}
+              targetSolveTenths={timer.targetSolveTenths}
+            />
+            {session.allPliesPlayed.length > 0 && (
+              <PuzzleMetaCard
+                puzzleId={puzzle.puzzleId}
+                rating={puzzle.rating}
+                themes={puzzle.themes}
+                pgnDisplay={pgnDisplay}
+                focusMode={true}
+                selectedPly={selectedPly}
+                onPlyClick={setSelectedPly}
+              />
+            )}
+            <div className="mt-auto">
+              <MoveStatusCard
+                lastMoveResult={displayBoard.moveFeedback.result}
+                turnToMove={board.turnToMove}
+                kingPieceUrl={board.kingPieceUrl}
+              />
+            </div>
+          </aside>
+        </div>
       </div>
     </div>
   )

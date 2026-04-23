@@ -17,10 +17,13 @@ import {
   HEADER_H,
   FOOTER_H,
   H_PAD_MD,
-  H_PAD_SM,
   MIN_SIDEBAR,
   MAX_BOARD,
   BOARD_GAP,
+  LG_BREAKPOINT,
+  V_PAD_DESKTOP,
+  MOBILE_H_PAD,
+  MOBILE_CHROME_H,
   MOVE_FEEDBACK_SUCCESS_MS,
   WRONG_REVERT_MS,
   FAILED_TO_OVERVIEW_MS,
@@ -183,13 +186,15 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
   useEffect(() => {
     const compute = (): void => {
-      const isDesktop = window.innerWidth >= 768
-      const availH = window.innerHeight - HEADER_H - FOOTER_H
+      const isDesktop = window.innerWidth >= LG_BREAKPOINT
       if (isDesktop) {
+        const availH = window.innerHeight - HEADER_H - FOOTER_H - V_PAD_DESKTOP
         const availW = window.innerWidth - H_PAD_MD - 2 * MIN_SIDEBAR - 2 * BOARD_GAP
         setBoardSize(Math.max(200, Math.min(availH, availW, MAX_BOARD)))
       } else {
-        setBoardSize(Math.max(200, Math.min(window.innerWidth - H_PAD_SM, MAX_BOARD)))
+        const availHMobile = window.innerHeight - MOBILE_CHROME_H
+        const availWMobile = window.innerWidth - MOBILE_H_PAD
+        setBoardSize(Math.max(200, Math.min(availHMobile, availWMobile, MAX_BOARD)))
       }
     }
     compute()

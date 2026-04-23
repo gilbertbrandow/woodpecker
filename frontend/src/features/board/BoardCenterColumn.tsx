@@ -50,7 +50,7 @@ export function BoardCenterColumn({
   return (
     <div className="flex shrink-0 flex-col">
       {mobileHeader && (
-        <div className="mb-3 md:hidden">
+        <div className="mb-3 lg:hidden">
           {mobileHeader}
         </div>
       )}
@@ -72,7 +72,7 @@ export function BoardCenterColumn({
       </div>
       <SessionAttemptStrip items={attemptHistory} runId={runId} activeAttemptId={activeAttemptId} interactive={stripInteractive} />
       {mobileExtras && (
-        <div className="md:hidden">
+        <div className="lg:hidden">
           {mobileExtras}
         </div>
       )}

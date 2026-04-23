@@ -61,7 +61,7 @@ export function OverviewSidebarLeft({
     : 0
 
   return (
-    <aside className="hidden flex-1 flex-col gap-4 md:flex" style={{ height: boardSize }}>
+    <aside className="hidden flex-1 flex-col gap-4 lg:flex" style={{ height: boardSize }}>
       <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
       <ProgressCard
         runProgress={{

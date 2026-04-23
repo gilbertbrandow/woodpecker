@@ -101,7 +101,7 @@ export function OverviewSidebarRight({
   )
 
   return (
-    <aside className="hidden flex-1 flex-col gap-4 md:flex" style={{ height: boardSize }}>
+    <aside className="hidden flex-1 flex-col gap-4 lg:flex" style={{ height: boardSize }}>
       <div className="flex flex-col gap-2">
         <TimerCard
           timerText={displayedTimerText}

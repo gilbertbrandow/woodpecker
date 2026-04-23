@@ -1,9 +1,9 @@
 import * as React from 'react'
 import { useLocation, useNavigate } from '@tanstack/react-router'
-import { CheckCircle2, XCircle, Clock } from 'lucide-react'
+import { Drawer, DrawerContent, DrawerTrigger } from '../../components/ui/drawer'
+import { ChevronUp, CheckCircle2, XCircle, Clock } from 'lucide-react'
 import { toast } from 'sonner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
-import { ProgressBar } from '../../components/ProgressBar'
 import { BoardBreadcrumbs } from './BoardBreadcrumbs'
 import { BoardCenterColumn } from './BoardCenterColumn'
 import { OverviewSidebarLeft } from './OverviewSidebarLeft'
@@ -11,12 +11,11 @@ import { OverviewSidebarRight } from './OverviewSidebarRight'
 import { OverviewStatsSection } from './OverviewStatsSection'
 import { OverviewActionsSection } from './OverviewActionsSection'
 import { OverviewAttemptHistoryTable } from './OverviewAttemptHistoryTable'
-import { DeltaBadge } from './DeltaBadge'
+import { PuzzleMetaCard } from './PuzzleMetaCard'
 import { useOverviewSelectionModel } from './useOverviewSelectionModel'
 import { computeOverviewBoardState } from './boardOverview.helpers'
 import { buildPgnDisplay } from './boardOverview.pgn'
 import { formatTimer, computeTrainingProgressDelta } from './boardPage.helpers'
-import { formatNumber } from '../../lib/utils'
 import { api } from '../../lib/api'
 import type { PuzzleRunReference, RunPuzzleFull } from '../../lib/api'
 import type { BoardPageControllerResult, BoardState } from './useBoardPageController'
@@ -298,30 +297,29 @@ export function BoardOverviewView({
     return next
   }, [board, effectivePuzzle, selectionModel, selectedPly, pgnDisplay])
 
-  const loadingMobileHeader = (
-    <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
-  )
-
   if (isLoading || selectionModel === null) {
     return (
-      <div className="flex flex-1 items-center justify-center overflow-hidden px-6">
-        <div className="flex w-full items-start gap-6">
-          <aside className="hidden flex-1 flex-col md:flex" style={{ height: board.boardSize }}>
-            <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
-            <p className="mt-4 text-sm text-muted-foreground">Loading…</p>
-          </aside>
-          <BoardCenterColumn
-            board={overviewBoard}
-            actions={actions}
-            attemptHistory={session.attemptHistory}
-            runId={runIdStr}
-            boardAnimationEnabled={false}
-            mobileHeader={loadingMobileHeader}
-            mobileExtras={null}
-          />
-          <aside className="hidden flex-1 flex-col md:flex" style={{ height: board.boardSize }}>
-            <p className="text-sm text-muted-foreground">Loading…</p>
-          </aside>
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex-none px-4 pt-3 pb-2 lg:hidden">
+          <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
+        </div>
+        <div className="flex flex-1 items-center justify-center overflow-hidden lg:px-6">
+          <div className="flex w-full items-center justify-center gap-6">
+            <aside className="hidden flex-1 flex-col lg:flex" style={{ height: board.boardSize }}>
+              <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
+              <p className="mt-4 text-sm text-muted-foreground">Loading…</p>
+            </aside>
+            <BoardCenterColumn
+              board={overviewBoard}
+              actions={actions}
+              attemptHistory={session.attemptHistory}
+              runId={runIdStr}
+              boardAnimationEnabled={false}
+            />
+            <aside className="hidden flex-1 flex-col lg:flex" style={{ height: board.boardSize }}>
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            </aside>
+          </div>
         </div>
       </div>
     )
@@ -340,15 +338,10 @@ export function BoardOverviewView({
   const stableAllRuns = overview.allRuns ?? lastOverviewAllRunsRef.current
   const trainingProgressDelta = computeTrainingProgressDelta(runProgressDelta, stableAllRuns ?? [])
 
-  const resolvedCount = run.solvedCount + run.solvedWithRetriesCount + run.failedCount
-
-  const mobileHeader = (
-    <>
-      <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
-      <div className="mt-1 flex items-center gap-2">
-        <span className="tabular-nums text-sm font-medium">
-          {formatTimer(frozenTimerTenths)}
-        </span>
+  const mobileExtras = (
+    <div className="mt-3 flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <span className="tabular-nums text-sm font-medium">{formatTimer(frozenTimerTenths)}</span>
         {metTargetTime !== null && (
           <Tooltip delayDuration={100}>
             <TooltipTrigger asChild>
@@ -390,39 +383,6 @@ export function BoardOverviewView({
           </Tooltip>
         )}
       </div>
-    </>
-  )
-
-  const mobileExtras = (
-    <div className="mt-4 flex flex-col gap-5">
-      <OverviewAttemptHistoryTable
-        rows={historyRows}
-        selectedAttemptId={selectedAttemptId}
-        onSelectAttempt={handleSelectAttemptForTable}
-      />
-      <div className="flex flex-col gap-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Run progress
-        </span>
-        <ProgressBar
-          value={runProgressPct}
-          tooltipLabel={`${formatNumber(resolvedCount)} of ${formatNumber(run.totalPuzzles)} puzzles completed`}
-          className="w-full"
-        />
-        <DeltaBadge
-          delta={runProgressDelta}
-          goodWhenPositive={true}
-          format={(n) => `${n.toFixed(1)}%`}
-        />
-      </div>
-      {afterStats !== null && run !== null && (
-        <OverviewStatsSection
-          afterStats={afterStats}
-          accuracyDelta={displayedAccuracyDelta}
-          timeDelta={displayedTimeDelta}
-          runIndex={run.runIndex}
-        />
-      )}
       <OverviewActionsSection
         run={run}
         isLoadingNextPuzzle={isLoadingNextPuzzle}
@@ -430,13 +390,57 @@ export function BoardOverviewView({
         onNextPuzzle={() => void actions.handleNextPuzzle()}
         onRetake={() => void actions.handleRetake()}
       />
+      <Drawer modal={false}>
+        <DrawerTrigger asChild>
+          <button
+            type="button"
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-border py-2 text-sm text-muted-foreground"
+          >
+            <ChevronUp className="h-4 w-4" />
+            Stats &amp; history
+          </button>
+        </DrawerTrigger>
+        <DrawerContent className="max-h-[75vh]">
+          <div className="overflow-y-auto px-4 pb-6 pt-2">
+            <div className="flex flex-col gap-5">
+              {afterStats !== null && (
+                <OverviewStatsSection
+                  afterStats={afterStats}
+                  accuracyDelta={displayedAccuracyDelta}
+                  timeDelta={displayedTimeDelta}
+                  runIndex={run.runIndex}
+                />
+              )}
+              <OverviewAttemptHistoryTable
+                rows={historyRows}
+                selectedAttemptId={selectedAttemptId}
+                onSelectAttempt={handleSelectAttemptForTable}
+              />
+              {pgnDisplay !== null && (
+                <PuzzleMetaCard
+                  puzzleId={effectivePuzzle.puzzleId}
+                  rating={effectivePuzzle.rating}
+                  themes={effectivePuzzle.themes}
+                  pgnDisplay={pgnDisplay}
+                  selectedPly={selectedPly}
+                  onPlyClick={setSelectedPly}
+                />
+              )}
+            </div>
+          </div>
+        </DrawerContent>
+      </Drawer>
     </div>
   )
 
   return (
-    <div className="flex flex-1 items-center justify-center overflow-hidden px-6">
-      <div className="flex w-full items-start gap-6">
-        <OverviewSidebarLeft
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex-none px-4 pt-3 pb-2 lg:hidden">
+        <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
+      </div>
+      <div className="flex flex-1 items-center justify-center overflow-hidden lg:px-6">
+        <div className="flex w-full items-center justify-center gap-6">
+          <OverviewSidebarLeft
           puzzle={effectivePuzzle}
           participationId={participation?.id ?? null}
           runIdStr={runIdStr}
@@ -459,7 +463,6 @@ export function BoardOverviewView({
           runId={runIdStr}
           activeAttemptId={selectedAttemptId}
           boardAnimationEnabled={false}
-          mobileHeader={mobileHeader}
           mobileExtras={mobileExtras}
         />
         <OverviewSidebarRight
@@ -479,6 +482,7 @@ export function BoardOverviewView({
           selectedPly={selectedPly}
           onPlyClick={setSelectedPly}
         />
+        </div>
       </div>
     </div>
   )

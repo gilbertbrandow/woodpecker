@@ -98,114 +98,130 @@ export function BoardFailedView({ puzzle, ctrl, runIdStr }: BoardFailedViewProps
     }
   }, [board, selectedPly, pgnDisplay, isAtHead])
 
-  const mobileHeader = (
-    <>
-      <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
-      <div className="mt-1 flex items-center gap-2">
-        <Badge variant="outline">Failed</Badge>
-        {puzzle.maxTriesPerPuzzle > 1 && (
-          <span className="text-xs text-muted-foreground">
-            {puzzle.currentTryNumber <= puzzle.maxTriesPerPuzzle
-              ? `Attempt ${puzzle.currentTryNumber} / ${puzzle.maxTriesPerPuzzle}`
-              : 'Practice attempt'}
+  const mobileExtras = (
+    <div className="mt-3 flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <span className="tabular-nums text-sm font-medium">{elapsed}</span>
+        {metTargetTime !== null && (
+          <span
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
+              metTargetTime
+                ? 'border-green-600/20 bg-green-500/15 text-green-700 dark:text-green-400'
+                : 'border-amber-600/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+            }`}
+          >
+            <Clock className="h-3 w-3" />
+            {metTargetTime ? 'Time met' : 'Time missed'}
           </span>
         )}
+        <span className="inline-flex items-center gap-1 rounded-full border border-red-600/20 bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
+          <XCircle className="h-3 w-3" />
+          Failed
+        </span>
       </div>
-    </>
-  )
-
-  const mobileExtras = (
-    <div className="mt-3 flex items-center justify-between">
-      <span className="tabular-nums text-sm text-muted-foreground">{elapsed}</span>
       <div className="flex gap-2">
-        <Button variant="outline" size="sm" onClick={actions.handleShowHint} disabled={inputBlocked}>
-          Show Hint
+        <Button variant="outline" className="flex-1" onClick={actions.handleShowHint} disabled={inputBlocked}>
+          Hint
         </Button>
-        <Button variant="outline" size="sm" onClick={actions.handleShowSolution} disabled={inputBlocked}>
-          Show Solution
+        <Button variant="outline" className="flex-1" onClick={actions.handleShowSolution} disabled={inputBlocked}>
+          Solution
         </Button>
       </div>
     </div>
   )
 
   return (
-    <div className="flex flex-1 items-center justify-center overflow-hidden px-6">
-      <div className="flex w-full items-start gap-6">
-        <aside className="hidden flex-1 flex-col gap-4 md:flex" style={{ height: board.boardSize }}>
-          <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
-          {run !== null && (() => {
-            const resolvedCount = run.solvedCount + run.solvedWithRetriesCount + run.failedCount
-            const trainingResolved = allRuns !== null
-              ? allRuns.reduce((s, r) => s + r.solvedCount + r.solvedWithRetriesCount + r.failedCount, 0)
-              : 0
-            const trainingTotal = allRuns !== null
-              ? allRuns.reduce((s, r) => s + r.totalPuzzles, 0)
-              : 0
-            return (
-              <ProgressCard
-                runProgress={{
-                  label: `Run ${run.runIndex + 1}`,
-                  value: computeRunProgressPct(run),
-                  tooltipLabel: `${formatNumber(resolvedCount)} of ${formatNumber(run.totalPuzzles)} puzzles completed`,
-                  delta: null,
-                }}
-                trainingProgress={allRuns !== null ? {
-                  label: `${participation?.schedule.name ?? 'Training'}`,
-                  value: computeTrainingProgressPct(allRuns),
-                  tooltipLabel: `${formatNumber(trainingResolved)} of ${formatNumber(trainingTotal)} puzzles completed across all runs`,
-                  delta: null,
-                } : null}
-              />
-            )
-          })()}
-          <Badge variant="outline" className="w-fit">Failed</Badge>
-          <AttemptScoring
-            currentTryNumber={puzzle.currentTryNumber}
-            maxTriesPerPuzzle={puzzle.maxTriesPerPuzzle}
-            positionStatus={puzzle.positionStatus}
-            attemptActive={false}
-          />
-        </aside>
-
-        <BoardCenterColumn
-          board={displayBoard}
-          actions={actions}
-          attemptHistory={session.attemptHistory}
-          runId={runIdStr}
-          mobileHeader={mobileHeader}
-          mobileExtras={mobileExtras}
-        />
-
-        <aside className="hidden flex-1 flex-col gap-2 md:flex" style={{ height: board.boardSize }}>
-          <TimerCard
-            timerText={elapsed}
-            elapsedTenths={timer.elapsedTenths}
-            targetSolveTenths={null}
-            rightSlot={timerRightSlot}
-          />
-          <PuzzleMetaCard
-            puzzleId={puzzle.puzzleId}
-            rating={puzzle.rating}
-            themes={puzzle.themes}
-            pgnDisplay={pgnDisplay}
-            focusMode={true}
-            selectedPly={selectedPly}
-            onPlyClick={setSelectedPly}
-          />
-          <div className="mt-auto flex flex-col gap-3">
-            <Button variant="outline" size="sm" onClick={actions.handleShowHint} disabled={inputBlocked || !isAtHead}>
-              Show Hint
-            </Button>
-            <Button variant="outline" size="sm" onClick={actions.handleShowSolution} disabled={inputBlocked || !isAtHead}>
-              Show Solution
-            </Button>
-            <MoveStatusCard
-              lastMoveResult={displayBoard.moveFeedback.result}
-              turnToMove={board.turnToMove}
-              kingPieceUrl={board.kingPieceUrl}
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex-none px-4 pt-3 pb-2 lg:hidden">
+        <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
+        <div className="mt-1 flex items-center gap-2">
+          <Badge variant="outline">Failed</Badge>
+          {puzzle.maxTriesPerPuzzle > 1 && (
+            <span className="text-xs text-muted-foreground">
+              {puzzle.currentTryNumber <= puzzle.maxTriesPerPuzzle
+                ? `Attempt ${puzzle.currentTryNumber} / ${puzzle.maxTriesPerPuzzle}`
+                : 'Practice attempt'}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-1 items-center justify-center overflow-hidden lg:px-6">
+        <div className="flex w-full items-center justify-center gap-6">
+          <aside className="hidden flex-1 flex-col gap-4 lg:flex" style={{ height: board.boardSize }}>
+            <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
+            {run !== null && (() => {
+              const resolvedCount = run.solvedCount + run.solvedWithRetriesCount + run.failedCount
+              const trainingResolved = allRuns !== null
+                ? allRuns.reduce((s, r) => s + r.solvedCount + r.solvedWithRetriesCount + r.failedCount, 0)
+                : 0
+              const trainingTotal = allRuns !== null
+                ? allRuns.reduce((s, r) => s + r.totalPuzzles, 0)
+                : 0
+              return (
+                <ProgressCard
+                  runProgress={{
+                    label: `Run ${run.runIndex + 1}`,
+                    value: computeRunProgressPct(run),
+                    tooltipLabel: `${formatNumber(resolvedCount)} of ${formatNumber(run.totalPuzzles)} puzzles completed`,
+                    delta: null,
+                  }}
+                  trainingProgress={allRuns !== null ? {
+                    label: `${participation?.schedule.name ?? 'Training'}`,
+                    value: computeTrainingProgressPct(allRuns),
+                    tooltipLabel: `${formatNumber(trainingResolved)} of ${formatNumber(trainingTotal)} puzzles completed across all runs`,
+                    delta: null,
+                  } : null}
+                />
+              )
+            })()}
+            <Badge variant="outline" className="w-fit">Failed</Badge>
+            <AttemptScoring
+              currentTryNumber={puzzle.currentTryNumber}
+              maxTriesPerPuzzle={puzzle.maxTriesPerPuzzle}
+              positionStatus={puzzle.positionStatus}
+              attemptActive={false}
             />
-          </div>
-        </aside>
+          </aside>
+
+          <BoardCenterColumn
+            board={displayBoard}
+            actions={actions}
+            attemptHistory={session.attemptHistory}
+            runId={runIdStr}
+            mobileExtras={mobileExtras}
+          />
+
+          <aside className="hidden flex-1 flex-col gap-2 lg:flex" style={{ height: board.boardSize }}>
+            <TimerCard
+              timerText={elapsed}
+              elapsedTenths={timer.elapsedTenths}
+              targetSolveTenths={null}
+              rightSlot={timerRightSlot}
+            />
+            <PuzzleMetaCard
+              puzzleId={puzzle.puzzleId}
+              rating={puzzle.rating}
+              themes={puzzle.themes}
+              pgnDisplay={pgnDisplay}
+              focusMode={true}
+              selectedPly={selectedPly}
+              onPlyClick={setSelectedPly}
+            />
+            <div className="mt-auto flex flex-col gap-3">
+              <Button variant="outline" size="sm" onClick={actions.handleShowHint} disabled={inputBlocked || !isAtHead}>
+                Show Hint
+              </Button>
+              <Button variant="outline" size="sm" onClick={actions.handleShowSolution} disabled={inputBlocked || !isAtHead}>
+                Show Solution
+              </Button>
+              <MoveStatusCard
+                lastMoveResult={displayBoard.moveFeedback.result}
+                turnToMove={board.turnToMove}
+                kingPieceUrl={board.kingPieceUrl}
+              />
+            </div>
+          </aside>
+        </div>
       </div>
     </div>
   )
