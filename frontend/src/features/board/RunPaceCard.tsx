@@ -3,12 +3,10 @@ import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, ReferenceDot } 
 import type { DotProps } from 'recharts'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { ChartContainer, ChartTooltip, type ChartConfig } from '../../components/ui/chart'
-import { buildChartSeries, formatTimeRemaining } from './boardPage.helpers'
-import type { RunPaceResult } from './boardPage.helpers'
+import { formatTimeRemaining } from './boardPage.helpers'
 import type { PaceChartData } from '../../lib/api'
 
 type RunPaceCardProps = {
-  pace: RunPaceResult
   chartData: PaceChartData | null
   isRunActive: boolean
   stretch?: boolean
@@ -48,10 +46,11 @@ function PulsingDot({ cx = 0, cy = 0, active }: { cx?: number; cy?: number; acti
   )
 }
 
-export function RunPaceCard({ pace, chartData, isRunActive, stretch = false }: RunPaceCardProps): React.ReactElement {
-  const nowMs = Date.now()
-  const { series, labelTicks, domainStartMs } = chartData !== null ? buildChartSeries(chartData, nowMs) : { series: [], labelTicks: [], domainStartMs: 0 }
-  const spanMs = chartData !== null ? Math.max(nowMs, chartData.deadlineMs) - chartData.startMs : 0
+export function RunPaceCard({ chartData, isRunActive, stretch = false }: RunPaceCardProps): React.ReactElement {
+  const series = chartData?.series ?? []
+  const labelTicks = chartData?.labelTicks ?? []
+  const domainStartMs = chartData?.domainStartMs ?? 0
+  const spanMs = chartData !== null ? chartData.deadlineMs - chartData.startMs : 0
   const tickFormatter = formatPaceAxisTick(spanMs)
   const totalPuzzles = chartData?.totalPuzzles ?? 0
   const lastActualArr = series.filter((t) => t.actual !== null)
@@ -79,7 +78,7 @@ export function RunPaceCard({ pace, chartData, isRunActive, stretch = false }: R
               dataKey="timeMs"
               type="number"
               scale="linear"
-              domain={[domainStartMs, labelTicks[labelTicks.length - 1] ?? Math.max(nowMs, chartData.deadlineMs)]}
+              domain={[domainStartMs, labelTicks[labelTicks.length - 1] ?? chartData.deadlineMs]}
               ticks={labelTicks}
               tickLine={false}
               axisLine={false}
@@ -171,18 +170,18 @@ export function RunPaceCard({ pace, chartData, isRunActive, stretch = false }: R
       )}
 
       {chartData !== null && isRunActive && (() => {
-        const statusIcon = pace.status === 'ahead'
+        const statusIcon = chartData.status === 'ahead'
           ? <TrendingUp className="h-4 w-4" />
-          : pace.status === 'behind'
+          : chartData.status === 'behind'
             ? <TrendingDown className="h-4 w-4" />
             : <Minus className="h-4 w-4" />
-        const statusLabel = pace.status === 'ahead'
-          ? `${pace.puzzleDelta} puzzle${pace.puzzleDelta === 1 ? '' : 's'} ahead of pace`
-          : pace.status === 'behind'
-            ? `${pace.puzzleDelta} puzzle${pace.puzzleDelta === 1 ? '' : 's'} behind pace`
+        const statusLabel = chartData.status === 'ahead'
+          ? `${chartData.puzzleDelta} puzzle${chartData.puzzleDelta === 1 ? '' : 's'} ahead of pace`
+          : chartData.status === 'behind'
+            ? `${chartData.puzzleDelta} puzzle${chartData.puzzleDelta === 1 ? '' : 's'} behind pace`
             : 'On pace'
-        const timeLabel = pace.timeRemainingHours > 0
-          ? `Due in ${formatTimeRemaining(pace.timeRemainingHours)}`
+        const timeLabel = chartData.timeRemainingMs > 0
+          ? `Due in ${formatTimeRemaining(chartData.timeRemainingMs)}`
           : 'Overdue'
         return (
           <div className="flex w-full items-start gap-2 border-t pt-3 text-sm">

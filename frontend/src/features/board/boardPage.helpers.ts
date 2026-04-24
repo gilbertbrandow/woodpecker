@@ -1,5 +1,5 @@
 import { Chess } from 'chess.js'
-import type { RunPuzzleListItem, PositionStatus, AttemptSummary, Run, PaceChartData } from '../../lib/api'
+import type { RunPuzzleListItem, PositionStatus, AttemptSummary, Run } from '../../lib/api'
 
 export type Mode = 'loading' | 'focus' | 'failed' | 'overview'
 export type Orientation = 'white' | 'black'
@@ -215,43 +215,9 @@ export function computeTrainingProgressDelta(
   return (1 / totalPuzzles) * 100
 }
 
-export type RunPaceInput = {
-  startedAt: string
-  targetHours: number
-  totalPuzzles: number
-  resolvedCount: number
-  nowMs?: number
-}
-
-export type RunPaceResult = {
-  status: 'ahead' | 'on_pace' | 'behind'
-  puzzleDelta: number
-  timeRemainingHours: number
-  deadlineIso: string
-  expectedResolved: number
-}
-
-export function computeRunPace(input: RunPaceInput): RunPaceResult {
-  const now = input.nowMs ?? Date.now()
-  const startMs = Date.parse(input.startedAt)
-  const elapsedMs = now - startMs
-  const elapsedHours = elapsedMs / 3_600_000
-  const progressFraction = Math.min(1, Math.max(0, elapsedHours / input.targetHours))
-  const expectedResolved = Math.round(progressFraction * input.totalPuzzles)
-  const rawDelta = input.resolvedCount - expectedResolved
-  const puzzleDelta = Math.abs(rawDelta)
-  const timeRemainingHours = input.targetHours - elapsedHours
-  const deadlineMs = startMs + input.targetHours * 3_600_000
-  const deadlineIso = new Date(deadlineMs).toISOString()
-
-  const status: RunPaceResult['status'] =
-    puzzleDelta <= 1 ? 'on_pace' : rawDelta > 0 ? 'ahead' : 'behind'
-
-  return { status, puzzleDelta, timeRemainingHours, deadlineIso, expectedResolved }
-}
-
-export function formatTimeRemaining(hours: number): string {
-  if (hours <= 0) return 'Overdue'
+export function formatTimeRemaining(ms: number): string {
+  if (ms <= 0) return 'Overdue'
+  const hours = ms / 3_600_000
   const months = Math.floor(hours / 720)
   if (months >= 1) return `${months} month${months === 1 ? '' : 's'}`
   const weeks = Math.floor(hours / 168)
@@ -260,101 +226,4 @@ export function formatTimeRemaining(hours: number): string {
   if (days >= 1) return `${days} day${days === 1 ? '' : 's'}`
   const h = Math.ceil(hours)
   return `${h} hour${h === 1 ? '' : 's'}`
-}
-
-export type ChartTick = { timeMs: number; actual: number | null; projection: number | null; target: number }
-
-const MS_15MIN = 15 * 60_000
-const MS_30MIN = 30 * 60_000
-const MS_1H = 3_600_000
-const MS_2H = 2 * MS_1H
-const MS_3H = 3 * MS_1H
-const MS_6H = 6 * MS_1H
-const MS_12H = 12 * MS_1H
-const MS_24H = 24 * MS_1H
-const MS_3D = 3 * MS_24H
-const MS_7D = 7 * MS_24H
-const MS_14D = 14 * MS_24H
-const MS_30D = 30 * MS_24H
-
-const NICE_INTERVALS = [
-  MS_15MIN, MS_30MIN, MS_1H, MS_2H, MS_3H, MS_6H, MS_12H, MS_24H, MS_3D, MS_7D, MS_14D, MS_30D,
-]
-
-function tickInterval(spanMs: number): number {
-  const target = spanMs / 5
-  return NICE_INTERVALS.reduce((best, v) => Math.abs(v - target) < Math.abs(best - target) ? v : best)
-}
-
-export function buildChartSeries(data: PaceChartData, nowMs: number): { series: ChartTick[]; labelTicks: number[]; interval: number; domainStartMs: number } {
-  const { startMs, deadlineMs, totalPuzzles, points } = data
-  const endMs = Math.max(nowMs, deadlineMs)
-  const spanMs = endMs - startMs
-  const interval = tickInterval(spanMs)
-
-  const labelTicks: number[] = []
-  for (let t = startMs; t <= endMs; t += interval) {
-    labelTicks.push(t)
-  }
-  if (labelTicks[labelTicks.length - 1] < endMs) {
-    labelTicks.push(labelTicks[labelTicks.length - 1] + interval)
-  }
-
-  const allTimestamps = [...new Set([...labelTicks, nowMs])].sort((a, b) => a - b)
-
-  let lastActualResolved = 0
-  for (const p of points) {
-    if (p.timeMs <= nowMs) lastActualResolved = p.resolved
-    else break
-  }
-
-  const targetRate = (deadlineMs - startMs) > 0 ? totalPuzzles / (deadlineMs - startMs) : 0
-
-  const projectionCrossMs = targetRate > 0 && lastActualResolved < totalPuzzles
-    ? nowMs + (totalPuzzles - lastActualResolved) / targetRate
-    : null
-
-  const domainStartMs = startMs - interval / 4
-  const seriesTimestamps = [...new Set([...allTimestamps, ...(projectionCrossMs !== null ? [projectionCrossMs] : []), deadlineMs])].sort((a, b) => a - b)
-
-  const series = seriesTimestamps.map((t): ChartTick => {
-    let actual: number | null = null
-    if (t >= startMs && t <= nowMs) {
-      actual = 0
-      for (const p of points) {
-        if (p.timeMs <= t) actual = p.resolved
-        else break
-      }
-    }
-
-    let projection: number | null = null
-    if (t >= nowMs) {
-      const raw = lastActualResolved + targetRate * (t - nowMs)
-      projection = raw >= totalPuzzles ? totalPuzzles : raw
-    }
-
-    let target: number
-    if (t <= deadlineMs) {
-      const frac = deadlineMs === startMs ? 1 : (t - startMs) / (deadlineMs - startMs)
-      target = Math.min(1, Math.max(0, frac)) * totalPuzzles
-    } else {
-      target = totalPuzzles
-    }
-
-    return { timeMs: t, actual, projection, target }
-  })
-
-  return { series, labelTicks, interval, domainStartMs }
-}
-
-export function computePaceDelta(
-  pace: RunPaceResult,
-  runProgressDelta: number | null,
-  resolvedCount: number,
-  input: RunPaceInput,
-): number | null {
-  if (runProgressDelta === null) return null
-  const prev = computeRunPace({ ...input, resolvedCount: resolvedCount - 1 })
-  const signed = (p: RunPaceResult): number => (p.status === 'behind' ? -p.puzzleDelta : p.puzzleDelta)
-  return signed(pace) - signed(prev)
 }

@@ -237,14 +237,18 @@ export type PositionStatus =
   | 'solved_with_retries'
   | 'failed'
 
-type PacePoint = { timeMs: number; resolved: number }
+type PaceChartTick = { timeMs: number; actual: number | null; projection: number | null; target: number }
 
 export type PaceChartData = {
   startMs: number
   deadlineMs: number
-  targetHours: number
   totalPuzzles: number
-  points: PacePoint[]
+  labelTicks: number[]
+  domainStartMs: number
+  series: PaceChartTick[]
+  status: 'ahead' | 'on_pace' | 'behind'
+  puzzleDelta: number
+  timeRemainingMs: number
 }
 
 export type Run = {

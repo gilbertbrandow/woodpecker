@@ -1,8 +1,8 @@
 import * as React from 'react'
 import { ProgressCard } from './ProgressCard'
-import type { RunPuzzleFull, Run, ScheduleParticipation } from '../../lib/api'
+import type { RunPuzzleFull, Run } from '../../lib/api'
 import type { StatsResult } from './boardPage.helpers'
-import { computeTrainingProgressPct, computeRunPace } from './boardPage.helpers'
+import { computeTrainingProgressPct } from './boardPage.helpers'
 import { formatNumber } from '../../lib/utils'
 import { BoardBreadcrumbs } from './BoardBreadcrumbs'
 import { OverviewStatsSection } from './OverviewStatsSection'
@@ -22,7 +22,6 @@ type OverviewSidebarLeftProps = {
   trainingProgressDelta: number | null
   scheduleName: string | null
   boardSize: number
-  participation: ScheduleParticipation | null
 }
 
 export function OverviewSidebarLeft({
@@ -39,18 +38,8 @@ export function OverviewSidebarLeft({
   trainingProgressDelta,
   scheduleName,
   boardSize,
-  participation,
 }: OverviewSidebarLeftProps): React.ReactElement {
   const resolvedCount = run.solvedCount + run.solvedWithRetriesCount + run.failedCount
-
-  const targetHours = participation?.schedule.runs[run.runIndex]?.target_hours ?? 0
-  const paceInput = {
-    startedAt: run.startedAt,
-    targetHours,
-    totalPuzzles: run.totalPuzzles,
-    resolvedCount,
-  }
-  const pace = targetHours > 0 ? computeRunPace(paceInput) : null
 
   const trainingResolved = allRuns !== null
     ? allRuns.reduce((s, r) => s + r.solvedCount + r.solvedWithRetriesCount + r.failedCount, 0)
@@ -62,7 +51,7 @@ export function OverviewSidebarLeft({
   return (
     <aside className="hidden flex-1 flex-col gap-4 lg:flex" style={{ height: boardSize }}>
       <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
-      {pace !== null && <RunPaceCard pace={pace} chartData={run.paceChart} isRunActive={run.status === 'active'} stretch />}
+      {run.paceChart !== null && <RunPaceCard chartData={run.paceChart} isRunActive={run.status === 'active'} stretch />}
       {afterStats !== null && (
         <OverviewStatsSection
           afterStats={afterStats}

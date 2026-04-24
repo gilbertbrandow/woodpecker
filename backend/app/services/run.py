@@ -1,3 +1,4 @@
+import math
 import random
 from datetime import datetime, timezone
 from typing import cast
@@ -257,6 +258,17 @@ def _create_attempt_for_puzzle(run_puzzle: RunPuzzle) -> PuzzleAttempt:
         raise
 
 
+_NICE_INTERVAL_HOURS: list[float] = [0.25, 0.5, 1.0, 2.0, 3.0, 4.0, 6.0, 8.0, 12.0, 24.0, 48.0, 72.0, 120.0, 168.0, 336.0]
+_MAX_INTERVALS = 7
+
+
+def _tick_interval_ms(target_hours: float) -> int:
+    for interval_h in _NICE_INTERVAL_HOURS:
+        if math.ceil(target_hours / interval_h) <= _MAX_INTERVALS:
+            return int(interval_h * 3_600_000)
+    return int(_NICE_INTERVAL_HOURS[-1] * 3_600_000)
+
+
 def _pace_chart_data(
     run: Run,
     run_puzzles: list[RunPuzzle],
@@ -274,8 +286,10 @@ def _pace_chart_data(
         return None
     target_hours = float(target_hours_raw)
 
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     start_ms = int(run.started_at.timestamp() * 1000)
     deadline_ms = start_ms + int(target_hours * 3_600_000)
+    total_puzzles = len(run_puzzles)
 
     terminal_timestamps: list[int] = []
     for rp in run_puzzles:
@@ -290,19 +304,68 @@ def _pace_chart_data(
         failed = next(reversed(queue_attempts), None)
         if failed is not None and failed.status == "failed" and failed.completed_at is not None:
             terminal_timestamps.append(int(failed.completed_at.timestamp() * 1000))
-
     terminal_timestamps.sort()
-    points: list[dict[str, object]] = [
-        {"timeMs": t, "resolved": i + 1}
-        for i, t in enumerate(terminal_timestamps)
-    ]
+
+    interval_ms = _tick_interval_ms(target_hours)
+    num_intervals = math.ceil(target_hours * 3_600_000 / interval_ms)
+    label_ticks = [start_ms + i * interval_ms for i in range(num_intervals + 1)]
+    domain_start_ms = start_ms - interval_ms // 4
+
+    last_actual_resolved = 0
+    for t in terminal_timestamps:
+        if t <= now_ms:
+            last_actual_resolved += 1
+        else:
+            break
+
+    target_rate = total_puzzles / (deadline_ms - start_ms) if deadline_ms > start_ms else 0.0
+    expected_at_now = (
+        (min(now_ms, deadline_ms) - start_ms) / (deadline_ms - start_ms) * total_puzzles
+        if deadline_ms > start_ms
+        else float(total_puzzles)
+    )
+    raw_delta = last_actual_resolved - expected_at_now
+    puzzle_delta = abs(round(raw_delta))
+    status = "on_pace" if puzzle_delta <= 1 else ("ahead" if raw_delta > 0 else "behind")
+
+    projection_cross_ms: int | None = None
+    if target_rate > 0 and last_actual_resolved < total_puzzles:
+        projection_cross_ms = int(now_ms + (total_puzzles - last_actual_resolved) / target_rate)
+
+    all_timestamps = sorted(
+        {*label_ticks, now_ms, deadline_ms, *([] if projection_cross_ms is None else [projection_cross_ms])}
+    )
+
+    series: list[dict[str, object]] = []
+    for t in all_timestamps:
+        actual: object = None
+        if t >= start_ms and t <= now_ms:
+            resolved_at_t = sum(1 for ts in terminal_timestamps if ts <= t)
+            actual = resolved_at_t
+
+        projection: object = None
+        if t >= now_ms:
+            raw = last_actual_resolved + target_rate * (t - now_ms)
+            projection = min(total_puzzles, raw)
+
+        if deadline_ms > start_ms and t <= deadline_ms:
+            frac = max(0.0, min(1.0, (t - start_ms) / (deadline_ms - start_ms)))
+            target: float = frac * total_puzzles
+        else:
+            target = float(total_puzzles)
+
+        series.append({"timeMs": t, "actual": actual, "projection": projection, "target": target})
 
     return {
         "startMs": start_ms,
         "deadlineMs": deadline_ms,
-        "targetHours": target_hours,
-        "totalPuzzles": len(run_puzzles),
-        "points": points,
+        "totalPuzzles": total_puzzles,
+        "labelTicks": label_ticks,
+        "domainStartMs": domain_start_ms,
+        "series": series,
+        "status": status,
+        "puzzleDelta": puzzle_delta,
+        "timeRemainingMs": deadline_ms - now_ms,
     }
 
 
