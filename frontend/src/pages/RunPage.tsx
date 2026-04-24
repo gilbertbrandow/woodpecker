@@ -159,17 +159,14 @@ function ConfigureTab({
   }, [runTarget])
 
   const isActive = run.status === 'active'
-  const isDirty =
-    accuracy !== (runTarget?.targetAccuracy ?? null) ||
-    solveSeconds !== (runTarget?.targetSolveSeconds ?? null)
 
-  const saveTarget = async (): Promise<void> => {
+  const saveTarget = async (accuracyVal: number | null, solveSecondsVal: number | null): Promise<void> => {
     if (saving) return
     setSaving(true)
     try {
       await api.participations.setRunTarget(run.participationId, run.runIndex, {
-        targetAccuracy: accuracy,
-        targetSolveSeconds: solveSeconds,
+        targetAccuracy: accuracyVal,
+        targetSolveSeconds: solveSecondsVal,
       })
       toast('Targets saved', { description: 'Your goals for this run have been updated.' })
     } catch {
@@ -219,6 +216,7 @@ function ConfigureTab({
                 step={1}
                 value={[accuracy ?? 0]}
                 onValueChange={([v]) => setAccuracy(v ?? 0)}
+                onValueCommit={([v]) => void saveTarget(v ?? 0, solveSeconds)}
                 disabled={!isActive || saving}
                 className={accuracy === null ? 'opacity-40' : ''}
               />
@@ -246,6 +244,7 @@ function ConfigureTab({
                 step={5}
                 value={[solveSeconds ?? 0]}
                 onValueChange={([v]) => setSolveSeconds(v ?? 0)}
+                onValueCommit={([v]) => void saveTarget(accuracy, v ?? 0)}
                 disabled={!isActive || saving}
                 className={solveSeconds === null ? 'opacity-40' : ''}
               />
@@ -255,18 +254,7 @@ function ConfigureTab({
               </div>
             </div>
 
-            {isActive && (
-              <div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void saveTarget()}
-                  disabled={!isDirty || saving}
-                >
-                  {saving ? 'Saving…' : 'Save targets'}
-                </Button>
-              </div>
-            )}
+
           </div>
         </CollapsibleContent>
       </Collapsible>

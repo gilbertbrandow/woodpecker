@@ -73,11 +73,19 @@ export function buildPgnDisplay(
   if (attemptStatus === 'solved') {
     const chess = new Chess(baseFen)
     const mainline: DisplayMove[] = []
-    for (let i = 0; i < solutionMoves.length; i++) {
-      const status: DisplayMove['moveStatus'] = i % 2 === 0 ? 'opponent' : 'correct'
-      const move = applyUciDisplay(chess, solutionMoves[i], status)
-      if (!move) break
-      mainline.push(move)
+    const firstOpponent = applyUciDisplay(chess, solutionMoves[0], 'opponent')
+    if (!firstOpponent) return { mainline, variation: null }
+    mainline.push(firstOpponent)
+    for (let i = 0; i < attemptMoves.length; i++) {
+      const userMove = applyUciDisplay(chess, attemptMoves[i], 'correct')
+      if (!userMove) break
+      mainline.push(userMove)
+      const nextOpponentIndex = 2 * (i + 1)
+      if (i + 1 < attemptMoves.length && nextOpponentIndex < solutionMoves.length) {
+        const oppMove = applyUciDisplay(chess, solutionMoves[nextOpponentIndex], 'opponent')
+        if (!oppMove) break
+        mainline.push(oppMove)
+      }
     }
     return { mainline, variation: null }
   }

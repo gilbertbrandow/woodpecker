@@ -29,6 +29,18 @@ function applyMovesUntilFail(chess: Chess, moves: string[]): void {
   }
 }
 
+function applySolvedGame(chess: Chess, solutionMoves: string[], userMoves: string[]): void {
+  if (solutionMoves.length === 0 || userMoves.length === 0) return
+  try { applyUci(chess, solutionMoves[0]) } catch { return }
+  for (let i = 0; i < userMoves.length; i++) {
+    try { applyUci(chess, userMoves[i]) } catch { return }
+    const nextOpponentIndex = 2 * (i + 1)
+    if (i + 1 < userMoves.length && nextOpponentIndex < solutionMoves.length) {
+      try { applyUci(chess, solutionMoves[nextOpponentIndex]) } catch { return }
+    }
+  }
+}
+
 export function computeOverviewBoardState(
   puzzle: RunPuzzleFull,
   selectedAttempt: AttemptSummary | null,
@@ -43,8 +55,8 @@ export function computeOverviewBoardState(
 
   if (selectedAttempt.status === 'solved') {
     const chess = new Chess(puzzle.fen)
-    applyMovesUntilFail(chess, solutionMoves)
-    const lastUci = solutionMoves[solutionMoves.length - 1]
+    applySolvedGame(chess, solutionMoves, selectedAttempt.moves)
+    const lastUci = selectedAttempt.moves[selectedAttempt.moves.length - 1]
     const lastMove: [string, string] = [lastUci.slice(0, 2), lastUci.slice(2, 4)]
     return {
       fen: chess.fen(),
