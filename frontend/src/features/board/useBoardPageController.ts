@@ -606,7 +606,12 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
         }
         navigateToOverview(id, false)
       } else {
-        enterFailed()
+        if (result.positionResolved && result.nextRunPuzzleId === null) {
+          setRunJustCompleted(true)
+          navigateToOverview(id, false)
+        } else {
+          enterFailed()
+        }
       }
     } catch {
       toast.error('Failed to submit attempt', { description: 'Please try again.' })

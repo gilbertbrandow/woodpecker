@@ -132,6 +132,10 @@ def _current_run_puzzle_id(run_id: int, total_queue: int) -> int | None:
                   SELECT 1 FROM puzzle_attempts pa
                   WHERE pa.run_puzzle_id = rp.id AND pa.status = 'in_progress'
               ) THEN 0 ELSE 1 END,
+              CASE WHEN NOT EXISTS(
+                  SELECT 1 FROM puzzle_attempts pa
+                  WHERE pa.run_puzzle_id = rp.id
+              ) THEN 0 ELSE 1 END,
               rp.position
             LIMIT 1
         """),
@@ -301,9 +305,10 @@ def _pace_chart_data(
         if solved is not None and solved.completed_at is not None:
             terminal_timestamps.append(int(solved.completed_at.timestamp() * 1000))
             continue
-        failed = next(reversed(queue_attempts), None)
-        if failed is not None and failed.status == "failed" and failed.completed_at is not None:
-            terminal_timestamps.append(int(failed.completed_at.timestamp() * 1000))
+        if len(queue_attempts) >= total_queue:
+            last = queue_attempts[-1]
+            if last.status == "failed" and last.completed_at is not None:
+                terminal_timestamps.append(int(last.completed_at.timestamp() * 1000))
     terminal_timestamps.sort()
 
     interval_ms = _tick_interval_ms(target_hours)

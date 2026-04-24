@@ -190,7 +190,7 @@ export function RunPaceCard({ chartData, isRunActive, stretch = false }: RunPace
                 {statusLabel}{statusIcon}
               </div>
               <div className="flex items-center gap-1 leading-none text-muted-foreground text-xs mt-1">
-                {timeLabel}<span className="text-muted-foreground/50">·</span>{chartData.totalPuzzles} puzzles total
+                {timeLabel}<span className="text-muted-foreground/50">·</span>{chartData.totalPuzzles - (lastActual !== null ? (lastActual.actual as number) : 0)} puzzles left
               </div>
             </div>
           </div>
