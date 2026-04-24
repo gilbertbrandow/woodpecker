@@ -156,17 +156,15 @@ export function BoardFocusView({ puzzle, ctrl, runIdStr }: BoardFocusViewProps):
               elapsedTenths={timer.elapsedTenths}
               targetSolveTenths={timer.targetSolveTenths}
             />
-            {session.allPliesPlayed.length > 0 && (
-              <PuzzleMetaCard
-                puzzleId={puzzle.puzzleId}
-                rating={puzzle.rating}
-                themes={puzzle.themes}
-                pgnDisplay={pgnDisplay}
-                focusMode={true}
-                selectedPly={selectedPly}
-                onPlyClick={setSelectedPly}
-              />
-            )}
+            <PuzzleMetaCard
+              puzzleId={puzzle.puzzleId}
+              rating={puzzle.rating}
+              themes={puzzle.themes}
+              pgnDisplay={pgnDisplay}
+              focusMode={true}
+              selectedPly={selectedPly}
+              onPlyClick={setSelectedPly}
+            />
             <div className="mt-auto">
               <MoveStatusCard
                 lastMoveResult={displayBoard.moveFeedback.result}
