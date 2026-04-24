@@ -79,6 +79,8 @@ export type BoardPageActions = {
   handleShowSolution: () => void
   handleRetake: () => Promise<void>
   handleNextPuzzle: () => Promise<void>
+  startNextRun: () => Promise<void>
+  dismissRunComplete: () => void
 }
 
 export type BoardPageControllerResult = {
@@ -98,6 +100,8 @@ export type BoardPageControllerResult = {
   }
   overview: OverviewState
   isLoadingNextPuzzle: boolean
+  isStartingNextRun: boolean
+  runJustCompleted: boolean
   participationId: number | null
   inputBlocked: boolean
   actions: BoardPageActions
@@ -165,6 +169,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const [participationId, setParticipationId] = useState<number | null>(null)
   const [boardKey, setBoardKey] = useState(0)
   const [isLoadingNextPuzzle, setIsLoadingNextPuzzle] = useState(false)
+  const [isStartingNextRun, setIsStartingNextRun] = useState(false)
+  const [runJustCompleted, setRunJustCompleted] = useState(false)
   const [movesPlayed, setMovesPlayed] = useState<string[]>([])
   const [allPliesPlayed, setAllPliesPlayed] = useState<string[]>([])
   const [failedRetryPlies, setFailedRetryPlies] = useState<string[]>([])
@@ -595,6 +601,9 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
           setOverviewFreshPuzzle(optimisticPuzzle)
           setOverviewRun(currentRun)
         }
+        if (result.positionResolved && result.nextRunPuzzleId === null) {
+          setRunJustCompleted(true)
+        }
         navigateToOverview(id, false)
       } else {
         enterFailed()
@@ -899,6 +908,27 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     }
   }, [navigate, runId, runPuzzleId, runIdStr, applyFreshActiveState, clearOverviewState])
 
+  const handleStartNextRun = useCallback(async (): Promise<void> => {
+    if (participationId === null || overviewRun === null) return
+    setIsStartingNextRun(true)
+    try {
+      const newRun = await api.runs.start(participationId, overviewRun.runIndex + 1)
+      void navigate({ to: '/app/runs/$runId', params: { runId: String(newRun.id) } })
+    } catch {
+      toast.error('Could not start next run', { description: 'Please try again.' })
+      void navigate({
+        to: '/app/participations/$participationId',
+        params: { participationId: String(participationId) },
+      })
+    } finally {
+      setIsStartingNextRun(false)
+    }
+  }, [participationId, overviewRun, navigate])
+
+  const dismissRunComplete = useCallback((): void => {
+    setRunJustCompleted(false)
+  }, [])
+
   const turnToMove: Orientation = displayFen.split(' ')[1] === 'b' ? 'black' : 'white'
   const pieceSet = resolvePieceSet(user?.pieceTheme ?? '')
   const kingPieceUrl = turnToMove === 'white' ? pieceSet.pieces.wK : pieceSet.pieces.bK
@@ -952,6 +982,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       allRuns: overviewAllRuns,
     },
     isLoadingNextPuzzle,
+    isStartingNextRun,
+    runJustCompleted,
     participationId,
     inputBlocked,
     actions: {
@@ -962,6 +994,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       handleShowSolution,
       handleRetake,
       handleNextPuzzle,
+      startNextRun: handleStartNextRun,
+      dismissRunComplete,
     },
   }
 }

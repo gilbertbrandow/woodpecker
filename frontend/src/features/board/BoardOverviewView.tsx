@@ -12,6 +12,7 @@ import { OverviewStatsSection } from './OverviewStatsSection'
 import { OverviewActionsSection } from './OverviewActionsSection'
 import { OverviewAttemptHistoryTable } from './OverviewAttemptHistoryTable'
 import { PuzzleMetaCard } from './PuzzleMetaCard'
+import { RunCompleteOverlay } from './RunCompleteOverlay'
 import { useOverviewSelectionModel } from './useOverviewSelectionModel'
 import { computeOverviewBoardState } from './boardOverview.helpers'
 import { buildPgnDisplay } from './boardOverview.pgn'
@@ -39,8 +40,10 @@ export function BoardOverviewView({
 }: BoardOverviewViewProps): React.ReactElement {
   const navigate = useNavigate()
   const location = useLocation({ select: (loc) => loc.pathname })
-  const { board, session, participationId, overview, timer, isLoadingNextPuzzle, actions } = ctrl
+  const { board, session, participationId, overview, timer, isLoadingNextPuzzle, isStartingNextRun, runJustCompleted, actions } = ctrl
   const { freshPuzzle, run, afterStats, accuracyDelta, timeDelta, participation } = overview
+
+  const [showOverlay, setShowOverlay] = React.useState(runJustCompleted)
 
   const [selectedAttemptId, setSelectedAttemptId] = React.useState<number | null>(null)
   const [selectedPly, setSelectedPly] = React.useState<PlySelection | null>(null)
@@ -480,6 +483,20 @@ export function BoardOverviewView({
           activeAttemptId={selectedAttemptId}
           boardAnimationEnabled={false}
           mobileExtras={mobileExtras}
+          overlay={
+            showOverlay && run && participation ? (
+              <RunCompleteOverlay
+                run={run}
+                participation={participation}
+                onStartNextRun={actions.startNextRun}
+                isLoading={isStartingNextRun}
+                onClose={() => {
+                  setShowOverlay(false)
+                  actions.dismissRunComplete()
+                }}
+              />
+            ) : undefined
+          }
         />
         <OverviewSidebarRight
           puzzle={effectivePuzzle}

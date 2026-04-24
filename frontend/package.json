@@ -24,6 +24,8 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tanstack/react-router": "^1.114.22",
     "@tanstack/react-table": "^8.21.3",
+    "@types/canvas-confetti": "^1.9.0",
+    "canvas-confetti": "^1.9.4",
     "chess.js": "^1.4.0",
     "chessground": "^9.2.1",
     "class-variance-authority": "^0.7.1",

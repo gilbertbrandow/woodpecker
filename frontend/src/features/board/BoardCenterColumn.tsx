@@ -17,6 +17,7 @@ type BoardCenterColumnProps = {
   mobileHeader?: React.ReactNode
   mobileExtras?: React.ReactNode
   timerBar?: { leftPct: number; color: string; tooltipText: string } | null
+  overlay?: React.ReactNode
 }
 
 export function BoardCenterColumn({
@@ -30,6 +31,7 @@ export function BoardCenterColumn({
   mobileHeader,
   mobileExtras,
   timerBar,
+  overlay,
 }: BoardCenterColumnProps): React.ReactElement {
   const boardSurfaceProps: BoardSurfaceProps = {
     boardKey: board.boardKey,
@@ -69,6 +71,7 @@ export function BoardCenterColumn({
           </Tooltip>
         )}
         <BoardSurface {...boardSurfaceProps} />
+        {overlay}
       </div>
       <SessionAttemptStrip items={attemptHistory} runId={runId} activeAttemptId={activeAttemptId} interactive={stripInteractive} />
       {mobileExtras && (
