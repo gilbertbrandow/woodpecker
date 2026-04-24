@@ -11,6 +11,7 @@ type RunPaceCardProps = {
   pace: RunPaceResult
   chartData: PaceChartData | null
   isRunActive: boolean
+  stretch?: boolean
 }
 
 const CHART_CONFIG: ChartConfig = {
@@ -47,7 +48,7 @@ function PulsingDot({ cx = 0, cy = 0, active }: { cx?: number; cy?: number; acti
   )
 }
 
-export function RunPaceCard({ pace, chartData, isRunActive }: RunPaceCardProps): React.ReactElement {
+export function RunPaceCard({ pace, chartData, isRunActive, stretch = false }: RunPaceCardProps): React.ReactElement {
   const nowMs = Date.now()
   const { series, labelTicks, domainStartMs } = chartData !== null ? buildChartSeries(chartData, nowMs) : { series: [], labelTicks: [], domainStartMs: 0 }
   const spanMs = chartData !== null ? Math.max(nowMs, chartData.deadlineMs) - chartData.startMs : 0
@@ -57,16 +58,16 @@ export function RunPaceCard({ pace, chartData, isRunActive }: RunPaceCardProps):
   const lastActual = lastActualArr.length > 0 ? lastActualArr[lastActualArr.length - 1] : null
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border bg-card p-4">
+    <div className={`flex flex-col gap-2 rounded-lg border bg-card p-4${stretch ? ' flex-1 min-h-0' : ''}`}>
       <div>
         <span className="font-medium">Run pace</span>
         <p className="text-xs text-muted-foreground">Actual progress & required pace</p>
       </div>
 
       {chartData === null ? (
-        <div className="h-48 w-full animate-pulse rounded-md bg-muted" />
+        <div className={`${stretch ? 'flex-1 min-h-0' : 'h-48'} w-full animate-pulse rounded-md bg-muted`} />
       ) : (
-        <ChartContainer config={CHART_CONFIG} className="h-48 w-full">
+        <ChartContainer config={CHART_CONFIG} className={`${stretch ? 'flex-1 min-h-0' : 'h-48'} w-full`}>
           <ComposedChart data={series} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="paceActualGradient" x1="0" y1="0" x2="0" y2="1">

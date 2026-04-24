@@ -62,7 +62,7 @@ export function OverviewSidebarLeft({
   return (
     <aside className="hidden flex-1 flex-col gap-4 lg:flex" style={{ height: boardSize }}>
       <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
-      {pace !== null && <RunPaceCard pace={pace} chartData={run.paceChart} isRunActive={run.status === 'active'} />}
+      {pace !== null && <RunPaceCard pace={pace} chartData={run.paceChart} isRunActive={run.status === 'active'} stretch />}
       {afterStats !== null && (
         <OverviewStatsSection
           afterStats={afterStats}

@@ -40,11 +40,12 @@ export function AttemptTable({
   return (
     <div className="flex flex-col gap-0.5">
       {visible.map((attempt) => {
-        const counts = attempt.tryNumber <= maxTriesPerPuzzle
+        const priorSolvedExists = tries.some(
+          (t) => t.status === 'solved' && t.tryNumber < attempt.tryNumber,
+        )
+        const counts = attempt.tryNumber <= maxTriesPerPuzzle && !priorSolvedExists
         const isSelected = attempt.id === selectedAttemptId
-        const label = attempt.tryNumber <= maxTriesPerPuzzle
-          ? `Try ${attempt.tryNumber}`
-          : 'Practice'
+        const label = counts ? `Try ${attempt.tryNumber}` : 'Practice'
 
         return (
           <div
