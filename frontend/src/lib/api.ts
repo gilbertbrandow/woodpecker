@@ -237,6 +237,16 @@ export type PositionStatus =
   | 'solved_with_retries'
   | 'failed'
 
+type PacePoint = { timeMs: number; resolved: number }
+
+export type PaceChartData = {
+  startMs: number
+  deadlineMs: number
+  targetHours: number
+  totalPuzzles: number
+  points: PacePoint[]
+}
+
 export type Run = {
   id: number
   participationId: number
@@ -251,6 +261,7 @@ export type Run = {
   failedCount: number
   inProgressCount: number
   currentRunPuzzleId: number | null
+  paceChart: PaceChartData | null
 }
 
 export type RunPuzzleListItem = {

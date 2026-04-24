@@ -587,7 +587,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
             currentAttemptId: null,
             tries: currentPuzzle.tries.map((t) =>
               t.id === id
-                ? { ...t, status, timeSpentMs: Math.round(elapsedRef.current * 100), completedAt: new Date().toISOString() }
+                ? { ...t, status, moves: movesPlayedRef.current, timeSpentMs: Math.round(elapsedRef.current * 100), completedAt: new Date().toISOString() }
                 : t
             ),
           }
@@ -665,7 +665,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
                 currentAttemptId: null,
                 tries: currentPuzzle.tries.map((t) =>
                   t.id === resolvedId
-                    ? { ...t, status: 'failed' as const, timeSpentMs: Math.round(elapsedRef.current * 100), completedAt: new Date().toISOString() }
+                    ? { ...t, status: 'failed' as const, moves: movesPlayedRef.current, timeSpentMs: Math.round(elapsedRef.current * 100), completedAt: new Date().toISOString() }
                     : t
                 ),
               }

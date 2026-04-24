@@ -44,14 +44,13 @@ export function OverviewSidebarLeft({
   const resolvedCount = run.solvedCount + run.solvedWithRetriesCount + run.failedCount
 
   const targetHours = participation?.schedule.runs[run.runIndex]?.target_hours ?? 0
-  const pace = targetHours > 0
-    ? computeRunPace({
-        startedAt: run.startedAt,
-        targetHours,
-        totalPuzzles: run.totalPuzzles,
-        resolvedCount,
-      })
-    : null
+  const paceInput = {
+    startedAt: run.startedAt,
+    targetHours,
+    totalPuzzles: run.totalPuzzles,
+    resolvedCount,
+  }
+  const pace = targetHours > 0 ? computeRunPace(paceInput) : null
 
   const trainingResolved = allRuns !== null
     ? allRuns.reduce((s, r) => s + r.solvedCount + r.solvedWithRetriesCount + r.failedCount, 0)
@@ -85,7 +84,7 @@ export function OverviewSidebarLeft({
           runIndex={run.runIndex}
         />
       )}
-      {pace !== null && <RunPaceCard pace={pace} />}
+      {pace !== null && <RunPaceCard pace={pace} chartData={run.paceChart} isRunActive={run.status === 'active'} />}
     </aside>
   )
 }

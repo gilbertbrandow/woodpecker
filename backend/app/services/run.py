@@ -257,6 +257,55 @@ def _create_attempt_for_puzzle(run_puzzle: RunPuzzle) -> PuzzleAttempt:
         raise
 
 
+def _pace_chart_data(
+    run: Run,
+    run_puzzles: list[RunPuzzle],
+    config: dict[str, object],
+    total_queue: int,
+) -> dict[str, object] | None:
+    runs_raw = config.get("runs")
+    if not isinstance(runs_raw, list) or run.run_index >= len(runs_raw):
+        return None
+    run_def = runs_raw[run.run_index]
+    if not isinstance(run_def, dict):
+        return None
+    target_hours_raw = run_def.get("target_hours")
+    if not isinstance(target_hours_raw, (int, float)) or target_hours_raw <= 0:
+        return None
+    target_hours = float(target_hours_raw)
+
+    start_ms = int(run.started_at.timestamp() * 1000)
+    deadline_ms = start_ms + int(target_hours * 3_600_000)
+
+    terminal_timestamps: list[int] = []
+    for rp in run_puzzles:
+        queue_attempts = sorted(
+            [a for a in rp.attempts if a.status != "in_progress" and a.try_number <= total_queue],
+            key=lambda a: a.try_number,
+        )
+        solved = next((a for a in queue_attempts if a.status == "solved"), None)
+        if solved is not None and solved.completed_at is not None:
+            terminal_timestamps.append(int(solved.completed_at.timestamp() * 1000))
+            continue
+        failed = next(reversed(queue_attempts), None)
+        if failed is not None and failed.status == "failed" and failed.completed_at is not None:
+            terminal_timestamps.append(int(failed.completed_at.timestamp() * 1000))
+
+    terminal_timestamps.sort()
+    points: list[dict[str, object]] = [
+        {"timeMs": t, "resolved": i + 1}
+        for i, t in enumerate(terminal_timestamps)
+    ]
+
+    return {
+        "startMs": start_ms,
+        "deadlineMs": deadline_ms,
+        "targetHours": target_hours,
+        "totalPuzzles": len(run_puzzles),
+        "points": points,
+    }
+
+
 def run_dict(run: Run) -> dict[str, object]:
     _, config = _get_schedule_config(run)
     total_queue = _total_queue_attempts(config)
@@ -287,6 +336,7 @@ def run_dict(run: Run) -> dict[str, object]:
         "currentRunPuzzleId": _current_run_puzzle_id(run.id, total_queue),
         "targetAccuracy": run.target_accuracy,
         "targetSolveSeconds": run.target_solve_seconds,
+        "paceChart": _pace_chart_data(run, run_puzzles, config, total_queue),
     }
 
 

@@ -58,41 +58,12 @@ export function computeOverviewBoardState(
     return { fen: puzzle.fen, lastMove: undefined, moveFeedback: EMPTY_FEEDBACK }
   }
 
-  try {
-    applyUci(chess, solutionMoves[0])
-  } catch {
-    return { fen: puzzle.fen, lastMove: undefined, moveFeedback: EMPTY_FEEDBACK }
-  }
-
-  const attemptMoves = selectedAttempt.moves
-  let opponentIdx = 2
-  let lastAppliedUci: string | null = null
-
-  for (let i = 0; i < attemptMoves.length; i++) {
-    try {
-      applyUci(chess, attemptMoves[i])
-      lastAppliedUci = attemptMoves[i]
-    } catch {
-      break
-    }
-    if (i < attemptMoves.length - 1 && opponentIdx < solutionMoves.length) {
-      try {
-        applyUci(chess, solutionMoves[opponentIdx])
-      } catch {
-        break
-      }
-      opponentIdx += 2
-    }
-  }
-
-  if (lastAppliedUci === null) {
-    return { fen: chess.fen(), lastMove: undefined, moveFeedback: EMPTY_FEEDBACK }
-  }
-
-  const lastMove: [string, string] = [lastAppliedUci.slice(0, 2), lastAppliedUci.slice(2, 4)]
+  applyMovesUntilFail(chess, solutionMoves)
+  const lastUci = solutionMoves[solutionMoves.length - 1]
+  const lastMove: [string, string] = [lastUci.slice(0, 2), lastUci.slice(2, 4)]
   return {
     fen: chess.fen(),
     lastMove,
-    moveFeedback: { result: 'wrong', square: lastMove[1], visible: true },
+    moveFeedback: { result: 'correct', square: lastMove[1], visible: true },
   }
 }

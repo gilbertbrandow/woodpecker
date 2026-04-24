@@ -23,7 +23,12 @@ function MoveToken({
     selectedPly.line === line &&
     selectedPly.index === index
 
-  const san = <span className="font-chess">{move.san}</span>
+  const isWrong = move.moveStatus === 'wrong'
+  const san = (
+    <span className="font-chess">
+      {move.san}{isWrong && <span className="text-red-600 dark:text-red-400">??</span>}
+    </span>
+  )
 
   if (!onPlyClick) {
     return (
@@ -134,7 +139,7 @@ export function PuzzleMetaCard({
         <div className={cn('text-sm leading-relaxed', !focusMode && 'border-t border-border pt-2')}>
           <MoveSequence moves={pgnDisplay.mainline} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />
           {pgnDisplay.variation !== null && (
-            <>(<MoveSequence moves={pgnDisplay.variation} line="variation" selectedPly={selectedPly} onPlyClick={onPlyClick} />)</>
+            <span className="text-xs">(<MoveSequence moves={pgnDisplay.variation} line="variation" selectedPly={selectedPly} onPlyClick={onPlyClick} />)</span>
           )}
         </div>
       )}

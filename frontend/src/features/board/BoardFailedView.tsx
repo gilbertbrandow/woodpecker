@@ -174,7 +174,6 @@ export function BoardFailedView({ puzzle, ctrl, runIdStr }: BoardFailedViewProps
                 />
               )
             })()}
-            <Badge variant="outline" className="w-fit">Failed</Badge>
             <AttemptScoring
               currentTryNumber={puzzle.currentTryNumber}
               maxTriesPerPuzzle={puzzle.maxTriesPerPuzzle}

@@ -241,6 +241,15 @@ export function BoardOverviewView({
       setSelectedPly(null)
       return
     }
+    const lastMove = pgnDisplay.mainline[pgnDisplay.mainline.length - 1]
+    if (lastMove.moveStatus === 'wrong') {
+      if (pgnDisplay.variation && pgnDisplay.variation.length > 0) {
+        setSelectedPly({ line: 'variation', index: pgnDisplay.variation.length - 1 })
+      } else {
+        setSelectedPly(null)
+      }
+      return
+    }
     setSelectedPly({ line: 'main', index: pgnDisplay.mainline.length - 1 })
   }, [pgnDisplay])
 
@@ -255,7 +264,14 @@ export function BoardOverviewView({
 
   const overviewBoard: BoardState = React.useMemo(() => {
     if (!effectivePuzzle || !selectionModel) {
-      return lastOverviewBoardRef.current ?? { ...board, dests: new Map() }
+      if (lastOverviewBoardRef.current) return lastOverviewBoardRef.current
+      if (effectivePuzzle) {
+        const derived = computeOverviewBoardState(effectivePuzzle, null)
+        const next: BoardState = { ...board, fen: derived.fen, lastMove: derived.lastMove, moveFeedback: derived.moveFeedback, dests: new Map() }
+        lastOverviewBoardRef.current = next
+        return next
+      }
+      return { ...board, dests: new Map() }
     }
     const derived = computeOverviewBoardState(effectivePuzzle, selectionModel.selectedAttempt)
     const moveFeedback = derived.moveFeedback.visible
