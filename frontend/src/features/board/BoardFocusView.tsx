@@ -4,6 +4,7 @@ import { TimerCard } from './TimerCard'
 import { MoveStatusCard } from './MoveStatusCard'
 import { BoardCenterColumn } from './BoardCenterColumn'
 import { PuzzleMetaCard } from './PuzzleMetaCard'
+import { AttemptTypeCard } from './AttemptTypeCard'
 import { buildPgnDisplay } from './boardOverview.pgn'
 import { formatTimer, formatTargetSolveTime } from './boardPage.helpers'
 import type { BoardPageControllerResult, BoardState } from './useBoardPageController'
@@ -90,47 +91,11 @@ export function BoardFocusView({ puzzle, ctrl, runIdStr }: BoardFocusViewProps):
         <div className="flex w-full items-start justify-center gap-6">
           <aside className="hidden flex-1 flex-col gap-4 lg:flex" style={{ height: board.boardSize }}>
             <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} linksDisabled={true} />
-            <div className="rounded-lg border bg-card p-4">
-              {(puzzle.currentTryNumber > puzzle.maxTriesPerPuzzle ||
-                puzzle.tries.some(
-                  (t) => t.status === 'solved' && t.tryNumber < puzzle.currentTryNumber,
-                )) ? (
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium">Practice attempt</span>
-                  <span className="text-xs text-muted-foreground">This attempt will not count towards your score.</span>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Attempt {puzzle.currentTryNumber}</span>
-                    {puzzle.maxTriesPerPuzzle > 1 && (
-                      <span className="text-xs text-muted-foreground">of {puzzle.maxTriesPerPuzzle}</span>
-                    )}
-                  </div>
-                  {puzzle.maxTriesPerPuzzle > 1 && (
-                    <div className="flex items-center gap-1.5">
-                      {Array.from({ length: puzzle.maxTriesPerPuzzle }).map((_, i) => {
-                        const n = i + 1
-                        const isCurrent = n === puzzle.currentTryNumber
-                        const isUsed = n < puzzle.currentTryNumber
-                        return (
-                          <div
-                            key={i}
-                            className={`rounded-full ${
-                              isCurrent
-                                ? 'h-2.5 w-2.5 bg-foreground'
-                                : isUsed
-                                  ? 'h-2 w-2 bg-foreground/35'
-                                  : 'h-2 w-2 bg-foreground/10'
-                            }`}
-                          />
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            <AttemptTypeCard
+              currentTryNumber={puzzle.currentTryNumber}
+              maxTriesPerPuzzle={puzzle.maxTriesPerPuzzle}
+              tries={puzzle.tries}
+            />
           </aside>
 
           <BoardCenterColumn
