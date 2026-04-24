@@ -11,6 +11,7 @@ import type { SessionAttemptHistoryItem } from '../../context/solveSession'
 import {
   computeDests,
   applyUci,
+  resultsInCheckmate,
   playerColor,
   computeFinalFen,
   computeStats,
@@ -740,7 +741,9 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
     if (isPromotion) {
       const expectedBase = solutionMoves[moveIndex]?.slice(0, 4)
-      if (orig + dest !== expectedBase) {
+      const promotionPieces = ['q', 'r', 'b', 'n'] as const
+      const squareLeadsToCheckmate = promotionPieces.some((p) => resultsInCheckmate(chess, orig, dest, p))
+      if (orig + dest !== expectedBase && !squareLeadsToCheckmate) {
         resolveWrongMove(orig, dest)
       } else {
         inputBlockedRef.current = true
@@ -752,7 +755,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     }
 
     const uci = orig + dest
-    if (uci === solutionMoves[moveIndex]) {
+    if (uci === solutionMoves[moveIndex] || resultsInCheckmate(chess, orig, dest)) {
       resolveCorrectMove(orig, dest, uci)
     } else {
       resolveWrongMove(orig, dest)
@@ -768,7 +771,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     setInputBlocked(false)
 
     const uci = pending.orig + pending.dest + piece
-    if (uci === solutionMovesRef.current[moveIndexRef.current]) {
+    const chess = chessRef.current
+    if (uci === solutionMovesRef.current[moveIndexRef.current] || (chess !== null && resultsInCheckmate(chess, pending.orig, pending.dest, piece))) {
       resolveCorrectMove(pending.orig, pending.dest, uci)
     } else {
       resolveWrongMove(pending.orig, pending.dest, piece)

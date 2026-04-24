@@ -74,6 +74,17 @@ export function applyUci(chess: Chess, uci: string): void {
   })
 }
 
+export function resultsInCheckmate(chess: Chess, orig: string, dest: string, promotionPiece?: string): boolean {
+  try {
+    chess.move({ from: orig, to: dest, promotion: promotionPiece ?? 'q' })
+  } catch {
+    return false
+  }
+  const checkmate = chess.isCheckmate()
+  chess.undo()
+  return checkmate
+}
+
 export function playerColor(fen: string): Orientation {
   return fen.split(' ')[1] === 'w' ? 'black' : 'white'
 }
