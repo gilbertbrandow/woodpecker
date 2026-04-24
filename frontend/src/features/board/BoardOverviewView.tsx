@@ -320,7 +320,7 @@ export function BoardOverviewView({
           <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
         </div>
         <div className="flex flex-1 items-center justify-center overflow-hidden lg:px-6">
-          <div className="flex w-full items-center justify-center gap-6">
+          <div className="flex w-full items-start justify-center gap-6">
             <aside className="hidden flex-1 flex-col lg:flex" style={{ height: board.boardSize }}>
               <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
               <p className="mt-4 text-sm text-muted-foreground">Loading…</p>
@@ -455,7 +455,7 @@ export function BoardOverviewView({
         <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
       </div>
       <div className="flex flex-1 items-center justify-center overflow-hidden lg:px-6">
-        <div className="flex w-full items-center justify-center gap-6">
+        <div className="flex w-full items-start justify-center gap-6">
           <OverviewSidebarLeft
           puzzle={effectivePuzzle}
           participationId={participation?.id ?? null}

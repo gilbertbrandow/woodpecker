@@ -4,11 +4,9 @@ import { AttemptScoring } from './AttemptScoring'
 import { TimerCard } from './TimerCard'
 import { MoveStatusCard } from './MoveStatusCard'
 import { BoardCenterColumn } from './BoardCenterColumn'
-import { ProgressCard } from './ProgressCard'
 import { PuzzleMetaCard } from './PuzzleMetaCard'
 import { buildPgnDisplay } from './boardOverview.pgn'
-import { formatTimer, computeRunProgressPct, computeTrainingProgressPct, formatTargetSolveTime } from './boardPage.helpers'
-import { formatNumber } from '../../lib/utils'
+import { formatTimer, formatTargetSolveTime } from './boardPage.helpers'
 import type { BoardPageControllerResult, BoardState } from './useBoardPageController'
 import type { RunPuzzleFull } from '../../lib/api'
 import type { PlySelection } from './boardOverview.pgn'
@@ -20,7 +18,7 @@ type BoardFocusViewProps = {
 }
 
 export function BoardFocusView({ puzzle, ctrl, runIdStr }: BoardFocusViewProps): React.ReactElement {
-  const { board, timer, session, participationId, actions, run, allRuns, participation } = ctrl
+  const { board, timer, session, participationId, actions } = ctrl
   const timerText = formatTimer(timer.elapsedTenths)
 
   const [selectedPly, setSelectedPly] = React.useState<PlySelection | null>(null)
@@ -73,34 +71,6 @@ export function BoardFocusView({ puzzle, ctrl, runIdStr }: BoardFocusViewProps):
     </div>
   )
 
-  const progressCard = run !== null ? (
-    (() => {
-      const resolvedCount = run.solvedCount + run.solvedWithRetriesCount + run.failedCount
-      const trainingResolved = allRuns !== null
-        ? allRuns.reduce((s, r) => s + r.solvedCount + r.solvedWithRetriesCount + r.failedCount, 0)
-        : 0
-      const trainingTotal = allRuns !== null
-        ? allRuns.reduce((s, r) => s + r.totalPuzzles, 0)
-        : 0
-      return (
-        <ProgressCard
-          runProgress={{
-            label: `Run ${run.runIndex + 1}`,
-            value: computeRunProgressPct(run),
-            tooltipLabel: `${formatNumber(resolvedCount)} of ${formatNumber(run.totalPuzzles)} puzzles completed`,
-            delta: null,
-          }}
-          trainingProgress={allRuns !== null ? {
-            label: `${participation?.schedule.name ?? 'Training'}`,
-            value: computeTrainingProgressPct(allRuns),
-            tooltipLabel: `${formatNumber(trainingResolved)} of ${formatNumber(trainingTotal)} puzzles completed across all runs`,
-            delta: null,
-          } : null}
-        />
-      )
-    })()
-  ) : null
-
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex-none px-4 pt-3 pb-2 lg:hidden">
@@ -118,10 +88,9 @@ export function BoardFocusView({ puzzle, ctrl, runIdStr }: BoardFocusViewProps):
         )}
       </div>
       <div className="flex flex-1 items-center justify-center overflow-hidden lg:px-6">
-        <div className="flex w-full items-center justify-center gap-6">
+        <div className="flex w-full items-start justify-center gap-6">
           <aside className="hidden flex-1 flex-col gap-4 lg:flex" style={{ height: board.boardSize }}>
             <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} linksDisabled={true} />
-            {progressCard}
             <AttemptScoring
               currentTryNumber={puzzle.currentTryNumber}
               maxTriesPerPuzzle={puzzle.maxTriesPerPuzzle}

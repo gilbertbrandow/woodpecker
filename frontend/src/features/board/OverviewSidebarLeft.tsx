@@ -62,6 +62,15 @@ export function OverviewSidebarLeft({
   return (
     <aside className="hidden flex-1 flex-col gap-4 lg:flex" style={{ height: boardSize }}>
       <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
+      {pace !== null && <RunPaceCard pace={pace} chartData={run.paceChart} isRunActive={run.status === 'active'} />}
+      {afterStats !== null && (
+        <OverviewStatsSection
+          afterStats={afterStats}
+          accuracyDelta={accuracyDelta}
+          timeDelta={timeDelta}
+          runIndex={run.runIndex}
+        />
+      )}
       <ProgressCard
         runProgress={{
           label: `Run ${run.runIndex + 1}`,
@@ -76,15 +85,6 @@ export function OverviewSidebarLeft({
           delta: trainingProgressDelta,
         } : null}
       />
-      {afterStats !== null && (
-        <OverviewStatsSection
-          afterStats={afterStats}
-          accuracyDelta={accuracyDelta}
-          timeDelta={timeDelta}
-          runIndex={run.runIndex}
-        />
-      )}
-      {pace !== null && <RunPaceCard pace={pace} chartData={run.paceChart} isRunActive={run.status === 'active'} />}
     </aside>
   )
 }
