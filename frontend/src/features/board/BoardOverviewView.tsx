@@ -355,7 +355,12 @@ export function BoardOverviewView({
   } = selectionModel
 
   const stableAllRuns = overview.allRuns ?? lastOverviewAllRunsRef.current
-  const trainingProgressDelta = computeTrainingProgressDelta(runProgressDelta, stableAllRuns ?? [])
+  const trainingTotalPuzzles = participation !== null
+    ? participation.schedule.runCount * participation.schedule.subset.puzzleCount
+    : null
+  const trainingTotalForDelta = trainingTotalPuzzles
+    ?? (stableAllRuns !== null ? stableAllRuns.reduce((s, r) => s + r.totalPuzzles, 0) : 0)
+  const trainingProgressDelta = computeTrainingProgressDelta(runProgressDelta, trainingTotalForDelta)
 
   const mobileExtras = (
     <div className="mt-3 flex flex-col gap-3">
@@ -471,6 +476,7 @@ export function BoardOverviewView({
           runProgressDelta={runProgressDelta}
           allRuns={stableAllRuns}
           trainingProgressDelta={trainingProgressDelta}
+          trainingTotalPuzzles={trainingTotalPuzzles}
           scheduleName={participation?.schedule.name ?? null}
           boardSize={board.boardSize}
         />

@@ -20,6 +20,7 @@ type OverviewSidebarLeftProps = {
   runProgressDelta: number | null
   allRuns: Run[] | null
   trainingProgressDelta: number | null
+  trainingTotalPuzzles: number | null
   scheduleName: string | null
   boardSize: number
 }
@@ -36,6 +37,7 @@ export function OverviewSidebarLeft({
   runProgressDelta,
   allRuns,
   trainingProgressDelta,
+  trainingTotalPuzzles,
   scheduleName,
   boardSize,
 }: OverviewSidebarLeftProps): React.ReactElement {
@@ -44,9 +46,9 @@ export function OverviewSidebarLeft({
   const trainingResolved = allRuns !== null
     ? allRuns.reduce((s, r) => s + r.solvedCount + r.solvedWithRetriesCount + r.failedCount, 0)
     : 0
-  const trainingTotal = allRuns !== null
+  const trainingTotal = trainingTotalPuzzles ?? (allRuns !== null
     ? allRuns.reduce((s, r) => s + r.totalPuzzles, 0)
-    : 0
+    : 0)
 
   return (
     <aside className="hidden flex-1 flex-col gap-4 lg:flex" style={{ height: boardSize }}>
@@ -69,7 +71,7 @@ export function OverviewSidebarLeft({
         }}
         trainingProgress={allRuns !== null ? {
           label: `${scheduleName ?? 'Training'}`,
-          value: computeTrainingProgressPct(allRuns),
+          value: computeTrainingProgressPct(trainingResolved, trainingTotal),
           tooltipLabel: `${formatNumber(trainingResolved)} of ${formatNumber(trainingTotal)} puzzles completed across all runs`,
           delta: trainingProgressDelta,
         } : null}
