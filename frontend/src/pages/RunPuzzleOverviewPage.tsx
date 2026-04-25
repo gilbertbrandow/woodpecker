@@ -95,9 +95,10 @@ function computeStats(puzzles: RunPuzzleListItem[], excludeId?: number): StatsRe
   const solved = resolved.filter(
     (p) => p.positionStatus === 'solved' || p.positionStatus === 'solved_with_retries',
   )
+  const firstAttemptSolved = resolved.filter((p) => p.positionStatus === 'solved')
   const times = solved.map((p) => p.timeMs).filter((t): t is number => t !== null)
   return {
-    accuracy: resolved.length > 0 ? (solved.length / resolved.length) * 100 : null,
+    accuracy: resolved.length > 0 ? (firstAttemptSolved.length / resolved.length) * 100 : null,
     avgTimeMs: times.length > 0 ? Math.round(times.reduce((a, b) => a + b, 0) / times.length) : null,
     solvedCount: solved.length,
     resolvedCount: resolved.length,

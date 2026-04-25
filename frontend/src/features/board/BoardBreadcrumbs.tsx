@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Link } from '@tanstack/react-router'
+import { Home } from 'lucide-react'
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -31,11 +32,11 @@ export function BoardBreadcrumbs({
         <BreadcrumbItem>
           {linksDisabled ? (
             <BreadcrumbPage className={disabledClass} title="Navigation disabled while solving">
-              Dashboard
+              <Home className="h-3.5 w-3.5" />
             </BreadcrumbPage>
           ) : (
             <BreadcrumbLink asChild>
-              <Link to="/app">Dashboard</Link>
+              <Link to="/app" aria-label="Dashboard"><Home className="h-3.5 w-3.5" /></Link>
             </BreadcrumbLink>
           )}
         </BreadcrumbItem>

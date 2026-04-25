@@ -50,7 +50,7 @@ function InsightsTab({ run, puzzleList }: { run: Run; puzzleList: RunPuzzleList 
   const resolvedCount = run.solvedCount + run.solvedWithRetriesCount + run.failedCount
   const accuracy =
     resolvedCount > 0
-      ? (((run.solvedCount + run.solvedWithRetriesCount) / resolvedCount) * 100).toFixed(1)
+      ? ((run.solvedCount / resolvedCount) * 100).toFixed(1)
       : null
 
   const solvedTimes = puzzleList.puzzles
