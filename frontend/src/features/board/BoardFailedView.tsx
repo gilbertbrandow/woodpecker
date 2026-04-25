@@ -1,6 +1,5 @@
 import * as React from 'react'
 import { Clock, XCircle } from 'lucide-react'
-import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 import { AttemptTypeCard } from './AttemptTypeCard'
@@ -129,22 +128,9 @@ export function BoardFailedView({ puzzle, ctrl, runIdStr }: BoardFailedViewProps
   )
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex-none px-4 pt-3 pb-2 lg:hidden">
+    <div className="flex flex-1 flex-col overflow-hidden px-4 lg:px-0">
+      <div className="flex-none pt-3 pb-2 lg:hidden">
         <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
-        <div className="mt-1 flex items-center gap-2">
-          <Badge variant="outline">Failed</Badge>
-          {puzzle.maxTriesPerPuzzle > 1 && (
-            <span className="text-xs text-muted-foreground">
-              {(puzzle.currentTryNumber > puzzle.maxTriesPerPuzzle ||
-                puzzle.tries.some(
-                  (t) => t.status === 'solved' && t.tryNumber < puzzle.currentTryNumber,
-                ))
-                ? 'Practice attempt'
-                : `Attempt ${puzzle.currentTryNumber} / ${puzzle.maxTriesPerPuzzle}`}
-            </span>
-          )}
-        </div>
       </div>
       <div className="flex flex-1 items-center justify-center overflow-hidden lg:px-6">
         <div className="flex w-full items-start justify-center gap-6">

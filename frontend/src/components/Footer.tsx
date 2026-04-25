@@ -9,7 +9,7 @@ const HANS_TIKKANEN_URL = 'https://sv.wikipedia.org/wiki/Hans_Tikkanen'
 export function Footer(): React.ReactElement {
   return (
     <footer className="border-t border-border">
-      <div className="flex flex-wrap items-center justify-between gap-y-2 px-4 py-4 text-xs text-muted-foreground sm:px-6">
+      <div className="flex items-center justify-between px-4 py-4 text-xs text-muted-foreground sm:px-6">
         <a
           href={GITHUB_URL}
           target="_blank"
@@ -17,7 +17,7 @@ export function Footer(): React.ReactElement {
           className="flex items-center gap-1.5 transition-colors hover:text-foreground"
         >
           <Github className="h-3.5 w-3.5" />
-          GitHub
+          <span className="hidden sm:inline">GitHub</span>
         </a>
         <div className="flex items-center gap-2">
           <span>
@@ -44,9 +44,9 @@ export function Footer(): React.ReactElement {
             href={BOOK_URL}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="The Woodpecker Method on Amazon"
-            className="transition-colors hover:text-foreground"
+            className="flex items-center gap-1.5 transition-colors hover:text-foreground"
           >
+            <span className="hidden sm:inline">Get the book</span>
             <BookOpen className="h-3.5 w-3.5" />
           </a>
         </div>

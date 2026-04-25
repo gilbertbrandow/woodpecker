@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useLocation, useNavigate } from '@tanstack/react-router'
 import { Drawer, DrawerContent, DrawerTrigger } from '../../components/ui/drawer'
-import { ChevronUp, CheckCircle2, XCircle, Clock } from 'lucide-react'
+import { ChevronUp, CheckCircle2, XCircle, Clock, RotateCcw, ExternalLink, SkipForward } from 'lucide-react'
 import { toast } from 'sonner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 import { BoardBreadcrumbs } from './BoardBreadcrumbs'
@@ -9,14 +9,17 @@ import { BoardCenterColumn } from './BoardCenterColumn'
 import { OverviewSidebarLeft } from './OverviewSidebarLeft'
 import { OverviewSidebarRight } from './OverviewSidebarRight'
 import { OverviewStatsSection } from './OverviewStatsSection'
-import { OverviewActionsSection } from './OverviewActionsSection'
+import { Button, buttonVariants } from '../../components/ui/button'
 import { OverviewAttemptHistoryTable } from './OverviewAttemptHistoryTable'
 import { PuzzleMetaCard } from './PuzzleMetaCard'
 import { RunCompleteOverlay } from './RunCompleteOverlay'
+import { ProgressCard } from './ProgressCard'
+import { RunPaceCard } from './RunPaceCard'
 import { useOverviewSelectionModel } from './useOverviewSelectionModel'
 import { computeOverviewBoardState } from './boardOverview.helpers'
 import { buildPgnDisplay } from './boardOverview.pgn'
-import { formatTimer, computeTrainingProgressDelta } from './boardPage.helpers'
+import { formatTimer, computeTrainingProgressDelta, computeTrainingProgressPct } from './boardPage.helpers'
+import { cn, formatNumber } from '../../lib/utils'
 import { api } from '../../lib/api'
 import type { PuzzleRunReference, RunPuzzleFull } from '../../lib/api'
 import type { BoardPageControllerResult, BoardState } from './useBoardPageController'
@@ -318,8 +321,8 @@ export function BoardOverviewView({
 
   if (isLoading || selectionModel === null) {
     return (
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <div className="flex-none px-4 pt-3 pb-2 lg:hidden">
+      <div className="flex flex-1 flex-col overflow-hidden px-4 lg:px-0">
+        <div className="flex-none pt-3 pb-2 lg:hidden">
           <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
         </div>
         <div className="flex flex-1 items-center justify-center overflow-hidden lg:px-6">
@@ -362,8 +365,23 @@ export function BoardOverviewView({
     ?? (stableAllRuns !== null ? stableAllRuns.reduce((s, r) => s + r.totalPuzzles, 0) : 0)
   const trainingProgressDelta = computeTrainingProgressDelta(runProgressDelta, trainingTotalForDelta)
 
+  const resolvedCount = run.solvedCount + run.solvedWithRetriesCount + run.failedCount
+  const trainingResolved = stableAllRuns !== null
+    ? stableAllRuns.reduce((s, r) => s + r.solvedCount + r.solvedWithRetriesCount + r.failedCount, 0)
+    : 0
+  const trainingTotal = trainingTotalPuzzles ?? (stableAllRuns !== null
+    ? stableAllRuns.reduce((s, r) => s + r.totalPuzzles, 0)
+    : 0)
+
+  const nextPuzzleDisabledReason =
+    run.status === 'completed'
+      ? 'Run complete'
+      : run.status === 'aborted'
+        ? 'Run aborted'
+        : null
+
   const mobileExtras = (
-    <div className="mt-3 flex flex-col gap-3">
+    <div className="mt-3 flex flex-col gap-2 pb-3">
       <div className="flex items-center gap-2">
         <span className="tabular-nums text-sm font-medium">{formatTimer(frozenTimerTenths)}</span>
         {metTargetTime !== null && (
@@ -406,14 +424,55 @@ export function BoardOverviewView({
             </TooltipContent>
           </Tooltip>
         )}
+        <div className="ml-auto flex items-center gap-1">
+          <Tooltip delayDuration={100}>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                disabled={isLoadingNextPuzzle}
+                onClick={() => void actions.handleRetake()}
+              >
+                <RotateCcw className="h-4 w-4" />
+                <span className="sr-only">Retake</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Retake</TooltipContent>
+          </Tooltip>
+          <Tooltip delayDuration={100}>
+            <TooltipTrigger asChild>
+              <a
+                href={effectivePuzzle.gameUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'h-8 w-8')}
+              >
+                <ExternalLink className="h-4 w-4" />
+                <span className="sr-only">Analyze</span>
+              </a>
+            </TooltipTrigger>
+            <TooltipContent>Analyze</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
-      <OverviewActionsSection
-        run={run}
-        isLoadingNextPuzzle={isLoadingNextPuzzle}
-        gameUrl={effectivePuzzle.gameUrl}
-        onNextPuzzle={() => void actions.handleNextPuzzle()}
-        onRetake={() => void actions.handleRetake()}
-      />
+      <Tooltip delayDuration={100}>
+        <TooltipTrigger asChild>
+          <span className="w-full">
+            <Button
+              className="w-full bg-foreground text-background hover:bg-foreground/90"
+              disabled={run.status !== 'active' || isLoadingNextPuzzle}
+              onClick={() => void actions.handleNextPuzzle()}
+            >
+              <SkipForward className="mr-2 h-4 w-4" />
+              Next puzzle
+            </Button>
+          </span>
+        </TooltipTrigger>
+        {nextPuzzleDisabledReason !== null && (
+          <TooltipContent>{nextPuzzleDisabledReason}</TooltipContent>
+        )}
+      </Tooltip>
       <Drawer modal={false}>
         <DrawerTrigger asChild>
           <button
@@ -424,8 +483,8 @@ export function BoardOverviewView({
             Stats &amp; history
           </button>
         </DrawerTrigger>
-        <DrawerContent className="max-h-[75vh]">
-          <div className="overflow-y-auto px-4 pb-6 pt-2">
+        <DrawerContent className="flex h-[82dvh] flex-col">
+          <div className="flex-1 overflow-y-auto px-4 pb-6 pt-2" data-vaul-no-drag>
             <div className="flex flex-col gap-5">
               {afterStats !== null && (
                 <OverviewStatsSection
@@ -435,6 +494,23 @@ export function BoardOverviewView({
                   runIndex={run.runIndex}
                 />
               )}
+              {run.paceChart !== null && (
+                <RunPaceCard chartData={run.paceChart} isRunActive={run.status === 'active'} />
+              )}
+              <ProgressCard
+                runProgress={{
+                  label: `Run ${run.runIndex + 1}`,
+                  value: runProgressPct,
+                  tooltipLabel: `${formatNumber(resolvedCount)} of ${formatNumber(run.totalPuzzles)} puzzles completed`,
+                  delta: runProgressDelta,
+                }}
+                trainingProgress={stableAllRuns !== null ? {
+                  label: participation?.schedule.name ?? 'Training',
+                  value: computeTrainingProgressPct(trainingResolved, trainingTotal),
+                  tooltipLabel: `${formatNumber(trainingResolved)} of ${formatNumber(trainingTotal)} puzzles completed across all runs`,
+                  delta: trainingProgressDelta,
+                } : null}
+              />
               <OverviewAttemptHistoryTable
                 rows={historyRows}
                 selectedAttemptId={selectedAttemptId}
@@ -458,8 +534,8 @@ export function BoardOverviewView({
   )
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex-none px-4 pt-3 pb-2 lg:hidden">
+    <div className="flex flex-1 flex-col overflow-hidden px-4 lg:px-0">
+      <div className="flex-none pt-3 pb-2 lg:hidden">
         <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} />
       </div>
       <div className="flex flex-1 items-center justify-center overflow-hidden lg:px-6">

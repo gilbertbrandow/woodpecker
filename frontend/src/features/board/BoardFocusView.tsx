@@ -72,20 +72,9 @@ export function BoardFocusView({ puzzle, ctrl, runIdStr }: BoardFocusViewProps):
   )
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex-none px-4 pt-3 pb-2 lg:hidden">
+    <div className="flex flex-1 flex-col overflow-hidden px-4 lg:px-0">
+      <div className="flex-none pt-3 pb-2 lg:hidden">
         <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} linksDisabled={true} />
-        {puzzle.maxTriesPerPuzzle > 1 && (
-          <div className="mt-1">
-            {puzzle.currentTryNumber <= puzzle.maxTriesPerPuzzle ? (
-              <span className="text-xs text-muted-foreground">
-                Attempt {puzzle.currentTryNumber} / {puzzle.maxTriesPerPuzzle}
-              </span>
-            ) : (
-              <span className="text-xs text-muted-foreground">Practice attempt</span>
-            )}
-          </div>
-        )}
       </div>
       <div className="flex flex-1 items-center justify-center overflow-hidden lg:px-6">
         <div className="flex w-full items-start justify-center gap-6">
@@ -104,6 +93,14 @@ export function BoardFocusView({ puzzle, ctrl, runIdStr }: BoardFocusViewProps):
             attemptHistory={session.attemptHistory}
             runId={runIdStr}
             stripInteractive={false}
+            mobileHeader={
+              <AttemptTypeCard
+                currentTryNumber={puzzle.currentTryNumber}
+                maxTriesPerPuzzle={puzzle.maxTriesPerPuzzle}
+                tries={puzzle.tries}
+                compact={true}
+              />
+            }
             mobileExtras={mobileExtras}
             timerBar={session.allPliesPlayed.length === 0 ? null : (() => {
               const { elapsedTenths, targetSolveTenths } = timer
