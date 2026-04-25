@@ -76,7 +76,7 @@ export function BoardFocusView({ puzzle, ctrl, runIdStr }: BoardFocusViewProps):
       <div className="flex-none pt-3 pb-2 lg:hidden">
         <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} linksDisabled={true} />
       </div>
-      <div className="flex flex-1 items-center justify-center overflow-hidden lg:px-6">
+      <div className="flex flex-1 items-start justify-center overflow-hidden lg:items-center lg:px-6">
         <div className="flex w-full items-start justify-center gap-6">
           <aside className="hidden flex-1 flex-col gap-4 lg:flex" style={{ height: board.boardSize }}>
             <BoardBreadcrumbs puzzle={puzzle} participationId={participationId} runIdStr={runIdStr} linksDisabled={true} />
