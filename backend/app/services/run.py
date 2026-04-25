@@ -674,6 +674,8 @@ def complete_attempt(
                     if run.run_index == run_count - 1:
                         participation.completed_at = now
 
+    run_just_completed = run.completed_at == now
+
     db.session.commit()
 
     next_run_puzzle_id: int | None = None
@@ -685,6 +687,7 @@ def complete_attempt(
         "triesRemaining": tries_remaining,
         "markedForRetry": False,
         "nextRunPuzzleId": next_run_puzzle_id,
+        "runCompleted": run_just_completed,
     }
 
 

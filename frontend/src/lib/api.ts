@@ -330,6 +330,7 @@ export type CompleteAttemptResult = {
   triesRemaining: number
   markedForRetry: boolean
   nextRunPuzzleId: number | null
+  runCompleted: boolean
 }
 
 export type PuzzleRunReference = {

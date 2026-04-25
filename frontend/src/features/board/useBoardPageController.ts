@@ -601,13 +601,15 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
           setOverviewFreshPuzzle(optimisticPuzzle)
           setOverviewRun(currentRun)
         }
-        if (result.positionResolved && result.nextRunPuzzleId === null) {
+        if (result.runCompleted) {
           setRunJustCompleted(true)
         }
         navigateToOverview(id, false)
       } else {
         if (result.positionResolved && result.nextRunPuzzleId === null) {
-          setRunJustCompleted(true)
+          if (result.runCompleted) {
+            setRunJustCompleted(true)
+          }
           navigateToOverview(id, false)
         } else {
           enterFailed()
