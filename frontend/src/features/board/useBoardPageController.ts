@@ -384,6 +384,14 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       return
     }
 
+    if (
+      modeRef.current === 'focus' &&
+      currentAttemptIdRef.current !== null &&
+      currentAttemptIdRef.current === attemptId
+    ) {
+      return
+    }
+
     void (async () => {
       try {
         setParticipationId(null)
