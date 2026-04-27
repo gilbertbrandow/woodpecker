@@ -3,23 +3,16 @@ import { RotateCcw, ExternalLink, SkipForward } from 'lucide-react'
 import { Button, buttonVariants } from '../../components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 import { cn } from '../../lib/utils'
-import type { Run } from '../../lib/api'
 
 type OverviewActionsSectionProps = {
-  run: Run
+  nextPuzzleDisabledReason: string | null
   isLoadingNextPuzzle: boolean
   gameUrl: string
   onNextPuzzle: () => void
   onRetake: () => void
 }
 
-export function OverviewActionsSection({ run, isLoadingNextPuzzle, gameUrl, onNextPuzzle, onRetake }: OverviewActionsSectionProps): React.ReactElement {
-  const nextPuzzleDisabledReason =
-    run.status === 'completed'
-      ? 'Run complete'
-      : run.status === 'aborted'
-        ? 'Run aborted'
-        : null
+export function OverviewActionsSection({ nextPuzzleDisabledReason, isLoadingNextPuzzle, gameUrl, onNextPuzzle, onRetake }: OverviewActionsSectionProps): React.ReactElement {
 
   return (
     <div className="mt-auto flex flex-col gap-3">
@@ -48,7 +41,7 @@ export function OverviewActionsSection({ run, isLoadingNextPuzzle, gameUrl, onNe
           <span className="w-full">
             <Button
               className="w-full bg-foreground text-background hover:bg-foreground/90"
-              disabled={run.status !== 'active' || isLoadingNextPuzzle}
+              disabled={nextPuzzleDisabledReason !== null || isLoadingNextPuzzle}
               onClick={onNextPuzzle}
             >
               <SkipForward className="mr-2 h-4 w-4" />

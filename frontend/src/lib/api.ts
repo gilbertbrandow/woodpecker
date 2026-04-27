@@ -239,6 +239,32 @@ export type PositionStatus =
 
 type PaceChartTick = { timeMs: number; actual: number | null; projection: number | null; target: number }
 
+export type RunPuzzleAttemptEntry = {
+  id: number
+  tryNumber: number
+  status: 'in_progress' | 'solved' | 'failed'
+  timeSpentMs: number | null
+}
+
+export type RunPuzzleFull = {
+  runPuzzleId: number
+  position: number
+  positionStatus: PositionStatus
+  puzzleId: string
+  fen: string
+  solution: string
+  rating: number
+  gameUrl: string
+  maxTriesPerPuzzle: number
+  currentTryNumber: number
+  currentAttemptId: number | null
+  tries: RunPuzzleAttemptEntry[]
+  totalPuzzles: number
+  scheduleName: string
+  runIndex: number
+  themes: PuzzleLabel[]
+}
+
 export type PaceChartData = {
   startMs: number
   deadlineMs: number
@@ -296,42 +322,198 @@ export type Schedule = {
   lockedAt: string | null
 }
 
-export type AttemptSummary = {
+export type DisplayMove = {
+  san: string
+  uci: string
+  fen: string
+  from: string
+  to: string
+  moveNumber: number
+  isWhite: boolean
+  moveStatus: 'correct' | 'wrong' | 'opponent' | null
+}
+
+export type PuzzleMetaPgnDisplay = {
+  mainline: DisplayMove[]
+  variation: DisplayMove[] | null
+}
+
+export type OverviewAttemptBoardView = {
+  terminalFen: string | null
+  lastMove: [string, string] | null
+  result: 'correct' | 'wrong' | null
+}
+
+export type OverviewAttemptView = {
   id: number
+  runId: number
+  runIndex: number
+  runPuzzleId: number
   tryNumber: number
-  status: 'in_progress' | 'solved' | 'failed'
+  status: 'solved' | 'failed' | 'in_progress'
   startedAt: string
   completedAt: string | null
   timeSpentMs: number | null
   moves: string[]
+  attemptType: 'scored' | 'practice'
+  isQualifying: boolean
+  countsTowardsTraining: boolean
+  countsTowardsProgress: boolean
+  countsTowardsAccuracy: boolean
+  countsTowardsAverageTime: boolean
+  board: OverviewAttemptBoardView | null
+  pgnDisplay: PuzzleMetaPgnDisplay | null
+  impact: {
+    runProgressDeltaPct: number | null
+    trainingProgressDeltaPct: number | null
+    accuracyDeltaPct: number | null
+    averageSolveTimeDeltaMs: number | null
+  }
 }
 
-export type RunPuzzleFull = {
-  runPuzzleId: number
-  position: number
-  positionStatus: PositionStatus
-  puzzleId: string
-  fen: string
-  solution: string
-  rating: number
-  gameUrl: string
-  maxTriesPerPuzzle: number
-  currentTryNumber: number
-  currentAttemptId: number | null
-  tries: AttemptSummary[]
-  totalPuzzles: number
-  scheduleName: string
+export type SamePuzzleRunOverview = {
+  runId: number
   runIndex: number
-  themes: PuzzleLabel[]
+  runPuzzleId: number
+  runPuzzleStatus: PositionStatus
+  attempts: OverviewAttemptView[]
+}
+
+export type ProgressRowView = {
+  label: string
+  value: number
+  tooltipLabel: string
+  delta: number | null
+}
+
+export type RunPuzzleOverview = {
+  runPuzzle: {
+    id: number
+    runId: number
+    runIndex: number
+    position: number
+    status: PositionStatus
+    triesRemaining: number
+    maxTriesPerPuzzle: number
+    qualifyingAttemptId: number | null
+    participationId: number | null
+    scheduleName: string | null
+  }
+  puzzle: {
+    puzzleId: string
+    fen: string
+    solution: string[]
+    rating: number
+    themes: PuzzleLabel[]
+    gameUrl: string
+  }
+  selectedAttemptId: number | null
+  attempts: OverviewAttemptView[]
+  samePuzzleAcrossRuns: SamePuzzleRunOverview[]
+  runPace: {
+    chartData: PaceChartData | null
+    isRunActive: boolean
+  }
+  stats: {
+    runIndex: number
+    accuracy: {
+      valuePct: number | null
+      deltaPct: number | null
+      solvedCount: number
+      resolvedCount: number
+    }
+    averageSolveTime: {
+      valueMs: number | null
+      deltaMs: number | null
+      timeCount: number
+    }
+  }
+  progress: {
+    runProgress: ProgressRowView
+    trainingProgress: ProgressRowView | null
+  }
+  actions: {
+    runStatus: RunStatus
+    retake: { enabled: boolean }
+    analyze: { enabled: boolean; url: string }
+    nextPuzzle: { enabled: boolean; disabledReason: string | null }
+  }
+  timer: {
+    targetSolveTenths: number | null
+  }
+  runCompleteOverlay: {
+    completedByAttemptId: number
+    runId: number
+    runIndex: number
+    summary: {
+      totalPuzzles: number
+      solvedCount: number
+      solvedWithRetriesCount: number
+      failedCount: number
+      accuracyPct: number | null
+      averageSolveTimeMs: number | null
+    }
+  } | null
+}
+
+export type SessionAttemptStripItemView = {
+  id: number
+  tryNumber: number
+  status: 'in_progress' | 'solved' | 'failed'
+  attemptType: 'scored' | 'practice'
+}
+
+export type RunPuzzleAttemptView = {
+  runPuzzle: {
+    id: number
+    runId: number
+    runIndex: number
+    position: number
+    status: PositionStatus
+    triesRemaining: number
+    currentTryNumber: number
+    maxTriesPerPuzzle: number
+    participationId: number | null
+    scheduleName: string | null
+  }
+  puzzle: {
+    puzzleId: string
+    fen: string
+    solution: string[]
+    rating: number
+    themes: PuzzleLabel[]
+    gameUrl: string
+  }
+  attempt: {
+    id: number
+    tryNumber: number
+    startedAt: string
+    attemptType: 'scored' | 'practice'
+    countsTowardsTraining: boolean
+    countsTowardsProgress: boolean
+    countsTowardsAccuracy: boolean
+    countsTowardsAverageTime: boolean
+  }
+  timer: {
+    targetSolveTenths: number | null
+  }
+  sessionAttempts: SessionAttemptStripItemView[]
 }
 
 export type CompleteAttemptResult = {
-  positionResolved: boolean
-  triesRemaining: number
-  markedForRetry: boolean
-  nextRunPuzzleId: number | null
-  runCompleted: boolean
+  completedAttemptId: number
+  outcome: 'solved' | 'failed'
+  runCompletedByThisAttempt: boolean
+  overview: RunPuzzleOverview
 }
+
+export type GetAttemptResponse =
+  | { kind: 'active_attempt'; attemptView: RunPuzzleAttemptView }
+  | { kind: 'completed_attempt'; overviewUrl: string; overview: RunPuzzleOverview }
+
+export type ContinueRunResult =
+  | { runCompleted: true; attemptView: null }
+  | { runCompleted: false; attemptView: RunPuzzleAttemptView }
 
 export type PuzzleRunReference = {
   runId: number
@@ -461,20 +643,36 @@ export const api = {
     puzzles: (runId: number): Promise<RunPuzzleList> => request(`/runs/${runId}/puzzles`),
     getPuzzle: (runId: number, runPuzzleId: number): Promise<RunPuzzleFull> =>
       request(`/runs/${runId}/puzzles/${runPuzzleId}`),
-    startPuzzle: (runId: number, runPuzzleId: number): Promise<RunPuzzleFull> =>
-      request(`/runs/${runId}/puzzles/${runPuzzleId}/start`, { method: 'POST' }),
-    continue: (runId: number): Promise<RunPuzzleFull> =>
+    getOverview: (
+      runId: number,
+      runPuzzleId: number,
+      attemptId?: number,
+    ): Promise<{ overview: RunPuzzleOverview; selectedAttemptId: number | null }> => {
+      const qs = attemptId !== undefined ? `?attempt=${attemptId}` : ''
+      return request(`/runs/${runId}/puzzles/${runPuzzleId}/overview${qs}`)
+    },
+    getAttempt: (
+      runId: number,
+      runPuzzleId: number,
+      attemptId: number,
+    ): Promise<GetAttemptResponse> =>
+      request(`/runs/${runId}/puzzles/${runPuzzleId}/attempts/${attemptId}`),
+    startPuzzle: (runId: number, runPuzzleId: number): Promise<RunPuzzleAttemptView> =>
+      request(`/runs/${runId}/puzzles/${runPuzzleId}/attempts`, { method: 'POST' }),
+    continue: (runId: number): Promise<ContinueRunResult> =>
       request(`/runs/${runId}/continue`, { method: 'POST' }),
   },
   attempts: {
     complete: (
+      runId: number,
+      runPuzzleId: number,
       attemptId: number,
-      status: 'solved' | 'failed',
-      moves: string[],
+      uciMoves: string[],
+      clientTimeSpentMs: number,
     ): Promise<CompleteAttemptResult> =>
-      request(`/attempts/${attemptId}/complete`, {
+      request(`/runs/${runId}/puzzles/${runPuzzleId}/attempts/${attemptId}/complete`, {
         method: 'POST',
-        body: JSON.stringify({ status, moves }),
+        body: JSON.stringify({ uciMoves, clientTimeSpentMs }),
       }),
   },
 }

@@ -34,14 +34,9 @@ export function PuzzleResolverPage(): React.ReactElement {
 
         if (!TERMINAL_STATUSES.has(puzzle.positionStatus)) {
           const started = await api.runs.startPuzzle(runId, runPuzzleId)
-          if (started.currentAttemptId === null) {
-            toast.error('Could not start puzzle', { description: 'Please try again.' })
-            void navigate({ to: '/app/runs/$runId', params: { runId: runIdStr }, replace: true })
-            return
-          }
           void navigate({
             to: '/app/runs/$runId/puzzles/$runPuzzleId/attempts/$attemptId',
-            params: { ...base, attemptId: String(started.currentAttemptId) },
+            params: { ...base, attemptId: String(started.attempt.id) },
             replace: true,
           })
           return

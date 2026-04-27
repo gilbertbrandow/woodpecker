@@ -1,27 +1,23 @@
 import * as React from 'react'
 import confetti from 'canvas-confetti'
 import { X } from 'lucide-react'
-import { Link } from '@tanstack/react-router'
 import { Button } from '../../components/ui/button'
-import type { Run, ScheduleParticipation } from '../../lib/api'
+import type { RunPuzzleOverview } from '../../lib/api'
 
 type RunCompleteOverlayProps = {
-  run: Run
-  participation: ScheduleParticipation
+  overlayData: NonNullable<RunPuzzleOverview['runCompleteOverlay']>
   onStartNextRun: () => Promise<void>
   isLoading: boolean
   onClose: () => void
 }
 
 export function RunCompleteOverlay({
-  run,
-  participation,
+  overlayData,
   onStartNextRun,
   isLoading,
   onClose,
 }: RunCompleteOverlayProps): React.ReactElement {
   const containerRef = React.useRef<HTMLDivElement>(null)
-  const isLastRun = run.runIndex + 1 >= participation.schedule.runCount
 
   React.useEffect(() => {
     const el = containerRef.current
@@ -53,34 +49,17 @@ export function RunCompleteOverlay({
         <X className="h-4 w-4" />
       </button>
       <div className="flex flex-col items-center gap-3 px-6 text-center">
-        {isLastRun ? (
-          <>
-            <p className="text-lg font-semibold">Training complete!</p>
-            <p className="text-sm text-muted-foreground">
-              You&apos;ve finished all {participation.schedule.runCount} runs.
-            </p>
-            <Link
-              to="/app/participations/$participationId"
-              params={{ participationId: String(participation.id) }}
-            >
-              <Button variant="outline" size="sm">View training</Button>
-            </Link>
-          </>
-        ) : (
-          <>
-            <p className="text-lg font-semibold">Run {run.runIndex + 1} complete!</p>
-            <p className="text-sm text-muted-foreground">
-              Ready for run {run.runIndex + 2}?
-            </p>
-            <Button
-              size="sm"
-              onClick={() => void onStartNextRun()}
-              disabled={isLoading}
-            >
-              {isLoading ? 'Starting…' : 'Start next run'}
-            </Button>
-          </>
-        )}
+        <p className="text-lg font-semibold">Run {overlayData.runIndex + 1} complete!</p>
+        <p className="text-sm text-muted-foreground">
+          Ready for run {overlayData.runIndex + 2}?
+        </p>
+        <Button
+          size="sm"
+          onClick={() => void onStartNextRun()}
+          disabled={isLoading}
+        >
+          {isLoading ? 'Starting…' : 'Start next run'}
+        </Button>
       </div>
     </div>
   )

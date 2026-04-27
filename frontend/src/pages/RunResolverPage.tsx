@@ -12,18 +12,19 @@ export function RunResolverPage(): React.ReactElement {
   useEffect(() => {
     api.runs
       .continue(runId)
-      .then((puzzle) => {
-        if (puzzle.currentAttemptId === null) {
+      .then((result) => {
+        if (result.runCompleted || result.attemptView === null) {
           toast.error('Run is complete', { description: 'No more puzzles to solve.' })
           void navigate({ to: '/app/runs/$runId', params: { runId: runIdStr }, replace: true })
           return
         }
+        const av = result.attemptView
         void navigate({
           to: '/app/runs/$runId/puzzles/$runPuzzleId/attempts/$attemptId',
           params: {
             runId: runIdStr,
-            runPuzzleId: String(puzzle.runPuzzleId),
-            attemptId: String(puzzle.currentAttemptId),
+            runPuzzleId: String(av.runPuzzle.id),
+            attemptId: String(av.attempt.id),
           },
           replace: true,
         })

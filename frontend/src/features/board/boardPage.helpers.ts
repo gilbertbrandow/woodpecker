@@ -1,5 +1,5 @@
 import { Chess } from 'chess.js'
-import type { RunPuzzleListItem, PositionStatus, AttemptSummary, Run } from '../../lib/api'
+import type { DisplayMove, PositionStatus, PuzzleMetaPgnDisplay } from '../../lib/api'
 
 export type Mode = 'loading' | 'focus' | 'failed' | 'overview'
 export type Orientation = 'white' | 'black'
@@ -9,14 +9,6 @@ export type MoveFeedbackState = {
   lastMoveResult: MoveFeedbackResult | null
   lastMoveSquare: string | null
   isShowingMoveFeedback: boolean
-}
-
-export type StatsResult = {
-  accuracy: number | null
-  avgTimeMs: number | null
-  solvedCount: number
-  resolvedCount: number
-  timeCount: number
 }
 
 export const HEADER_H = 57
@@ -130,86 +122,6 @@ export function computeFinalFen(fen: string, solutionMoves: string[]): string {
   return chess.fen()
 }
 
-export function computeStats(puzzles: RunPuzzleListItem[], excludeId?: number): StatsResult {
-  const items = excludeId !== undefined ? puzzles.filter((p) => p.runPuzzleId !== excludeId) : puzzles
-  const resolved = items.filter((p) =>
-    p.positionStatus === 'solved' || p.positionStatus === 'solved_with_retries' || p.positionStatus === 'failed',
-  )
-  const solvedItems = resolved.filter(
-    (p) => p.positionStatus === 'solved' || p.positionStatus === 'solved_with_retries',
-  )
-  const firstAttemptSolved = resolved.filter((p) => p.positionStatus === 'solved')
-  const times = solvedItems.map((p) => p.timeMs).filter((t): t is number => t !== null)
-  return {
-    accuracy: resolved.length > 0 ? (firstAttemptSolved.length / resolved.length) * 100 : null,
-    avgTimeMs: times.length > 0 ? Math.round(times.reduce((a, b) => a + b, 0) / times.length) : null,
-    solvedCount: solvedItems.length,
-    resolvedCount: resolved.length,
-    timeCount: times.length,
-  }
-}
-
-// TEMPORARY: frontend reconstruction of backend semantics.
-// If backend training logic evolves, this derivation can silently become wrong.
-// Preferred long-term solution: backend provides per-attempt flags (isQualifyingAttempt, countsTowardTraining, etc.).
-export function computeQualifyingAttemptId(
-  tries: AttemptSummary[],
-  maxTriesPerPuzzle: number,
-): number | null {
-  const queueAttempts = tries
-    .filter((a) => a.tryNumber <= maxTriesPerPuzzle && a.status !== 'in_progress')
-    .sort((a, b) => a.tryNumber - b.tryNumber)
-
-  const firstSolved = queueAttempts.find((a) => a.status === 'solved')
-  if (firstSolved) return firstSolved.id
-
-  if (queueAttempts.length >= maxTriesPerPuzzle) {
-    return queueAttempts[queueAttempts.length - 1].id
-  }
-
-  return null
-}
-
-export function computeFrozenTimerTenths(attempt: AttemptSummary): number {
-  return attempt.timeSpentMs !== null ? Math.round(attempt.timeSpentMs / 100) : 0
-}
-
-export function computeMetTargetTime(
-  attempt: AttemptSummary,
-  targetSolveTenths: number | null,
-): boolean | null {
-  if (attempt.timeSpentMs === null || targetSolveTenths === null || targetSolveTenths <= 0) return null
-  return Math.round(attempt.timeSpentMs / 100) <= targetSolveTenths
-}
-
-export function computeRunProgressPct(run: Run): number {
-  const resolved = run.solvedCount + run.solvedWithRetriesCount + run.failedCount
-  return run.totalPuzzles > 0 ? (resolved / run.totalPuzzles) * 100 : 0
-}
-
-export function computeRunProgressDelta(
-  selectedAttemptId: number,
-  qualifyingAttemptId: number | null,
-  totalPuzzles: number,
-): number | null {
-  if (qualifyingAttemptId !== selectedAttemptId) return null
-  return totalPuzzles > 0 ? (1 / totalPuzzles) * 100 : null
-}
-
-export function computeTrainingProgressPct(resolved: number, total: number): number {
-  if (total === 0) return 0
-  return (resolved / total) * 100
-}
-
-export function computeTrainingProgressDelta(
-  runProgressDelta: number | null,
-  total: number,
-): number | null {
-  if (runProgressDelta === null) return null
-  if (total === 0) return null
-  return (1 / total) * 100
-}
-
 export function formatTimeRemaining(ms: number): string {
   if (ms <= 0) return 'Overdue'
   const hours = ms / 3_600_000
@@ -221,4 +133,140 @@ export function formatTimeRemaining(ms: number): string {
   if (days >= 1) return `${days} day${days === 1 ? '' : 's'}`
   const h = Math.ceil(hours)
   return `${h} hour${h === 1 ? '' : 's'}`
+}
+
+export type PlySelection = {
+  line: 'main' | 'variation'
+  index: number
+}
+
+function applyUciDisplay(
+  chess: Chess,
+  uci: string,
+  moveStatus: DisplayMove['moveStatus'],
+): DisplayMove | null {
+  const isWhite = chess.turn() === 'w'
+  const moveNumber = parseInt(chess.fen().split(' ')[5], 10)
+  try {
+    const result = chess.move({
+      from: uci.slice(0, 2),
+      to: uci.slice(2, 4),
+      promotion: uci.length === 5 ? uci[4] : undefined,
+    })
+    if (!result) return null
+    return {
+      san: result.san,
+      uci,
+      fen: chess.fen(),
+      from: uci.slice(0, 2),
+      to: uci.slice(2, 4),
+      moveNumber,
+      isWhite,
+      moveStatus,
+    }
+  } catch {
+    return null
+  }
+}
+
+export function buildPgnDisplay(
+  baseFen: string,
+  attemptMoves: string[],
+  solutionMovesStr: string,
+  attemptStatus: 'solved' | 'failed' | 'in_progress',
+  retryPlies: string[] = [],
+  autoVariation: boolean = true,
+): PuzzleMetaPgnDisplay {
+  const solutionMoves = solutionMovesStr.split(' ').filter(Boolean)
+  if (solutionMoves.length === 0) return { mainline: [], variation: null }
+
+  if (attemptStatus === 'in_progress') {
+    const chess = new Chess(baseFen)
+    const mainline: DisplayMove[] = []
+    for (const uci of attemptMoves) {
+      const move = applyUciDisplay(chess, uci, null)
+      if (!move) break
+      mainline.push(move)
+    }
+    return { mainline, variation: null }
+  }
+
+  if (attemptStatus === 'solved') {
+    const chess = new Chess(baseFen)
+    const mainline: DisplayMove[] = []
+    const firstOpponent = applyUciDisplay(chess, solutionMoves[0], 'opponent')
+    if (!firstOpponent) return { mainline, variation: null }
+    mainline.push(firstOpponent)
+    for (let i = 0; i < attemptMoves.length; i++) {
+      const isLast = i === attemptMoves.length - 1
+      const userMove = applyUciDisplay(chess, attemptMoves[i], 'correct')
+      if (!userMove) break
+      mainline.push(userMove)
+      if (!isLast) {
+        const nextOpponentIndex = 2 * (i + 1)
+        if (nextOpponentIndex < solutionMoves.length) {
+          const oppMove = applyUciDisplay(chess, solutionMoves[nextOpponentIndex], 'opponent')
+          if (!oppMove) break
+          mainline.push(oppMove)
+        }
+      }
+    }
+    return { mainline, variation: null }
+  }
+
+  const chess = new Chess(baseFen)
+  const mainline: DisplayMove[] = []
+
+  const opponentFirst = applyUciDisplay(chess, solutionMoves[0], 'opponent')
+  if (!opponentFirst) return { mainline: [], variation: null }
+  mainline.push(opponentFirst)
+
+  if (attemptMoves.length === 0) {
+    return { mainline, variation: null }
+  }
+
+  let branchFen = chess.fen()
+  let actualFailedIdx = 0
+
+  for (let i = 0; i < attemptMoves.length; i++) {
+    actualFailedIdx = i
+    const isLastUserMove = i === attemptMoves.length - 1
+    const userStatus: DisplayMove['moveStatus'] = isLastUserMove ? 'wrong' : 'correct'
+
+    if (isLastUserMove) {
+      branchFen = chess.fen()
+    }
+
+    const userMove = applyUciDisplay(chess, attemptMoves[i], userStatus)
+    if (!userMove) break
+    mainline.push(userMove)
+
+    const opponentIdx = 2 + i * 2
+    if (!isLastUserMove && opponentIdx < solutionMoves.length) {
+      const oppMove = applyUciDisplay(chess, solutionMoves[opponentIdx], 'opponent')
+      if (!oppMove) break
+      mainline.push(oppMove)
+    }
+  }
+
+  const variationChess = new Chess(branchFen)
+  const variation: DisplayMove[] = []
+
+  if (retryPlies.length > 0) {
+    for (const uci of retryPlies) {
+      const move = applyUciDisplay(variationChess, uci, null)
+      if (!move) break
+      variation.push(move)
+    }
+  } else if (autoVariation) {
+    const correctStartIdx = actualFailedIdx * 2 + 1
+    for (let i = correctStartIdx; i < solutionMoves.length; i++) {
+      const status: DisplayMove['moveStatus'] = i % 2 === 0 ? 'opponent' : 'correct'
+      const move = applyUciDisplay(variationChess, solutionMoves[i], status)
+      if (!move) break
+      variation.push(move)
+    }
+  }
+
+  return { mainline, variation: variation.length > 0 ? variation : null }
 }

@@ -3,6 +3,8 @@ import random
 from datetime import datetime, timezone
 from typing import cast
 
+import chess
+
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 
@@ -11,7 +13,7 @@ from app.models.puzzle import Puzzle
 from app.models.run import MAX_PUZZLE_TIME_MS, PuzzleAttempt, Run, RunPuzzle
 from app.models.schedule import Schedule
 from app.models.schedule_participation import ScheduleParticipation
-from app.models.subset import SubsetPuzzle
+from app.models.subset import Subset, SubsetPuzzle
 
 
 def _get_owned_run(run_id: int, user_id: int) -> Run:
@@ -158,6 +160,120 @@ def _attempt_dict(attempt: PuzzleAttempt) -> dict[str, object]:
     }
 
 
+def _attempt_type_fields(
+    sorted_attempts: list[PuzzleAttempt],
+    current_try_number: int,
+    total_queue: int,
+) -> dict[str, object]:
+    is_beyond_queue = current_try_number > total_queue
+    already_solved_in_queue = any(
+        a.status == "solved" and a.try_number < current_try_number
+        for a in sorted_attempts
+        if a.status != "in_progress"
+    )
+    is_practice = is_beyond_queue or already_solved_in_queue
+    counts_towards = not is_practice
+    return {
+        "attemptType": "practice" if is_practice else "scored",
+        "countsTowardsTraining": counts_towards,
+        "countsTowardsProgress": counts_towards,
+        "countsTowardsAccuracy": counts_towards,
+        "countsTowardsAverageTime": counts_towards,
+    }
+
+
+def _session_attempt_strip_item(
+    attempt: PuzzleAttempt, total_queue: int
+) -> dict[str, object]:
+    sorted_for_type = [attempt]
+    type_data = _attempt_type_fields(sorted_for_type, attempt.try_number, total_queue)
+    return {
+        "id": attempt.id,
+        "tryNumber": attempt.try_number,
+        "status": attempt.status,
+        "attemptType": type_data["attemptType"],
+    }
+
+
+def _run_puzzle_attempt_view_dict(run_puzzle: RunPuzzle) -> dict[str, object]:
+    puzzle = db.session.get(Puzzle, run_puzzle.puzzle_id)
+    if puzzle is None:
+        raise LookupError("Puzzle not found.")
+    run = db.session.get(Run, run_puzzle.run_id)
+    if run is None:
+        raise LookupError("Run not found.")
+    _, config = _get_schedule_config(run)
+    total_queue = _total_queue_attempts(config)
+
+    sorted_attempts = sorted(run_puzzle.attempts, key=lambda a: a.try_number)
+    in_progress_attempt = next((a for a in sorted_attempts if a.status == "in_progress"), None)
+    if in_progress_attempt is None:
+        raise LookupError("No in-progress attempt found.")
+
+    participation = db.session.get(ScheduleParticipation, run.participation_id)
+    schedule = db.session.get(Schedule, participation.schedule_id) if participation else None
+    schedule_name: str | None = schedule.name if schedule is not None else None
+
+    position_status = _derive_position_status(sorted_attempts, total_queue)
+    position_resolved = position_status in ("solved", "solved_with_retries", "failed")
+    tries_in_window = sum(
+        1 for a in sorted_attempts
+        if a.status != "in_progress" and a.try_number <= total_queue
+    )
+    tries_remaining = max(0, total_queue - tries_in_window) if not position_resolved else 0
+
+    attempt_type_data = _attempt_type_fields(
+        sorted_attempts, in_progress_attempt.try_number, total_queue
+    )
+
+    target_solve_tenths: int | None = (
+        run.target_solve_seconds * 10 if run.target_solve_seconds is not None else None
+    )
+
+    return {
+        "runPuzzle": {
+            "id": run_puzzle.id,
+            "runId": run.id,
+            "runIndex": run.run_index,
+            "position": run_puzzle.position,
+            "status": position_status,
+            "triesRemaining": tries_remaining,
+            "currentTryNumber": in_progress_attempt.try_number,
+            "maxTriesPerPuzzle": total_queue,
+            "participationId": run.participation_id,
+            "scheduleName": schedule_name,
+        },
+        "puzzle": {
+            "puzzleId": puzzle.puzzle_id,
+            "fen": puzzle.fen,
+            "solution": puzzle.moves.split(),
+            "rating": puzzle.rating,
+            "themes": [
+                {"name": t.name, "displayName": t.display_name}
+                for t in puzzle.themes
+            ],
+            "gameUrl": puzzle.game_url,
+        },
+        "attempt": {
+            "id": in_progress_attempt.id,
+            "tryNumber": in_progress_attempt.try_number,
+            "startedAt": in_progress_attempt.started_at.isoformat(),
+            "attemptType": attempt_type_data["attemptType"],
+            "countsTowardsTraining": attempt_type_data["countsTowardsTraining"],
+            "countsTowardsProgress": attempt_type_data["countsTowardsProgress"],
+            "countsTowardsAccuracy": attempt_type_data["countsTowardsAccuracy"],
+            "countsTowardsAverageTime": attempt_type_data["countsTowardsAverageTime"],
+        },
+        "timer": {
+            "targetSolveTenths": target_solve_tenths,
+        },
+        "sessionAttempts": [
+            _session_attempt_strip_item(a, total_queue)
+            for a in sorted_attempts
+        ],
+    }
+
+
 def _run_puzzle_full_dict(run_puzzle: RunPuzzle) -> dict[str, object]:
     puzzle = db.session.get(Puzzle, run_puzzle.puzzle_id)
     if puzzle is None:
@@ -185,6 +301,8 @@ def _run_puzzle_full_dict(run_puzzle: RunPuzzle) -> dict[str, object]:
         current_try_number = 1
         current_attempt_id = None
 
+    attempt_type_data = _attempt_type_fields(sorted_attempts, current_try_number, total_queue)
+
     return {
         "runPuzzleId": run_puzzle.id,
         "position": run_puzzle.position,
@@ -205,6 +323,7 @@ def _run_puzzle_full_dict(run_puzzle: RunPuzzle) -> dict[str, object]:
             {"name": t.name, "displayName": t.display_name}
             for t in puzzle.themes
         ],
+        **attempt_type_data,
     }
 
 
@@ -522,18 +641,24 @@ def continue_run(run_id: int, user_id: int) -> dict[str, object]:
         run_puzzle = db.session.get(RunPuzzle, existing_attempt.run_puzzle_id)
         if run_puzzle is None:
             raise LookupError("Run puzzle not found.")
-        return _run_puzzle_full_dict(run_puzzle)
+        return {
+            "runCompleted": False,
+            "attemptView": _run_puzzle_attempt_view_dict(run_puzzle),
+        }
 
     next_id = _current_run_puzzle_id(run_id, total_queue)
     if next_id is None:
-        raise ValueError("Run is already complete.")
+        return {"runCompleted": True, "attemptView": None}
 
     run_puzzle = db.session.get(RunPuzzle, next_id)
     if run_puzzle is None:
         raise LookupError("Run puzzle not found.")
     _create_attempt_for_puzzle(run_puzzle)
     db.session.refresh(run_puzzle)
-    return _run_puzzle_full_dict(run_puzzle)
+    return {
+        "runCompleted": False,
+        "attemptView": _run_puzzle_attempt_view_dict(run_puzzle),
+    }
 
 
 def list_run_puzzles(run_id: int, user_id: int) -> dict[str, object]:
@@ -598,6 +723,710 @@ def get_run_puzzle(run_id: int, run_puzzle_id: int, user_id: int) -> dict[str, o
     return _run_puzzle_full_dict(run_puzzle)
 
 
+def _qualifying_attempt_id(
+    sorted_attempts: list[PuzzleAttempt], total_queue: int
+) -> int | None:
+    for a in sorted_attempts:
+        if a.status == "solved" and a.try_number <= total_queue:
+            return a.id
+    completed_in_window = [
+        a for a in sorted_attempts
+        if a.status != "in_progress" and a.try_number <= total_queue
+    ]
+    if len(completed_in_window) >= total_queue:
+        return completed_in_window[-1].id
+    return None
+
+
+def _compute_overview_stats(
+    run_puzzles: list[RunPuzzle],
+    total_queue: int,
+    focus_run_puzzle_id: int,
+    selected_attempt_id: int | None,
+) -> dict[str, object]:
+    def _stats_pass(
+        exclude_id: int | None,
+    ) -> tuple[int, int, int, list[int]]:
+        first_solved = 0
+        all_solved = 0
+        resolved = 0
+        times: list[int] = []
+
+        for rp in run_puzzles:
+            if exclude_id is not None and rp.id == exclude_id:
+                continue
+
+            completed = sorted(
+                [a for a in rp.attempts if a.status != "in_progress"],
+                key=lambda a: a.try_number,
+            )
+            queue_completed = [a for a in completed if a.try_number <= total_queue]
+            has_solved = any(a.status == "solved" for a in queue_completed)
+            all_failed = not has_solved and len(queue_completed) >= total_queue
+
+            if not (has_solved or all_failed):
+                continue
+
+            resolved += 1
+
+            if has_solved:
+                all_solved += 1
+                if queue_completed and queue_completed[0].status == "solved" and queue_completed[0].try_number == 1:
+                    first_solved += 1
+                if completed and completed[-1].time_spent_ms is not None:
+                    times.append(completed[-1].time_spent_ms)
+
+        return first_solved, all_solved, resolved, times
+
+    first_after, solved_after, resolved_after, times_after = _stats_pass(exclude_id=None)
+    first_before, _, resolved_before, times_before = _stats_pass(exclude_id=focus_run_puzzle_id)
+
+    acc_after = (first_after / resolved_after * 100) if resolved_after > 0 else None
+    acc_before = (first_before / resolved_before * 100) if resolved_before > 0 else None
+    avg_after = (sum(times_after) / len(times_after)) if times_after else None
+    avg_before = (sum(times_before) / len(times_before)) if times_before else None
+
+    focus_rp = next((rp for rp in run_puzzles if rp.id == focus_run_puzzle_id), None)
+    qualifying_attempt_id: int | None = None
+    if focus_rp is not None:
+        queue = sorted(
+            [a for a in focus_rp.attempts if a.try_number <= total_queue and a.status != "in_progress"],
+            key=lambda a: a.try_number,
+        )
+        first_solved_a = next((a for a in queue if a.status == "solved"), None)
+        if first_solved_a is not None:
+            qualifying_attempt_id = first_solved_a.id
+        elif len(queue) >= total_queue:
+            qualifying_attempt_id = queue[-1].id
+
+    is_qualifying = (
+        selected_attempt_id is not None
+        and qualifying_attempt_id is not None
+        and selected_attempt_id == qualifying_attempt_id
+    )
+
+    acc_delta: float | None = (
+        (acc_after - acc_before)
+        if is_qualifying and acc_after is not None and acc_before is not None and resolved_before > 0
+        else None
+    )
+    time_delta: float | None = (
+        (avg_after - avg_before)
+        if is_qualifying and avg_after is not None and avg_before is not None and len(times_before) > 0
+        else None
+    )
+
+    return {
+        "accuracy": {
+            "valuePct": acc_after,
+            "deltaPct": acc_delta,
+            "solvedCount": solved_after,
+            "resolvedCount": resolved_after,
+        },
+        "averageSolveTime": {
+            "valueMs": round(avg_after) if avg_after is not None else None,
+            "deltaMs": round(time_delta) if time_delta is not None else None,
+            "timeCount": len(times_after),
+        },
+    }
+
+
+def _compute_attempt_board(
+    fen: str,
+    solution: str,
+    attempt: PuzzleAttempt,
+) -> dict[str, object] | None:
+    if attempt.status == "in_progress":
+        return None
+
+    solution_plies = solution.split()
+    user_moves: list[str] = attempt.moves if isinstance(attempt.moves, list) else []
+
+    board = chess.Board(fen)
+
+    if attempt.status == "solved":
+        try:
+            board.push_uci(solution_plies[0])
+            player_idx = 0
+            opponent_idx = 2
+            for uci in user_moves:
+                board.push_uci(uci)
+                is_last_user = player_idx + 1 >= len(user_moves)
+                if not is_last_user and opponent_idx < len(solution_plies):
+                    board.push_uci(solution_plies[opponent_idx])
+                    opponent_idx += 2
+                player_idx += 1
+        except Exception:
+            pass
+        last_uci = user_moves[-1] if user_moves else None
+        last_move: list[str] | None = [last_uci[:2], last_uci[2:4]] if last_uci else None
+        return {
+            "terminalFen": board.fen(),
+            "lastMove": last_move,
+            "result": "correct",
+        }
+
+    try:
+        board.push_uci(solution_plies[0])
+        player_positions = list(range(1, len(solution_plies), 2))
+        for i, uci in enumerate(user_moves):
+            if i >= len(player_positions):
+                break
+            expected = solution_plies[player_positions[i]]
+            board.push_uci(uci)
+            if uci != expected and not board.is_checkmate():
+                last_move = [uci[:2], uci[2:4]]
+                return {
+                    "terminalFen": board.fen(),
+                    "lastMove": last_move,
+                    "result": "wrong",
+                }
+            if i + 1 < len(user_moves) and player_positions[i] + 1 < len(solution_plies):
+                board.push_uci(solution_plies[player_positions[i] + 1])
+    except Exception:
+        pass
+
+    return {"terminalFen": None, "lastMove": None, "result": None}
+
+
+def _compute_attempt_pgn(
+    fen: str,
+    solution: str,
+    attempt: PuzzleAttempt,
+) -> dict[str, object] | None:
+    if attempt.status == "in_progress":
+        return None
+
+    solution_plies = solution.split()
+    user_moves: list[str] = attempt.moves if isinstance(attempt.moves, list) else []
+
+    def _make_display_move(
+        board: chess.Board,
+        uci: str,
+        status: str | None,
+    ) -> dict[str, object] | None:
+        is_white = board.turn == chess.WHITE
+        move_number = board.fullmove_number
+        try:
+            move = chess.Move.from_uci(uci)
+            san = board.san(move)
+            board.push(move)
+            return {
+                "san": san,
+                "uci": uci,
+                "fen": board.fen(),
+                "from": uci[:2],
+                "to": uci[2:4],
+                "moveNumber": move_number,
+                "isWhite": is_white,
+                "moveStatus": status,
+            }
+        except Exception:
+            return None
+
+    mainline: list[dict[str, object]] = []
+    variation: list[dict[str, object]] | None = None
+
+    board = chess.Board(fen)
+    try:
+        opp_move = _make_display_move(board, solution_plies[0], "opponent")
+        if opp_move:
+            mainline.append(opp_move)
+    except Exception:
+        return {"mainline": mainline, "variation": None}
+
+    player_positions = list(range(1, len(solution_plies), 2))
+
+    if attempt.status == "solved":
+        for i, uci in enumerate(user_moves):
+            is_last = i == len(user_moves) - 1
+            dm = _make_display_move(board, uci, "correct")
+            if not dm:
+                break
+            mainline.append(dm)
+            if not is_last:
+                opp_idx = player_positions[i] + 1 if i < len(player_positions) else None
+                if opp_idx is not None and opp_idx < len(solution_plies):
+                    opp = _make_display_move(board, solution_plies[opp_idx], "opponent")
+                    if opp:
+                        mainline.append(opp)
+        return {"mainline": mainline, "variation": None}
+
+    for i, uci in enumerate(user_moves):
+        if i >= len(player_positions):
+            break
+        expected = solution_plies[player_positions[i]]
+        is_wrong = uci != expected
+        dm = _make_display_move(board, uci, "wrong" if is_wrong else "correct")
+        if not dm:
+            break
+        mainline.append(dm)
+        if is_wrong and not board.is_checkmate():
+            var_board = chess.Board(fen)
+            try:
+                var_board.push_uci(solution_plies[0])
+                for j in range(i):
+                    var_board.push_uci(user_moves[j])
+                    if player_positions[j] + 1 < len(solution_plies):
+                        var_board.push_uci(solution_plies[player_positions[j] + 1])
+            except Exception:
+                break
+            variation = []
+            var_idx = player_positions[i]
+            for k in range(var_idx, len(solution_plies)):
+                vdm = _make_display_move(
+                    var_board,
+                    solution_plies[k],
+                    "correct" if k % 2 == 1 else "opponent",
+                )
+                if not vdm:
+                    break
+                variation.append(vdm)
+            break
+        if i + 1 < len(user_moves) and player_positions[i] + 1 < len(solution_plies):
+            opp = _make_display_move(board, solution_plies[player_positions[i] + 1], "opponent")
+            if opp:
+                mainline.append(opp)
+
+    return {"mainline": mainline, "variation": variation}
+
+
+def _compute_attempt_impact(
+    attempt: PuzzleAttempt,
+    qualifying_attempt_id: int | None,
+    run_puzzles: list[RunPuzzle],
+    total_queue: int,
+    participation_id: int,
+) -> dict[str, object]:
+    is_qualifying = attempt.id == qualifying_attempt_id
+
+    run_progress_delta_pct: float | None = None
+    total_run_puzzles = len(run_puzzles)
+    if is_qualifying and total_run_puzzles > 0:
+        run_progress_delta_pct = round(1.0 / total_run_puzzles * 100, 2)
+
+    training_progress_delta_pct: float | None = None
+    if is_qualifying:
+        all_participation_runs = list(
+            db.session.scalars(
+                sa.select(Run).where(Run.participation_id == participation_id)
+            ).all()
+        )
+        total_training_puzzles = sum(
+            db.session.scalar(
+                sa.select(sa.func.count()).where(RunPuzzle.run_id == r.id)
+            ) or 0
+            for r in all_participation_runs
+        )
+        if total_training_puzzles > 0:
+            training_progress_delta_pct = round(1.0 / total_training_puzzles * 100, 2)
+
+    return {
+        "runProgressDeltaPct": run_progress_delta_pct,
+        "trainingProgressDeltaPct": training_progress_delta_pct,
+        "accuracyDeltaPct": None,
+        "averageSolveTimeDeltaMs": None,
+    }
+
+
+def _overview_attempt_view(
+    attempt: PuzzleAttempt,
+    run: Run,
+    run_puzzle: RunPuzzle,
+    qualifying_attempt_id: int | None,
+    total_queue: int,
+    puzzle_fen: str,
+    puzzle_solution: str,
+    run_puzzles: list[RunPuzzle],
+    participation_id: int,
+) -> dict[str, object]:
+    sorted_for_type = sorted(run_puzzle.attempts, key=lambda a: a.try_number)
+    type_data = _attempt_type_fields(sorted_for_type, attempt.try_number, total_queue)
+
+    impact = _compute_attempt_impact(
+        attempt, qualifying_attempt_id, run_puzzles, total_queue, participation_id
+    )
+
+    return {
+        "id": attempt.id,
+        "runId": run.id,
+        "runIndex": run.run_index,
+        "runPuzzleId": run_puzzle.id,
+        "tryNumber": attempt.try_number,
+        "status": attempt.status,
+        "startedAt": attempt.started_at.isoformat(),
+        "completedAt": attempt.completed_at.isoformat() if attempt.completed_at else None,
+        "timeSpentMs": attempt.time_spent_ms,
+        "moves": attempt.moves if isinstance(attempt.moves, list) else [],
+        "attemptType": type_data["attemptType"],
+        "isQualifying": attempt.id == qualifying_attempt_id,
+        "countsTowardsTraining": type_data["countsTowardsTraining"],
+        "countsTowardsProgress": type_data["countsTowardsProgress"],
+        "countsTowardsAccuracy": type_data["countsTowardsAccuracy"],
+        "countsTowardsAverageTime": type_data["countsTowardsAverageTime"],
+        "board": _compute_attempt_board(puzzle_fen, puzzle_solution, attempt),
+        "pgnDisplay": _compute_attempt_pgn(puzzle_fen, puzzle_solution, attempt),
+        "impact": impact,
+    }
+
+
+def _same_puzzle_run_overview_items(
+    run_puzzle: RunPuzzle,
+    participation_id: int,
+    total_queue: int,
+) -> list[dict[str, object]]:
+    other_run_puzzles = list(
+        db.session.scalars(
+            sa.select(RunPuzzle)
+            .join(Run, RunPuzzle.run_id == Run.id)
+            .where(
+                Run.participation_id == participation_id,
+                RunPuzzle.puzzle_id == run_puzzle.puzzle_id,
+                RunPuzzle.id != run_puzzle.id,
+            )
+        ).all()
+    )
+
+    items: list[dict[str, object]] = []
+    for rp in other_run_puzzles:
+        other_run = db.session.get(Run, rp.run_id)
+        if other_run is None:
+            continue
+        puzzle = db.session.get(Puzzle, rp.puzzle_id)
+        if puzzle is None:
+            continue
+
+        sorted_attempts = sorted(rp.attempts, key=lambda a: a.try_number)
+        q_id = _qualifying_attempt_id(sorted_attempts, total_queue)
+
+        other_run_puzzles_for_run = list(
+            db.session.scalars(
+                sa.select(RunPuzzle).where(RunPuzzle.run_id == other_run.id)
+            ).all()
+        )
+
+        attempt_views = [
+            _overview_attempt_view(
+                a, other_run, rp, q_id, total_queue,
+                puzzle.fen, puzzle.moves,
+                other_run_puzzles_for_run, participation_id,
+            )
+            for a in sorted_attempts
+            if a.status != "in_progress"
+        ]
+
+        items.append({
+            "runId": other_run.id,
+            "runIndex": other_run.run_index,
+            "runPuzzleId": rp.id,
+            "runPuzzleStatus": _derive_position_status(sorted_attempts, total_queue),
+            "attempts": attempt_views,
+        })
+
+    items.sort(key=lambda x: x["runIndex"] if isinstance(x["runIndex"], int) else 0)
+    return items
+
+
+def _compute_progress_card(
+    run: Run,
+    run_puzzles: list[RunPuzzle],
+    total_queue: int,
+    run_progress_delta_pct: float | None,
+    participation_id: int,
+) -> dict[str, object]:
+    total_run = len(run_puzzles)
+    resolved_run = sum(
+        1 for rp in run_puzzles
+        if _derive_position_status(rp.attempts, total_queue) in (
+            "solved", "solved_with_retries", "failed"
+        )
+    )
+    run_pct = round(resolved_run / total_run * 100, 2) if total_run > 0 else 0.0
+
+    run_progress_row: dict[str, object] = {
+        "label": f"Run {run.run_index + 1}",
+        "value": run_pct,
+        "tooltipLabel": f"{resolved_run} of {total_run} puzzles completed",
+        "delta": run_progress_delta_pct,
+    }
+
+    participation = db.session.get(ScheduleParticipation, participation_id)
+    if participation is None:
+        return {"runProgress": run_progress_row, "trainingProgress": None}
+
+    schedule = db.session.get(Schedule, participation.schedule_id)
+    subset = None
+    if schedule is not None:
+        subset = db.session.get(Subset, schedule.subset_id)
+
+    if subset is None or schedule is None:
+        return {"runProgress": run_progress_row, "trainingProgress": None}
+
+    config: dict[str, object] = schedule.config if isinstance(schedule.config, dict) else {}
+    runs_raw = config.get("runs")
+    run_count = len(runs_raw) if isinstance(runs_raw, list) else 0
+    puzzle_count = (
+        subset.locked_puzzle_count
+        if subset.locked_puzzle_count is not None
+        else subset.puzzle_count
+    ) or 0
+    training_total = run_count * puzzle_count
+
+    if training_total == 0:
+        return {"runProgress": run_progress_row, "trainingProgress": None}
+
+    all_runs = list(
+        db.session.scalars(
+            sa.select(Run).where(Run.participation_id == participation_id)
+        ).all()
+    )
+    training_resolved = 0
+    for r in all_runs:
+        all_rps = list(
+            db.session.scalars(sa.select(RunPuzzle).where(RunPuzzle.run_id == r.id)).all()
+        )
+        for rp in all_rps:
+            if _derive_position_status(rp.attempts, total_queue) in (
+                "solved", "solved_with_retries", "failed"
+            ):
+                training_resolved += 1
+
+    training_pct = round(training_resolved / training_total * 100, 2) if training_total > 0 else 0.0
+    training_delta: float | None = (
+        round(1.0 / training_total * 100, 2)
+        if run_progress_delta_pct is not None and training_total > 0
+        else None
+    )
+
+    training_progress_row: dict[str, object] = {
+        "label": schedule.name,
+        "value": training_pct,
+        "tooltipLabel": f"{training_resolved} of {training_total} puzzles completed across all runs",
+        "delta": training_delta,
+    }
+
+    return {"runProgress": run_progress_row, "trainingProgress": training_progress_row}
+
+
+def _compute_overview_actions(run: Run, puzzle: Puzzle) -> dict[str, object]:
+    next_enabled = run.completed_at is None and run.aborted_at is None
+    disabled_reason: str | None = None
+    if run.completed_at is not None:
+        disabled_reason = "Run complete"
+    elif run.aborted_at is not None:
+        disabled_reason = "Run aborted"
+
+    return {
+        "runStatus": run.status,
+        "retake": {"enabled": True},
+        "analyze": {"enabled": True, "url": puzzle.game_url},
+        "nextPuzzle": {"enabled": next_enabled, "disabledReason": disabled_reason},
+    }
+
+
+def _compute_run_complete_overlay(
+    run: Run,
+    run_puzzles: list[RunPuzzle],
+    total_queue: int,
+    run_just_completed: bool,
+    completing_attempt_id: int | None,
+) -> dict[str, object] | None:
+    if not run_just_completed or completing_attempt_id is None:
+        return None
+
+    total = len(run_puzzles)
+    solved = sum(
+        1 for rp in run_puzzles
+        if _derive_position_status(rp.attempts, total_queue) == "solved"
+    )
+    solved_with_retries = sum(
+        1 for rp in run_puzzles
+        if _derive_position_status(rp.attempts, total_queue) == "solved_with_retries"
+    )
+    failed = sum(
+        1 for rp in run_puzzles
+        if _derive_position_status(rp.attempts, total_queue) == "failed"
+    )
+
+    all_times: list[int] = []
+    for rp in run_puzzles:
+        completed = sorted(
+            [a for a in rp.attempts if a.status != "in_progress"],
+            key=lambda a: a.try_number,
+        )
+        if completed and completed[-1].time_spent_ms is not None:
+            all_times.append(completed[-1].time_spent_ms)
+
+    resolved = solved + solved_with_retries + failed
+    acc_pct: float | None = (
+        round(solved / resolved * 100, 1) if resolved > 0 else None
+    )
+    avg_time: int | None = (
+        round(sum(all_times) / len(all_times)) if all_times else None
+    )
+
+    return {
+        "completedByAttemptId": completing_attempt_id,
+        "runId": run.id,
+        "runIndex": run.run_index,
+        "summary": {
+            "totalPuzzles": total,
+            "solvedCount": solved,
+            "solvedWithRetriesCount": solved_with_retries,
+            "failedCount": failed,
+            "accuracyPct": acc_pct,
+            "averageSolveTimeMs": avg_time,
+        },
+    }
+
+
+def _build_run_puzzle_overview(
+    run: Run,
+    run_puzzle: RunPuzzle,
+    selected_attempt_id: int | None,
+    participation_id: int,
+    run_just_completed: bool = False,
+    completing_attempt_id: int | None = None,
+) -> dict[str, object]:
+    puzzle = db.session.get(Puzzle, run_puzzle.puzzle_id)
+    if puzzle is None:
+        raise LookupError("Puzzle not found.")
+
+    _, config = _get_schedule_config(run)
+    total_queue = _total_queue_attempts(config)
+
+    participation = db.session.get(ScheduleParticipation, participation_id)
+    schedule = db.session.get(Schedule, participation.schedule_id) if participation else None
+    schedule_name: str | None = schedule.name if schedule is not None else None
+
+    all_run_puzzles = list(
+        db.session.scalars(sa.select(RunPuzzle).where(RunPuzzle.run_id == run.id)).all()
+    )
+
+    sorted_attempts = sorted(
+        [a for a in run_puzzle.attempts if a.status != "in_progress"],
+        key=lambda a: a.try_number,
+    )
+
+    valid_ids = {a.id for a in sorted_attempts}
+    resolved_selected_id: int | None = (
+        selected_attempt_id if selected_attempt_id in valid_ids
+        else (sorted_attempts[-1].id if sorted_attempts else None)
+    )
+
+    qualifying_attempt_id = _qualifying_attempt_id(sorted_attempts, total_queue)
+
+    stats = _compute_overview_stats(
+        all_run_puzzles, total_queue, run_puzzle.id, resolved_selected_id
+    )
+
+    is_selected_qualifying = (
+        resolved_selected_id is not None
+        and qualifying_attempt_id is not None
+        and resolved_selected_id == qualifying_attempt_id
+    )
+    accuracy_delta = cast(dict[str, object], stats["accuracy"])["deltaPct"] if is_selected_qualifying else None
+    time_delta = cast(dict[str, object], stats["averageSolveTime"])["deltaMs"] if is_selected_qualifying else None
+
+    attempt_views: list[dict[str, object]] = []
+    for a in sorted_attempts:
+        view = _overview_attempt_view(
+            a, run, run_puzzle, qualifying_attempt_id, total_queue,
+            puzzle.fen, puzzle.moves, all_run_puzzles, participation_id,
+        )
+        if a.id == qualifying_attempt_id:
+            impact = cast(dict[str, object], view["impact"])
+            impact["accuracyDeltaPct"] = accuracy_delta
+            impact["averageSolveTimeDeltaMs"] = time_delta
+        attempt_views.append(view)
+
+    run_progress_delta_pct: float | None = None
+    if resolved_selected_id is not None:
+        for view in attempt_views:
+            if view["id"] == resolved_selected_id:
+                impact = cast(dict[str, object], view["impact"])
+                run_progress_delta_pct = cast(float | None, impact.get("runProgressDeltaPct"))
+                break
+
+    position_status = _derive_position_status(run_puzzle.attempts, total_queue)
+    position_resolved = position_status in ("solved", "solved_with_retries", "failed")
+    tries_in_window = sum(1 for a in sorted_attempts if a.try_number <= total_queue)
+    tries_remaining = max(0, total_queue - tries_in_window) if not position_resolved else 0
+
+    target_solve_tenths: int | None = (
+        run.target_solve_seconds * 10 if run.target_solve_seconds is not None else None
+    )
+
+    return {
+        "runPuzzle": {
+            "id": run_puzzle.id,
+            "runId": run.id,
+            "runIndex": run.run_index,
+            "position": run_puzzle.position,
+            "status": position_status,
+            "triesRemaining": tries_remaining,
+            "maxTriesPerPuzzle": total_queue,
+            "qualifyingAttemptId": qualifying_attempt_id,
+            "participationId": participation_id,
+            "scheduleName": schedule_name,
+        },
+        "puzzle": {
+            "puzzleId": puzzle.puzzle_id,
+            "fen": puzzle.fen,
+            "solution": puzzle.moves.split(),
+            "rating": puzzle.rating,
+            "themes": [
+                {"name": t.name, "displayName": t.display_name}
+                for t in puzzle.themes
+            ],
+            "gameUrl": puzzle.game_url,
+        },
+        "selectedAttemptId": resolved_selected_id,
+        "attempts": attempt_views,
+        "samePuzzleAcrossRuns": _same_puzzle_run_overview_items(
+            run_puzzle, participation_id, total_queue
+        ),
+        "runPace": {
+            "chartData": _pace_chart_data(run, all_run_puzzles, config, total_queue),
+            "isRunActive": run.completed_at is None and run.aborted_at is None,
+        },
+        "stats": {
+            "runIndex": run.run_index,
+            "accuracy": stats["accuracy"],
+            "averageSolveTime": stats["averageSolveTime"],
+        },
+        "progress": _compute_progress_card(
+            run, all_run_puzzles, total_queue, run_progress_delta_pct, participation_id
+        ),
+        "actions": _compute_overview_actions(run, puzzle),
+        "timer": {
+            "targetSolveTenths": target_solve_tenths,
+        },
+        "runCompleteOverlay": _compute_run_complete_overlay(
+            run, all_run_puzzles, total_queue, run_just_completed, completing_attempt_id
+        ),
+    }
+
+
+def get_run_puzzle_overview(
+    run_id: int,
+    run_puzzle_id: int,
+    user_id: int,
+    selected_attempt_id: int | None = None,
+) -> dict[str, object]:
+    run = _get_owned_run(run_id, user_id)
+    run_puzzle = db.session.get(RunPuzzle, run_puzzle_id)
+    if run_puzzle is None or run_puzzle.run_id != run.id:
+        raise LookupError("Run puzzle not found.")
+    overview = _build_run_puzzle_overview(
+        run, run_puzzle, selected_attempt_id, run.participation_id
+    )
+    return {
+        "overview": overview,
+        "selectedAttemptId": overview["selectedAttemptId"],
+    }
+
+
 def start_puzzle(run_id: int, run_puzzle_id: int, user_id: int) -> dict[str, object]:
     run = _get_owned_run(run_id, user_id)
     run_puzzle = db.session.get(RunPuzzle, run_puzzle_id)
@@ -614,25 +1443,50 @@ def start_puzzle(run_id: int, run_puzzle_id: int, user_id: int) -> dict[str, obj
         _create_attempt_for_puzzle(run_puzzle)
         db.session.refresh(run_puzzle)
 
-    return _run_puzzle_full_dict(run_puzzle)
+    return _run_puzzle_attempt_view_dict(run_puzzle)
 
 
-def submit_moves(attempt_id: int, user_id: int, moves: list[str]) -> None:
-    attempt, _, _ = _get_owned_attempt(attempt_id, user_id)
-    if attempt.status != "in_progress":
-        raise ValueError("Attempt is already completed.")
-    current = attempt.moves if isinstance(attempt.moves, list) else []
-    attempt.moves = [*current, *moves]
-    db.session.commit()
+def _derive_attempt_outcome(fen: str, solution: str, uci_moves: list[str]) -> str:
+    solution_plies = solution.split()
+    player_positions = list(range(1, len(solution_plies), 2))
+    required_player_count = len(player_positions)
+
+    if not solution_plies or required_player_count == 0:
+        return "failed"
+
+    board = chess.Board(fen)
+    try:
+        board.push_uci(solution_plies[0])
+        for i, player_uci in enumerate(uci_moves):
+            if i >= required_player_count:
+                return "failed"
+            move = chess.Move.from_uci(player_uci)
+            if not board.is_legal(move):
+                return "failed"
+            board.push(move)
+            expected_uci = solution_plies[player_positions[i]]
+            if player_uci != expected_uci and not board.is_checkmate():
+                return "failed"
+            if i < required_player_count - 1:
+                board.push_uci(solution_plies[player_positions[i] + 1])
+    except (chess.InvalidMoveError, chess.IllegalMoveError, ValueError, IndexError):
+        return "failed"
+
+    return "solved" if len(uci_moves) == required_player_count else "failed"
 
 
 def complete_attempt(
     attempt_id: int,
     user_id: int,
-    status: str,
-    moves: list[str],
+    run_id: int,
+    run_puzzle_id: int,
+    uci_moves: list[str],
+    client_time_spent_ms: int | None = None,
 ) -> dict[str, object]:
     attempt, run_puzzle, run = _get_owned_attempt(attempt_id, user_id)
+
+    if run.id != run_id or run_puzzle.id != run_puzzle_id:
+        raise LookupError("Attempt not found.")
 
     if attempt.status != "in_progress":
         raise ValueError("Attempt is already completed.")
@@ -641,22 +1495,25 @@ def complete_attempt(
     total_queue = _total_queue_attempts(config)
     is_queue_attempt = attempt.try_number <= total_queue
 
+    puzzle = db.session.get(Puzzle, run_puzzle.puzzle_id)
+    if puzzle is None:
+        raise LookupError("Puzzle not found.")
+
+    outcome = _derive_attempt_outcome(puzzle.fen, puzzle.moves, uci_moves)
+
     now = datetime.now(timezone.utc)
-    attempt.status = status
+    attempt.status = outcome
     attempt.completed_at = now
-    attempt.time_spent_ms = min(
-        int((now - attempt.started_at).total_seconds() * 1000), MAX_PUZZLE_TIME_MS
-    )
-    attempt.moves = moves
+    if client_time_spent_ms is not None:
+        attempt.time_spent_ms = min(client_time_spent_ms, MAX_PUZZLE_TIME_MS)
+    else:
+        attempt.time_spent_ms = min(
+            int((now - attempt.started_at).total_seconds() * 1000), MAX_PUZZLE_TIME_MS
+        )
+    attempt.moves = uci_moves
 
     position_status = _derive_position_status(run_puzzle.attempts, total_queue)
     position_resolved = position_status in ("solved", "solved_with_retries", "failed")
-
-    tries_in_window = sum(
-        1 for a in run_puzzle.attempts
-        if a.status != "in_progress" and a.try_number <= total_queue
-    )
-    tries_remaining = max(0, total_queue - tries_in_window) if not position_resolved else 0
 
     if is_queue_attempt and position_resolved and run.completed_at is None and run.aborted_at is None:
         db.session.flush()
@@ -677,17 +1534,19 @@ def complete_attempt(
     run_just_completed = run.completed_at == now
 
     db.session.commit()
+    db.session.refresh(run_puzzle)
 
-    next_run_puzzle_id: int | None = None
-    if position_resolved and is_queue_attempt:
-        next_run_puzzle_id = _current_run_puzzle_id(run.id, total_queue)
+    overview = _build_run_puzzle_overview(
+        run, run_puzzle, attempt_id, run.participation_id,
+        run_just_completed=run_just_completed,
+        completing_attempt_id=attempt_id,
+    )
 
     return {
-        "positionResolved": position_resolved,
-        "triesRemaining": tries_remaining,
-        "markedForRetry": False,
-        "nextRunPuzzleId": next_run_puzzle_id,
-        "runCompleted": run_just_completed,
+        "completedAttemptId": attempt_id,
+        "outcome": outcome,
+        "runCompletedByThisAttempt": run_just_completed,
+        "overview": overview,
     }
 
 
@@ -742,3 +1601,33 @@ def abort_run(run_id: int, user_id: int) -> Run:
     run.aborted_at = datetime.now(timezone.utc)
     db.session.commit()
     return run
+
+
+def get_attempt(
+    run_id: int, run_puzzle_id: int, attempt_id: int, user_id: int
+) -> dict[str, object]:
+    run = _get_owned_run(run_id, user_id)
+    run_puzzle = db.session.get(RunPuzzle, run_puzzle_id)
+    if run_puzzle is None or run_puzzle.run_id != run.id:
+        raise LookupError("Run puzzle not found.")
+    attempt = db.session.get(PuzzleAttempt, attempt_id)
+    if attempt is None or attempt.run_puzzle_id != run_puzzle.id:
+        raise LookupError("Attempt not found.")
+
+    if attempt.status == "in_progress":
+        return {
+            "kind": "active_attempt",
+            "attemptView": _run_puzzle_attempt_view_dict(run_puzzle),
+        }
+
+    overview_url = (
+        f"/app/runs/{run_id}/puzzles/{run_puzzle_id}/overview?attempt={attempt_id}"
+    )
+    overview = _build_run_puzzle_overview(
+        run, run_puzzle, attempt_id, run.participation_id
+    )
+    return {
+        "kind": "completed_attempt",
+        "overviewUrl": overview_url,
+        "overview": overview,
+    }

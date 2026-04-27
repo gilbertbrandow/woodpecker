@@ -9,18 +9,21 @@ import {
   BreadcrumbSeparator,
   BreadcrumbPage,
 } from '../../components/ui/breadcrumb'
-import type { RunPuzzleFull } from '../../lib/api'
 
 type BoardBreadcrumbsProps = {
-  puzzle: RunPuzzleFull
+  runIndex: number
+  position: number
   participationId: number | null
+  scheduleName: string | null
   runIdStr: string
   linksDisabled?: boolean
 }
 
 export function BoardBreadcrumbs({
-  puzzle,
+  runIndex,
+  position,
   participationId,
+  scheduleName,
   runIdStr,
   linksDisabled = false,
 }: BoardBreadcrumbsProps): React.ReactElement {
@@ -40,48 +43,52 @@ export function BoardBreadcrumbs({
             </BreadcrumbLink>
           )}
         </BreadcrumbItem>
-        <BreadcrumbSeparator />
-        <BreadcrumbItem>
-          {linksDisabled ? (
-            <BreadcrumbPage
-              className={disabledClass}
-              title="Navigation disabled while solving"
-            >
-              {puzzle.scheduleName.length > 8 ? `${puzzle.scheduleName.slice(0, 5)}...` : puzzle.scheduleName}
-            </BreadcrumbPage>
-          ) : participationId !== null ? (
-            <BreadcrumbLink asChild>
-              <Link
-                to="/app/participations/$participationId"
-                params={{ participationId: String(participationId) }}
-                title={puzzle.scheduleName}
-              >
-                {puzzle.scheduleName.length > 8 ? `${puzzle.scheduleName.slice(0, 5)}...` : puzzle.scheduleName}
-              </Link>
-            </BreadcrumbLink>
-          ) : (
-            <BreadcrumbPage title={puzzle.scheduleName}>
-              {puzzle.scheduleName.length > 8 ? `${puzzle.scheduleName.slice(0, 5)}...` : puzzle.scheduleName}
-            </BreadcrumbPage>
-          )}
-        </BreadcrumbItem>
+        {scheduleName !== null && (
+          <>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              {linksDisabled ? (
+                <BreadcrumbPage
+                  className={disabledClass}
+                  title="Navigation disabled while solving"
+                >
+                  {scheduleName.length > 8 ? `${scheduleName.slice(0, 5)}...` : scheduleName}
+                </BreadcrumbPage>
+              ) : participationId !== null ? (
+                <BreadcrumbLink asChild>
+                  <Link
+                    to="/app/participations/$participationId"
+                    params={{ participationId: String(participationId) }}
+                    title={scheduleName}
+                  >
+                    {scheduleName.length > 8 ? `${scheduleName.slice(0, 5)}...` : scheduleName}
+                  </Link>
+                </BreadcrumbLink>
+              ) : (
+                <BreadcrumbPage title={scheduleName}>
+                  {scheduleName.length > 8 ? `${scheduleName.slice(0, 5)}...` : scheduleName}
+                </BreadcrumbPage>
+              )}
+            </BreadcrumbItem>
+          </>
+        )}
         <BreadcrumbSeparator />
         <BreadcrumbItem>
           {linksDisabled ? (
             <BreadcrumbPage className={disabledClass} title="Navigation disabled while solving">
-              Run {puzzle.runIndex + 1}
+              Run {runIndex + 1}
             </BreadcrumbPage>
           ) : (
             <BreadcrumbLink asChild>
               <Link to="/app/runs/$runId" params={{ runId: runIdStr }}>
-                Run {puzzle.runIndex + 1}
+                Run {runIndex + 1}
               </Link>
             </BreadcrumbLink>
           )}
         </BreadcrumbItem>
         <BreadcrumbSeparator />
         <BreadcrumbItem>
-          <BreadcrumbPage>Puzzle {puzzle.position + 1}</BreadcrumbPage>
+          <BreadcrumbPage>Puzzle {position + 1}</BreadcrumbPage>
         </BreadcrumbItem>
       </BreadcrumbList>
     </Breadcrumb>

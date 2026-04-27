@@ -2,7 +2,19 @@ import * as React from 'react'
 import { Badge } from '../../components/ui/badge'
 import { cn } from '../../lib/utils'
 import type { PuzzleLabel } from '../../lib/api'
-import type { DisplayMove, PlySelection, PuzzleMetaPgnDisplay } from './boardOverview.pgn'
+import type { PlySelection } from './boardPage.helpers'
+
+type DisplayMoveMin = {
+  san: string
+  moveNumber: number
+  isWhite: boolean
+  moveStatus: 'correct' | 'wrong' | 'opponent' | null
+}
+
+type PuzzleMetaPgnDisplayMin = {
+  mainline: DisplayMoveMin[]
+  variation: DisplayMoveMin[] | null
+}
 
 function MoveToken({
   move,
@@ -11,7 +23,7 @@ function MoveToken({
   selectedPly,
   onPlyClick,
 }: {
-  move: DisplayMove
+  move: DisplayMoveMin
   line: 'main' | 'variation'
   index: number
   selectedPly: PlySelection | null | undefined
@@ -58,7 +70,7 @@ function MoveSequence({
   selectedPly,
   onPlyClick,
 }: {
-  moves: DisplayMove[]
+  moves: DisplayMoveMin[]
   line: 'main' | 'variation'
   selectedPly: PlySelection | null | undefined
   onPlyClick: ((ply: PlySelection) => void) | undefined
@@ -83,11 +95,43 @@ function MoveSequence({
   return <span>{items}</span>
 }
 
+function computeNextPly(
+  selected: PlySelection | null | undefined,
+  pgnDisplay: PuzzleMetaPgnDisplayMin,
+): PlySelection | null {
+  const mainLen = pgnDisplay.mainline.length
+  const varLen = pgnDisplay.variation?.length ?? 0
+
+  if (selected === null || selected === undefined) {
+    return mainLen > 0 ? { line: 'main', index: 0 } : null
+  }
+
+  if (selected.line === 'main') {
+    const next = selected.index + 1
+    return next < mainLen ? { line: 'main', index: next } : null
+  }
+
+  const next = selected.index + 1
+  return next < varLen ? { line: 'variation', index: next } : null
+}
+
+function computePrevPly(
+  selected: PlySelection | null | undefined,
+): PlySelection | null {
+  if (selected === null || selected === undefined) return null
+
+  if (selected.line === 'variation') {
+    return selected.index > 0 ? { line: 'variation', index: selected.index - 1 } : null
+  }
+
+  return selected.index > 0 ? { line: 'main', index: selected.index - 1 } : null
+}
+
 type PuzzleMetaCardProps = {
   puzzleId: string
   rating: number
   themes: PuzzleLabel[]
-  pgnDisplay: PuzzleMetaPgnDisplay | null
+  pgnDisplay: PuzzleMetaPgnDisplayMin | null
   focusMode?: boolean
   selectedPly?: PlySelection | null
   onPlyClick?: (ply: PlySelection) => void
@@ -102,6 +146,23 @@ export function PuzzleMetaCard({
   selectedPly,
   onPlyClick,
 }: PuzzleMetaCardProps): React.ReactElement {
+  React.useEffect(() => {
+    if (!onPlyClick || !pgnDisplay) return
+
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+      e.preventDefault()
+      const next =
+        e.key === 'ArrowRight'
+          ? computeNextPly(selectedPly, pgnDisplay)
+          : computePrevPly(selectedPly)
+      if (next !== null) onPlyClick(next)
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onPlyClick, selectedPly, pgnDisplay])
+
   return (
     <div className="flex flex-col gap-3 rounded-md border border-border px-3 py-3">
       <div className="flex flex-col gap-2">

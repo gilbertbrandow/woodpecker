@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Chess, type Square } from 'chess.js'
 import { toast } from 'sonner'
-import { api, type RunPuzzleFull, type CompleteAttemptResult, type Run, type RunPuzzleList, type ScheduleParticipation } from '../../lib/api'
+import { api, type RunPuzzleAttemptView, type RunPuzzleOverview } from '../../lib/api'
 import { useAuth } from '../../context/auth'
 import { useChessTheme } from '../../hooks/useChessTheme'
 import { resolvePieceSet } from '../../lib/themes'
@@ -14,7 +14,6 @@ import {
   resultsInCheckmate,
   playerColor,
   computeFinalFen,
-  computeStats,
   HEADER_H,
   FOOTER_H,
   H_PAD_MD,
@@ -32,7 +31,7 @@ import {
   INITIAL_OPPONENT_MOVE_DELAY_MS,
   OPPONENT_MOVE_ANIM_MS,
 } from './boardPage.helpers'
-import type { Mode, Orientation, PendingPromotion, MoveFeedbackResult, MoveFeedbackState, StatsResult } from './boardPage.helpers'
+import type { Mode, Orientation, PendingPromotion, MoveFeedbackResult, MoveFeedbackState } from './boardPage.helpers'
 
 export type { Mode, Orientation, PendingPromotion, MoveFeedbackResult }
 
@@ -60,15 +59,7 @@ export type TimerState = {
 }
 
 export type OverviewState = {
-  run: Run | null
-  puzzleList: RunPuzzleList | null
-  freshPuzzle: RunPuzzleFull | null
-  afterStats: StatsResult | null
-  beforeStats: StatsResult | null
-  accuracyDelta: number | null
-  timeDelta: number | null
-  participation: ScheduleParticipation | null
-  allRuns: Run[] | null
+  data: RunPuzzleOverview | null
 }
 
 export type BoardPageActions = {
@@ -85,10 +76,7 @@ export type BoardPageActions = {
 
 export type BoardPageControllerResult = {
   mode: Mode
-  puzzle: RunPuzzleFull | null
-  run: Run | null
-  allRuns: Run[] | null
-  participation: ScheduleParticipation | null
+  solvingView: RunPuzzleAttemptView | null
   board: BoardState
   timer: TimerState
   session: {
@@ -102,7 +90,6 @@ export type BoardPageControllerResult = {
   isLoadingNextPuzzle: boolean
   isStartingNextRun: boolean
   runJustCompleted: boolean
-  participationId: number | null
   inputBlocked: boolean
   actions: BoardPageActions
 }
@@ -142,20 +129,19 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     lastMoveSquare: null,
     isShowingMoveFeedback: false,
   })
-  const concludeFnRef = useRef<(status: 'solved' | 'failed') => Promise<void>>(async () => {})
+  const concludeFnRef = useRef<() => Promise<void>>(async () => {})
   const concludingRef = useRef(false)
   const skipNextLoadRef = useRef(false)
+  const cachedOverviewPuzzleRef = useRef<RunPuzzleOverview | null>(null)
   const loadRequestIdRef = useRef(0)
   const isAttemptReadyRef = useRef(false)
   const latestResolvedAttemptIdRef = useRef<number | null>(null)
   const primeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
-  const puzzleRef = useRef<RunPuzzleFull | null>(null)
-  const focusRunRef = useRef<Run | null>(null)
 
   const [mode, setMode] = useState<Mode>('loading')
-  const [puzzle, setPuzzle] = useState<RunPuzzleFull | null>(null)
-  puzzleRef.current = puzzle
+  const [solvingView, setSolvingView] = useState<RunPuzzleAttemptView | null>(null)
+  const [overview, setOverview] = useState<RunPuzzleOverview | null>(null)
   const [orientation, setOrientation] = useState<Orientation>('white')
   const [currentAttemptId, setCurrentAttemptId] = useState<number | null>(null)
   const [displayFen, setDisplayFen] = useState('')
@@ -166,7 +152,6 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const [hintSquare, setHintSquare] = useState<string | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [targetSolveTenths, setTargetSolveTenths] = useState<number | null>(null)
-  const [participationId, setParticipationId] = useState<number | null>(null)
   const [boardKey, setBoardKey] = useState(0)
   const [isLoadingNextPuzzle, setIsLoadingNextPuzzle] = useState(false)
   const [isStartingNextRun, setIsStartingNextRun] = useState(false)
@@ -176,16 +161,6 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const [failedRetryPlies, setFailedRetryPlies] = useState<string[]>([])
   const [liveFocusStatus, setLiveFocusStatus] = useState<'in_progress' | 'solved' | 'failed'>('in_progress')
   const [isAttemptReady, setIsAttemptReady] = useState(false)
-  const [overviewRun, setOverviewRun] = useState<Run | null>(null)
-  const [overviewPuzzleList, setOverviewPuzzleList] = useState<RunPuzzleList | null>(null)
-  const [overviewFreshPuzzle, setOverviewFreshPuzzle] = useState<RunPuzzleFull | null>(null)
-  const [overviewParticipation, setOverviewParticipation] = useState<ScheduleParticipation | null>(null)
-  const [overviewAllRuns, setOverviewAllRuns] = useState<Run[] | null>(null)
-  const [focusRun, setFocusRun] = useState<Run | null>(null)
-  focusRunRef.current = focusRun
-  const [focusAllRuns, setFocusAllRuns] = useState<Run[] | null>(null)
-  const [focusParticipation, setFocusParticipation] = useState<ScheduleParticipation | null>(null)
-  const [, setCompleteResult] = useState<CompleteAttemptResult | null>(null)
   const [lastMoveResult, setLastMoveResult] = useState<MoveFeedbackResult | null>(null)
   const [lastMoveSquare, setLastMoveSquare] = useState<string | null>(null)
   const [isShowingMoveFeedback, setIsShowingMoveFeedback] = useState(false)
@@ -245,11 +220,9 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   }, [setMoveFeedback])
 
   const clearOverviewState = useCallback((): void => {
-    setOverviewFreshPuzzle(null)
-    setOverviewRun(null)
-    setOverviewPuzzleList(null)
-    setOverviewParticipation(null)
-    setOverviewAllRuns(null)
+    setOverview(null)
+    setSolvingView(null)
+    cachedOverviewPuzzleRef.current = null
   }, [])
 
   const clearPendingTimeouts = useCallback((): void => {
@@ -281,7 +254,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     })
   }, [navigate, runIdStr, runPuzzleIdStr])
 
-  const applyFreshActiveState = useCallback((data: RunPuzzleFull, resolvedAttemptId: number): void => {
+  const applyFreshActiveState = useCallback((data: RunPuzzleAttemptView): void => {
     clearPendingTimeouts()
 
     if (primeTimeoutRef.current !== null) {
@@ -289,8 +262,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       primeTimeoutRef.current = null
     }
 
-    const solutionMoves = data.solution.split(' ')
-    const chess = new Chess(data.fen)
+    const solutionMoves = data.puzzle.solution
+    const chess = new Chess(data.puzzle.fen)
 
     chessRef.current = chess
     solutionMovesRef.current = solutionMoves
@@ -301,22 +274,22 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     setMovesPlayed([])
     setAllPliesPlayed([])
     setLiveFocusStatus('in_progress')
-    currentAttemptIdRef.current = resolvedAttemptId
+    currentAttemptIdRef.current = data.attempt.id
     concludingRef.current = false
     latestResolvedAttemptIdRef.current = null
     elapsedRef.current = 0
     committedLastMoveRef.current = undefined
     isAttemptReadyRef.current = false
 
-    setPuzzle(data)
-    setCurrentAttemptId(resolvedAttemptId)
-    setOrientation(playerColor(data.fen))
+    setSolvingView(data)
+    setCurrentAttemptId(data.attempt.id)
+    setOrientation(playerColor(data.puzzle.fen))
     setElapsedSeconds(0)
     setPendingPromotionBoth(null)
     setBlocked(true)
     clearMoveFeedback()
     setHintSquare(null)
-    setFen(data.fen)
+    setFen(data.puzzle.fen)
     setDests(new Map())
     setLastMove(undefined)
     setIsAttemptReady(false)
@@ -347,11 +320,16 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     }, INITIAL_OPPONENT_MOVE_DELAY_MS)
   }, [clearMoveFeedback, clearPendingTimeouts, setFen, setBlocked, setPendingPromotionBoth])
 
-  const applyOverviewDisplayState = useCallback((data: RunPuzzleFull): void => {
-    const solutionMoves = data.solution.split(' ')
-    const finalFen = computeFinalFen(data.fen, solutionMoves)
+  const applyOverviewDisplayState = useCallback((data: RunPuzzleOverview): void => {
+    const solutionMoves = data.puzzle.solution
+    const selectedAttemptEntry = data.attempts.find((a) => a.id === data.selectedAttemptId) ?? null
+    const boardFen =
+      selectedAttemptEntry?.board?.terminalFen ??
+      computeFinalFen(data.puzzle.fen, solutionMoves)
+    const boardLastMove: [string, string] | undefined =
+      selectedAttemptEntry?.board?.lastMove ?? undefined
 
-    chessRef.current = new Chess(data.fen)
+    chessRef.current = new Chess(data.puzzle.fen)
     solutionMovesRef.current = solutionMoves
     moveIndexRef.current = 1
     inputBlockedRef.current = false
@@ -360,17 +338,17 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     elapsedRef.current = 0
     committedLastMoveRef.current = undefined
 
-    setPuzzle(data)
     setCurrentAttemptId(null)
-    setOrientation(playerColor(data.fen))
+    setOrientation(playerColor(data.puzzle.fen))
     setElapsedSeconds(0)
     setPendingPromotionBoth(null)
     setBlocked(false)
     clearMoveFeedback()
     setHintSquare(null)
-    setFen(finalFen)
+    setFen(boardFen)
     setDests(new Map())
-    setLastMove(undefined)
+    setLastMove(boardLastMove)
+    setBoardKey((k) => k + 1)
     modeRef.current = 'overview'
     setMode('overview')
   }, [clearMoveFeedback, setFen, setBlocked, setPendingPromotionBoth])
@@ -380,8 +358,14 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     const requestId = loadRequestIdRef.current
 
     if (skipNextLoadRef.current) {
+      const cached = cachedOverviewPuzzleRef.current
+      if (cached !== null) {
+        skipNextLoadRef.current = false
+        cachedOverviewPuzzleRef.current = null
+        applyOverviewDisplayState(cached)
+        return
+      }
       skipNextLoadRef.current = false
-      return
     }
 
     if (
@@ -394,51 +378,6 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
     void (async () => {
       try {
-        setParticipationId(null)
-        const [data, run] = await Promise.all([
-          api.runs.getPuzzle(runId, runPuzzleId),
-          api.runs.get(runId),
-        ])
-
-        if (requestId !== loadRequestIdRef.current) {
-          return
-        }
-
-        const solutionMoves = data.solution.split(' ')
-
-        let resolvedTargetSolveTenths: number | null = null
-        let resolvedFocusAllRuns: Run[] | null = null
-        try {
-          const [participation, allRuns] = await Promise.all([
-            api.participations.get(run.participationId),
-            api.runs.list(run.participationId),
-          ])
-          const runTarget = participation.runTargets.find((t) => t.runIndex === data.runIndex)
-          resolvedTargetSolveTenths = runTarget?.targetSolveSeconds !== null && runTarget?.targetSolveSeconds !== undefined
-            ? Math.max(0, Math.round(runTarget.targetSolveSeconds * 10))
-            : null
-          resolvedFocusAllRuns = allRuns
-          setFocusParticipation(participation)
-        } catch {
-          resolvedTargetSolveTenths = null
-          setFocusParticipation(null)
-        }
-
-        if (requestId !== loadRequestIdRef.current) {
-          return
-        }
-
-        if (solutionMoves.length < 2) {
-          toast.error('Invalid puzzle', { description: 'Puzzle solution is too short.' })
-          void navigate({ to: '/app/runs/$runId', params: { runId: runIdStr }, replace: true })
-          return
-        }
-
-        setParticipationId(run.participationId)
-        setTargetSolveTenths(resolvedTargetSolveTenths)
-        setFocusRun(run)
-        setFocusAllRuns(resolvedFocusAllRuns)
-
         if (routeKind === 'overview') {
           if (modeRef.current === 'focus' && currentAttemptIdRef.current !== null) {
             void navigate({
@@ -453,9 +392,12 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
             return
           }
 
-          setOverviewFreshPuzzle(data)
-          setOverviewRun(run)
-          applyOverviewDisplayState(data)
+          const { overview: overviewData } = await api.runs.getOverview(runId, runPuzzleId, attemptId ?? undefined)
+
+          if (requestId !== loadRequestIdRef.current) return
+
+          setOverview(overviewData)
+          applyOverviewDisplayState(overviewData)
           return
         }
 
@@ -465,16 +407,18 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
           return
         }
 
-        const matchedAttempt = data.tries.find((attempt) => attempt.id === attemptId)
+        const attemptResponse = await api.runs.getAttempt(runId, runPuzzleId, attemptId)
 
-        if (attemptId === data.currentAttemptId || matchedAttempt?.status === 'in_progress') {
-          applyFreshActiveState(data, attemptId)
-        } else if (matchedAttempt !== undefined) {
+        if (requestId !== loadRequestIdRef.current) return
+
+        if (attemptResponse.kind === 'completed_attempt') {
           navigateToOverview(attemptId, true)
-        } else {
-          toast.error('Invalid attempt', { description: 'Attempt not found for this puzzle.' })
-          void navigate({ to: '/app/runs/$runId', params: { runId: runIdStr }, replace: true })
+          return
         }
+
+        const data = attemptResponse.attemptView
+        setTargetSolveTenths(data.timer.targetSolveTenths)
+        applyFreshActiveState(data)
       } catch {
         if (requestId !== loadRequestIdRef.current) {
           return
@@ -526,40 +470,14 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   }, [currentAttemptId])
 
   useEffect(() => {
-    if (mode !== 'overview') return
-    void (async () => {
-      try {
-        const [listData, runData] = await Promise.all([
-          api.runs.puzzles(runId),
-          api.runs.get(runId),
-        ])
-        setOverviewPuzzleList(listData)
-        setOverviewRun(runData)
-        try {
-          const [participationData, allRunsData] = await Promise.all([
-            api.participations.get(runData.participationId),
-            api.runs.list(runData.participationId),
-          ])
-          setOverviewParticipation(participationData)
-          setOverviewAllRuns(allRunsData)
-        } catch {
-          setOverviewParticipation(null)
-        }
-      } catch {
-        toast.error('Failed to load overview', { description: 'Please try again.' })
-      }
-    })()
-  }, [mode, runId, runPuzzleId])
-
-  useEffect(() => {
     if (mode !== 'focus') return
-    if (!puzzle || currentAttemptId === null) return
+    if (solvingView === null || currentAttemptId === null) return
     registerAttemptStart({
       attemptId: currentAttemptId,
-      runPuzzleId: puzzle.runPuzzleId,
-      puzzlePosition: puzzle.position + 1,
+      runPuzzleId: solvingView.runPuzzle.id,
+      puzzlePosition: solvingView.runPuzzle.position + 1,
     })
-  }, [mode, puzzle, currentAttemptId, registerAttemptStart])
+  }, [mode, solvingView, currentAttemptId, registerAttemptStart])
 
   const enterFailed = useCallback((): void => {
     modeRef.current = 'failed'
@@ -569,7 +487,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     setFailedRetryPlies([])
   }, [])
 
-  const conclude = useCallback(async (status: 'solved' | 'failed'): Promise<void> => {
+  const conclude = useCallback(async (): Promise<void> => {
     if (timerRef.current !== null) {
       clearInterval(timerRef.current)
       timerRef.current = null
@@ -579,44 +497,31 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
     concludingRef.current = true
     try {
-      const result = await api.attempts.complete(id, status, movesPlayedRef.current)
+      const result = await api.attempts.complete(runId, runPuzzleId, id, movesPlayedRef.current, Math.round(elapsedRef.current * 100))
 
       if (currentAttemptIdRef.current !== id) {
-        markAttemptResolved(id, status)
+        markAttemptResolved(id, result.outcome)
         latestResolvedAttemptIdRef.current = id
         return
       }
 
-      setCompleteResult(result)
-      markAttemptResolved(id, status)
+      markAttemptResolved(id, result.outcome)
       latestResolvedAttemptIdRef.current = id
       setCurrentAttemptId(null)
       currentAttemptIdRef.current = null
 
-      if (result.markedForRetry || status === 'solved') {
-        const currentPuzzle = puzzleRef.current
-        const currentRun = focusRunRef.current
-        if (currentPuzzle !== null && currentRun !== null) {
-          const optimisticPuzzle: RunPuzzleFull = {
-            ...currentPuzzle,
-            currentAttemptId: null,
-            tries: currentPuzzle.tries.map((t) =>
-              t.id === id
-                ? { ...t, status, moves: movesPlayedRef.current, timeSpentMs: Math.round(elapsedRef.current * 100), completedAt: new Date().toISOString() }
-                : t
-            ),
-          }
-          setOverviewFreshPuzzle(optimisticPuzzle)
-          setOverviewRun(currentRun)
-        }
-        if (result.runCompleted) {
-          setRunJustCompleted(true)
-        }
+      setOverview(result.overview)
+
+      if (result.runCompletedByThisAttempt) {
+        setRunJustCompleted(true)
+      }
+
+      cachedOverviewPuzzleRef.current = result.overview
+
+      if (result.outcome === 'solved') {
+        skipNextLoadRef.current = true
         navigateToOverview(id, false)
       } else {
-        if (result.runCompleted) {
-          setRunJustCompleted(true)
-        }
         enterFailed()
       }
     } catch {
@@ -624,7 +529,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     } finally {
       concludingRef.current = false
     }
-  }, [enterFailed, markAttemptResolved, navigateToOverview])
+  }, [enterFailed, markAttemptResolved, navigateToOverview, runId, runPuzzleId])
 
   concludeFnRef.current = conclude
 
@@ -674,26 +579,11 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       if (modeRef.current === 'focus') setLiveFocusStatus('solved')
       scheduleTimeout(() => {
         if (modeRef.current === 'focus') {
-          void concludeFnRef.current('solved')
+          void concludeFnRef.current()
         } else {
           scheduleTimeout(() => {
-            const currentPuzzle = puzzleRef.current
-            const currentRun = focusRunRef.current
-            const resolvedId = latestResolvedAttemptIdRef.current
-            if (currentPuzzle !== null && currentRun !== null) {
-              const optimisticPuzzle: RunPuzzleFull = {
-                ...currentPuzzle,
-                currentAttemptId: null,
-                tries: currentPuzzle.tries.map((t) =>
-                  t.id === resolvedId
-                    ? { ...t, status: 'failed' as const, moves: movesPlayedRef.current, timeSpentMs: Math.round(elapsedRef.current * 100), completedAt: new Date().toISOString() }
-                    : t
-                ),
-              }
-              setOverviewFreshPuzzle(optimisticPuzzle)
-              setOverviewRun(currentRun)
-            }
-            navigateToOverview(resolvedId, false)
+            skipNextLoadRef.current = true
+            navigateToOverview(latestResolvedAttemptIdRef.current, false)
           }, FAILED_TO_OVERVIEW_MS)
         }
       }, MOVE_FEEDBACK_SUCCESS_MS)
@@ -742,7 +632,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       inputBlockedRef.current = false
       setInputBlocked(false)
       if (modeRef.current === 'focus') {
-        void concludeFnRef.current('failed')
+        void concludeFnRef.current()
       }
     }, WRONG_REVERT_MS)
   }, [setFen, setMoveFeedback, hideMoveFeedbackBadge, scheduleTimeout])
@@ -834,6 +724,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       scheduleTimeout(() => {
         inputBlockedRef.current = false
         setInputBlocked(false)
+        skipNextLoadRef.current = true
         navigateToOverview(latestResolvedAttemptIdRef.current, false)
       }, FAILED_TO_OVERVIEW_MS)
       return
@@ -851,21 +742,21 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     setIsLoadingNextPuzzle(true)
     try {
       const data = await api.runs.continue(runId)
-      if (data.currentAttemptId === null) {
-        toast.error('Run complete', { description: 'No more puzzles to solve.' })
-        void navigate({ to: '/app/runs/$runId', params: { runId: runIdStr }, replace: true })
+
+      if (data.runCompleted) {
         return
       }
 
-      const solutionMoves = data.solution.split(' ')
-      if (solutionMoves.length < 2) {
+      const av = data.attemptView
+      if (av.puzzle.solution.length < 2) {
         toast.error('Invalid puzzle', { description: 'Puzzle solution is too short.' })
         void navigate({ to: '/app/runs/$runId', params: { runId: runIdStr }, replace: true })
         return
       }
 
       clearOverviewState()
-      applyFreshActiveState(data, data.currentAttemptId)
+      setTargetSolveTenths(av.timer.targetSolveTenths)
+      applyFreshActiveState(av)
       setBoardKey((k) => k + 1)
 
       skipNextLoadRef.current = true
@@ -873,8 +764,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
         to: '/app/runs/$runId/puzzles/$runPuzzleId/attempts/$attemptId',
         params: {
           runId: runIdStr,
-          runPuzzleId: String(data.runPuzzleId),
-          attemptId: String(data.currentAttemptId),
+          runPuzzleId: String(av.runPuzzle.id),
+          attemptId: String(av.attempt.id),
         },
       })
     } catch {
@@ -888,19 +779,14 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     setIsLoadingNextPuzzle(true)
     try {
       const data = await api.runs.startPuzzle(runId, runPuzzleId)
-      if (data.currentAttemptId === null) {
-        toast.error('Could not start puzzle', { description: 'Please try again.' })
-        return
-      }
-
-      const solutionMoves = data.solution.split(' ')
-      if (solutionMoves.length < 2) {
+      if (data.puzzle.solution.length < 2) {
         toast.error('Invalid puzzle', { description: 'Puzzle solution is too short.' })
         return
       }
 
       clearOverviewState()
-      applyFreshActiveState(data, data.currentAttemptId)
+      setTargetSolveTenths(data.timer.targetSolveTenths)
+      applyFreshActiveState(data)
       setBoardKey((k) => k + 1)
 
       skipNextLoadRef.current = true
@@ -908,8 +794,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
         to: '/app/runs/$runId/puzzles/$runPuzzleId/attempts/$attemptId',
         params: {
           runId: runIdStr,
-          runPuzzleId: String(data.runPuzzleId),
-          attemptId: String(data.currentAttemptId),
+          runPuzzleId: String(data.runPuzzle.id),
+          attemptId: String(data.attempt.id),
         },
       })
     } catch {
@@ -920,21 +806,18 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   }, [navigate, runId, runPuzzleId, runIdStr, applyFreshActiveState, clearOverviewState])
 
   const handleStartNextRun = useCallback(async (): Promise<void> => {
-    if (participationId === null || overviewRun === null) return
+    if (overview === null) return
     setIsStartingNextRun(true)
     try {
-      const newRun = await api.runs.start(participationId, overviewRun.runIndex + 1)
+      const run = await api.runs.get(overview.runPuzzle.runId)
+      const newRun = await api.runs.start(run.participationId, overview.runPuzzle.runIndex + 1)
       void navigate({ to: '/app/runs/$runId', params: { runId: String(newRun.id) } })
     } catch {
       toast.error('Could not start next run', { description: 'Please try again.' })
-      void navigate({
-        to: '/app/participations/$participationId',
-        params: { participationId: String(participationId) },
-      })
     } finally {
       setIsStartingNextRun(false)
     }
-  }, [participationId, overviewRun, navigate])
+  }, [overview, navigate])
 
   const dismissRunComplete = useCallback((): void => {
     setRunJustCompleted(false)
@@ -944,22 +827,9 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const pieceSet = resolvePieceSet(user?.pieceTheme ?? '')
   const kingPieceUrl = turnToMove === 'white' ? pieceSet.pieces.wK : pieceSet.pieces.bK
 
-  const afterStats: StatsResult | null = overviewPuzzleList ? computeStats(overviewPuzzleList.puzzles) : null
-  const beforeStats: StatsResult | null = overviewPuzzleList ? computeStats(overviewPuzzleList.puzzles, runPuzzleId) : null
-
-  const accuracyDelta: number | null =
-    afterStats?.accuracy != null && beforeStats?.accuracy != null && beforeStats.resolvedCount > 0
-      ? afterStats.accuracy - beforeStats.accuracy
-      : null
-
-  const timeDelta: number | null =
-    afterStats?.avgTimeMs != null && beforeStats?.avgTimeMs != null && beforeStats.timeCount > 0
-      ? afterStats.avgTimeMs - beforeStats.avgTimeMs
-      : null
-
   return {
     mode,
-    puzzle,
+    solvingView,
     board: {
       boardKey,
       boardSize,
@@ -978,24 +848,10 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       targetSolveTenths,
     },
     session: { attemptHistory, movesPlayed, allPliesPlayed, failedRetryPlies, liveFocusStatus },
-    run: focusRun,
-    allRuns: focusAllRuns,
-    participation: focusParticipation,
-    overview: {
-      run: overviewRun,
-      puzzleList: overviewPuzzleList,
-      freshPuzzle: overviewFreshPuzzle,
-      afterStats,
-      beforeStats,
-      accuracyDelta,
-      timeDelta,
-      participation: overviewParticipation,
-      allRuns: overviewAllRuns,
-    },
+    overview: { data: overview },
     isLoadingNextPuzzle,
     isStartingNextRun,
     runJustCompleted,
-    participationId,
     inputBlocked,
     actions: {
       handleUserMove,

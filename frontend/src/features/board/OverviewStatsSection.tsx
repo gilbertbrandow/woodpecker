@@ -2,16 +2,15 @@ import * as React from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 import { DeltaBadge } from './DeltaBadge'
 import { formatSolveTimeMs } from '../../lib/utils'
-import type { StatsResult } from './boardPage.helpers'
+import type { RunPuzzleOverview } from '../../lib/api'
 
 type OverviewStatsSectionProps = {
-  afterStats: StatsResult
-  accuracyDelta: number | null
-  timeDelta: number | null
   runIndex: number
+  accuracy: RunPuzzleOverview['stats']['accuracy']
+  averageSolveTime: RunPuzzleOverview['stats']['averageSolveTime']
 }
 
-export function OverviewStatsSection({ afterStats, accuracyDelta, timeDelta, runIndex }: OverviewStatsSectionProps): React.ReactElement {
+export function OverviewStatsSection({ runIndex, accuracy, averageSolveTime }: OverviewStatsSectionProps): React.ReactElement {
   return (
     <div className="flex flex-col gap-4 rounded-lg border bg-card p-4">
       <span>Run {runIndex + 1} stats</span>
@@ -22,17 +21,17 @@ export function OverviewStatsSection({ afterStats, accuracyDelta, timeDelta, run
               <span className="text-xs font-medium text-muted-foreground">Average accuracy</span>
               <div className="flex items-baseline gap-2">
                 <span className="tabular-nums text-2xl font-semibold">
-                  {afterStats.accuracy !== null ? `${afterStats.accuracy.toFixed(1)}%` : '—'}
+                  {accuracy.valuePct !== null ? `${accuracy.valuePct.toFixed(1)}%` : '—'}
                 </span>
-                <DeltaBadge delta={accuracyDelta} goodWhenPositive={true} format={(n) => `${n.toFixed(1)}%`} />
+                <DeltaBadge delta={accuracy.deltaPct} goodWhenPositive={true} format={(n) => `${n.toFixed(1)}%`} />
               </div>
             </div>
           </TooltipTrigger>
-          {afterStats.resolvedCount > 0 && (
-            <TooltipContent>
-              {afterStats.solvedCount} of {afterStats.resolvedCount} resolved
-            </TooltipContent>
-          )}
+          <TooltipContent>
+            {accuracy.resolvedCount > 0
+              ? `${accuracy.solvedCount} of ${accuracy.resolvedCount} resolved`
+              : null}
+          </TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -40,17 +39,17 @@ export function OverviewStatsSection({ afterStats, accuracyDelta, timeDelta, run
               <span className="text-xs font-medium text-muted-foreground">Average solve time</span>
               <div className="flex items-baseline gap-2">
                 <span className="tabular-nums text-2xl font-semibold">
-                  {afterStats.avgTimeMs !== null ? formatSolveTimeMs(afterStats.avgTimeMs) : '—'}
+                  {averageSolveTime.valueMs !== null ? formatSolveTimeMs(averageSolveTime.valueMs) : '—'}
                 </span>
-                <DeltaBadge delta={timeDelta} goodWhenPositive={false} format={formatSolveTimeMs} />
+                <DeltaBadge delta={averageSolveTime.deltaMs} goodWhenPositive={false} format={formatSolveTimeMs} />
               </div>
             </div>
           </TooltipTrigger>
-          {afterStats.timeCount > 0 && (
-            <TooltipContent>
-              across {afterStats.timeCount} solved puzzle{afterStats.timeCount !== 1 ? 's' : ''}
-            </TooltipContent>
-          )}
+          <TooltipContent>
+            {averageSolveTime.timeCount > 0
+              ? `across ${averageSolveTime.timeCount} solved puzzle${averageSolveTime.timeCount !== 1 ? 's' : ''}`
+              : null}
+          </TooltipContent>
         </Tooltip>
       </div>
     </div>
