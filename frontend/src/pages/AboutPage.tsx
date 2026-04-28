@@ -4,7 +4,32 @@ import { BookOpen, ExternalLink } from 'lucide-react'
 const BOOK_URL = 'https://www.amazon.se/-/en/Axel-Smith/dp/1784830542'
 const AXEL_SMITH_URL = 'https://en.wikipedia.org/wiki/Axel_Smith_(chess_player)'
 const HANS_TIKKANEN_URL = 'https://sv.wikipedia.org/wiki/Hans_Tikkanen'
-const WOODPECKER_VIDEO_URL = 'https://www.youtube.com/embed/placeholder'
+const WOODPECKER_VIDEO_URL = 'https://www.youtube.com/embed/O1keZYdPgD0'
+
+type Founder = {
+  name: string
+  url: string
+  peakElo: number
+  peakEloDate: string
+  bio: string
+}
+
+const FOUNDERS: Founder[] = [
+  {
+    name: 'Axel Smith',
+    url: AXEL_SMITH_URL,
+    peakElo: 2516,
+    peakEloDate: 'August 2016',
+    bio: 'Won the Nordic Championship 2013. Secured his GM title in Kecskemét, December 2015. Competitive marathon runner — 2:28:47 at the Berlin Marathon 2021.',
+  },
+  {
+    name: 'Hans Tikkanen',
+    url: HANS_TIKKANEN_URL,
+    peakElo: 2596,
+    peakEloDate: 'July 2011',
+    bio: 'Five-time Swedish Champion (2011, 2012, 2013, 2017, 2018). Received the GM title in 2010. Won the Swedish Grand Prix 2015/16.',
+  },
+]
 
 export function AboutPage(): React.ReactElement {
   return (
@@ -12,15 +37,10 @@ export function AboutPage(): React.ReactElement {
       <section className="flex flex-col gap-3">
         <h1 className="text-xl font-semibold">The Woodpecker Method</h1>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          The Woodpecker Method is a chess training system built around solving a large set of tactical
-          puzzles repeatedly in cycles. Each cycle, you solve the full set — but faster than the previous
-          one. Over time, pattern recognition becomes deeply internalised and tactical vision improves
-          significantly, even under tournament time pressure.
-        </p>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          The method was popularised by grandmasters Axel Smith and Hans Tikkanen, who both used it to
-          achieve remarkable jumps in their playing strength. Smith wrote about the experience in his book
-          and later co-authored a dedicated training manual with Tikkanen.
+          A training system developed by Hans Tikkanen and described by Axel Smith in their 2018 book.
+          The idea is straightforward: solve a fixed set of tactical puzzles, then solve the same set again, faster each time.
+          Repeated exposure to the same positions is meant to internalise patterns and sharpen tactical vision,
+          particularly under time pressure.
         </p>
       </section>
 
@@ -29,37 +49,21 @@ export function AboutPage(): React.ReactElement {
         <ol className="flex flex-col gap-2 text-sm leading-relaxed text-muted-foreground">
           <li className="flex gap-2">
             <span className="font-medium text-foreground">1.</span>
-            Select a set of tactical puzzles suited to your level.
+            Choose a set of tactical puzzles suited to your level.
           </li>
           <li className="flex gap-2">
             <span className="font-medium text-foreground">2.</span>
-            Solve all puzzles in a timed cycle. Mark any you struggle with.
+            Build a schedule of progressively shorter time windows, one per cycle.
           </li>
           <li className="flex gap-2">
             <span className="font-medium text-foreground">3.</span>
-            Repeat the full set, aiming to finish faster than the previous cycle.
+            Solve the entire set within the allotted window.
           </li>
           <li className="flex gap-2">
             <span className="font-medium text-foreground">4.</span>
-            Continue until the patterns feel automatic — not memorised, but seen.
+            Repeat the same set in the next, shorter window.
           </li>
         </ol>
-      </section>
-
-      <section className="flex flex-col gap-4">
-        <h2 className="text-base font-semibold">Watch the method explained</h2>
-        <div className="aspect-video w-full overflow-hidden rounded-md border border-border bg-muted">
-          <iframe
-            src={WOODPECKER_VIDEO_URL}
-            title="The Woodpecker Method explained"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            className="h-full w-full"
-          />
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Video URL is a placeholder — update <code>WOODPECKER_VIDEO_URL</code> in AboutPage.tsx with the real link.
-        </p>
       </section>
 
       <section className="flex flex-col gap-4">
@@ -84,36 +88,45 @@ export function AboutPage(): React.ReactElement {
       </section>
 
       <section className="flex flex-col gap-4">
+        <h2 className="text-base font-semibold">Watch the method explained</h2>
+        <div className="aspect-video w-full overflow-hidden rounded-md border border-border bg-muted">
+          <iframe
+            src={WOODPECKER_VIDEO_URL}
+            title="The Woodpecker Method explained"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="h-full w-full"
+          />
+        </div>
+
+      </section>
+
+      <section className="flex flex-col gap-4">
         <h2 className="text-base font-semibold">The founders</h2>
         <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
-          <a
-            href={AXEL_SMITH_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex flex-1 items-center gap-3 rounded-md border border-border p-4 transition-colors hover:bg-accent"
-          >
-            <div className="flex flex-col gap-0.5">
-              <span className="text-sm font-medium text-foreground">Axel Smith</span>
-              <span className="text-xs text-muted-foreground">
-                Swedish grandmaster. Used the Woodpecker Method to raise his rating over 100 points.
-              </span>
-            </div>
-            <ExternalLink className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" />
-          </a>
-          <a
-            href={HANS_TIKKANEN_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex flex-1 items-center gap-3 rounded-md border border-border p-4 transition-colors hover:bg-accent"
-          >
-            <div className="flex flex-col gap-0.5">
-              <span className="text-sm font-medium text-foreground">Hans Tikkanen</span>
-              <span className="text-xs text-muted-foreground">
-                Swedish grandmaster. Co-author of the Woodpecker Method book and training system.
-              </span>
-            </div>
-            <ExternalLink className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" />
-          </a>
+          {FOUNDERS.map((founder) => (
+            <a
+              key={founder.name}
+              href={founder.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-1 flex-col gap-2 rounded-md border border-border p-4 transition-colors hover:bg-accent"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-medium text-foreground">
+                    <span className="mr-1.5 text-sm font-medium" style={{ color: 'hsl(37, 74%, 43%)' }}>GM</span>
+                    {founder.name}
+                  </span>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    Peak ELO {founder.peakElo} ({founder.peakEloDate})
+                  </span>
+                </div>
+                <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              </div>
+              <span className="text-xs leading-relaxed text-muted-foreground">{founder.bio}</span>
+            </a>
+          ))}
         </div>
       </section>
     </div>

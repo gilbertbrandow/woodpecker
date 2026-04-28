@@ -17,7 +17,9 @@ export function AppShell(): React.ReactElement {
           <ThemeToggle />
         </header>
         <div className="flex flex-1 flex-col overflow-y-auto">
-          <Outlet />
+          <div className="flex flex-1 flex-col">
+            <Outlet />
+          </div>
           <Footer />
         </div>
       </SidebarInset>
