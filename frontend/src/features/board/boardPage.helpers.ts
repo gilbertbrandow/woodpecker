@@ -11,7 +11,7 @@ export type MoveFeedbackState = {
   isShowingMoveFeedback: boolean
 }
 
-export const HEADER_H = 57
+export const HEADER_H = 56
 export const FOOTER_H = 49
 export const BOARD_GAP = 24
 export const H_PAD_MD = 48

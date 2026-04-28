@@ -29,7 +29,7 @@ import {
 } from '../components/ui/breadcrumb'
 import { formatSolveTimeMs } from '../lib/utils'
 
-const HEADER_H = 57
+const HEADER_H = 56
 const FOOTER_H = 49
 const BOARD_GAP = 24
 const H_PAD_MD = 48

@@ -10,16 +10,16 @@ export function AppShell(): React.ReactElement {
   return (
     <SidebarProvider defaultOpen={true}>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="h-svh overflow-hidden">
         <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
           <SidebarTrigger />
           <Separator orientation="vertical" className="h-4" />
           <ThemeToggle />
         </header>
-        <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col overflow-y-auto">
           <Outlet />
+          <Footer />
         </div>
-        <Footer />
       </SidebarInset>
     </SidebarProvider>
   )

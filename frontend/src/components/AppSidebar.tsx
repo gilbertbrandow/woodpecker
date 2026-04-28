@@ -25,6 +25,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarSeparator,
 } from './ui/sidebar'
 
 type NavItem = {
@@ -39,7 +40,6 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Schedules', to: '/app/schedules', icon: CalendarDays },
   { label: 'Training', to: '/app/training', icon: Dumbbell },
   { label: 'About', to: '/app/about', icon: Info },
-  { label: 'Settings', to: '/app/settings', icon: Settings },
 ]
 
 export function AppSidebar(): React.ReactElement {
@@ -86,6 +86,7 @@ export function AppSidebar(): React.ReactElement {
           </div>
         </Link>
       </SidebarHeader>
+      <SidebarSeparator />
       <SidebarContent>
         <SidebarGroup>
           <SidebarMenu>
