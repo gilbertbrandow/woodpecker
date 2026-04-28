@@ -65,9 +65,14 @@ test-frontend:
 	cd frontend && npm run test:run
 
 test-backend:
-	cd backend && .venv/bin/pytest
+	cd backend && .venv/bin/pytest -m "not integration"
+
+test-backend-integration:
+	cd backend && .venv/bin/pytest -m integration
 
 test: test-frontend test-backend
+
+test-integration: test-backend-integration
 
 test-frontend-docker:
 	$(LOCAL_COMPOSE) run --rm frontend npm run test:run
@@ -79,4 +84,4 @@ test-docker:
 	$(MAKE) test-frontend-docker
 	$(MAKE) test-backend-docker
 
-.PHONY: up up-build down logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade migrate-current migrate-history migrate-rollback puzzle-copy puzzle-import puzzle-copy-prod puzzle-import-prod openings-import openings-import-prod test-frontend test-backend test
+.PHONY: up up-build down logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade migrate-current migrate-history migrate-rollback puzzle-copy puzzle-import puzzle-copy-prod puzzle-import-prod openings-import openings-import-prod test-frontend test-backend test-backend-integration test-integration test
