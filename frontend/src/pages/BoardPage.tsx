@@ -1,5 +1,4 @@
 import * as React from 'react'
-import { Chess } from 'chess.js'
 import { useLocation, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { Clock, CheckCircle2, XCircle, RotateCcw, ExternalLink, SkipForward } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
@@ -25,41 +24,6 @@ import { buildPgnDisplay, formatTimer, formatTargetSolveTime } from '../features
 import type { PlySelection } from '../features/board/boardPage.helpers'
 import type { BoardState } from '../features/board/useBoardPageController'
 import type { OverviewAttemptView } from '../lib/api'
-
-type PlyPosition = { fen: string; lastMove: [string, string] }
-type PlyPositions = { mainline: PlyPosition[]; variation: PlyPosition[] }
-
-function computePlyPositions(
-  startFen: string,
-  mainline: { uci: string; moveStatus: 'correct' | 'wrong' | 'opponent' | null }[],
-  variation: { uci: string }[] | null,
-): PlyPositions {
-  const chess = new Chess(startFen)
-  const mainlineResult: PlyPosition[] = []
-  let branchFen: string | null = null
-  for (const move of mainline) {
-    if (move.moveStatus === 'wrong' && branchFen === null) {
-      branchFen = chess.fen()
-    }
-    const from = move.uci.slice(0, 2)
-    const to = move.uci.slice(2, 4)
-    const promotion = move.uci.length === 5 ? move.uci[4] : undefined
-    chess.move({ from, to, promotion })
-    mainlineResult.push({ fen: chess.fen(), lastMove: [from, to] })
-  }
-  const variationResult: PlyPosition[] = []
-  if (variation !== null && branchFen !== null) {
-    const varChess = new Chess(branchFen)
-    for (const move of variation) {
-      const from = move.uci.slice(0, 2)
-      const to = move.uci.slice(2, 4)
-      const promotion = move.uci.length === 5 ? move.uci[4] : undefined
-      varChess.move({ from, to, promotion })
-      variationResult.push({ fen: varChess.fen(), lastMove: [from, to] })
-    }
-  }
-  return { mainline: mainlineResult, variation: variationResult }
-}
 
 function parsePositiveInt(value: unknown): number | null {
   if (typeof value === 'number') {
@@ -242,15 +206,6 @@ export function BoardPage(): React.ReactElement | null {
   const overviewPgnDisplay = ctrl.mode === 'overview' ? (selectedAttempt?.pgnDisplay ?? null) : null
   const pgnDisplay = ctrl.mode === 'overview' ? overviewPgnDisplay : focusPgnDisplay
 
-  const plyPositions = React.useMemo((): PlyPositions | null => {
-    if (overviewPgnDisplay === null || ctrl.overview.data === null) return null
-    return computePlyPositions(
-      ctrl.overview.data.puzzle.fen,
-      overviewPgnDisplay.mainline,
-      overviewPgnDisplay.variation,
-    )
-  }, [overviewPgnDisplay, ctrl.overview.data])
-
   React.useEffect(() => {
     if (ctrl.mode !== 'overview') return
     if (overviewPgnDisplay === null || overviewPgnDisplay.mainline.length === 0) {
@@ -272,24 +227,22 @@ export function BoardPage(): React.ReactElement | null {
   const displayBoard = React.useMemo((): BoardState => {
     if (ctrl.mode === 'overview') {
       const base: BoardState = { ...ctrl.board, dests: new Map() }
-      if (selectedPly !== null && plyPositions !== null) {
+      if (selectedPly !== null && overviewPgnDisplay !== null) {
         const plyList =
-          selectedPly.line === 'main' ? plyPositions.mainline : plyPositions.variation
-        const pos = plyList[selectedPly.index]
-        if (pos) {
-          const moveStatus =
-            selectedPly.line === 'main'
-              ? (overviewPgnDisplay?.mainline[selectedPly.index]?.moveStatus ?? null)
-              : (overviewPgnDisplay?.variation?.[selectedPly.index]?.moveStatus ?? null)
+          selectedPly.line === 'main'
+            ? overviewPgnDisplay.mainline
+            : (overviewPgnDisplay.variation ?? [])
+        const ply = plyList[selectedPly.index]
+        if (ply) {
           const feedbackResult: 'correct' | 'wrong' | null =
-            moveStatus === 'correct' ? 'correct' : moveStatus === 'wrong' ? 'wrong' : null
+            ply.moveStatus === 'correct' ? 'correct' : ply.moveStatus === 'wrong' ? 'wrong' : null
           return {
             ...base,
-            fen: pos.fen,
-            lastMove: pos.lastMove,
+            fen: ply.fen,
+            lastMove: [ply.from, ply.to],
             moveFeedback: {
               result: feedbackResult,
-              square: feedbackResult !== null ? pos.lastMove[1] : null,
+              square: feedbackResult !== null ? ply.to : null,
               visible: feedbackResult !== null,
             },
           }
@@ -337,10 +290,8 @@ export function BoardPage(): React.ReactElement | null {
   }, [
     ctrl.board,
     ctrl.mode,
-    ctrl.overview.data,
     selectedPly,
     focusPgnDisplay,
-    plyPositions,
     selectedAttempt,
     overviewPgnDisplay,
   ])

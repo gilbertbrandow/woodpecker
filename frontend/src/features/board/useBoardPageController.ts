@@ -654,7 +654,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       const promotionPieces = ['q', 'r', 'b', 'n'] as const
       const squareLeadsToCheckmate = promotionPieces.some((p) => resultsInCheckmate(chess, orig, dest, p))
       if (orig + dest !== expectedBase && !squareLeadsToCheckmate) {
-        resolveWrongMove(orig, dest)
+        resolveWrongMove(orig, dest, 'q')
       } else {
         inputBlockedRef.current = true
         setInputBlocked(true)
