@@ -24,7 +24,7 @@ import {
   TableRow,
 } from '../components/ui/table'
 
-export function ParticipationNewPage(): React.ReactElement | null {
+export function TrainingNewPage(): React.ReactElement | null {
   const { user, loading } = useAuth()
   const navigate = useNavigate()
   const [schedules, setSchedules] = useState<ScheduleSummary[]>([])
@@ -51,8 +51,8 @@ export function ParticipationNewPage(): React.ReactElement | null {
   const handleEnroll = async (schedule: ScheduleSummary): Promise<void> => {
     setEnrollingId(schedule.id)
     try {
-      const participation = await api.participations.create(schedule.id)
-      void navigate({ to: '/app/participations/$participationId', params: { participationId: String(participation.id) } })
+      const training = await api.training.create(schedule.id)
+      void navigate({ to: '/app/training/$trainingId', params: { trainingId: String(training.id) } })
     } catch {
       toast.error('Failed to start training', { description: 'Could not enrol in this schedule.' })
       setEnrollingId(null)
@@ -65,7 +65,7 @@ export function ParticipationNewPage(): React.ReactElement | null {
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
-              <Link to="/app">Dashboard</Link>
+              <Link to="/app/training">Training</Link>
             </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />

@@ -5,7 +5,7 @@ from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.user import User
 from app.services import schedule as schedule_svc
-from app.services import schedule_participation as participation_svc
+from app.services import training as training_svc
 
 schedules_bp = Blueprint("schedules", __name__, url_prefix="/schedules")
 
@@ -113,37 +113,37 @@ def get_schedule_insights(schedule_id: int) -> tuple[Response, int] | Response:
     return jsonify({"data": data})
 
 
-@schedules_bp.get("/<int:schedule_id>/participations/me")
+@schedules_bp.get("/<int:schedule_id>/training/me")
 @login_required
-def get_my_participation_for_schedule(schedule_id: int) -> tuple[Response, int] | Response:
-    participation = participation_svc.get_my_participation_for_schedule(
+def get_my_training_for_schedule(schedule_id: int) -> tuple[Response, int] | Response:
+    training = training_svc.get_my_training_for_schedule(
         schedule_id, session["user_id"]
     )
-    if participation is None:
+    if training is None:
         return jsonify({"error": "Not enrolled."}), 404
     return jsonify({
-        "id": participation.id,
-        "scheduleId": participation.schedule_id,
-        "status": participation_svc.participation_status(participation),
-        "startedAt": participation.started_at.isoformat(),
-        "completedAt": participation.completed_at.isoformat() if participation.completed_at else None,
-        "abortedAt": participation.aborted_at.isoformat() if participation.aborted_at else None,
+        "id": training.id,
+        "scheduleId": training.schedule_id,
+        "status": training_svc.training_status(training),
+        "startedAt": training.started_at.isoformat(),
+        "completedAt": training.completed_at.isoformat() if training.completed_at else None,
+        "abortedAt": training.aborted_at.isoformat() if training.aborted_at else None,
     })
 
 
-@schedules_bp.get("/<int:schedule_id>/participations")
+@schedules_bp.get("/<int:schedule_id>/training/participants")
 @login_required
 def get_schedule_participants(schedule_id: int) -> tuple[Response, int] | Response:
     try:
-        result = participation_svc.get_schedule_participants(schedule_id, session["user_id"])
+        result = training_svc.get_schedule_participants(schedule_id, session["user_id"])
     except PermissionError as e:
         return jsonify({"error": str(e)}), 403
     return jsonify(result)
 
 
-@schedules_bp.get("/<int:schedule_id>/participation-insights")
+@schedules_bp.get("/<int:schedule_id>/training-insights")
 @login_required
-def get_participation_insights(schedule_id: int) -> tuple[Response, int] | Response:
+def get_training_insights(schedule_id: int) -> tuple[Response, int] | Response:
     runs_raw = request.args.get("runs", "")
     participants_raw = request.args.get("participants", "")
     try:
@@ -156,7 +156,7 @@ def get_participation_insights(schedule_id: int) -> tuple[Response, int] | Respo
     except ValueError:
         return jsonify({"error": "Invalid runs or participants parameter."}), 400
     try:
-        result = participation_svc.get_participation_insights(
+        result = training_svc.get_training_insights(
             schedule_id, session["user_id"], run_indices, participant_ids
         )
     except PermissionError as e:

@@ -8,7 +8,7 @@ import {
   api,
   type Run,
   type RunPuzzleList,
-  type ScheduleParticipation,
+  type Training,
 } from '../lib/api'
 import { formatNumber, formatSolveTime, formatSolveTimeMs, formatStartedAt } from '../lib/utils'
 import {
@@ -143,7 +143,7 @@ function ConfigureTab({
   run: Run
   puzzleList: RunPuzzleList
   runIdStr: string
-  participation: ScheduleParticipation | null
+  participation: Training | null
 }): React.ReactElement {
   const [targetsOpen, setTargetsOpen] = useState(true)
   const [puzzlesOpen, setPuzzlesOpen] = useState(false)
@@ -164,7 +164,7 @@ function ConfigureTab({
     if (saving) return
     setSaving(true)
     try {
-      await api.participations.setRunTarget(run.participationId, run.runIndex, {
+      await api.training.setRunTarget(run.trainingId, run.runIndex, {
         targetAccuracy: accuracyVal,
         targetSolveSeconds: solveSecondsVal,
       })
@@ -300,12 +300,12 @@ const RUN_STATUS_LABELS: Record<Run['status'], string> = {
 export function RunPage(): React.ReactElement | null {
   const { user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
-  const { runId: runIdStr } = useParams({ from: '/app/runs/$runId' })
+  const { runId: runIdStr } = useParams({ from: '/app/app-shell/runs/$runId' })
   const runId = parseInt(runIdStr, 10)
 
   const [run, setRun] = useState<Run | null>(null)
   const [puzzleList, setPuzzleList] = useState<RunPuzzleList | null>(null)
-  const [participation, setParticipation] = useState<ScheduleParticipation | null>(null)
+  const [participation, setParticipation] = useState<Training | null>(null)
   const [pageLoading, setPageLoading] = useState(true)
   const [showAbortDialog, setShowAbortDialog] = useState(false)
   const [aborting, setAborting] = useState(false)
@@ -322,8 +322,8 @@ export function RunPage(): React.ReactElement | null {
       .then(([fetchedRun, fetchedPuzzles]) => {
         setRun(fetchedRun)
         setPuzzleList(fetchedPuzzles)
-        api.participations
-          .get(fetchedRun.participationId)
+        api.training
+          .get(fetchedRun.trainingId)
           .then(setParticipation)
           .catch(() => {})
       })
@@ -367,7 +367,7 @@ export function RunPage(): React.ReactElement | null {
   }
 
   const scheduleName = participation?.schedule.name ?? '…'
-  const participationId = run.participationId
+  const trainingId = run.trainingId
 
   const statsLine = `Started ${formatStartedAt(run.startedAt)}`
 
@@ -384,8 +384,8 @@ export function RunPage(): React.ReactElement | null {
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
               <Link
-                to="/app/participations/$participationId"
-                params={{ participationId: String(participationId) }}
+                to="/app/training/$trainingId"
+                params={{ trainingId: String(trainingId) }}
               >
                 {scheduleName}
               </Link>

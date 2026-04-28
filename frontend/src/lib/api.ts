@@ -160,9 +160,9 @@ export type RunTarget = {
   targetSolveSeconds: number | null
 }
 
-export type ParticipationStatus = 'draft' | 'in_progress' | 'completed' | 'aborted'
+export type TrainingStatus = 'draft' | 'in_progress' | 'completed' | 'aborted'
 
-export type ParticipationScheduleSummary = {
+export type TrainingScheduleSummary = {
   id: number
   name: string
   description: string | null
@@ -175,24 +175,24 @@ export type ParticipationScheduleSummary = {
   subset: { id: number; name: string; puzzleCount: number }
 }
 
-export type ScheduleParticipation = {
+export type Training = {
   id: number
   scheduleId: number
-  status: ParticipationStatus
+  status: TrainingStatus
   startedAt: string
   completedAt: string | null
   abortedAt: string | null
   ownerUsername: string
   runTargets: RunTarget[]
-  schedule: ParticipationScheduleSummary
+  schedule: TrainingScheduleSummary
 }
 
-export type MyParticipationSummary = {
+export type MyTrainingSummary = {
   id: number
   scheduleId: number
   scheduleName: string
   subsetId: number
-  status: ParticipationStatus
+  status: TrainingStatus
   runsCompleted: number
   totalRuns: number
   startedAt: string
@@ -200,7 +200,7 @@ export type MyParticipationSummary = {
   abortedAt: string | null
 }
 
-export type AllParticipationSummary = MyParticipationSummary & {
+export type AllTrainingSummary = MyTrainingSummary & {
   user: { username: string; avatarUrl: string | null }
 }
 
@@ -212,17 +212,17 @@ export type ParticipantInfo = {
 }
 
 export type InsightDatapoint = {
-  participationId: number
+  trainingId: number
   username: string
   runIndex: number
   accuracy: number
   totalSolveSeconds: number
 }
 
-export type MyScheduleParticipation = {
+export type MyScheduleTraining = {
   id: number
   scheduleId: number
-  status: ParticipationStatus
+  status: TrainingStatus
   startedAt: string
   completedAt: string | null
   abortedAt: string | null
@@ -279,7 +279,7 @@ export type PaceChartData = {
 
 export type Run = {
   id: number
-  participationId: number
+  trainingId: number
   runIndex: number
   status: RunStatus
   startedAt: string
@@ -396,7 +396,7 @@ export type RunPuzzleOverview = {
     triesRemaining: number
     maxTriesPerPuzzle: number
     qualifyingAttemptId: number | null
-    participationId: number | null
+    trainingId: number | null
     scheduleName: string | null
   }
   puzzle: {
@@ -473,7 +473,7 @@ export type RunPuzzleAttemptView = {
     triesRemaining: number
     currentTryNumber: number
     maxTriesPerPuzzle: number
-    participationId: number | null
+    trainingId: number | null
     scheduleName: string | null
   }
   puzzle: {
@@ -583,44 +583,44 @@ export const api = {
     delete: (id: number): Promise<void> => request(`/schedules/${id}`, { method: 'DELETE' }),
     insights: (id: number): Promise<ScheduleInsightPoint[]> =>
       request<{ data: ScheduleInsightPoint[] }>(`/schedules/${id}/insights`).then((r) => r.data),
-    getMyParticipation: (scheduleId: number): Promise<MyScheduleParticipation | null> =>
-      request<MyScheduleParticipation>(`/schedules/${scheduleId}/participations/me`).catch(
+    getMyTraining: (scheduleId: number): Promise<MyScheduleTraining | null> =>
+      request<MyScheduleTraining>(`/schedules/${scheduleId}/training/me`).catch(
         (err: unknown) => {
           if (err instanceof ApiError && err.status === 404) return null
           throw err
         },
       ),
     getParticipants: (id: number): Promise<{ count: number; participants: ParticipantInfo[] }> =>
-      request(`/schedules/${id}/participations`),
-    getParticipationInsights: (
+      request(`/schedules/${id}/training/participants`),
+    getTrainingInsights: (
       id: number,
       runs: number[],
       participants: number[],
     ): Promise<{ datapoints: InsightDatapoint[] }> =>
       request(
-        `/schedules/${id}/participation-insights?runs=${runs.join(',')}&participants=${participants.join(',')}`,
+        `/schedules/${id}/training-insights?runs=${runs.join(',')}&participants=${participants.join(',')}`,
       ),
   },
-  participations: {
-    create: (scheduleId: number): Promise<ScheduleParticipation> =>
-      request('/participations', { method: 'POST', body: JSON.stringify({ scheduleId }) }),
-    get: (id: number): Promise<ScheduleParticipation> => request(`/participations/${id}`),
-    listMine: (): Promise<MyParticipationSummary[]> => request('/participations'),
-    listAll: (scheduleId?: number): Promise<AllParticipationSummary[]> =>
-      request(`/participations/all${scheduleId !== undefined ? `?scheduleId=${scheduleId}` : ''}`),
+  training: {
+    create: (scheduleId: number): Promise<Training> =>
+      request('/training', { method: 'POST', body: JSON.stringify({ scheduleId }) }),
+    get: (id: number): Promise<Training> => request(`/training/${id}`),
+    listMine: (): Promise<MyTrainingSummary[]> => request('/training'),
+    listAll: (scheduleId?: number): Promise<AllTrainingSummary[]> =>
+      request(`/training/all${scheduleId !== undefined ? `?scheduleId=${scheduleId}` : ''}`),
     setRunTarget: (
-      participationId: number,
+      trainingId: number,
       runIndex: number,
       target: { targetAccuracy: number | null; targetSolveSeconds: number | null },
     ): Promise<RunTarget> =>
-      request(`/participations/${participationId}/run-targets/${runIndex}`, {
+      request(`/training/${trainingId}/run-targets/${runIndex}`, {
         method: 'PUT',
         body: JSON.stringify(target),
       }),
-    getCrossRunPuzzle: (participationId: number, puzzleId: string): Promise<PuzzleRunReference[]> =>
-      request(`/participations/${participationId}/cross-run-puzzle/${encodeURIComponent(puzzleId)}`),
-    abort: (participationId: number): Promise<ScheduleParticipation> =>
-      request(`/participations/${participationId}/abort`, { method: 'POST' }),
+    getCrossRunPuzzle: (trainingId: number, puzzleId: string): Promise<PuzzleRunReference[]> =>
+      request(`/training/${trainingId}/cross-run-puzzle/${encodeURIComponent(puzzleId)}`),
+    abort: (trainingId: number): Promise<Training> =>
+      request(`/training/${trainingId}/abort`, { method: 'POST' }),
   },
   themes: {
     list: (): Promise<Theme[]> => request('/themes'),
@@ -630,13 +630,13 @@ export const api = {
       request(`/openings?q=${encodeURIComponent(q)}`),
   },
   runs: {
-    start: (participationId: number, runIndex?: number): Promise<Run> =>
-      request(`/participations/${participationId}/runs`, {
+    start: (trainingId: number, runIndex?: number): Promise<Run> =>
+      request(`/training/${trainingId}/runs`, {
         method: 'POST',
         body: JSON.stringify(runIndex === undefined ? {} : { runIndex }),
       }),
-    list: (participationId: number): Promise<Run[]> =>
-      request(`/participations/${participationId}/runs`),
+    list: (trainingId: number): Promise<Run[]> =>
+      request(`/training/${trainingId}/runs`),
     get: (runId: number): Promise<Run> => request(`/runs/${runId}`),
     abort: (runId: number): Promise<Run> =>
       request(`/runs/${runId}/abort`, { method: 'POST' }),

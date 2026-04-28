@@ -14,17 +14,17 @@ import {
 } from '../ui/table'
 import { ProgressBar } from '../ProgressBar'
 import { UserAvatar } from '../UserAvatar'
-import type { AllParticipationSummary, ParticipationStatus } from '../../lib/api'
+import type { AllTrainingSummary, TrainingStatus } from '../../lib/api'
 
 type SortKey = 'scheduleName' | 'status' | 'progress' | 'startedAt'
 type SortDir = 'asc' | 'desc'
 
-type ParticipationsTableProps = {
-  participations: AllParticipationSummary[]
+type TrainingTableProps = {
+  trainings: AllTrainingSummary[]
   hideSchedule?: boolean
 }
 
-const STATUS_LABELS: Record<ParticipationStatus, string> = {
+const STATUS_LABELS: Record<TrainingStatus, string> = {
   draft: 'Not started',
   in_progress: 'In progress',
   completed: 'Completed',
@@ -73,10 +73,10 @@ function formatDate(iso: string): string {
   })
 }
 
-export function ParticipationsTable({
-  participations,
+export function TrainingTable({
+  trainings,
   hideSchedule = false,
-}: ParticipationsTableProps): React.ReactElement {
+}: TrainingTableProps): React.ReactElement {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('startedAt')
@@ -93,8 +93,8 @@ export function ParticipationsTable({
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
-    return participations
-      .filter((p) => !q || p.scheduleName.toLowerCase().includes(q))
+    return trainings
+      .filter((t) => !q || t.scheduleName.toLowerCase().includes(q))
       .sort((a, b) => {
         let cmp = 0
         if (sortKey === 'scheduleName') {
@@ -108,7 +108,7 @@ export function ParticipationsTable({
         }
         return sortDir === 'asc' ? cmp : -cmp
       })
-  }, [participations, search, sortKey, sortDir])
+  }, [trainings, search, sortKey, sortDir])
 
   return (
     <div className="flex flex-col gap-3">
@@ -168,36 +168,36 @@ export function ParticipationsTable({
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((p) => (
+              filtered.map((t) => (
                 <TableRow
-                  key={p.id}
+                  key={t.id}
                   className="cursor-pointer"
                   onClick={() =>
                     void navigate({
-                      to: '/app/participations/$participationId',
-                      params: { participationId: String(p.id) },
+                      to: '/app/training/$trainingId',
+                      params: { trainingId: String(t.id) },
                     })
                   }
                 >
                   <TableCell>
-                    <UserAvatar username={p.user.username} avatarUrl={p.user.avatarUrl} />
+                    <UserAvatar username={t.user.username} avatarUrl={t.user.avatarUrl} />
                   </TableCell>
                   {!hideSchedule && (
                     <TableCell className="font-medium">
                       <Link
                         to="/app/schedules/$scheduleId"
-                        params={{ scheduleId: String(p.scheduleId) }}
+                        params={{ scheduleId: String(t.scheduleId) }}
                         className="hover:underline"
-                        title={p.scheduleName}
+                        title={t.scheduleName}
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {p.scheduleName.length > 8 ? `${p.scheduleName.slice(0, 8)}…` : p.scheduleName}
+                        {t.scheduleName.length > 8 ? `${t.scheduleName.slice(0, 8)}…` : t.scheduleName}
                       </Link>
                     </TableCell>
                   )}
                   <TableCell>
                     <Badge variant="outline" className="text-xs">
-                      {STATUS_LABELS[p.status as ParticipationStatus]}
+                      {STATUS_LABELS[t.status as TrainingStatus]}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -208,10 +208,10 @@ export function ParticipationsTable({
                     />
                   </TableCell>
                   <TableCell className="hidden text-muted-foreground sm:table-cell">
-                    {formatDate(p.startedAt)}
+                    {formatDate(t.startedAt)}
                   </TableCell>
                   <TableCell className="hidden text-muted-foreground md:table-cell">
-                    {p.completedAt ? formatDate(p.completedAt) : '—'}
+                    {t.completedAt ? formatDate(t.completedAt) : '—'}
                   </TableCell>
                 </TableRow>
               ))

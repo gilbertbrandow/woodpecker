@@ -7,8 +7,8 @@ import { useAuth } from '../context/auth'
 import {
   api,
   type Run,
-  type ScheduleParticipation,
-  type ParticipationStatus,
+  type Training,
+  type TrainingStatus,
 } from '../lib/api'
 import {
   Breadcrumb,
@@ -49,7 +49,7 @@ import { ProgressBar } from '../components/ProgressBar'
 import { formatDuration } from '../components/schedules/DurationInput'
 import { formatStartedAt } from '../lib/utils'
 
-const STATUS_LABELS: Record<ParticipationStatus, string> = {
+const STATUS_LABELS: Record<TrainingStatus, string> = {
   draft: 'Not started',
   in_progress: 'In progress',
   completed: 'Completed',
@@ -79,13 +79,13 @@ function getRunForSlot(runs: Run[], slotIndex: number): Run | null {
 }
 
 
-export function ParticipationPage(): React.ReactElement | null {
+export function TrainingPage(): React.ReactElement | null {
   const { user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
-  const { participationId } = useParams({ from: '/app/participations/$participationId' })
-  const id = parseInt(participationId, 10)
+  const { trainingId } = useParams({ from: '/app/app-shell/training/$trainingId' })
+  const id = parseInt(trainingId, 10)
 
-  const [participation, setParticipation] = useState<ScheduleParticipation | null>(null)
+  const [training, setTraining] = useState<Training | null>(null)
   const [runs, setRuns] = useState<Run[]>([])
   const [pageLoading, setPageLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('configure')
@@ -104,13 +104,13 @@ export function ParticipationPage(): React.ReactElement | null {
 
   useEffect(() => {
     if (!user) return
-    Promise.all([api.participations.get(id), api.runs.list(id)])
-      .then(([p, fetchedRuns]) => {
-        setParticipation(p)
+    Promise.all([api.training.get(id), api.runs.list(id)])
+      .then(([t, fetchedRuns]) => {
+        setTraining(t)
         setRuns(fetchedRuns)
       })
       .catch(() =>
-        toast.error('Failed to load participation', {
+        toast.error('Failed to load training', {
           description: 'Could not fetch training data.',
         }),
       )
@@ -123,10 +123,10 @@ export function ParticipationPage(): React.ReactElement | null {
   }
 
   const handleStartRun = async (runIndex: number): Promise<void> => {
-    if (startingIndex !== null || !participation) return
+    if (startingIndex !== null || !training) return
     setStartingIndex(runIndex)
     try {
-      const newRun = await api.runs.start(participation.id, runIndex)
+      const newRun = await api.runs.start(training.id, runIndex)
       handleRunStarted(newRun)
       void navigate({
         to: '/app/runs/$runId/solve',
@@ -138,13 +138,13 @@ export function ParticipationPage(): React.ReactElement | null {
     }
   }
 
-  const handleAbortParticipation = async (): Promise<void> => {
-    if (!participation || aborting) return
+  const handleAbortTraining = async (): Promise<void> => {
+    if (!training || aborting) return
     setAborting(true)
     try {
-      const updated = await api.participations.abort(participation.id)
-      setParticipation(updated)
-      toast('Participation aborted', { description: 'Your progress has been saved.' })
+      const updated = await api.training.abort(training.id)
+      setTraining(updated)
+      toast('Training aborted', { description: 'Your progress has been saved.' })
     } catch {
       toast.error('Failed to abort', { description: 'Please try again.' })
     } finally {
@@ -163,18 +163,18 @@ export function ParticipationPage(): React.ReactElement | null {
     )
   }
 
-  if (!participation) {
+  if (!training) {
     return (
       <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
-        <p className="text-sm text-muted-foreground">Participation not found.</p>
+        <p className="text-sm text-muted-foreground">Training not found.</p>
       </div>
     )
   }
 
-  const { schedule } = participation
+  const { schedule } = training
   const runDefs = schedule.runs
-  const isOwner = participation.ownerUsername === user.username
-  const canManageRuns = isOwner && (participation.status === 'draft' || participation.status === 'in_progress')
+  const isOwner = training.ownerUsername === user.username
+  const canManageRuns = isOwner && (training.status === 'draft' || training.status === 'in_progress')
   const completedRunCount = runs.filter((r) => r.status === 'completed').length
   const hasActiveRun = runs.some((r) => r.status === 'active')
   const startableRunIndex = (
@@ -189,7 +189,7 @@ export function ParticipationPage(): React.ReactElement | null {
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
-              <Link to="/app">Training</Link>
+              <Link to="/app/training">Training</Link>
             </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
@@ -204,29 +204,29 @@ export function ParticipationPage(): React.ReactElement | null {
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-semibold">{schedule.name}</h1>
             <Badge variant="outline" className="text-xs">
-              {STATUS_LABELS[participation.status]}
+              {STATUS_LABELS[training.status]}
             </Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Started {formatStartedAt(participation.startedAt)}
+            Started {formatStartedAt(training.startedAt)}
           </p>
         </div>
-        {isOwner && participation.status === 'in_progress' && (
+        {isOwner && training.status === 'in_progress' && (
           <Button variant="ghost" size="sm" onClick={() => setShowAbortDialog(true)}>
-            Abort participation
+            Abort training
           </Button>
         )}
       </div>
 
-      {participation.status === 'aborted' && participation.abortedAt && (
+      {training.status === 'aborted' && training.abortedAt && (
         <div className="mb-6 rounded-md border border-amber-600/30 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950/20 dark:text-amber-400">
-          This participation was aborted on {formatDate(participation.abortedAt)}.
+          This training was aborted on {formatDate(training.abortedAt)}.
         </div>
       )}
 
-      {participation.status === 'completed' && participation.completedAt && (
+      {training.status === 'completed' && training.completedAt && (
         <div className="mb-6 rounded-md border px-4 py-3 text-sm text-muted-foreground">
-          Completed on {formatDate(participation.completedAt)}.
+          Completed on {formatDate(training.completedAt)}.
         </div>
       )}
 
@@ -446,16 +446,16 @@ export function ParticipationPage(): React.ReactElement | null {
       <AlertDialog open={showAbortDialog} onOpenChange={setShowAbortDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Abort participation?</AlertDialogTitle>
+            <AlertDialogTitle>Abort training?</AlertDialogTitle>
             <AlertDialogDescription>
-              This cannot be undone. Your completed runs will be preserved but the participation
+              This cannot be undone. Your completed runs will be preserved but the training
               will be marked as aborted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => void handleAbortParticipation()}
+              onClick={() => void handleAbortTraining()}
               disabled={aborting}
             >
               {aborting ? 'Aborting…' : 'Abort'}

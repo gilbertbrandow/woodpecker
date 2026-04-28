@@ -12,9 +12,9 @@ import {
   type PuzzleOrder,
   type Subset,
   type ScheduleInsightPoint,
-  type MyScheduleParticipation,
-  type ParticipationStatus,
-  type AllParticipationSummary,
+  type MyScheduleTraining,
+  type TrainingStatus,
+  type AllTrainingSummary,
 } from "../lib/api";
 import { AreaChart, Area, XAxis, YAxis } from "recharts";
 import {
@@ -30,7 +30,7 @@ import {
 } from "../components/ui/tabs";
 import { UserAvatar } from "../components/UserAvatar";
 import { ProgressBar } from "../components/ProgressBar";
-import { ParticipationsTable } from "../components/participations/ParticipationsTable";
+import { TrainingTable } from "../components/participations/TrainingTable";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
@@ -67,7 +67,7 @@ import { formatNumber } from "../lib/utils";
 
 const MAX_RUNS = 20;
 
-const PARTICIPATION_STATUS_LABELS: Record<ParticipationStatus, string> = {
+const TRAINING_STATUS_LABELS: Record<TrainingStatus, string> = {
   draft: "Not started",
   in_progress: "In progress",
   completed: "Completed",
@@ -141,7 +141,7 @@ function SectionTrigger({
 export function SchedulePage(): React.ReactElement | null {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const { scheduleId } = useParams({ from: "/app/schedules/$scheduleId" });
+  const { scheduleId } = useParams({ from: "/app/app-shell/schedules/$scheduleId" });
   const id = parseInt(scheduleId, 10);
 
   const [schedule, setSchedule] = useState<Schedule | null>(null);
@@ -160,9 +160,9 @@ export function SchedulePage(): React.ReactElement | null {
   const [orderOpen, setOrderOpen] = useState(true);
   const [repetitionOpen, setRepetitionOpen] = useState(true);
 
-  const [myParticipation, setMyParticipation] = useState<MyScheduleParticipation | null | undefined>(undefined)
+  const [myTraining, setMyTraining] = useState<MyScheduleTraining | null | undefined>(undefined)
   const [enrolling, setEnrolling] = useState(false)
-  const [scheduleParticipations, setScheduleParticipations] = useState<AllParticipationSummary[] | null>(null)
+  const [scheduleTrainings, setScheduleTrainings] = useState<AllTrainingSummary[] | null>(null)
 
   const [activeTab, setActiveTab] = useState("configuration");
   const [insightsData, setInsightsData] = useState<ScheduleInsightPoint[] | null>(null);
@@ -196,9 +196,9 @@ export function SchedulePage(): React.ReactElement | null {
           setRepetitionOpen(false);
           setActiveTab("insights");
           api.schedules
-            .getMyParticipation(s.id)
-            .then((p) => setMyParticipation(p))
-            .catch(() => setMyParticipation(null));
+            .getMyTraining(s.id)
+            .then((p) => setMyTraining(p))
+            .catch(() => setMyTraining(null));
         }
         return api.subsets.get(s.subsetId);
       })
@@ -216,12 +216,12 @@ export function SchedulePage(): React.ReactElement | null {
   }, []);
 
   useEffect(() => {
-    if (activeTab !== "insights" || scheduleParticipations !== null || !user) return;
-    api.participations
+    if (activeTab !== "insights" || scheduleTrainings !== null || !user) return;
+    api.training
       .listAll(id)
-      .then(setScheduleParticipations)
+      .then(setScheduleTrainings)
       .catch(() => {});
-  }, [activeTab, id, user, scheduleParticipations]);
+  }, [activeTab, id, user, scheduleTrainings]);
 
   useEffect(() => {
     if (activeTab !== "insights" || insightsData !== null || !user) return;
@@ -279,15 +279,15 @@ export function SchedulePage(): React.ReactElement | null {
   const handleEnroll = async (): Promise<void> => {
     setEnrolling(true);
     try {
-      const participation = await api.participations.create(id);
+      const participation = await api.training.create(id);
       void navigate({
-        to: "/app/participations/$participationId",
-        params: { participationId: String(participation.id) },
+        to: "/app/training/$trainingId",
+        params: { trainingId: String(participation.id) },
       });
     } catch (err) {
       if (err instanceof Error && err.message.includes("409")) {
-        const p = await api.schedules.getMyParticipation(id);
-        setMyParticipation(p);
+        const p = await api.schedules.getMyTraining(id);
+        setMyTraining(p);
       } else {
         const msg = err instanceof Error ? err.message : "Please try again.";
         toast.error("Enroll failed", { description: msg });
@@ -509,11 +509,11 @@ export function SchedulePage(): React.ReactElement | null {
             </span>
           </div>
 
-          {myParticipation === undefined ? (
+          {myTraining === undefined ? (
             <div className="px-4 py-3">
               <p className="text-sm text-muted-foreground">Loading…</p>
             </div>
-          ) : myParticipation === null ? (
+          ) : myTraining === null ? (
             <div className="flex items-center gap-3 px-4 py-3">
               <p className="flex-1 text-sm text-muted-foreground">
                 You are not training this schedule.
@@ -527,8 +527,8 @@ export function SchedulePage(): React.ReactElement | null {
               className="flex cursor-pointer items-center gap-6 px-4 py-3 transition-colors hover:bg-muted/50"
               onClick={() =>
                 void navigate({
-                  to: "/app/participations/$participationId",
-                  params: { participationId: String(myParticipation.id) },
+                  to: "/app/training/$trainingId",
+                  params: { trainingId: String(myTraining.id) },
                 })
               }
             >
@@ -536,10 +536,10 @@ export function SchedulePage(): React.ReactElement | null {
               <ProgressBar value={65} tooltipLabel="3/5 Runs, 67% completed" className="w-40" />
               <div className="flex flex-1 items-center justify-end gap-4">
                 <Badge variant="outline" className="text-xs">
-                  {PARTICIPATION_STATUS_LABELS[myParticipation.status]}
+                  {TRAINING_STATUS_LABELS[myTraining.status]}
                 </Badge>
                 <span className="hidden text-xs text-muted-foreground sm:block">
-                  {formatDate(myParticipation.startedAt)}
+                  {formatDate(myTraining.startedAt)}
                 </span>
               </div>
             </div>
@@ -962,10 +962,10 @@ export function SchedulePage(): React.ReactElement | null {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="pt-4">
-                  {scheduleParticipations === null ? (
+                  {scheduleTrainings === null ? (
                     <p className="text-sm text-muted-foreground">Loading…</p>
                   ) : (
-                    <ParticipationsTable participations={scheduleParticipations} hideSchedule />
+                    <TrainingTable trainings={scheduleTrainings} hideSchedule />
                   )}
                 </div>
               </CollapsibleContent>

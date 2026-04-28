@@ -6,7 +6,7 @@ from app.routes.auth import auth_bp
 from app.routes.settings import settings_bp
 from app.routes.subsets import subsets_bp
 from app.routes.schedules import schedules_bp
-from app.routes.schedule_participations import participations_bp
+from app.routes.training import training_bp
 from app.routes.runs import runs_bp
 from app.routes.themes import themes_bp
 from app.routes.openings import openings_bp
@@ -32,7 +32,7 @@ def create_app() -> Flask:
     app.register_blueprint(settings_bp)
     app.register_blueprint(subsets_bp)
     app.register_blueprint(schedules_bp)
-    app.register_blueprint(participations_bp)
+    app.register_blueprint(training_bp)
     app.register_blueprint(runs_bp)
     app.register_blueprint(themes_bp)
     app.register_blueprint(openings_bp)

@@ -14,8 +14,8 @@ class Run(Base):
     __tablename__ = "runs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    participation_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("schedule_participations.id"), nullable=False
+    training_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("trainings.id"), nullable=False
     )
     run_index: Mapped[int] = mapped_column(Integer, nullable=False)
     started_at: Mapped[datetime] = mapped_column(
@@ -39,7 +39,7 @@ class Run(Base):
     )
 
     __table_args__ = (
-        Index("ix_runs_participation_id", "participation_id"),
+        Index("ix_runs_training_id", "training_id"),
     )
 
 

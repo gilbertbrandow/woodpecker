@@ -810,7 +810,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     setIsStartingNextRun(true)
     try {
       const run = await api.runs.get(overview.runPuzzle.runId)
-      const newRun = await api.runs.start(run.participationId, overview.runPuzzle.runIndex + 1)
+      const newRun = await api.runs.start(run.trainingId, overview.runPuzzle.runIndex + 1)
       void navigate({ to: '/app/runs/$runId', params: { runId: String(newRun.id) } })
     } catch {
       toast.error('Could not start next run', { description: 'Please try again.' })

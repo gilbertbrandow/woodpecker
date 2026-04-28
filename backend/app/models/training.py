@@ -7,8 +7,8 @@ from sqlalchemy.sql import func
 from app.extensions import Base
 
 
-class ScheduleParticipation(Base):
-    __tablename__ = "schedule_participations"
+class Training(Base):
+    __tablename__ = "trainings"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
@@ -20,5 +20,5 @@ class ScheduleParticipation(Base):
     aborted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
-        UniqueConstraint("user_id", "schedule_id", name="uq_participation_user_schedule"),
+        UniqueConstraint("user_id", "schedule_id", name="uq_training_user_schedule"),
     )

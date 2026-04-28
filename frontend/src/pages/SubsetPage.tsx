@@ -257,7 +257,7 @@ function UsedBySchedules({
 export function SubsetPage(): React.ReactElement | null {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const { subsetId } = useParams({ from: "/app/subsets/$subsetId" });
+  const { subsetId } = useParams({ from: "/app/app-shell/subsets/$subsetId" });
   const id = parseInt(subsetId, 10);
 
   const [subset, setSubset] = useState<Subset | null>(null);

@@ -7,7 +7,7 @@ from flask import Flask
 from flask.testing import FlaskClient
 
 _TRUNCATE_TABLES = (
-    "puzzle_attempts, run_puzzles, runs, schedule_participations, "
+    "puzzle_attempts, run_puzzles, runs, trainings, "
     "schedules, subset_puzzles, subsets, users, puzzles"
 )
 
@@ -55,7 +55,7 @@ def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
     from app.models.puzzle import Puzzle
     from app.models.subset import Subset, SubsetPuzzle
     from app.models.schedule import Schedule
-    from app.models.schedule_participation import ScheduleParticipation
+    from app.models.training import Training
     from app.models.run import Run, RunPuzzle, PuzzleAttempt
 
     PUZZLE_ID = "test_spec17_001"
@@ -110,7 +110,7 @@ def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
     session.add(schedule)
     session.flush()
 
-    participation = ScheduleParticipation(
+    participation = Training(
         user_id=user.id,
         schedule_id=schedule.id,
         started_at=datetime.now(timezone.utc),

@@ -12,7 +12,7 @@ from app.extensions import db
 from app.models.puzzle import Puzzle
 from app.models.run import MAX_PUZZLE_TIME_MS, PuzzleAttempt, Run, RunPuzzle
 from app.models.schedule import Schedule
-from app.models.schedule_participation import ScheduleParticipation
+from app.models.training import Training
 from app.models.subset import Subset, SubsetPuzzle
 
 
@@ -20,8 +20,8 @@ def _get_owned_run(run_id: int, user_id: int) -> Run:
     run = db.session.get(Run, run_id)
     if run is None:
         raise LookupError("Run not found.")
-    participation = db.session.get(ScheduleParticipation, run.participation_id)
-    if participation is None or participation.user_id != user_id:
+    training = db.session.get(Training, run.training_id)
+    if training is None or training.user_id != user_id:
         raise PermissionError("Access denied.")
     return run
 
@@ -40,10 +40,10 @@ def _get_owned_attempt(
 
 
 def _get_schedule_config(run: Run) -> tuple[Schedule, dict[str, object]]:
-    participation = db.session.get(ScheduleParticipation, run.participation_id)
-    if participation is None:
-        raise LookupError("Participation not found.")
-    schedule = db.session.get(Schedule, participation.schedule_id)
+    training = db.session.get(Training, run.training_id)
+    if training is None:
+        raise LookupError("Training not found.")
+    schedule = db.session.get(Schedule, training.schedule_id)
     if schedule is None:
         raise LookupError("Schedule not found.")
     config: dict[str, object] = schedule.config if isinstance(schedule.config, dict) else {}
@@ -210,8 +210,8 @@ def _run_puzzle_attempt_view_dict(run_puzzle: RunPuzzle) -> dict[str, object]:
     if in_progress_attempt is None:
         raise LookupError("No in-progress attempt found.")
 
-    participation = db.session.get(ScheduleParticipation, run.participation_id)
-    schedule = db.session.get(Schedule, participation.schedule_id) if participation else None
+    training = db.session.get(Training, run.training_id)
+    schedule = db.session.get(Schedule, training.schedule_id) if training else None
     schedule_name: str | None = schedule.name if schedule is not None else None
 
     position_status = _derive_position_status(sorted_attempts, total_queue)
@@ -240,7 +240,7 @@ def _run_puzzle_attempt_view_dict(run_puzzle: RunPuzzle) -> dict[str, object]:
             "triesRemaining": tries_remaining,
             "currentTryNumber": in_progress_attempt.try_number,
             "maxTriesPerPuzzle": total_queue,
-            "participationId": run.participation_id,
+            "trainingId": run.training_id,
             "scheduleName": schedule_name,
         },
         "puzzle": {
@@ -509,7 +509,7 @@ def run_dict(run: Run) -> dict[str, object]:
     total = sum(counts.values())
     return {
         "id": run.id,
-        "participationId": run.participation_id,
+        "trainingId": run.training_id,
         "runIndex": run.run_index,
         "status": run.status,
         "startedAt": run.started_at.isoformat(),
@@ -527,26 +527,26 @@ def run_dict(run: Run) -> dict[str, object]:
     }
 
 
-def start_run(participation_id: int, user_id: int, expected_run_index: int | None = None) -> Run:
-    participation = db.session.get(ScheduleParticipation, participation_id)
-    if participation is None:
-        raise LookupError("Participation not found.")
-    if participation.user_id != user_id:
+def start_run(training_id: int, user_id: int, expected_run_index: int | None = None) -> Run:
+    training = db.session.get(Training, training_id)
+    if training is None:
+        raise LookupError("Training not found.")
+    if training.user_id != user_id:
         raise PermissionError("Access denied.")
-    if participation.completed_at is not None or participation.aborted_at is not None:
-        raise ValueError("Participation is already terminal.")
+    if training.completed_at is not None or training.aborted_at is not None:
+        raise ValueError("Training is already terminal.")
 
     active_run = db.session.scalar(
         sa.select(Run).where(
-            Run.participation_id == participation_id,
+            Run.training_id == training_id,
             Run.completed_at.is_(None),
             Run.aborted_at.is_(None),
         )
     )
     if active_run is not None:
-        raise ValueError("An active run already exists for this participation.")
+        raise ValueError("An active run already exists for this training.")
 
-    schedule = db.session.get(Schedule, participation.schedule_id)
+    schedule = db.session.get(Schedule, training.schedule_id)
     if schedule is None:
         raise LookupError("Schedule not found.")
     config: dict[str, object] = schedule.config if isinstance(schedule.config, dict) else {}
@@ -557,7 +557,7 @@ def start_run(participation_id: int, user_id: int, expected_run_index: int | Non
 
     run_index = db.session.scalar(
         sa.select(sa.func.count()).where(
-            Run.participation_id == participation_id,
+            Run.training_id == training_id,
             Run.completed_at.isnot(None),
         )
     ) or 0
@@ -576,7 +576,7 @@ def start_run(participation_id: int, user_id: int, expected_run_index: int | Non
     )
 
     run = Run(
-        participation_id=participation_id,
+        training_id=training_id,
         run_index=run_index,
     )
     db.session.add(run)
@@ -602,16 +602,16 @@ def start_run(participation_id: int, user_id: int, expected_run_index: int | Non
     return run
 
 
-def list_runs(participation_id: int, user_id: int) -> list[Run]:
-    participation = db.session.get(ScheduleParticipation, participation_id)
-    if participation is None:
-        raise LookupError("Participation not found.")
-    if participation.user_id != user_id:
+def list_runs(training_id: int, user_id: int) -> list[Run]:
+    training = db.session.get(Training, training_id)
+    if training is None:
+        raise LookupError("Training not found.")
+    if training.user_id != user_id:
         raise PermissionError("Access denied.")
     return list(
         db.session.scalars(
             sa.select(Run)
-            .where(Run.participation_id == participation_id)
+            .where(Run.training_id == training_id)
             .order_by(Run.started_at.asc())
         ).all()
     )
@@ -996,7 +996,7 @@ def _compute_attempt_impact(
     qualifying_attempt_id: int | None,
     run_puzzles: list[RunPuzzle],
     total_queue: int,
-    participation_id: int,
+    training_id: int,
 ) -> dict[str, object]:
     is_qualifying = attempt.id == qualifying_attempt_id
 
@@ -1007,16 +1007,16 @@ def _compute_attempt_impact(
 
     training_progress_delta_pct: float | None = None
     if is_qualifying:
-        all_participation_runs = list(
+        all_training_runs = list(
             db.session.scalars(
-                sa.select(Run).where(Run.participation_id == participation_id)
+                sa.select(Run).where(Run.training_id == training_id)
             ).all()
         )
         total_training_puzzles = sum(
             db.session.scalar(
                 sa.select(sa.func.count()).where(RunPuzzle.run_id == r.id)
             ) or 0
-            for r in all_participation_runs
+            for r in all_training_runs
         )
         if total_training_puzzles > 0:
             training_progress_delta_pct = round(1.0 / total_training_puzzles * 100, 2)
@@ -1038,13 +1038,13 @@ def _overview_attempt_view(
     puzzle_fen: str,
     puzzle_solution: str,
     run_puzzles: list[RunPuzzle],
-    participation_id: int,
+    training_id: int,
 ) -> dict[str, object]:
     sorted_for_type = sorted(run_puzzle.attempts, key=lambda a: a.try_number)
     type_data = _attempt_type_fields(sorted_for_type, attempt.try_number, total_queue)
 
     impact = _compute_attempt_impact(
-        attempt, qualifying_attempt_id, run_puzzles, total_queue, participation_id
+        attempt, qualifying_attempt_id, run_puzzles, total_queue, training_id
     )
 
     return {
@@ -1072,7 +1072,7 @@ def _overview_attempt_view(
 
 def _same_puzzle_run_overview_items(
     run_puzzle: RunPuzzle,
-    participation_id: int,
+    training_id: int,
     total_queue: int,
 ) -> list[dict[str, object]]:
     other_run_puzzles = list(
@@ -1080,7 +1080,7 @@ def _same_puzzle_run_overview_items(
             sa.select(RunPuzzle)
             .join(Run, RunPuzzle.run_id == Run.id)
             .where(
-                Run.participation_id == participation_id,
+                Run.training_id == training_id,
                 RunPuzzle.puzzle_id == run_puzzle.puzzle_id,
                 RunPuzzle.id != run_puzzle.id,
             )
@@ -1109,7 +1109,7 @@ def _same_puzzle_run_overview_items(
             _overview_attempt_view(
                 a, other_run, rp, q_id, total_queue,
                 puzzle.fen, puzzle.moves,
-                other_run_puzzles_for_run, participation_id,
+                other_run_puzzles_for_run, training_id,
             )
             for a in sorted_attempts
             if a.status != "in_progress"
@@ -1132,7 +1132,7 @@ def _compute_progress_card(
     run_puzzles: list[RunPuzzle],
     total_queue: int,
     run_progress_delta_pct: float | None,
-    participation_id: int,
+    training_id: int,
 ) -> dict[str, object]:
     total_run = len(run_puzzles)
     resolved_run = sum(
@@ -1150,11 +1150,11 @@ def _compute_progress_card(
         "delta": run_progress_delta_pct,
     }
 
-    participation = db.session.get(ScheduleParticipation, participation_id)
-    if participation is None:
+    training = db.session.get(Training, training_id)
+    if training is None:
         return {"runProgress": run_progress_row, "trainingProgress": None}
 
-    schedule = db.session.get(Schedule, participation.schedule_id)
+    schedule = db.session.get(Schedule, training.schedule_id)
     subset = None
     if schedule is not None:
         subset = db.session.get(Subset, schedule.subset_id)
@@ -1177,7 +1177,7 @@ def _compute_progress_card(
 
     all_runs = list(
         db.session.scalars(
-            sa.select(Run).where(Run.participation_id == participation_id)
+            sa.select(Run).where(Run.training_id == training_id)
         ).all()
     )
     training_resolved = 0
@@ -1284,7 +1284,7 @@ def _build_run_puzzle_overview(
     run: Run,
     run_puzzle: RunPuzzle,
     selected_attempt_id: int | None,
-    participation_id: int,
+    training_id: int,
     run_just_completed: bool = False,
     completing_attempt_id: int | None = None,
 ) -> dict[str, object]:
@@ -1295,8 +1295,8 @@ def _build_run_puzzle_overview(
     _, config = _get_schedule_config(run)
     total_queue = _total_queue_attempts(config)
 
-    participation = db.session.get(ScheduleParticipation, participation_id)
-    schedule = db.session.get(Schedule, participation.schedule_id) if participation else None
+    training = db.session.get(Training, training_id)
+    schedule = db.session.get(Schedule, training.schedule_id) if training else None
     schedule_name: str | None = schedule.name if schedule is not None else None
 
     all_run_puzzles = list(
@@ -1332,7 +1332,7 @@ def _build_run_puzzle_overview(
     for a in sorted_attempts:
         view = _overview_attempt_view(
             a, run, run_puzzle, qualifying_attempt_id, total_queue,
-            puzzle.fen, puzzle.moves, all_run_puzzles, participation_id,
+            puzzle.fen, puzzle.moves, all_run_puzzles, training_id,
         )
         if a.id == qualifying_attempt_id:
             impact = cast(dict[str, object], view["impact"])
@@ -1367,7 +1367,7 @@ def _build_run_puzzle_overview(
             "triesRemaining": tries_remaining,
             "maxTriesPerPuzzle": total_queue,
             "qualifyingAttemptId": qualifying_attempt_id,
-            "participationId": participation_id,
+            "trainingId": training_id,
             "scheduleName": schedule_name,
         },
         "puzzle": {
@@ -1384,7 +1384,7 @@ def _build_run_puzzle_overview(
         "selectedAttemptId": resolved_selected_id,
         "attempts": attempt_views,
         "samePuzzleAcrossRuns": _same_puzzle_run_overview_items(
-            run_puzzle, participation_id, total_queue
+            run_puzzle, training_id, total_queue
         ),
         "runPace": {
             "chartData": _pace_chart_data(run, all_run_puzzles, config, total_queue),
@@ -1396,7 +1396,7 @@ def _build_run_puzzle_overview(
             "averageSolveTime": stats["averageSolveTime"],
         },
         "progress": _compute_progress_card(
-            run, all_run_puzzles, total_queue, run_progress_delta_pct, participation_id
+            run, all_run_puzzles, total_queue, run_progress_delta_pct, training_id
         ),
         "actions": _compute_overview_actions(run, puzzle),
         "timer": {
@@ -1419,7 +1419,7 @@ def get_run_puzzle_overview(
     if run_puzzle is None or run_puzzle.run_id != run.id:
         raise LookupError("Run puzzle not found.")
     overview = _build_run_puzzle_overview(
-        run, run_puzzle, selected_attempt_id, run.participation_id
+        run, run_puzzle, selected_attempt_id, run.training_id
     )
     return {
         "overview": overview,
@@ -1519,9 +1519,9 @@ def complete_attempt(
         db.session.flush()
         if _all_puzzles_terminal(run.id, total_queue):
             run.completed_at = now
-            participation = db.session.get(ScheduleParticipation, run.participation_id)
-            if participation is not None:
-                schedule = db.session.get(Schedule, participation.schedule_id)
+            training = db.session.get(Training, run.training_id)
+            if training is not None:
+                schedule = db.session.get(Schedule, training.schedule_id)
                 if schedule is not None:
                     schedule_config: dict[str, object] = (
                         schedule.config if isinstance(schedule.config, dict) else {}
@@ -1529,7 +1529,7 @@ def complete_attempt(
                     runs_list = schedule_config.get("runs")
                     run_count = len(runs_list) if isinstance(runs_list, list) else 0
                     if run.run_index == run_count - 1:
-                        participation.completed_at = now
+                        training.completed_at = now
 
     run_just_completed = run.completed_at == now
 
@@ -1537,7 +1537,7 @@ def complete_attempt(
     db.session.refresh(run_puzzle)
 
     overview = _build_run_puzzle_overview(
-        run, run_puzzle, attempt_id, run.participation_id,
+        run, run_puzzle, attempt_id, run.training_id,
         run_just_completed=run_just_completed,
         completing_attempt_id=attempt_id,
     )
@@ -1624,7 +1624,7 @@ def get_attempt(
         f"/app/runs/{run_id}/puzzles/{run_puzzle_id}/overview?attempt={attempt_id}"
     )
     overview = _build_run_puzzle_overview(
-        run, run_puzzle, attempt_id, run.participation_id
+        run, run_puzzle, attempt_id, run.training_id
     )
     return {
         "kind": "completed_attempt",

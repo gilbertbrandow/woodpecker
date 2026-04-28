@@ -2,59 +2,59 @@ from flask import Blueprint, Response, jsonify, request, session
 
 from app.decorators import login_required
 from app.services import run as run_svc
-from app.services import schedule_participation as participation_svc
+from app.services import training as training_svc
 
-participations_bp = Blueprint("participations", __name__, url_prefix="/participations")
+training_bp = Blueprint("training", __name__, url_prefix="/training")
 
 
-@participations_bp.post("")
+@training_bp.post("")
 @login_required
-def create_participation() -> tuple[Response, int]:
+def create_training() -> tuple[Response, int]:
     data: dict[str, object] = request.get_json(silent=True) or {}
     schedule_id_raw = data.get("scheduleId")
     if not isinstance(schedule_id_raw, int):
         return jsonify({"error": "scheduleId must be an integer"}), 400
     try:
-        participation = participation_svc.create_participation(session["user_id"], schedule_id_raw)
+        training = training_svc.create_training(session["user_id"], schedule_id_raw)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
     except ValueError as e:
         status_code = 409 if "Already enrolled" in str(e) else 400
         return jsonify({"error": str(e)}), status_code
-    return jsonify(participation_svc.participation_full_dict(participation)), 201
+    return jsonify(training_svc.training_full_dict(training)), 201
 
 
-@participations_bp.get("")
+@training_bp.get("")
 @login_required
-def list_my_participations() -> Response:
-    return jsonify(participation_svc.list_my_participations(session["user_id"]))
+def list_my_trainings() -> Response:
+    return jsonify(training_svc.list_my_trainings(session["user_id"]))
 
 
-@participations_bp.get("/all")
+@training_bp.get("/all")
 @login_required
-def list_all_participations() -> Response:
+def list_all_trainings() -> Response:
     schedule_id_raw = request.args.get("scheduleId")
     schedule_id = int(schedule_id_raw) if schedule_id_raw is not None else None
-    return jsonify(participation_svc.list_all_participations(schedule_id))
+    return jsonify(training_svc.list_all_trainings(schedule_id))
 
 
-@participations_bp.get("/<int:participation_id>")
+@training_bp.get("/<int:training_id>")
 @login_required
-def get_participation(participation_id: int) -> tuple[Response, int] | Response:
+def get_training(training_id: int) -> tuple[Response, int] | Response:
     try:
-        participation = participation_svc.get_participation(participation_id)
+        training = training_svc.get_training(training_id)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
     try:
-        result = participation_svc.participation_full_dict(participation)
+        result = training_svc.training_full_dict(training)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
     return jsonify(result)
 
 
-@participations_bp.put("/<int:participation_id>/run-targets/<int:run_index>")
+@training_bp.put("/<int:training_id>/run-targets/<int:run_index>")
 @login_required
-def set_run_target(participation_id: int, run_index: int) -> tuple[Response, int] | Response:
+def set_run_target(training_id: int, run_index: int) -> tuple[Response, int] | Response:
     data: dict[str, object] = request.get_json(silent=True) or {}
     target_accuracy_raw = data.get("targetAccuracy")
     target_solve_seconds_raw = data.get("targetSolveSeconds")
@@ -67,8 +67,8 @@ def set_run_target(participation_id: int, run_index: int) -> tuple[Response, int
     target_accuracy = float(target_accuracy_raw) if target_accuracy_raw is not None else None
 
     try:
-        target = participation_svc.set_run_target(
-            participation_id,
+        target = training_svc.set_run_target(
+            training_id,
             session["user_id"],
             run_index,
             target_accuracy,
@@ -88,9 +88,9 @@ def set_run_target(participation_id: int, run_index: int) -> tuple[Response, int
     })
 
 
-@participations_bp.post("/<int:participation_id>/runs")
+@training_bp.post("/<int:training_id>/runs")
 @login_required
-def start_run(participation_id: int) -> tuple[Response, int]:
+def start_run(training_id: int) -> tuple[Response, int]:
     data: dict[str, object] = request.get_json(silent=True) or {}
     run_index_raw = data.get("runIndex")
     if run_index_raw is not None and not isinstance(run_index_raw, int):
@@ -98,7 +98,7 @@ def start_run(participation_id: int) -> tuple[Response, int]:
 
     try:
         run = run_svc.start_run(
-            participation_id,
+            training_id,
             session["user_id"],
             run_index_raw if isinstance(run_index_raw, int) else None,
         )
@@ -112,11 +112,11 @@ def start_run(participation_id: int) -> tuple[Response, int]:
     return jsonify(run_svc.run_dict(run)), 201
 
 
-@participations_bp.get("/<int:participation_id>/runs")
+@training_bp.get("/<int:training_id>/runs")
 @login_required
-def list_runs(participation_id: int) -> tuple[Response, int] | Response:
+def list_runs(training_id: int) -> tuple[Response, int] | Response:
     try:
-        runs = run_svc.list_runs(participation_id, session["user_id"])
+        runs = run_svc.list_runs(training_id, session["user_id"])
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
     except PermissionError as e:
@@ -124,12 +124,12 @@ def list_runs(participation_id: int) -> tuple[Response, int] | Response:
     return jsonify([run_svc.run_dict(r) for r in runs])
 
 
-@participations_bp.get("/<int:participation_id>/cross-run-puzzle/<puzzle_id>")
+@training_bp.get("/<int:training_id>/cross-run-puzzle/<puzzle_id>")
 @login_required
-def get_cross_run_puzzle(participation_id: int, puzzle_id: str) -> tuple[Response, int] | Response:
+def get_cross_run_puzzle(training_id: int, puzzle_id: str) -> tuple[Response, int] | Response:
     try:
-        result = participation_svc.get_cross_run_puzzle_refs(
-            participation_id, puzzle_id, session["user_id"]
+        result = training_svc.get_cross_run_puzzle_refs(
+            training_id, puzzle_id, session["user_id"]
         )
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
@@ -138,11 +138,11 @@ def get_cross_run_puzzle(participation_id: int, puzzle_id: str) -> tuple[Respons
     return jsonify(result)
 
 
-@participations_bp.post("/<int:participation_id>/abort")
+@training_bp.post("/<int:training_id>/abort")
 @login_required
-def abort_participation(participation_id: int) -> tuple[Response, int] | Response:
+def abort_training(training_id: int) -> tuple[Response, int] | Response:
     try:
-        participation = participation_svc.abort_participation(participation_id, session["user_id"])
+        training = training_svc.abort_training(training_id, session["user_id"])
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
     except PermissionError as e:
@@ -151,7 +151,7 @@ def abort_participation(participation_id: int) -> tuple[Response, int] | Respons
         status_code = 409 if "terminal" in str(e) else 400
         return jsonify({"error": str(e)}), status_code
     try:
-        result = participation_svc.participation_full_dict(participation)
+        result = training_svc.training_full_dict(training)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
     return jsonify(result)

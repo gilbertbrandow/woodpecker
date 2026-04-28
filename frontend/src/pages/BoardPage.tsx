@@ -481,7 +481,7 @@ export function BoardPage(): React.ReactElement | null {
       <BoardBreadcrumbs
         runIndex={overviewData.runPuzzle.runIndex}
         position={overviewData.runPuzzle.position}
-        participationId={overviewData.runPuzzle.participationId}
+        trainingId={overviewData.runPuzzle.trainingId}
         scheduleName={overviewData.runPuzzle.scheduleName}
         runIdStr={runIdStr}
       />
@@ -489,7 +489,7 @@ export function BoardPage(): React.ReactElement | null {
       <BoardBreadcrumbs
         runIndex={ctrl.solvingView.runPuzzle.runIndex}
         position={ctrl.solvingView.runPuzzle.position}
-        participationId={ctrl.solvingView.runPuzzle.participationId}
+        trainingId={ctrl.solvingView.runPuzzle.trainingId}
         scheduleName={ctrl.solvingView.runPuzzle.scheduleName}
         runIdStr={runIdStr}
         linksDisabled={ctrl.mode === 'focus'}
@@ -719,7 +719,7 @@ export function BoardPage(): React.ReactElement | null {
           <BoardBreadcrumbs
             runIndex={overviewData.runPuzzle.runIndex}
             position={overviewData.runPuzzle.position}
-            participationId={overviewData.runPuzzle.participationId}
+            trainingId={overviewData.runPuzzle.trainingId}
             scheduleName={overviewData.runPuzzle.scheduleName}
             runIdStr={runIdStr}
           />
@@ -730,7 +730,7 @@ export function BoardPage(): React.ReactElement | null {
         <BoardBreadcrumbs
           runIndex={ctrl.solvingView.runPuzzle.runIndex}
           position={ctrl.solvingView.runPuzzle.position}
-          participationId={ctrl.solvingView.runPuzzle.participationId}
+          trainingId={ctrl.solvingView.runPuzzle.trainingId}
           scheduleName={ctrl.solvingView.runPuzzle.scheduleName}
           runIdStr={runIdStr}
           linksDisabled={ctrl.mode === 'focus'}

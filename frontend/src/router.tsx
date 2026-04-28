@@ -1,15 +1,20 @@
 import { createRouter, createRoute, createRootRouteWithContext, redirect } from '@tanstack/react-router'
 import type { AuthContextValue } from './context/auth'
 import { Layout } from './components/Layout'
+import { AppShell } from './components/AppShell'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { SubsetsListPage } from './pages/SubsetsListPage'
 import { SubsetNewPage } from './pages/SubsetNewPage'
 import { SubsetPage } from './pages/SubsetPage'
+import { SchedulesListPage } from './pages/SchedulesListPage'
 import { ScheduleNewPage } from './pages/ScheduleNewPage'
 import { SchedulePage } from './pages/SchedulePage'
-import { ParticipationPage } from './pages/ParticipationPage'
-import { ParticipationNewPage } from './pages/ParticipationNewPage'
+import { TrainingListPage } from './pages/TrainingListPage'
+import { TrainingPage } from './pages/TrainingPage'
+import { TrainingNewPage } from './pages/TrainingNewPage'
+import { AboutPage } from './pages/AboutPage'
 import { RunPage } from './pages/RunPage'
 import { RunResolverPage } from './pages/RunResolverPage'
 import { PuzzleResolverPage } from './pages/PuzzleResolverPage'
@@ -61,56 +66,86 @@ const appRoute = createRoute({
   },
 })
 
-const dashboardRoute = createRoute({
+const appShellRoute = createRoute({
   getParentRoute: () => appRoute,
+  id: 'app-shell',
+  component: AppShell,
+})
+
+const dashboardRoute = createRoute({
+  getParentRoute: () => appShellRoute,
   path: '/',
   component: DashboardPage,
 })
 
 const settingsRoute = createRoute({
-  getParentRoute: () => appRoute,
+  getParentRoute: () => appShellRoute,
   path: '/settings',
   component: SettingsPage,
 })
 
+const subsetsListRoute = createRoute({
+  getParentRoute: () => appShellRoute,
+  path: '/subsets',
+  component: SubsetsListPage,
+})
+
 const subsetNewRoute = createRoute({
-  getParentRoute: () => appRoute,
+  getParentRoute: () => appShellRoute,
   path: '/subsets/new',
   component: SubsetNewPage,
 })
 
 const subsetRoute = createRoute({
-  getParentRoute: () => appRoute,
+  getParentRoute: () => appShellRoute,
   path: '/subsets/$subsetId',
   component: SubsetPage,
 })
 
+const schedulesListRoute = createRoute({
+  getParentRoute: () => appShellRoute,
+  path: '/schedules',
+  component: SchedulesListPage,
+})
+
 const scheduleNewRoute = createRoute({
-  getParentRoute: () => appRoute,
+  getParentRoute: () => appShellRoute,
   path: '/schedules/new',
   component: ScheduleNewPage,
 })
 
 const scheduleRoute = createRoute({
-  getParentRoute: () => appRoute,
+  getParentRoute: () => appShellRoute,
   path: '/schedules/$scheduleId',
   component: SchedulePage,
 })
 
-const participationNewRoute = createRoute({
-  getParentRoute: () => appRoute,
-  path: '/participations/new',
-  component: ParticipationNewPage,
+const trainingListRoute = createRoute({
+  getParentRoute: () => appShellRoute,
+  path: '/training',
+  component: TrainingListPage,
 })
 
-const participationRoute = createRoute({
-  getParentRoute: () => appRoute,
-  path: '/participations/$participationId',
-  component: ParticipationPage,
+const trainingNewRoute = createRoute({
+  getParentRoute: () => appShellRoute,
+  path: '/training/new',
+  component: TrainingNewPage,
+})
+
+const trainingRoute = createRoute({
+  getParentRoute: () => appShellRoute,
+  path: '/training/$trainingId',
+  component: TrainingPage,
+})
+
+const aboutRoute = createRoute({
+  getParentRoute: () => appShellRoute,
+  path: '/about',
+  component: AboutPage,
 })
 
 const runRoute = createRoute({
-  getParentRoute: () => appRoute,
+  getParentRoute: () => appShellRoute,
   path: '/runs/$runId',
   component: RunPage,
 })
@@ -149,15 +184,21 @@ const runPuzzleOverviewRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   loginRoute,
   appRoute.addChildren([
-    dashboardRoute,
-    settingsRoute,
-    subsetNewRoute,
-    subsetRoute,
-    scheduleNewRoute,
-    scheduleRoute,
-    participationNewRoute,
-    participationRoute,
-    runRoute,
+    appShellRoute.addChildren([
+      dashboardRoute,
+      settingsRoute,
+      subsetsListRoute,
+      subsetNewRoute,
+      subsetRoute,
+      schedulesListRoute,
+      scheduleNewRoute,
+      scheduleRoute,
+      trainingListRoute,
+      trainingNewRoute,
+      trainingRoute,
+      aboutRoute,
+      runRoute,
+    ]),
     solveFlowRoute.addChildren([
       runSolveRoute,
       puzzleResolverRoute,

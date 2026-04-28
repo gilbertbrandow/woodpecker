@@ -13,7 +13,7 @@ import {
 type BoardBreadcrumbsProps = {
   runIndex: number
   position: number
-  participationId: number | null
+  trainingId: number | null
   scheduleName: string | null
   runIdStr: string
   linksDisabled?: boolean
@@ -22,7 +22,7 @@ type BoardBreadcrumbsProps = {
 export function BoardBreadcrumbs({
   runIndex,
   position,
-  participationId,
+  trainingId,
   scheduleName,
   runIdStr,
   linksDisabled = false,
@@ -54,11 +54,11 @@ export function BoardBreadcrumbs({
                 >
                   {scheduleName.length > 8 ? `${scheduleName.slice(0, 5)}...` : scheduleName}
                 </BreadcrumbPage>
-              ) : participationId !== null ? (
+              ) : trainingId !== null ? (
                 <BreadcrumbLink asChild>
                   <Link
-                    to="/app/participations/$participationId"
-                    params={{ participationId: String(participationId) }}
+                    to="/app/training/$trainingId"
+                    params={{ trainingId: String(trainingId) }}
                     title={scheduleName}
                   >
                     {scheduleName.length > 8 ? `${scheduleName.slice(0, 5)}...` : scheduleName}
