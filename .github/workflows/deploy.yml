@@ -1,0 +1,88 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-push:
+    name: Build and push images
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    outputs:
+      image_tag: ${{ steps.tag.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Set image tag
+        id: tag
+        run: echo "value=sha-${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: backend
+          target: prod
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/woodpecker-backend:${{ steps.tag.outputs.value }}
+            ghcr.io/${{ github.repository_owner }}/woodpecker-backend:latest
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: frontend
+          target: prod
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/woodpecker-frontend:${{ steps.tag.outputs.value }}
+            ghcr.io/${{ github.repository_owner }}/woodpecker-frontend:latest
+
+  deploy:
+    name: Deploy to EC2
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy compose files to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "docker-compose.yml,docker-compose-prod.yml"
+          target: /opt/woodpecker
+
+      - name: Pull, restart, migrate
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GHCR_ACTOR: ${{ github.actor }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: GHCR_TOKEN,GHCR_ACTOR,IMAGE_TAG
+          script: |
+            set -e
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
+            cd /opt/woodpecker
+            docker compose -f docker-compose.yml -f docker-compose-prod.yml pull
+            docker compose -f docker-compose.yml -f docker-compose-prod.yml up -d --remove-orphans
+            docker compose -f docker-compose.yml -f docker-compose-prod.yml restart nginx
+            echo "Waiting for backend..."
+            for i in $(seq 1 30); do
+              docker compose -f docker-compose.yml -f docker-compose-prod.yml exec -T backend true 2>/dev/null && break
+              sleep 2
+            done
+            docker compose -f docker-compose.yml -f docker-compose-prod.yml exec -T backend flask --app app db upgrade
