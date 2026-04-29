@@ -1,12 +1,23 @@
 import * as React from 'react'
-import { Outlet } from '@tanstack/react-router'
+import { useEffect } from 'react'
+import { Outlet, useNavigate } from '@tanstack/react-router'
 import { SidebarProvider, SidebarInset, SidebarTrigger } from './ui/sidebar'
 import { Separator } from './ui/separator'
 import { AppSidebar } from './AppSidebar'
 import { Footer } from './Footer'
 import { ThemeToggle } from './ThemeToggle'
+import { useAuth } from '../context/auth'
 
 export function AppShell(): React.ReactElement {
+  const { user, loading } = useAuth()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!loading && !user) {
+      void navigate({ to: '/' })
+    }
+  }, [user, loading, navigate])
+
   return (
     <SidebarProvider defaultOpen={true}>
       <AppSidebar />

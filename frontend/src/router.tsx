@@ -53,6 +53,11 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
+  beforeLoad: ({ context }) => {
+    if (!context.auth.loading && context.auth.user) {
+      throw redirect({ to: '/app' })
+    }
+  },
   component: LoginPage,
 })
 

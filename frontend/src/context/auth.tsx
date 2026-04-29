@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { api, type AuthUser } from '../lib/api'
 
 export type AuthContextValue = {
@@ -24,7 +25,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async (): Promise<void> => {
     await api.auth.logout()
-    setUser(null)
+    flushSync(() => setUser(null))
   }
 
   const updateUser = (updated: AuthUser): void => {
