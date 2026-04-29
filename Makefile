@@ -49,17 +49,28 @@ puzzle-copy:
 puzzle-import:
 	$(LOCAL_COMPOSE) exec backend flask --app app puzzles import --file /tmp/lichess_db_puzzle.csv.zst $(args)
 
-puzzle-copy-prod:
-	$(PROD_COMPOSE) cp $(file) backend:/tmp/lichess_db_puzzle.csv.zst
-
-puzzle-import-prod:
-	$(PROD_COMPOSE) exec backend flask --app app puzzles import --file /tmp/lichess_db_puzzle.csv.zst $(args)
-
 openings-import:
 	$(LOCAL_COMPOSE) exec backend flask --app app openings import $(args)
 
-openings-import-prod:
-	$(PROD_COMPOSE) exec backend flask --app app openings import $(args)
+puzzle-seed-ec2:
+	scp $(file) ubuntu@$(EC2_HOST):/tmp/lichess_db_puzzle.csv.zst
+	ssh ubuntu@$(EC2_HOST) "cd /opt/woodpecker && docker compose cp /tmp/lichess_db_puzzle.csv.zst backend:/tmp/"
+	ssh ubuntu@$(EC2_HOST) "cd /opt/woodpecker && docker compose -f docker-compose.yml -f docker-compose-prod.yml exec -T backend flask --app app puzzles import --file /tmp/lichess_db_puzzle.csv.zst $(args)"
+	ssh ubuntu@$(EC2_HOST) "rm /tmp/lichess_db_puzzle.csv.zst"
+
+db-shell-ec2:
+	ssh -t ubuntu@$(EC2_HOST) "cd /opt/woodpecker && docker compose -f docker-compose.yml -f docker-compose-prod.yml exec db psql -U woodpecker woodpecker"
+
+db-expose-ec2:
+	ssh ubuntu@$(EC2_HOST) "cd /opt/woodpecker && docker compose -f docker-compose.yml -f docker-compose-prod.yml -f docker-compose-admin.yml up -d db"
+	@echo "DB port now bound to 127.0.0.1:5432 on EC2. Run 'make db-tunnel-ec2' in a new terminal."
+
+db-tunnel-ec2:
+	@echo "Forwarding localhost:5433 → EC2 db. Ctrl-C to close."
+	ssh -N -L 5433:localhost:5432 ubuntu@$(EC2_HOST)
+
+db-unexpose-ec2:
+	ssh ubuntu@$(EC2_HOST) "cd /opt/woodpecker && docker compose -f docker-compose.yml -f docker-compose-prod.yml up -d db"
 
 test-frontend:
 	cd frontend && npm run test:run
@@ -84,4 +95,4 @@ test-docker:
 	$(MAKE) test-frontend-docker
 	$(MAKE) test-backend-docker
 
-.PHONY: up up-build down logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade migrate-current migrate-history migrate-rollback puzzle-copy puzzle-import puzzle-copy-prod puzzle-import-prod openings-import openings-import-prod test-frontend test-backend test-backend-integration test-integration test
+.PHONY: up up-build down logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade migrate-current migrate-history migrate-rollback puzzle-copy puzzle-import openings-import puzzle-seed-ec2 db-shell-ec2 db-expose-ec2 db-tunnel-ec2 db-unexpose-ec2 test-frontend test-backend test-backend-integration test-integration test

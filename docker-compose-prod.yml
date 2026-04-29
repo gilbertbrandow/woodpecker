@@ -1,8 +1,9 @@
 services:
   backend:
+    image: ghcr.io/${GHCR_OWNER}/woodpecker-backend:${IMAGE_TAG:-latest}
     build:
       target: prod
-    command: ["bash", "-lc", "gunicorn -b 0.0.0.0:8000 'app:create_app()' --workers 2 --threads 4 --timeout 60"]
+    command: ["bash", "-lc", "gunicorn -b 0.0.0.0:8000 'app:create_app()' --workers 1 --threads 4 --timeout 60"]
     expose:
       - "8000"
     environment:
@@ -11,6 +12,7 @@ services:
       APP_ORIGIN: ${APP_ORIGIN:?set APP_ORIGIN}
 
   frontend:
+    image: ghcr.io/${GHCR_OWNER}/woodpecker-frontend:${IMAGE_TAG:-latest}
     build:
       context: ./frontend
       target: prod
@@ -22,8 +24,11 @@ services:
     image: nginx:1.27-alpine
     ports:
       - "80:80"
+      - "443:443"
     volumes:
-      - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - /opt/woodpecker/deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
     depends_on:
       - backend
       - frontend
