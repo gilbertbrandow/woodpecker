@@ -1,0 +1,4 @@
+region         = "eu-west-1"
+instance_type  = "t3.micro"
+ssh_public_key = "ssh-ed25519 AAAA... user@host"
+domain_name    = "woodpeckerchess.com"
