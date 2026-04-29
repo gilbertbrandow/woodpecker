@@ -85,8 +85,15 @@ resource "aws_instance" "woodpecker" {
 
   user_data = <<-EOF
     #!/bin/bash
+    set -e
     apt-get update
-    apt-get install -y docker.io docker-compose-plugin certbot python3-certbot-nginx
+    apt-get install -y ca-certificates curl certbot
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable" > /etc/apt/sources.list.d/docker.list
+    apt-get update
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
     usermod -aG docker ubuntu
     systemctl enable docker
     systemctl start docker
