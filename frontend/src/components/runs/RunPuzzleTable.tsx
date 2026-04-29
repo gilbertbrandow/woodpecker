@@ -23,7 +23,7 @@ import {
   TableHead,
   TableCell,
 } from '../ui/table'
-import { type RunPuzzleListItem, type PositionStatus } from '../../lib/api'
+import { type RunPuzzleListItem } from '../../lib/api'
 import { formatSolveTimeMs } from '../../lib/utils'
 
 const PAGE_SIZE = 25
