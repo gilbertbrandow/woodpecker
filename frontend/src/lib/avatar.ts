@@ -1,8 +1,8 @@
-import bk from '../assets/piece/alpha/bk.svg'
-import bq from '../assets/piece/alpha/bq.svg'
-import br from '../assets/piece/alpha/br.svg'
-import bb from '../assets/piece/alpha/bb.svg'
-import bn from '../assets/piece/alpha/bn.svg'
+import bk from '../assets/piece/alpha/bK.svg'
+import bq from '../assets/piece/alpha/bQ.svg'
+import br from '../assets/piece/alpha/bR.svg'
+import bb from '../assets/piece/alpha/bB.svg'
+import bn from '../assets/piece/alpha/bN.svg'
 
 export const AVATAR_PIECE_URLS: Record<string, string> = { bk, bq, br, bb, bn }
 
