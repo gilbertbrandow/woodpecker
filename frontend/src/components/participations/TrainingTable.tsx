@@ -127,7 +127,7 @@ export function TrainingTable({
     <DataTable
       columns={columns}
       data={trainings}
-      globalFilterPlaceholder="Search training\u2026"
+      globalFilterPlaceholder="Search training…"
       filterableColumns={filterableColumns}
       pageSize={10}
       onRowClick={(t) =>

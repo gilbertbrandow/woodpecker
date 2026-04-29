@@ -11,7 +11,7 @@ import {
   type SortingState,
   type ColumnFiltersState,
 } from '@tanstack/react-table'
-import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+import { ArrowUp, ArrowDown, ArrowUpDown, Search } from 'lucide-react'
 import { Input } from './ui/input'
 import { Button } from './ui/button'
 import {
@@ -109,15 +109,18 @@ export function DataTable<T>({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Input
-          placeholder={globalFilterPlaceholder}
-          value={globalFilter}
-          onChange={(e) => {
-            setGlobalFilter(e.target.value)
-            table.setPageIndex(0)
-          }}
-          className="h-8 text-sm sm:w-56"
-        />
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder={globalFilterPlaceholder}
+            value={globalFilter}
+            onChange={(e) => {
+              setGlobalFilter(e.target.value)
+              table.setPageIndex(0)
+            }}
+            className="h-8 pl-7 text-sm sm:w-56"
+          />
+        </div>
         {filterableColumns.map((fc) => (
           <select
             key={fc.id}

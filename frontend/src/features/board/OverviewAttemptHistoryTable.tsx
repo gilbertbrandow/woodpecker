@@ -177,6 +177,8 @@ export function OverviewAttemptHistoryTable({
                   <TableCell className="whitespace-nowrap px-2 py-1.5">
                     {row.result === 'solved' ? (
                       <Check className="h-3 w-3" />
+                    ) : (
+                      <X className="h-3 w-3" />
                     )}
                   </TableCell>
                   <TableCell className="whitespace-nowrap px-2 py-1.5 text-xs tabular-nums text-muted-foreground">

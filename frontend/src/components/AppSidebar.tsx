@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
-import { ChevronsUpDown, LayoutDashboard, Layers, CalendarDays, Dumbbell, Info, Settings, LogOut } from 'lucide-react'
+import { ChevronsUpDown, LayoutDashboard, Library, CalendarDays, Puzzle, CircleHelp, Settings, LogOut } from 'lucide-react'
 import { toast } from 'sonner'
 import woodpeckerLogo from '../assets/woodpecker.svg'
 import { useAuth } from '../context/auth'
@@ -36,10 +36,10 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', to: '/app', icon: LayoutDashboard },
-  { label: 'Subsets', to: '/app/subsets', icon: Layers },
+  { label: 'Subsets', to: '/app/subsets', icon: Library },
   { label: 'Schedules', to: '/app/schedules', icon: CalendarDays },
-  { label: 'Training', to: '/app/training', icon: Dumbbell },
-  { label: 'About', to: '/app/about', icon: Info },
+  { label: 'Training', to: '/app/training', icon: Puzzle },
+  { label: 'About', to: '/app/about', icon: CircleHelp },
 ]
 
 export function AppSidebar(): React.ReactElement {

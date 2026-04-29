@@ -187,7 +187,7 @@ export function SchedulesTable({
     <DataTable
       columns={columns}
       data={schedules}
-      globalFilterPlaceholder="Search schedules\u2026"
+      globalFilterPlaceholder="Search schedules…"
       filterableColumns={filterableColumns}
       pageSize={10}
       onRowClick={(schedule) =>
