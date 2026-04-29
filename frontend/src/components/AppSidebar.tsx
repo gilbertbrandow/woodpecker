@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
+import { useSidebar } from './ui/sidebar'
 import { ChevronsUpDown, LayoutDashboard, Library, CalendarDays, Puzzle, CircleHelp, Settings, LogOut } from 'lucide-react'
 import { toast } from 'sonner'
 import woodpeckerLogo from '../assets/woodpecker.svg'
@@ -46,6 +47,7 @@ export function AppSidebar(): React.ReactElement {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const { setOpenMobile } = useSidebar()
 
   const handleSignOut = async (): Promise<void> => {
     await logout()
@@ -95,7 +97,7 @@ export function AppSidebar(): React.ReactElement {
             return (
               <SidebarMenuItem key={to}>
                 <SidebarMenuButton asChild isActive={isActive} tooltip={label}>
-                  <Link to={to}>
+                  <Link to={to} onClick={() => setOpenMobile(false)}>
                     <Icon className="h-4 w-4" />
                     <span>{label}</span>
                   </Link>
