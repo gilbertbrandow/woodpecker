@@ -9,6 +9,7 @@ jobs:
     name: Build and push images
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       packages: write
     outputs:
       image_tag: ${{ steps.tag.outputs.value }}
