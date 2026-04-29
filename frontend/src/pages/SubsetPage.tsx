@@ -18,7 +18,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "../components/ui/tooltip";
-import { Badge } from "../components/ui/badge";
+import { StatusBadge } from "../components/StatusBadge";
 import {
   Tabs,
   TabsList,
@@ -166,19 +166,6 @@ function SectionTrigger({
         {description}
       </span>
     </button>
-  );
-}
-
-function statusBadge(status: Subset["status"]): React.ReactElement {
-  const labels: Record<Subset["status"], string> = {
-    draft: "Draft",
-    filled: "Filled",
-    locked: "Locked",
-  };
-  return (
-    <Badge variant="outline" className="text-xs capitalize">
-      {labels[status]}
-    </Badge>
   );
 }
 
@@ -476,7 +463,7 @@ export function SubsetPage(): React.ReactElement | null {
 
       <div className="mb-6 flex items-center gap-3">
         <h1 className="text-xl font-semibold">{subset.name}</h1>
-        {statusBadge(subset.status)}
+        <StatusBadge status={subset.status} />
         <span className="text-sm text-muted-foreground">
           {subset.puzzleCount} puzzles
         </span>

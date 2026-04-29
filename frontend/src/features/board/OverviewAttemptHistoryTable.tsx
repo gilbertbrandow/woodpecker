@@ -110,11 +110,11 @@ export function OverviewAttemptHistoryTable({
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="rounded-md border">
-        <Table>
+      <div className="overflow-x-auto rounded-md border">
+        <Table className="min-w-max">
           <TableHeader>
             <TableRow>
-              <TableHead className="px-2 py-0">
+              <TableHead className="whitespace-nowrap px-2 py-0">
                 <button
                   type="button"
                   className="inline-flex items-center text-xs font-medium text-muted-foreground"
@@ -124,7 +124,7 @@ export function OverviewAttemptHistoryTable({
                   <SortIndicator active={sortKey === 'runOrder'} dir={sortDir} />
                 </button>
               </TableHead>
-              <TableHead className="px-2 py-0">
+              <TableHead className="whitespace-nowrap px-2 py-0">
                 <button
                   type="button"
                   className="inline-flex items-center text-xs font-medium text-muted-foreground"
@@ -134,8 +134,8 @@ export function OverviewAttemptHistoryTable({
                   <SortIndicator active={sortKey === 'tryNumber'} dir={sortDir} />
                 </button>
               </TableHead>
-              <TableHead className="px-2 py-0 text-xs">Solved</TableHead>
-              <TableHead className="px-2 py-0">
+              <TableHead className="whitespace-nowrap px-2 py-0 text-xs">Solved</TableHead>
+              <TableHead className="whitespace-nowrap px-2 py-0">
                 <button
                   type="button"
                   className="inline-flex items-center text-xs font-medium text-muted-foreground"
@@ -157,10 +157,10 @@ export function OverviewAttemptHistoryTable({
                   className="cursor-pointer"
                   onClick={() => onSelectAttempt(row.attemptId)}
                 >
-                  <TableCell className="px-2 py-1.5 text-xs tabular-nums">
+                  <TableCell className="whitespace-nowrap px-2 py-1.5 text-xs tabular-nums">
                     {row.runLabel}
                   </TableCell>
-                  <TableCell className="px-2 py-1.5 text-xs text-muted-foreground">
+                  <TableCell className="whitespace-nowrap px-2 py-1.5 text-xs text-muted-foreground">
                     {row.countsTowardsTraining ? (
                       `#${row.tryNumber}`
                     ) : (
@@ -174,14 +174,12 @@ export function OverviewAttemptHistoryTable({
                       </Tooltip>
                     )}
                   </TableCell>
-                  <TableCell className="px-2 py-1.5">
+                  <TableCell className="whitespace-nowrap px-2 py-1.5">
                     {row.result === 'solved' ? (
                       <Check className="h-3 w-3" />
-                    ) : (
-                      <X className="h-3 w-3" />
                     )}
                   </TableCell>
-                  <TableCell className="px-2 py-1.5 text-xs tabular-nums text-muted-foreground">
+                  <TableCell className="whitespace-nowrap px-2 py-1.5 text-xs tabular-nums text-muted-foreground">
                     {row.timeSpentMs !== null ? formatSolveTimeMs(row.timeSpentMs) : '—'}
                   </TableCell>
                 </TableRow>

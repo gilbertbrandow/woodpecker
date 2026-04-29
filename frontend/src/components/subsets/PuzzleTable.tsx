@@ -333,13 +333,13 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
         </div>
       )}
 
-      <div className={`rounded-md border transition-opacity duration-150 ${fetching ? 'opacity-50' : ''}`}>
-        <Table>
+      <div className={`overflow-x-auto rounded-md border transition-opacity duration-150 ${fetching ? 'opacity-50' : ''}`}>
+        <Table className="min-w-max">
           <TableHeader>
             {table.getHeaderGroups().map((hg) => (
               <TableRow key={hg.id}>
                 {hg.headers.map((h) => (
-                  <TableHead key={h.id} className={(h.column.columnDef.meta as ColMeta | undefined)?.className}>
+                  <TableHead key={h.id} className={`whitespace-nowrap ${(h.column.columnDef.meta as ColMeta | undefined)?.className ?? ''}`}>
                     {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
                   </TableHead>
                 ))}
@@ -369,7 +369,7 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} data-state={row.getIsSelected() ? 'selected' : undefined}>
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className={(cell.column.columnDef.meta as ColMeta | undefined)?.className}>
+                      <TableCell key={cell.id} className={`whitespace-nowrap ${(cell.column.columnDef.meta as ColMeta | undefined)?.className ?? ''}`}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}

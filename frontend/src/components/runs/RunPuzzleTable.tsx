@@ -12,7 +12,7 @@ import {
   type Column,
 } from '@tanstack/react-table'
 import { ChevronUp, ChevronDown, ChevronsUpDown, ExternalLink, Play, Eye } from 'lucide-react'
-import { Badge } from '../ui/badge'
+import { StatusBadge } from '../StatusBadge'
 import { Button } from '../ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 import {
@@ -28,21 +28,7 @@ import { formatSolveTimeMs } from '../../lib/utils'
 
 const PAGE_SIZE = 25
 
-const POSITION_STATUS_LABELS: Record<PositionStatus, string> = {
-  not_started: 'Not started',
-  in_progress: 'In progress',
-  solved: 'Solved',
-  solved_with_retries: 'Solved with retries',
-  failed: 'Failed',
-}
 
-const POSITION_STATUS_CLASS: Record<PositionStatus, string> = {
-  not_started: '',
-  in_progress: 'border-amber-600/30 bg-amber-50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400',
-  solved: 'border-green-600/30 bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400',
-  solved_with_retries: 'border-amber-600/30 bg-amber-50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400',
-  failed: 'border-red-600/30 bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400',
-}
 
 type ColMeta = { className?: string }
 
@@ -142,14 +128,7 @@ export function RunPuzzleTable({ puzzles, runIdStr, isActive }: RunPuzzleTablePr
       header: 'Status',
       enableSorting: false,
       meta: { className: 'min-w-32' } satisfies ColMeta,
-      cell: ({ row }) => {
-        const status = row.original.positionStatus
-        return (
-          <Badge variant="outline" className={POSITION_STATUS_CLASS[status]}>
-            {POSITION_STATUS_LABELS[status]}
-          </Badge>
-        )
-      },
+      cell: ({ row }) => <StatusBadge status={row.original.positionStatus} />,
     },
     {
       accessorKey: 'timeMs',
@@ -243,13 +222,13 @@ export function RunPuzzleTable({ puzzles, runIdStr, isActive }: RunPuzzleTablePr
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-md border">
-        <Table>
+      <div className="overflow-x-auto rounded-md border">
+        <Table className="min-w-max">
           <TableHeader>
             {table.getHeaderGroups().map((hg) => (
               <TableRow key={hg.id}>
                 {hg.headers.map((h) => (
-                  <TableHead key={h.id} className={(h.column.columnDef.meta as ColMeta | undefined)?.className}>
+                  <TableHead key={h.id} className={`whitespace-nowrap ${(h.column.columnDef.meta as ColMeta | undefined)?.className ?? ''}`}>
                     {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
                   </TableHead>
                 ))}
@@ -271,7 +250,7 @@ export function RunPuzzleTable({ puzzles, runIdStr, isActive }: RunPuzzleTablePr
                   onClick={() => openSolvePuzzle(row.original.runPuzzleId)}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className={(cell.column.columnDef.meta as ColMeta | undefined)?.className}>
+                      <TableCell key={cell.id} className={`whitespace-nowrap ${(cell.column.columnDef.meta as ColMeta | undefined)?.className ?? ''}`}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}

@@ -1,68 +1,16 @@
 import * as React from 'react'
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
-import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
-import { Badge } from '../ui/badge'
-import { Input } from '../ui/input'
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from '../ui/table'
+import { type ColumnDef } from '@tanstack/react-table'
+import { StatusBadge } from '../StatusBadge'
+import { DataTable, type FilterableColumn } from '../DataTable'
 import { ProgressBar } from '../ProgressBar'
 import { UserAvatar } from '../UserAvatar'
 import type { AllTrainingSummary, TrainingStatus } from '../../lib/api'
 
-type SortKey = 'scheduleName' | 'status' | 'progress' | 'startedAt'
-type SortDir = 'asc' | 'desc'
-
 type TrainingTableProps = {
   trainings: AllTrainingSummary[]
   hideSchedule?: boolean
-}
-
-const STATUS_LABELS: Record<TrainingStatus, string> = {
-  draft: 'Not started',
-  in_progress: 'In progress',
-  completed: 'Completed',
-  aborted: 'Aborted',
-}
-
-function SortHead({
-  label,
-  sortKey,
-  current,
-  dir,
-  onSort,
-  className,
-}: {
-  label: string
-  sortKey: SortKey
-  current: SortKey
-  dir: SortDir
-  onSort: (key: SortKey) => void
-  className?: string
-}): React.ReactElement {
-  const active = current === sortKey
-  return (
-    <TableHead className={className}>
-      <button
-        type="button"
-        onClick={() => onSort(sortKey)}
-        className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
-      >
-        {label}
-        {active ? (
-          dir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
-        ) : (
-          <ArrowUpDown className="h-3 w-3 opacity-40" />
-        )}
-      </button>
-    </TableHead>
-  )
 }
 
 function formatDate(iso: string): string {
@@ -78,147 +26,117 @@ export function TrainingTable({
   hideSchedule = false,
 }: TrainingTableProps): React.ReactElement {
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
-  const [sortKey, setSortKey] = useState<SortKey>('startedAt')
-  const [sortDir, setSortDir] = useState<SortDir>('desc')
 
-  const handleSort = (key: SortKey): void => {
-    if (key === sortKey) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortKey(key)
-      setSortDir('asc')
-    }
-  }
+  const statusOptions = useMemo(
+    () =>
+      Array.from(new Set(trainings.map((t) => t.status))).map((v) => ({
+        label:
+          v === 'draft'
+            ? 'Not started'
+            : v === 'in_progress'
+              ? 'In progress'
+              : v === 'completed'
+                ? 'Completed'
+                : 'Aborted',
+        value: v,
+      })),
+    [trainings],
+  )
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase()
-    return trainings
-      .filter((t) => !q || t.scheduleName.toLowerCase().includes(q))
-      .sort((a, b) => {
-        let cmp = 0
-        if (sortKey === 'scheduleName') {
-          cmp = a.scheduleName.localeCompare(b.scheduleName)
-        } else if (sortKey === 'status') {
-          cmp = a.status.localeCompare(b.status)
-        } else if (sortKey === 'progress') {
-          cmp = a.runsCompleted / (a.totalRuns || 1) - b.runsCompleted / (b.totalRuns || 1)
-        } else if (sortKey === 'startedAt') {
-          cmp = new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime()
-        }
-        return sortDir === 'asc' ? cmp : -cmp
-      })
-  }, [trainings, search, sortKey, sortDir])
+  const filterableColumns: FilterableColumn[] = [
+    { id: 'status', label: 'statuses', options: statusOptions },
+  ]
+
+  const columns: ColumnDef<AllTrainingSummary>[] = [
+    {
+      id: 'user',
+      accessorFn: (row) => row.user.username,
+      header: 'User',
+      enableSorting: false,
+      cell: ({ row }) => (
+        <UserAvatar username={row.original.user.username} avatarUrl={row.original.user.avatarUrl} />
+      ),
+    },
+    ...(!hideSchedule
+      ? ([
+          {
+            id: 'schedule',
+            accessorFn: (row: AllTrainingSummary) => row.scheduleName,
+            header: 'Schedule',
+            cell: ({ row }: { row: { original: AllTrainingSummary } }) => (
+              <Link
+                to="/app/schedules/$scheduleId"
+                params={{ scheduleId: String(row.original.scheduleId) }}
+                className="font-medium hover:underline"
+                title={row.original.scheduleName}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {row.original.scheduleName}
+              </Link>
+            ),
+          },
+        ] as ColumnDef<AllTrainingSummary>[])
+      : []),
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      enableSorting: false,
+      cell: ({ row }) => <StatusBadge status={row.original.status as TrainingStatus} />,
+      filterFn: 'equals',
+    },
+    {
+      id: 'progress',
+      accessorFn: (row) =>
+        row.totalRuns > 0 ? row.runsCompleted / row.totalRuns : 0,
+      header: 'Progress',
+      cell: ({ row }) => {
+        const pct =
+          row.original.totalRuns > 0
+            ? Math.round((row.original.runsCompleted / row.original.totalRuns) * 100)
+            : 0
+        return (
+          <ProgressBar
+            value={pct}
+            tooltipLabel={`${row.original.runsCompleted}/${row.original.totalRuns} runs`}
+            className="w-28"
+          />
+        )
+      },
+    },
+    {
+      id: 'startedAt',
+      accessorFn: (row) => new Date(row.startedAt).getTime(),
+      header: 'Started',
+      cell: ({ row }) => (
+        <span className="text-muted-foreground">{formatDate(row.original.startedAt)}</span>
+      ),
+    },
+    {
+      id: 'completedAt',
+      accessorFn: (row) => (row.completedAt ? new Date(row.completedAt).getTime() : 0),
+      header: 'Finished',
+      cell: ({ row }) => (
+        <span className="text-muted-foreground">
+          {row.original.completedAt ? formatDate(row.original.completedAt) : '\u2014'}
+        </span>
+      ),
+    },
+  ]
 
   return (
-    <div className="flex flex-col gap-3">
-      <Input
-        placeholder="Search training…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="h-8 text-sm sm:w-56"
-      />
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-10">User</TableHead>
-              {!hideSchedule && (
-                <SortHead
-                  label="Schedule"
-                  sortKey="scheduleName"
-                  current={sortKey}
-                  dir={sortDir}
-                  onSort={handleSort}
-                />
-              )}
-              <SortHead
-                label="Status"
-                sortKey="status"
-                current={sortKey}
-                dir={sortDir}
-                onSort={handleSort}
-              />
-              <SortHead
-                label="Progress"
-                sortKey="progress"
-                current={sortKey}
-                dir={sortDir}
-                onSort={handleSort}
-              />
-              <SortHead
-                label="Started"
-                sortKey="startedAt"
-                current={sortKey}
-                dir={sortDir}
-                onSort={handleSort}
-                className="hidden sm:table-cell"
-              />
-              <TableHead className="hidden md:table-cell">Finished</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={hideSchedule ? 5 : 6}
-                  className="py-6 text-center text-sm text-muted-foreground"
-                >
-                  No training sessions match your search.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((t) => (
-                <TableRow
-                  key={t.id}
-                  className="cursor-pointer"
-                  onClick={() =>
-                    void navigate({
-                      to: '/app/training/$trainingId',
-                      params: { trainingId: String(t.id) },
-                    })
-                  }
-                >
-                  <TableCell>
-                    <UserAvatar username={t.user.username} avatarUrl={t.user.avatarUrl} />
-                  </TableCell>
-                  {!hideSchedule && (
-                    <TableCell className="font-medium">
-                      <Link
-                        to="/app/schedules/$scheduleId"
-                        params={{ scheduleId: String(t.scheduleId) }}
-                        className="hover:underline"
-                        title={t.scheduleName}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {t.scheduleName.length > 8 ? `${t.scheduleName.slice(0, 8)}…` : t.scheduleName}
-                      </Link>
-                    </TableCell>
-                  )}
-                  <TableCell>
-                    <Badge variant="outline" className="text-xs">
-                      {STATUS_LABELS[t.status as TrainingStatus]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <ProgressBar
-                      value={65}
-                      tooltipLabel="3/5 Runs, 67% completed"
-                      className="w-28"
-                    />
-                  </TableCell>
-                  <TableCell className="hidden text-muted-foreground sm:table-cell">
-                    {formatDate(t.startedAt)}
-                  </TableCell>
-                  <TableCell className="hidden text-muted-foreground md:table-cell">
-                    {t.completedAt ? formatDate(t.completedAt) : '—'}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
+    <DataTable
+      columns={columns}
+      data={trainings}
+      globalFilterPlaceholder="Search training\u2026"
+      filterableColumns={filterableColumns}
+      pageSize={10}
+      onRowClick={(t) =>
+        void navigate({
+          to: '/app/training/$trainingId',
+          params: { trainingId: String(t.id) },
+        })
+      }
+      emptyMessage="No training sessions match your filters."
+    />
   )
 }
