@@ -105,6 +105,7 @@ export function BoardPage(): React.ReactElement | null {
   React.useEffect(() => {
     const data = ctrl.overview.data
     if (!data) return
+    if (data.runPuzzle.id !== Number(runPuzzleIdStr)) return
     const allIds = new Set(allAttempts.map((a) => a.id))
     const validRequested =
       requestedOverviewAttemptId !== null && allIds.has(requestedOverviewAttemptId)
@@ -112,10 +113,10 @@ export function BoardPage(): React.ReactElement | null {
         : null
     const nextId = validRequested ?? data.selectedAttemptId
     setSelectedAttemptId(nextId)
-    if (nextId !== null && nextId !== requestedOverviewAttemptId) {
+    if (validRequested !== null && nextId !== null && nextId !== requestedOverviewAttemptId) {
       setOverviewAttemptInUrl(nextId, true)
     }
-  }, [ctrl.overview.data, allAttempts, requestedOverviewAttemptId, setOverviewAttemptInUrl])
+  }, [ctrl.overview.data, allAttempts, requestedOverviewAttemptId, setOverviewAttemptInUrl, runPuzzleIdStr])
 
   React.useEffect(() => {
     if (ctrl.overview.data !== null && ctrl.runJustCompleted) {

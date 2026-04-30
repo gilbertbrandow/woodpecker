@@ -26,7 +26,7 @@ type SessionAttemptStripProps = {
 }
 
 export function SessionAttemptStrip({ items, runId, activeAttemptId, interactive = true, maxVisible = 20 }: SessionAttemptStripProps): React.ReactElement | null {
-  const visibleItems = items.slice(-maxVisible)
+  const visibleItems = React.useMemo(() => items.slice(-maxVisible), [items, maxVisible])
   const [now, setNow] = React.useState<number>(() => Date.now())
 
   React.useEffect(() => {

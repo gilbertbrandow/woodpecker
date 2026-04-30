@@ -282,7 +282,7 @@ export function SettingsPage(): React.ReactElement | null {
 
         <Button
           variant="ghost"
-          size="mrsm"
+          size="sm"
           onClick={() => void resetAvatar()}
           className="px-0 text-muted-foreground hover:bg-transparent hover:text-foreground ml-3"
         >
