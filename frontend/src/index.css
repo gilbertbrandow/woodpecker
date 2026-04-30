@@ -126,6 +126,24 @@
   letter-spacing: 0.01em;
 }
 
+@media (max-width: 1023px) {
+  .cg-wrap coords.ranks,
+  .cg-wrap coords.files {
+    font-size: 8px;
+  }
+
+  .cg-wrap coords.ranks coord {
+    padding-top: 3px;
+    padding-right: 3px;
+  }
+
+  .cg-wrap coords.files coord {
+    padding-left: 3px;
+    padding-top: 6px;
+    padding-bottom: 2px;
+  }
+}
+
 .cg-wrap coords.files coord {
   padding-left: 4px;
   padding-bottom: 1px;

@@ -174,9 +174,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
         const availW = window.innerWidth - H_PAD_MD - 2 * MIN_SIDEBAR - 2 * BOARD_GAP
         setBoardSize(Math.max(200, Math.min(availH, availW, MAX_BOARD)))
       } else {
-        const availHMobile = window.innerHeight - MOBILE_CHROME_H
         const availWMobile = window.innerWidth - MOBILE_H_PAD
-        setBoardSize(Math.max(200, Math.min(availHMobile, availWMobile, MAX_BOARD)))
+        setBoardSize(Math.max(200, Math.min(availWMobile, MAX_BOARD)))
       }
     }
     compute()

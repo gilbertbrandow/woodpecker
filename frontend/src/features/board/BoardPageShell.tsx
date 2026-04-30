@@ -22,12 +22,12 @@ export function BoardPageShell({
   mobileDrawerContent,
 }: BoardPageShellProps): React.ReactElement {
   return (
-    <div className="flex flex-1 flex-col overflow-hidden px-4 lg:px-0">
-      <div className="flex-none pt-3 pb-2 lg:hidden">
+    <div className="flex flex-1 flex-col overflow-x-hidden lg:px-0">
+      <div className="flex-none px-3 pt-3 pb-2 lg:hidden">
         {mobileHeader}
       </div>
-      <div className="flex flex-1 items-start justify-center overflow-hidden lg:items-center lg:px-6">
-        <div className="flex w-full items-start justify-center gap-6">
+      <div className="flex flex-1 items-start justify-center lg:items-center lg:overflow-hidden lg:px-6">
+        <div className="flex w-full items-start justify-center gap-6 lg:justify-center">
           <aside className="hidden flex-1 flex-col gap-4 lg:flex" style={{ height: boardSize }}>
             {left}
           </aside>
@@ -38,19 +38,21 @@ export function BoardPageShell({
         </div>
       </div>
       {mobileExtras && (
-        <div className="lg:hidden">{mobileExtras}</div>
+        <div className="px-3 lg:hidden">{mobileExtras}</div>
       )}
       {mobileDrawerContent && (
         <Drawer modal={false}>
-          <DrawerTrigger asChild>
-            <button
-              type="button"
-              className="flex w-full items-center justify-center gap-2 rounded-md border border-border py-2 text-sm text-muted-foreground lg:hidden"
-            >
-              <ChevronUp className="h-4 w-4" />
-              Stats &amp; history
-            </button>
-          </DrawerTrigger>
+          <div className="px-3 lg:hidden">
+            <DrawerTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center justify-center gap-2 rounded-md border border-border py-2 text-sm text-muted-foreground"
+              >
+                <ChevronUp className="h-4 w-4" />
+                Stats &amp; history
+              </button>
+            </DrawerTrigger>
+          </div>
           <DrawerContent className="flex h-[82dvh] flex-col">
             <div className="flex-1 overflow-y-auto px-4 pb-6 pt-2" data-vaul-no-drag>
               {mobileDrawerContent}
