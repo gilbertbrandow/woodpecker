@@ -119,7 +119,7 @@ def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
     session.flush()
 
     run = Run(
-        participation_id=participation.id,
+        training_id=participation.id,
         run_index=0,
         started_at=datetime.now(timezone.utc),
     )

@@ -70,6 +70,7 @@ export function AppSidebar(): React.ReactElement {
         username={user?.username ?? ''}
         piece={avatarValue.type === 'default' ? avatarValue.piece : undefined}
         color={avatarValue.type === 'default' ? avatarValue.color : undefined}
+        style={avatarValue.type === 'default' ? avatarValue.style : undefined}
         className="h-8 w-8 rounded-lg"
       />
     )

@@ -37,11 +37,15 @@ def _validate_avatar_url(value: str) -> str | None:
         return value
     if value.startswith("default:"):
         parts = value.split(":")
-        if len(parts) != 3:
+        if len(parts) not in (3, 4):
             raise ValueError("Invalid default avatar format.")
-        _, piece, color = parts
+        piece = parts[1]
+        color = parts[2]
+        style = parts[3] if len(parts) == 4 else "alpha"
         if piece not in AVATAR_PIECES or color not in AVATAR_COLORS:
             raise ValueError("Invalid default avatar piece or color.")
+        if style not in PIECE_SETS:
+            raise ValueError("Invalid default avatar style.")
         return value
     raise ValueError("Avatar URL must start with https:// or be a valid default avatar.")
 

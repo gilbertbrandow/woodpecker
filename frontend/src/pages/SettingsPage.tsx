@@ -4,7 +4,11 @@ import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { useAuth } from '../context/auth'
 import { api } from '../lib/api'
-import { AVATAR_PIECES, AVATAR_COLORS, parseAvatarValue, type AvatarPiece, type AvatarColor } from '../lib/avatar'
+import {
+  AVATAR_PIECES, AVATAR_COLORS, AVATAR_STYLES, AVATAR_COLOR_VALUES,
+  parseAvatarValue, resolveAvatarDefaults,
+  type AvatarPiece, type AvatarColor, type AvatarStyle,
+} from '../lib/avatar'
 import { BOARD_THEMES, PIECE_SETS, resolvePieceSet, resolveBoardTheme } from '../lib/themes'
 import { Button } from '../components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar'
@@ -19,12 +23,23 @@ import {
   BreadcrumbPage,
 } from '../components/ui/breadcrumb'
 
+const PIECE_CHESS_NOTATION: Record<string, string> = {
+  bk: 'K',
+  bq: 'Q',
+  br: 'R',
+  bb: 'B',
+  bn: 'N',
+}
+
 export function SettingsPage(): React.ReactElement | null {
   const { user, loading, updateUser } = useAuth()
   const navigate = useNavigate()
   const [nickname, setNickname] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [saving, setSaving] = useState(false)
+  const [selectedPiece, setSelectedPiece] = useState<AvatarPiece>(AVATAR_PIECES[0])
+  const [selectedColor, setSelectedColor] = useState<AvatarColor>(AVATAR_COLORS[0])
+  const [selectedStyle, setSelectedStyle] = useState<AvatarStyle>(AVATAR_STYLES[0])
   const [savingBoard, setSavingBoard] = useState(false)
   const [savingPiece, setSavingPiece] = useState(false)
 
@@ -37,6 +52,11 @@ export function SettingsPage(): React.ReactElement | null {
   useEffect(() => {
     if (user) {
       setNickname(user.nickname ?? '')
+      const avatarVal = parseAvatarValue(user.avatarUrl)
+      const defaults = resolveAvatarDefaults(user.username)
+      setSelectedPiece(avatarVal.type === 'default' ? avatarVal.piece : defaults.piece)
+      setSelectedColor(avatarVal.type === 'default' ? avatarVal.color : defaults.color)
+      setSelectedStyle(avatarVal.type === 'default' ? avatarVal.style : defaults.style)
     }
   }, [user])
 
@@ -57,20 +77,11 @@ export function SettingsPage(): React.ReactElement | null {
     }
   }
 
-  const selectDefaultAvatar = async (piece: AvatarPiece, color: AvatarColor): Promise<void> => {
-    try {
-      const updated = await api.settings.update({ avatarUrl: `default:${piece}:${color}` })
-      updateUser(updated)
-      toast('Avatar updated', { description: 'Your avatar has been saved.' })
-    } catch {
-      toast.error('Something went wrong', { description: 'Please try again.' })
-    }
-  }
-
-  const saveAvatarUrl = async (): Promise<void> => {
+  const saveAvatar = async (): Promise<void> => {
     setSaving(true)
     try {
-      const updated = await api.settings.update({ avatarUrl })
+      const value = avatarUrl.trim() || `default:${selectedPiece}:${selectedColor}:${selectedStyle}`
+      const updated = await api.settings.update({ avatarUrl: value })
       updateUser(updated)
       setAvatarUrl('')
       toast('Avatar updated', { description: 'Your avatar has been saved.' })
@@ -171,47 +182,80 @@ export function SettingsPage(): React.ReactElement | null {
           ) : (
             <DefaultAvatar
               username={user.username}
-              piece={avatarValue.type === 'default' ? avatarValue.piece : undefined}
-              color={avatarValue.type === 'default' ? avatarValue.color : undefined}
+              piece={selectedPiece}
+              color={selectedColor}
+              style={selectedStyle}
               className="h-16 w-16"
             />
           )}
         </div>
 
-        <div className="mb-6">
-          <p className="text-xs text-muted-foreground mb-3">Choose a default avatar</p>
-          <div className="flex flex-col gap-3">
-            {AVATAR_PIECES.map((piece) => (
-              <div key={piece} className="flex flex-wrap gap-2">
-                {AVATAR_COLORS.map((color) => {
-                  const isActive =
-                    avatarValue.type === 'default' &&
-                    avatarValue.piece === piece &&
-                    avatarValue.color === color
-                  return (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => void selectDefaultAvatar(piece, color)}
-                      aria-label={`${piece} in ${color}`}
-                      aria-pressed={isActive}
-                      className={
-                        isActive
-                          ? 'rounded-full ring-2 ring-foreground ring-offset-2 ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring'
-                          : 'rounded-full ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover:ring-1 hover:ring-muted-foreground hover:ring-offset-1'
-                      }
-                    >
-                      <DefaultAvatar
-                        username={user.username}
-                        piece={piece}
-                        color={color}
-                        className="h-10 w-10"
-                      />
-                    </button>
-                  )
-                })}
-              </div>
-            ))}
+        <div className="mb-6 flex flex-col gap-5">
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">Color</p>
+            <div className="flex flex-wrap gap-2">
+              {AVATAR_COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  aria-label={color}
+                  aria-pressed={selectedColor === color}
+                  onClick={() => setSelectedColor(color)}
+                  className={selectedColor === color
+                    ? 'rounded-full ring-2 ring-foreground ring-offset-2 ring-offset-background focus:outline-none'
+                    : 'rounded-full ring-offset-background focus:outline-none hover:ring-1 hover:ring-muted-foreground hover:ring-offset-1'}
+                >
+                  <div className="h-8 w-8 rounded-full" style={{ backgroundColor: AVATAR_COLOR_VALUES[color] }} />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">Style</p>
+            <div className="flex flex-wrap gap-2">
+              {AVATAR_STYLES.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  aria-label={s}
+                  aria-pressed={selectedStyle === s}
+                  onClick={() => setSelectedStyle(s)}
+                  className={selectedStyle === s
+                    ? 'rounded p-1 ring-2 ring-foreground ring-offset-2 ring-offset-background focus:outline-none'
+                    : 'rounded p-1 ring-offset-background focus:outline-none hover:ring-1 hover:ring-muted-foreground hover:ring-offset-1'}
+                >
+                  <img
+                    src={resolvePieceSet(s).knightPreviewUrl}
+                    alt={s}
+                    className="h-10 w-10 object-contain"
+                    draggable={false}
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">Piece</p>
+            <div className="flex flex-wrap gap-2">
+              {AVATAR_PIECES.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  aria-label={p}
+                  aria-pressed={selectedPiece === p}
+                  onClick={() => setSelectedPiece(p)}
+                  className={selectedPiece === p
+                    ? 'rounded ring-2 ring-foreground ring-offset-2 ring-offset-background focus:outline-none'
+                    : 'rounded ring-offset-background focus:outline-none hover:ring-1 hover:ring-muted-foreground hover:ring-offset-1'}
+                >
+                  <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
+                    <span className="font-chess text-xl">{PIECE_CHESS_NOTATION[p] ?? p}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -219,29 +263,28 @@ export function SettingsPage(): React.ReactElement | null {
           <label htmlFor="avatar-url" className="text-xs text-muted-foreground">
             Custom avatar URL
           </label>
-          <div className="flex gap-2">
-            <input
-              id="avatar-url"
-              type="url"
-              value={avatarUrl}
-              onChange={(e) => setAvatarUrl(e.target.value)}
-              placeholder="https://example.com/your-avatar.png"
-              className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-            <Button size="sm" onClick={() => void saveAvatarUrl()} disabled={saving}>
-              Save
-            </Button>
-          </div>
+          <input
+            id="avatar-url"
+            type="url"
+            value={avatarUrl}
+            onChange={(e) => setAvatarUrl(e.target.value)}
+            placeholder="https://example.com/your-avatar.png"
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          />
           <p className="text-xs text-muted-foreground">
-            Paste a direct link to any image hosted online.
+            Paste a direct link to any image hosted online. If filled, this takes priority over the pickers above.
           </p>
         </div>
 
+        <Button size="sm" onClick={() => void saveAvatar()} disabled={saving} className="mb-6">
+          Save avatar
+        </Button>
+
         <Button
           variant="ghost"
-          size="sm"
+          size="mrsm"
           onClick={() => void resetAvatar()}
-          className="px-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
+          className="px-0 text-muted-foreground hover:bg-transparent hover:text-foreground ml-3"
         >
           Reset to auto
         </Button>

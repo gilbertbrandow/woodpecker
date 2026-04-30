@@ -41,6 +41,7 @@ export function UserMenu(): React.ReactElement | null {
         username={user.username}
         piece={avatarValue.type === 'default' ? avatarValue.piece : undefined}
         color={avatarValue.type === 'default' ? avatarValue.color : undefined}
+        style={avatarValue.type === 'default' ? avatarValue.style : undefined}
         className="h-8 w-8"
       />
     )

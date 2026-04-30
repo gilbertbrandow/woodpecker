@@ -10,9 +10,11 @@ export const AVATAR_PIECES = ['bk', 'bq', 'br', 'bb', 'bn'] as const
 export const AVATAR_COLORS = [
   'navy', 'sky', 'forest', 'sage', 'amber', 'straw', 'crimson', 'rust',
 ] as const
+export const AVATAR_STYLES = ['alpha', 'anarcandy', 'companion', 'maestro', 'merida'] as const
 
 export type AvatarPiece = typeof AVATAR_PIECES[number]
 export type AvatarColor = typeof AVATAR_COLORS[number]
+export type AvatarStyle = typeof AVATAR_STYLES[number]
 
 export const AVATAR_COLOR_VALUES: Record<AvatarColor, string> = {
   navy:    '#4d7fa0',
@@ -27,14 +29,17 @@ export const AVATAR_COLOR_VALUES: Record<AvatarColor, string> = {
 
 export type AvatarValue =
   | { type: 'auto' }
-  | { type: 'default'; piece: AvatarPiece; color: AvatarColor }
+  | { type: 'default'; piece: AvatarPiece; color: AvatarColor; style: AvatarStyle }
   | { type: 'custom'; url: string }
 
 export function parseAvatarValue(avatarUrl: string | null): AvatarValue {
   if (!avatarUrl) return { type: 'auto' }
   if (avatarUrl.startsWith('default:')) {
-    const [, piece, color] = avatarUrl.split(':')
-    return { type: 'default', piece: piece as AvatarPiece, color: color as AvatarColor }
+    const parts = avatarUrl.split(':')
+    const piece = parts[1] as AvatarPiece
+    const color = parts[2] as AvatarColor
+    const style = (parts[3] ?? 'alpha') as AvatarStyle
+    return { type: 'default', piece, color, style }
   }
   return { type: 'custom', url: avatarUrl }
 }
@@ -47,11 +52,14 @@ function usernameHash(username: string): number {
   return Math.abs(hash)
 }
 
-export function resolveAvatarPieceAndColor(username: string): { piece: AvatarPiece; color: AvatarColor } {
+export function resolveAvatarDefaults(username: string): { piece: AvatarPiece; color: AvatarColor; style: AvatarStyle } {
   const hash = usernameHash(username)
-  const pieceIndex = Math.floor(hash / AVATAR_COLORS.length) % AVATAR_PIECES.length
   const colorIndex = hash % AVATAR_COLORS.length
-  const piece = AVATAR_PIECES[pieceIndex] ?? AVATAR_PIECES[0]
-  const color = AVATAR_COLORS[colorIndex] ?? AVATAR_COLORS[0]
-  return { piece, color }
+  const pieceIndex = Math.floor(hash / AVATAR_COLORS.length) % AVATAR_PIECES.length
+  const styleIndex = Math.floor(hash / (AVATAR_COLORS.length * AVATAR_PIECES.length)) % AVATAR_STYLES.length
+  return {
+    piece: AVATAR_PIECES[pieceIndex] ?? AVATAR_PIECES[0],
+    color: AVATAR_COLORS[colorIndex] ?? AVATAR_COLORS[0],
+    style: AVATAR_STYLES[styleIndex] ?? AVATAR_STYLES[0],
+  }
 }
