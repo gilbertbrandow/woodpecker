@@ -461,7 +461,7 @@ export function SubsetPage(): React.ReactElement | null {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="mb-6 flex items-center gap-3">
+      <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="text-xl font-semibold">{subset.name}</h1>
         <StatusBadge status={subset.status} />
         <span className="text-sm text-muted-foreground">

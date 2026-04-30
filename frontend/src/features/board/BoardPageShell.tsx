@@ -53,8 +53,8 @@ export function BoardPageShell({
               </button>
             </DrawerTrigger>
           </div>
-          <DrawerContent className="flex h-[82dvh] flex-col">
-            <div className="flex-1 overflow-y-auto px-4 pb-6 pt-2" data-vaul-no-drag>
+          <DrawerContent className="flex h-[70dvh] flex-col">
+            <div className="flex-1 overflow-y-auto px-4 pb-6 pt-4" data-vaul-no-drag>
               {mobileDrawerContent}
             </div>
           </DrawerContent>

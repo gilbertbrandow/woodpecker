@@ -92,6 +92,7 @@ export function AboutPage(): React.ReactElement {
         <div className="aspect-video w-full overflow-hidden rounded-md border border-border bg-muted">
           <iframe
             src={WOODPECKER_VIDEO_URL}
+            loading="lazy"
             title="The Woodpecker Method explained"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen

@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { useAuth } from '../context/auth'
 import { api } from '../lib/api'
 import { AVATAR_PIECES, AVATAR_COLORS, parseAvatarValue, type AvatarPiece, type AvatarColor } from '../lib/avatar'
-import { BOARD_THEMES, PIECE_SETS } from '../lib/themes'
+import { BOARD_THEMES, PIECE_SETS, resolvePieceSet, resolveBoardTheme } from '../lib/themes'
 import { Button } from '../components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar'
 import { DefaultAvatar } from '../components/DefaultAvatar'
@@ -254,7 +254,7 @@ export function SettingsPage(): React.ReactElement | null {
         </p>
         <div className="flex flex-wrap gap-2">
           {BOARD_THEMES.map((theme) => {
-            const isActive = user.boardTheme === theme.id
+            const isActive = resolveBoardTheme(user.boardTheme ?? '').id === theme.id
             const previewUrl = theme.thumbnailUrl ?? theme.url
             return (
               <button
@@ -292,7 +292,7 @@ export function SettingsPage(): React.ReactElement | null {
         </p>
         <div className="flex flex-wrap gap-2">
           {PIECE_SETS.map((set) => {
-            const isActive = user.pieceTheme === set.id
+            const isActive = resolvePieceSet(user.pieceTheme ?? '').id === set.id
             return (
               <button
                 key={set.id}

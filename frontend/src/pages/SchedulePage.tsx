@@ -391,7 +391,7 @@ export function SchedulePage(): React.ReactElement | null {
 
       <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h1 className="text-xl font-semibold">{schedule.name}</h1>
             <Badge variant="outline" className="capitalize text-xs">
               {schedule.status}
@@ -859,7 +859,7 @@ export function SchedulePage(): React.ReactElement | null {
                         {chartsReady && (
                           <ChartContainer
                             config={INSIGHTS_CONFIG}
-                            className="h-64 w-full"
+                            className="h-64 min-w-0 w-full"
                           >
                             <AreaChart
                               data={insightsData}

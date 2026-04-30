@@ -66,7 +66,7 @@ export function RunPaceCard({ chartData, isRunActive, stretch = false }: RunPace
       {chartData === null ? (
         <div className={`${stretch ? 'flex-1 min-h-0' : 'h-48'} w-full animate-pulse rounded-md bg-muted`} />
       ) : (
-        <ChartContainer config={CHART_CONFIG} className={`${stretch ? 'flex-1 min-h-0' : 'h-48'} w-full`}>
+        <ChartContainer config={CHART_CONFIG} className={`${stretch ? 'flex-1 min-h-0' : 'h-48'} min-w-0 w-full`}>
           <ComposedChart data={series} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="paceActualGradient" x1="0" y1="0" x2="0" y2="1">

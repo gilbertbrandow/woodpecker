@@ -400,7 +400,7 @@ export function RunPage(): React.ReactElement | null {
 
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h1 className="text-xl font-semibold">Run {run.runIndex + 1}</h1>
             <Badge variant="outline">{RUN_STATUS_LABELS[run.status]}</Badge>
           </div>

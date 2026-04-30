@@ -94,7 +94,7 @@ export function SubsetStats({ stats, collapsible = true }: SubsetStatsProps): Re
           <p className="text-sm font-semibold">Rating distribution</p>
           <p className="mt-1 text-xs text-muted-foreground">How puzzles in this subset are spread across rating ranges</p>
         </div>
-        <ChartContainer config={CHART_CONFIG} className="h-56 w-full">
+        <ChartContainer config={CHART_CONFIG} className="h-56 min-w-0 w-full">
           <AreaChart
             data={stats.ratingBuckets}
             margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
@@ -147,7 +147,7 @@ export function SubsetStats({ stats, collapsible = true }: SubsetStatsProps): Re
             <p className="text-sm font-semibold">Top themes</p>
             <p className="mt-1 text-xs text-muted-foreground">The most common tactical motifs across puzzles in this subset</p>
           </div>
-          <ChartContainer config={CHART_CONFIG} className="h-64 w-full">
+          <ChartContainer config={CHART_CONFIG} className="h-64 min-w-0 w-full">
             <BarChart
               data={topThemes}
               margin={{ top: 4, right: 4, left: 16, bottom: 8 }}
