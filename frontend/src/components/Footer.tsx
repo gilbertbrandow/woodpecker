@@ -6,9 +6,13 @@ const BOOK_URL = 'https://www.amazon.se/-/en/Axel-Smith/dp/1784830542'
 const AXEL_SMITH_URL = 'https://en.wikipedia.org/wiki/Axel_Smith_(chess_player)'
 const HANS_TIKKANEN_URL = 'https://sv.wikipedia.org/wiki/Hans_Tikkanen'
 
-export function Footer(): React.ReactElement {
+type FooterProps = {
+  className?: string
+}
+
+export function Footer({ className = '' }: FooterProps): React.ReactElement {
   return (
-    <footer className="border-t border-border">
+    <footer className={`border-t border-border ${className}`}>
       <div className="flex items-center justify-between px-4 py-4 text-xs text-muted-foreground sm:px-6">
         <a
           href={GITHUB_URL}

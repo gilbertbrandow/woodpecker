@@ -22,7 +22,7 @@ export function BoardPageShell({
   mobileDrawerContent,
 }: BoardPageShellProps): React.ReactElement {
   return (
-    <div className="flex flex-1 flex-col overflow-x-hidden lg:px-0">
+    <div className="flex flex-1 flex-col overflow-x-hidden pb-3 lg:pb-0 lg:px-0">
       <div className="flex-none px-3 pt-3 pb-2 lg:hidden">
         {mobileHeader}
       </div>
@@ -54,7 +54,7 @@ export function BoardPageShell({
             </DrawerTrigger>
           </div>
           <DrawerContent className="flex h-[70dvh] flex-col">
-            <div className="flex-1 overflow-y-auto px-4 pb-6 pt-4" data-vaul-no-drag>
+            <div className="flex-1 overflow-y-auto px-4 pb-6" data-vaul-no-drag>
               {mobileDrawerContent}
             </div>
           </DrawerContent>

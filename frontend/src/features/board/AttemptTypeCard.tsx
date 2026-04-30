@@ -16,7 +16,7 @@ export function AttemptTypeCard({ isPractice, currentTryNumber, maxTriesPerPuzzl
           <CircleOff className={`shrink-0 ${compact ? 'h-3 w-3' : 'h-4 w-4'}`} />
           <span className={`font-medium ${compact ? 'text-xs' : 'text-sm'}`}>Practice attempt</span>
         </div>
-        {!compact && <p className="mt-1.5 text-xs opacity-75">This attempt won't count towards your score.</p>}
+        <p className={`opacity-75 ${compact ? 'mt-1 text-[10px]' : 'mt-1.5 text-xs'}`}>This attempt won't count towards your score.</p>
       </div>
     )
   }
@@ -27,14 +27,11 @@ export function AttemptTypeCard({ isPractice, currentTryNumber, maxTriesPerPuzzl
         <CheckCircle2 className={`shrink-0 text-muted-foreground ${compact ? 'h-3 w-3' : 'h-4 w-4'}`} />
         <span className={`font-medium ${compact ? 'text-xs' : 'text-sm'}`}>Scored attempt</span>
       </div>
-      {!compact && maxTriesPerPuzzle === 1 && (
-        <p className="mt-1.5 text-xs text-muted-foreground">This attempt will count towards your score.</p>
-      )}
-      {maxTriesPerPuzzle > 1 && (
-        <p className={`text-muted-foreground ${compact ? 'text-xs' : 'mt-1.5 text-xs'}`}>
-          {compact ? `Attempt ${currentTryNumber} / ${maxTriesPerPuzzle}` : `Attempt ${currentTryNumber} of ${maxTriesPerPuzzle}`}
-        </p>
-      )}
+      <p className={`text-muted-foreground ${compact ? 'mt-1 text-[10px]' : 'mt-1.5 text-xs'}`}>
+        {maxTriesPerPuzzle > 1
+          ? `Attempt ${currentTryNumber} of ${maxTriesPerPuzzle}`
+          : 'This attempt will count towards your score.'}
+      </p>
     </div>
   )
 }
