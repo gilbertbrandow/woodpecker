@@ -70,7 +70,6 @@ export type BoardPageActions = {
   handleShowSolution: () => void
   handleRetake: () => Promise<void>
   handleNextPuzzle: () => Promise<void>
-  startNextRun: () => Promise<void>
   dismissRunComplete: () => void
 }
 
@@ -88,7 +87,6 @@ export type BoardPageControllerResult = {
   }
   overview: OverviewState
   isLoadingNextPuzzle: boolean
-  isStartingNextRun: boolean
   runJustCompleted: boolean
   inputBlocked: boolean
   actions: BoardPageActions
@@ -154,7 +152,6 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const [targetSolveTenths, setTargetSolveTenths] = useState<number | null>(null)
   const [boardKey, setBoardKey] = useState(0)
   const [isLoadingNextPuzzle, setIsLoadingNextPuzzle] = useState(false)
-  const [isStartingNextRun, setIsStartingNextRun] = useState(false)
   const [runJustCompleted, setRunJustCompleted] = useState(false)
   const [movesPlayed, setMovesPlayed] = useState<string[]>([])
   const [allPliesPlayed, setAllPliesPlayed] = useState<string[]>([])
@@ -804,20 +801,6 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     }
   }, [navigate, runId, runPuzzleId, runIdStr, applyFreshActiveState, clearOverviewState])
 
-  const handleStartNextRun = useCallback(async (): Promise<void> => {
-    if (overview === null) return
-    setIsStartingNextRun(true)
-    try {
-      const run = await api.runs.get(overview.runPuzzle.runId)
-      const newRun = await api.runs.start(run.trainingId, overview.runPuzzle.runIndex + 1)
-      void navigate({ to: '/app/runs/$runId', params: { runId: String(newRun.id) } })
-    } catch {
-      toast.error('Could not start next run', { description: 'Please try again.' })
-    } finally {
-      setIsStartingNextRun(false)
-    }
-  }, [overview, navigate])
-
   const dismissRunComplete = useCallback((): void => {
     setRunJustCompleted(false)
   }, [])
@@ -849,7 +832,6 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     session: { attemptHistory, movesPlayed, allPliesPlayed, failedRetryPlies, liveFocusStatus },
     overview: { data: overview },
     isLoadingNextPuzzle,
-    isStartingNextRun,
     runJustCompleted,
     inputBlocked,
     actions: {
@@ -860,7 +842,6 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       handleShowSolution,
       handleRetake,
       handleNextPuzzle,
-      startNextRun: handleStartNextRun,
       dismissRunComplete,
     },
   }

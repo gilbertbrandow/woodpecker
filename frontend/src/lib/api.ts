@@ -445,6 +445,8 @@ export type RunPuzzleOverview = {
     completedByAttemptId: number
     runId: number
     runIndex: number
+    breakDuration: string | null
+    isTrainingComplete: boolean
     summary: {
       totalPuzzles: number
       solvedCount: number

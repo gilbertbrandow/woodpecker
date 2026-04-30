@@ -1,23 +1,21 @@
 import * as React from 'react'
 import confetti from 'canvas-confetti'
 import { X } from 'lucide-react'
+import { useNavigate } from '@tanstack/react-router'
 import { Button } from '../../components/ui/button'
 import type { RunPuzzleOverview } from '../../lib/api'
 
 type RunCompleteOverlayProps = {
   overlayData: NonNullable<RunPuzzleOverview['runCompleteOverlay']>
-  onStartNextRun: () => Promise<void>
-  isLoading: boolean
   onClose: () => void
 }
 
 export function RunCompleteOverlay({
   overlayData,
-  onStartNextRun,
-  isLoading,
   onClose,
 }: RunCompleteOverlayProps): React.ReactElement {
   const containerRef = React.useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
 
   React.useEffect(() => {
     const el = containerRef.current
@@ -35,6 +33,16 @@ export function RunCompleteOverlay({
     })
   }, [])
 
+  const title = overlayData.isTrainingComplete
+    ? 'Training complete!'
+    : `Run ${overlayData.runIndex + 1} complete!`
+
+  const body = overlayData.isTrainingComplete
+    ? "Congratulations on finishing the full training set. You've worked through every puzzle — well done."
+    : overlayData.breakDuration !== null
+      ? `You've earned your break. Take a ${overlayData.breakDuration} break now and come back after that.`
+      : 'Ready to head back?'
+
   return (
     <div
       ref={containerRef}
@@ -49,16 +57,13 @@ export function RunCompleteOverlay({
         <X className="h-4 w-4" />
       </button>
       <div className="flex flex-col items-center gap-3 px-6 text-center">
-        <p className="text-lg font-semibold">Run {overlayData.runIndex + 1} complete!</p>
-        <p className="text-sm text-muted-foreground">
-          Ready for run {overlayData.runIndex + 2}?
-        </p>
+        <p className="text-lg font-semibold">{title}</p>
+        <p className="text-sm text-muted-foreground">{body}</p>
         <Button
           size="sm"
-          onClick={() => void onStartNextRun()}
-          disabled={isLoading}
+          onClick={() => void navigate({ to: '/app' })}
         >
-          {isLoading ? 'Starting…' : 'Start next run'}
+          Go to Dashboard
         </Button>
       </div>
     </div>

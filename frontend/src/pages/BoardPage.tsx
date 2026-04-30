@@ -467,8 +467,6 @@ export function BoardPage(): React.ReactElement | null {
     ctrl.mode === 'overview' && showOverlay && overlayData !== null ? (
       <RunCompleteOverlay
         overlayData={overlayData}
-        onStartNextRun={ctrl.actions.startNextRun}
-        isLoading={ctrl.isStartingNextRun}
         onClose={() => {
           setShowOverlay(false)
           ctrl.actions.dismissRunComplete()

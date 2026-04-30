@@ -50,6 +50,18 @@ def _get_schedule_config(run: Run) -> tuple[Schedule, dict[str, object]]:
     return schedule, config
 
 
+def _format_break_duration(hours: int) -> str | None:
+    if hours <= 0:
+        return None
+    if hours < 24:
+        return f"{hours} hour{'s' if hours != 1 else ''}"
+    days = hours // 24
+    if days < 7:
+        return f"{days} day{'s' if days != 1 else ''}"
+    weeks = days // 7
+    return f"{weeks} week{'s' if weeks != 1 else ''}"
+
+
 def _total_queue_attempts(config: dict[str, object]) -> int:
     rep_raw = config.get("failed_repetition")
     if not isinstance(rep_raw, dict):
@@ -1230,6 +1242,8 @@ def _compute_run_complete_overlay(
     total_queue: int,
     run_just_completed: bool,
     completing_attempt_id: int | None,
+    break_duration: str | None,
+    is_training_complete: bool,
 ) -> dict[str, object] | None:
     if not run_just_completed or completing_attempt_id is None:
         return None
@@ -1269,6 +1283,8 @@ def _compute_run_complete_overlay(
         "completedByAttemptId": completing_attempt_id,
         "runId": run.id,
         "runIndex": run.run_index,
+        "breakDuration": break_duration,
+        "isTrainingComplete": is_training_complete,
         "summary": {
             "totalPuzzles": total,
             "solvedCount": solved,
@@ -1298,6 +1314,16 @@ def _build_run_puzzle_overview(
     training = db.session.get(Training, training_id)
     schedule = db.session.get(Schedule, training.schedule_id) if training else None
     schedule_name: str | None = schedule.name if schedule is not None else None
+
+    runs_raw = config.get("runs")
+    runs_list: list[object] = runs_raw if isinstance(runs_raw, list) else []
+    total_runs = len(runs_list)
+    is_training_complete = total_runs > 0 and run.run_index == total_runs - 1
+    run_entry = runs_list[run.run_index] if run.run_index < total_runs else {}
+    run_entry_dict = cast(dict[str, object], run_entry) if isinstance(run_entry, dict) else {}
+    break_hours_raw = run_entry_dict.get("break_after_hours")
+    break_hours = break_hours_raw if isinstance(break_hours_raw, int) else 0
+    break_duration = _format_break_duration(break_hours)
 
     all_run_puzzles = list(
         db.session.scalars(sa.select(RunPuzzle).where(RunPuzzle.run_id == run.id)).all()
@@ -1403,7 +1429,8 @@ def _build_run_puzzle_overview(
             "targetSolveTenths": target_solve_tenths,
         },
         "runCompleteOverlay": _compute_run_complete_overlay(
-            run, all_run_puzzles, total_queue, run_just_completed, completing_attempt_id
+            run, all_run_puzzles, total_queue, run_just_completed, completing_attempt_id,
+            break_duration, is_training_complete,
         ),
     }
 
