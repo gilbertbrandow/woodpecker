@@ -21,7 +21,6 @@ export const MAX_BOARD = 760
 export const LG_BREAKPOINT = 1024
 export const V_PAD_DESKTOP = 48
 export const MOBILE_H_PAD = 24
-export const MOBILE_CHROME_H = 244
 export const MOVE_FEEDBACK_SUCCESS_MS = 200
 export const WRONG_REVERT_MS = 500
 export const FAILED_TO_OVERVIEW_MS = 300
