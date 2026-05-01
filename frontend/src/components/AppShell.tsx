@@ -7,11 +7,15 @@ import { AppSidebar } from './AppSidebar'
 import { Footer } from './Footer'
 import { ThemeToggle } from './ThemeToggle'
 import { useAuth } from '../context/auth'
-import { Menu } from 'lucide-react'
+import { Menu, Play } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import woodpeckerLogo from '../assets/woodpecker.svg'
+import { useActiveRun } from '../hooks/useActiveRun'
+import type { ActiveRun } from '../lib/api'
+import { buttonVariants } from './ui/button'
+import { cn } from '../lib/utils'
 
-function AppShellHeader(): React.ReactElement {
+function AppShellHeader({ activeRun }: { activeRun: ActiveRun | null }): React.ReactElement {
   const { toggleSidebar } = useSidebar()
   return (
     <header className="flex h-12 shrink-0 items-center border-b border-border px-4">
@@ -33,11 +37,21 @@ function AppShellHeader(): React.ReactElement {
           </button>
         </div>
       </div>
-      {/* Desktop: sidebar trigger left, theme toggle */}
-      <div className="hidden sm:flex sm:items-center sm:gap-2">
+      {/* Desktop: sidebar trigger left, continue button far right */}
+      <div className="hidden w-full sm:flex sm:items-center sm:gap-2">
         <SidebarTrigger />
         <Separator orientation="vertical" className="h-4" />
         <ThemeToggle />
+        {activeRun !== null && (
+          <Link
+            to="/app/runs/$runId/solve"
+            params={{ runId: String(activeRun.runId) }}
+            className={cn(buttonVariants({ size: 'sm' }), 'ml-auto h-7 gap-1.5 whitespace-nowrap text-xs')}
+          >
+            <Play className="h-3 w-3 shrink-0" />
+            Continue Run {activeRun.runIndex + 1}
+          </Link>
+        )}
       </div>
     </header>
   )
@@ -46,6 +60,7 @@ function AppShellHeader(): React.ReactElement {
 export function AppShell(): React.ReactElement {
   const { user, loading } = useAuth()
   const navigate = useNavigate()
+  const { data: activeRun } = useActiveRun()
 
   useEffect(() => {
     if (!loading && !user) {
@@ -55,9 +70,9 @@ export function AppShell(): React.ReactElement {
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <AppSidebar />
+      <AppSidebar activeRun={activeRun} />
       <SidebarInset className="h-svh overflow-hidden">
-        <AppShellHeader />
+        <AppShellHeader activeRun={activeRun} />
         <div className="flex flex-1 flex-col overflow-y-auto">
           <div className="flex flex-1 flex-col">
             <Outlet />

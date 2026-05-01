@@ -6,6 +6,13 @@ from app.services import run as run_svc
 runs_bp = Blueprint("runs", __name__, url_prefix="/runs")
 
 
+@runs_bp.get("/active")
+@login_required
+def get_active_run() -> tuple[Response, int] | Response:
+    result = run_svc.get_active_run_summary(session["user_id"])
+    return jsonify(result)
+
+
 @runs_bp.get("/<int:run_id>")
 @login_required
 def get_run(run_id: int) -> tuple[Response, int] | Response:

@@ -505,6 +505,25 @@ def _pace_chart_data(
     }
 
 
+def get_active_run_summary(user_id: int) -> dict[str, object] | None:
+    row = db.session.execute(
+        sa.select(Run.id, Run.run_index, Schedule.name)
+        .join(Training, Run.training_id == Training.id)
+        .join(Schedule, Training.schedule_id == Schedule.id)
+        .where(
+            Training.user_id == user_id,
+            Run.completed_at.is_(None),
+            Run.aborted_at.is_(None),
+        )
+        .order_by(Run.started_at.desc())
+        .limit(1)
+    ).first()
+    if row is None:
+        return None
+    run_id, run_index, schedule_name = row
+    return {"runId": run_id, "scheduleName": schedule_name, "runIndex": run_index}
+
+
 def run_dict(run: Run) -> dict[str, object]:
     _, config = _get_schedule_config(run)
     total_queue = _total_queue_attempts(config)

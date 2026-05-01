@@ -1,13 +1,15 @@
 import * as React from 'react'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useSidebar } from './ui/sidebar'
-import { ChevronsUpDown, LayoutDashboard, Library, CalendarDays, Puzzle, CircleHelp, Settings, LogOut } from 'lucide-react'
+import { ChevronsUpDown, LayoutDashboard, Library, CalendarDays, Puzzle, CircleHelp, Settings, LogOut, Play } from 'lucide-react'
 import { toast } from 'sonner'
 import woodpeckerLogo from '../assets/woodpecker.svg'
 import { useAuth } from '../context/auth'
 import { parseAvatarValue } from '../lib/avatar'
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar'
 import { DefaultAvatar } from './DefaultAvatar'
+import { useIsMobile } from '../hooks/use-mobile'
+import type { ActiveRun } from '../lib/api'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,11 +45,12 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'About', to: '/app/about', icon: CircleHelp },
 ]
 
-export function AppSidebar(): React.ReactElement {
+export function AppSidebar({ activeRun }: { activeRun: ActiveRun | null }): React.ReactElement {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const { setOpenMobile } = useSidebar()
+  const isMobile = useIsMobile()
 
   const handleSignOut = async (): Promise<void> => {
     await logout()
@@ -93,6 +96,24 @@ export function AppSidebar(): React.ReactElement {
       <SidebarContent>
         <SidebarGroup>
           <SidebarMenu>
+          {isMobile && activeRun !== null && (
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                tooltip={`Continue — Run ${activeRun.runIndex + 1}`}
+                className="bg-foreground text-background hover:bg-foreground/90 hover:text-background"
+              >
+                <Link
+                  to="/app/runs/$runId/solve"
+                  params={{ runId: String(activeRun.runId) }}
+                  onClick={() => setOpenMobile(false)}
+                >
+                  <Play className="h-4 w-4" />
+                  <span>Continue — Run {activeRun.runIndex + 1}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           {NAV_ITEMS.map(({ label, to, icon: Icon }) => {
             const isActive = to === '/app' ? pathname === '/app' : pathname.startsWith(to)
             return (

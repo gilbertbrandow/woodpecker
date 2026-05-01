@@ -277,6 +277,12 @@ export type PaceChartData = {
   timeRemainingMs: number
 }
 
+export type ActiveRun = {
+  runId: number
+  scheduleName: string
+  runIndex: number
+}
+
 export type Run = {
   id: number
   trainingId: number
@@ -632,6 +638,7 @@ export const api = {
       request(`/openings?q=${encodeURIComponent(q)}`),
   },
   runs: {
+    getActive: (): Promise<ActiveRun | null> => request('/runs/active'),
     start: (trainingId: number, runIndex?: number): Promise<Run> =>
       request(`/training/${trainingId}/runs`, {
         method: 'POST',
