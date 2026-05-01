@@ -375,19 +375,6 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     void (async () => {
       try {
         if (routeKind === 'overview') {
-          if (modeRef.current === 'focus' && currentAttemptIdRef.current !== null) {
-            void navigate({
-              to: '/app/runs/$runId/puzzles/$runPuzzleId/attempts/$attemptId',
-              params: {
-                runId: runIdStr,
-                runPuzzleId: runPuzzleIdStr,
-                attemptId: String(currentAttemptIdRef.current),
-              },
-              replace: true,
-            })
-            return
-          }
-
           const { overview: overviewData } = await api.runs.getOverview(runId, runPuzzleId, attemptId ?? undefined)
 
           if (requestId !== loadRequestIdRef.current) return
@@ -434,6 +421,16 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     applyOverviewDisplayState,
     navigateToOverview,
   ])
+
+  useEffect(() => {
+    if (routeKind !== 'overview') return
+    if (currentAttemptId === null) return
+    void navigate({
+      to: '/app/runs/$runId/puzzles/$runPuzzleId/attempts/$attemptId',
+      params: { runId: runIdStr, runPuzzleId: runPuzzleIdStr, attemptId: String(currentAttemptId) },
+      replace: true,
+    })
+  }, [routeKind, currentAttemptId, navigate, runIdStr, runPuzzleIdStr])
 
   useEffect(() => {
     if (mode !== 'focus' || !isAttemptReady) return
