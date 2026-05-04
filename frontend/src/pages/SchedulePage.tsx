@@ -13,7 +13,6 @@ import {
   type Subset,
   type ScheduleInsightPoint,
   type MyScheduleTraining,
-  type TrainingStatus,
   type AllTrainingSummary,
 } from "../lib/api";
 import { AreaChart, Area, XAxis, YAxis } from "recharts";
@@ -30,6 +29,7 @@ import {
 } from "../components/ui/tabs";
 import { UserAvatar } from "../components/UserAvatar";
 import { ProgressBar } from "../components/ProgressBar";
+import { StatusBadge } from "../components/StatusBadge";
 import { TrainingTable } from "../components/participations/TrainingTable";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -67,12 +67,6 @@ import { formatNumber } from "../lib/utils";
 
 const MAX_RUNS = 20;
 
-const TRAINING_STATUS_LABELS: Record<TrainingStatus, string> = {
-  draft: "Not started",
-  in_progress: "In progress",
-  completed: "Completed",
-  aborted: "Aborted",
-};
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
@@ -472,7 +466,7 @@ export function SchedulePage(): React.ReactElement | null {
             </span>
           </div>
           <div
-            className="flex cursor-pointer items-center gap-4 px-4 py-3 transition-colors hover:bg-muted/50"
+            className="flex cursor-pointer items-center gap-4 overflow-x-auto px-4 py-3 transition-colors hover:bg-muted/50"
             onClick={() =>
               void navigate({
                 to: "/app/subsets/$subsetId",
@@ -480,16 +474,14 @@ export function SchedulePage(): React.ReactElement | null {
               })
             }
           >
-            <UserAvatar username={subset.ownedBy.username} avatarUrl={subset.ownedBy.avatarUrl} />
-            <span className="flex-1 font-medium">{subset.name}</span>
-            <Badge variant="outline" className="capitalize text-xs">
-              {subset.status}
-            </Badge>
-            <span className="text-sm tabular-nums text-muted-foreground">
+            <UserAvatar username={subset.ownedBy.username} avatarUrl={subset.ownedBy.avatarUrl} className="shrink-0" />
+            <span className="flex-1 shrink-0 whitespace-nowrap font-medium">{subset.name}</span>
+            <StatusBadge status={subset.status} />
+            <span className="shrink-0 whitespace-nowrap text-sm tabular-nums text-muted-foreground">
               {subset.puzzleCount} puzzles
             </span>
             {subset.lockedAt && (
-              <span className="hidden text-sm text-muted-foreground sm:block">
+              <span className="hidden shrink-0 whitespace-nowrap text-sm text-muted-foreground sm:block">
                 {new Date(subset.lockedAt).toLocaleDateString(undefined, {
                   year: "numeric",
                   month: "short",
@@ -524,7 +516,7 @@ export function SchedulePage(): React.ReactElement | null {
             </div>
           ) : (
             <div
-              className="flex cursor-pointer items-center gap-6 px-4 py-3 transition-colors hover:bg-muted/50"
+              className="flex cursor-pointer items-center gap-6 overflow-x-auto px-4 py-3 transition-colors hover:bg-muted/50"
               onClick={() =>
                 void navigate({
                   to: "/app/training/$trainingId",
@@ -532,16 +524,13 @@ export function SchedulePage(): React.ReactElement | null {
                 })
               }
             >
-              <UserAvatar username={user.username} avatarUrl={user.avatarUrl} className="h-7 w-7" />
-              <ProgressBar value={65} tooltipLabel="3/5 Runs, 67% completed" className="w-40" />
-              <div className="flex flex-1 items-center justify-end gap-4">
-                <Badge variant="outline" className="text-xs">
-                  {TRAINING_STATUS_LABELS[myTraining.status]}
-                </Badge>
-                <span className="hidden text-xs text-muted-foreground sm:block">
-                  {formatDate(myTraining.startedAt)}
-                </span>
-              </div>
+              <UserAvatar username={user.username} avatarUrl={user.avatarUrl} className="h-7 w-7 shrink-0" />
+              <ProgressBar value={65} tooltipLabel="3/5 Runs, 67% completed" className="w-40 shrink-0" />
+              <div className="flex-1 shrink-0" />
+              <StatusBadge status={myTraining.status} />
+              <span className="hidden shrink-0 whitespace-nowrap text-xs text-muted-foreground sm:block">
+                {formatDate(myTraining.startedAt)}
+              </span>
             </div>
           )}
         </div>

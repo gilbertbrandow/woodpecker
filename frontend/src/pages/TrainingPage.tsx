@@ -37,6 +37,7 @@ import {
 import { Button } from '../components/ui/button'
 import { UserAvatar } from '../components/UserAvatar'
 import { Badge } from '../components/ui/badge'
+import { StatusBadge } from '../components/StatusBadge'
 import {
   Table,
   TableBody,
@@ -237,7 +238,7 @@ export function TrainingPage(): React.ReactElement | null {
           </span>
         </div>
         <div
-          className="flex cursor-pointer items-center gap-4 px-4 py-3 transition-colors hover:bg-muted/50"
+          className="flex cursor-pointer items-center gap-4 overflow-x-auto px-4 py-3 transition-colors hover:bg-muted/50"
           onClick={() =>
             void navigate({
               to: '/app/schedules/$scheduleId',
@@ -248,14 +249,13 @@ export function TrainingPage(): React.ReactElement | null {
           <UserAvatar
             username={schedule.createdBy.username}
             avatarUrl={schedule.createdBy.avatarUrl}
+            className="shrink-0"
           />
-          <span className="flex-1 font-medium">{schedule.name}</span>
-          <Badge variant="outline" className="text-xs">
-            Locked
-          </Badge>
-          <span className="text-sm tabular-nums text-muted-foreground">{schedule.runCount} runs</span>
+          <span className="flex-1 shrink-0 whitespace-nowrap font-medium">{schedule.name}</span>
+          <StatusBadge status="locked" />
+          <span className="shrink-0 whitespace-nowrap text-sm tabular-nums text-muted-foreground">{schedule.runCount} runs</span>
           {schedule.totalHours > 0 && (
-            <span className="hidden text-sm text-muted-foreground sm:block">
+            <span className="hidden shrink-0 whitespace-nowrap text-sm text-muted-foreground sm:block">
               {formatDuration(schedule.totalHours)}
             </span>
           )}
