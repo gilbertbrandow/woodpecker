@@ -57,26 +57,6 @@ export function TrainingTable({
         <UserAvatar username={row.original.user.username} avatarUrl={row.original.user.avatarUrl} />
       ),
     },
-    ...(!hideSchedule
-      ? ([
-          {
-            id: 'schedule',
-            accessorFn: (row: AllTrainingSummary) => row.scheduleName,
-            header: 'Schedule',
-            cell: ({ row }: { row: { original: AllTrainingSummary } }) => (
-              <Link
-                to="/app/schedules/$scheduleId"
-                params={{ scheduleId: String(row.original.scheduleId) }}
-                className="font-medium hover:underline"
-                title={row.original.scheduleName}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {row.original.scheduleName}
-              </Link>
-            ),
-          },
-        ] as ColumnDef<AllTrainingSummary>[])
-      : []),
     {
       accessorKey: 'status',
       header: 'Status',
@@ -103,6 +83,26 @@ export function TrainingTable({
         )
       },
     },
+    ...(!hideSchedule
+      ? ([
+          {
+            id: 'schedule',
+            accessorFn: (row: AllTrainingSummary) => row.scheduleName,
+            header: 'Schedule',
+            cell: ({ row }: { row: { original: AllTrainingSummary } }) => (
+              <Link
+                to="/app/schedules/$scheduleId"
+                params={{ scheduleId: String(row.original.scheduleId) }}
+                className="font-medium hover:underline"
+                title={row.original.scheduleName}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {row.original.scheduleName}
+              </Link>
+            ),
+          },
+        ] as ColumnDef<AllTrainingSummary>[])
+      : []),
     {
       id: 'startedAt',
       accessorFn: (row) => new Date(row.startedAt).getTime(),
