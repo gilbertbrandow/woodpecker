@@ -816,6 +816,7 @@ export function BoardPage(): React.ReactElement | null {
       runId={runIdStr}
       activeAttemptId={ctrl.mode === 'overview' ? selectedAttemptId : undefined}
       stripInteractive={ctrl.mode === 'overview'}
+      pulseActive={ctrl.mode === 'focus' || ctrl.mode === 'failed'}
       boardAnimationEnabled={ctrl.mode !== 'overview'}
       mobileHeader={centerMobileHeader}
       timerBar={timerBar}

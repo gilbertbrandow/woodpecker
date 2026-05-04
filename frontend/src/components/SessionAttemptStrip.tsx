@@ -3,8 +3,6 @@ import { Link } from '@tanstack/react-router'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import type { SessionAttemptHistoryItem } from '../context/solveSession'
 
-const FAILED_PULSE_WINDOW_MS = 1800
-
 const BASE_STATUS_CLASS: Record<SessionAttemptHistoryItem['status'], string> = {
   ongoing: 'bg-sky-500',
   solved: 'bg-green-500',
@@ -23,30 +21,11 @@ type SessionAttemptStripProps = {
   activeAttemptId?: number | null
   interactive?: boolean
   maxVisible?: number
+  pulseActive?: boolean
 }
 
-export function SessionAttemptStrip({ items, runId, activeAttemptId, interactive = true, maxVisible = 20 }: SessionAttemptStripProps): React.ReactElement | null {
+export function SessionAttemptStrip({ items, runId, activeAttemptId, interactive = true, maxVisible = 20, pulseActive = false }: SessionAttemptStripProps): React.ReactElement | null {
   const visibleItems = React.useMemo(() => items.slice(-maxVisible), [items, maxVisible])
-  const [now, setNow] = React.useState<number>(() => Date.now())
-
-  React.useEffect(() => {
-    const pendingFailedItems = visibleItems.filter(
-      (item) => item.status === 'failed' && item.finishedAt !== undefined && now < item.finishedAt + FAILED_PULSE_WINDOW_MS,
-    )
-
-    if (pendingFailedItems.length === 0) return
-
-    const nextDeadline = Math.min(...pendingFailedItems.map((item) => (item.finishedAt ?? now) + FAILED_PULSE_WINDOW_MS))
-    const delayMs = Math.max(0, nextDeadline - now)
-
-    const timeoutId = window.setTimeout(() => {
-      setNow(Date.now())
-    }, delayMs)
-
-    return () => {
-      window.clearTimeout(timeoutId)
-    }
-  }, [visibleItems, now])
 
   if (visibleItems.length === 0) {
     return null
@@ -58,18 +37,10 @@ export function SessionAttemptStrip({ items, runId, activeAttemptId, interactive
         {visibleItems.map((item) => {
           const statusLabel = STATUS_LABEL[item.status]
           const tooltip = `Attempt for puzzle ${item.puzzlePosition}: ${statusLabel}`
-          const isFreshFailed =
-            item.status === 'failed' &&
-            item.finishedAt !== undefined &&
-            now < item.finishedAt + FAILED_PULSE_WINDOW_MS
 
           const isOngoing = item.status === 'ongoing'
-          const dotColorClass = isOngoing
-            ? 'bg-sky-400'
-            : isFreshFailed
-              ? 'bg-red-400'
-              : BASE_STATUS_CLASS[item.status]
-          const isPulsing = isOngoing || isFreshFailed
+          const isPulsing = pulseActive && isOngoing
+          const dotColorClass = isOngoing ? 'bg-sky-400' : BASE_STATUS_CLASS[item.status]
           const isActive = item.attemptId === activeAttemptId
           const isClickable = interactive && !isActive && !isOngoing
 
