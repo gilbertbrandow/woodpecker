@@ -45,13 +45,17 @@ import {
   TableRow,
 } from '../components/ui/table'
 import { RunPuzzleTable } from '../components/runs/RunPuzzleTable'
+import { RunPaceCard } from '../features/board/RunPaceCard'
 
 function InsightsTab({ run, puzzleList }: { run: Run; puzzleList: RunPuzzleList }): React.ReactElement {
+  const [breakdownOpen, setBreakdownOpen] = useState(true)
+  const [paceOpen, setPaceOpen] = useState(true)
+
   const resolvedCount = run.solvedCount + run.solvedWithRetriesCount + run.failedCount
-  const accuracy =
-    resolvedCount > 0
-      ? ((run.solvedCount / resolvedCount) * 100).toFixed(1)
-      : null
+  const accuracyPct =
+    resolvedCount > 0 ? ((run.solvedCount / resolvedCount) * 100).toFixed(1) : null
+  const completionPct =
+    run.totalPuzzles > 0 ? ((resolvedCount / run.totalPuzzles) * 100).toFixed(1) : null
 
   const solvedTimes = puzzleList.puzzles
     .filter((p) => p.positionStatus === 'solved' || p.positionStatus === 'solved_with_retries')
@@ -63,7 +67,6 @@ function InsightsTab({ run, puzzleList }: { run: Run; puzzleList: RunPuzzleList 
       ? Math.round(solvedTimes.reduce((a, b) => a + b, 0) / solvedTimes.length)
       : null
   const fastestMs = solvedTimes.length > 0 ? Math.min(...solvedTimes) : null
-  const slowestMs = solvedTimes.length > 0 ? Math.max(...solvedTimes) : null
 
   if (resolvedCount === 0) {
     return (
@@ -72,64 +75,93 @@ function InsightsTab({ run, puzzleList }: { run: Run; puzzleList: RunPuzzleList 
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Accuracy
-        </span>
-        <span className="text-2xl font-semibold tabular-nums">
-          {accuracy !== null ? `${accuracy}%` : '—'}
-        </span>
-        <span className="text-xs text-muted-foreground">
-          based on {resolvedCount} resolved puzzle{resolvedCount !== 1 ? 's' : ''}
-        </span>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Solve times
-        </span>
-        <div className="grid grid-cols-3 gap-4">
-          {(
-            [
-              ['Average', avgMs],
-              ['Fastest', fastestMs],
-              ['Slowest', slowestMs],
-            ] as [string, number | null][]
-          ).map(([label, ms]) => (
-            <div key={label} className="flex flex-col gap-0.5">
-              <span className="text-xs text-muted-foreground">{label}</span>
-              <span className="tabular-nums font-medium">
-                {ms !== null ? formatSolveTimeMs(ms) : '—'}
-              </span>
+    <div className="flex flex-col gap-4">
+      <Collapsible open={breakdownOpen} onOpenChange={setBreakdownOpen}>
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex w-full items-center justify-between border-b pb-2.5 text-left"
+          >
+            <span className="flex items-center gap-2 text-sm font-medium">
+              <ChevronDown
+                className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
+                style={{ transform: breakdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+              />
+              Breakdown
+            </span>
+            <span className="hidden text-xs text-muted-foreground sm:block">
+              Puzzle results for this run
+            </span>
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="pt-4">
+            <div className="rounded-md border">
+              <Table>
+                <TableBody>
+                  {(
+                    [
+                      ['Solved', run.solvedCount],
+                      ['Solved with retries', run.solvedWithRetriesCount],
+                      ['Failed', run.failedCount],
+                      ['Remaining', run.inProgressCount],
+                      ['Total', run.totalPuzzles],
+                    ] as [string, number][]
+                  ).map(([label, count]) => (
+                    <TableRow key={label}>
+                      <TableCell className="text-sm">{label}</TableCell>
+                      <TableCell className="text-right tabular-nums text-sm">{formatNumber(count)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
-          ))}
-        </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {(
+          [
+            ['Accuracy', accuracyPct !== null ? `${accuracyPct}%` : '—'],
+            ['Completion', completionPct !== null ? `${completionPct}%` : '—'],
+            ['Avg solve time', avgMs !== null ? formatSolveTimeMs(avgMs) : '—'],
+            ['Fastest', fastestMs !== null ? formatSolveTimeMs(fastestMs) : '—'],
+          ] as [string, string][]
+        ).map(([label, value]) => (
+          <div key={label} className="flex flex-col gap-0.5 rounded-md border p-3">
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className="text-lg font-semibold tabular-nums">{value}</p>
+          </div>
+        ))}
       </div>
 
-      <div className="flex flex-col gap-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Breakdown
-        </span>
-        <Table>
-          <TableBody>
-            {(
-              [
-                ['Solved', run.solvedCount],
-                ['Solved with retries', run.solvedWithRetriesCount],
-                ['Failed', run.failedCount],
-                ['Remaining', run.inProgressCount],
-                ['Total', run.totalPuzzles],
-              ] as [string, number][]
-            ).map(([label, count]) => (
-              <TableRow key={label}>
-                <TableCell className="text-sm">{label}</TableCell>
-                <TableCell className="text-right tabular-nums text-sm">{formatNumber(count)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      {run.paceChart !== null && (
+        <Collapsible open={paceOpen} onOpenChange={setPaceOpen}>
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between border-b pb-2.5 text-left"
+            >
+              <span className="flex items-center gap-2 text-sm font-medium">
+                <ChevronDown
+                  className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
+                  style={{ transform: paceOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                />
+                Run pace
+              </span>
+              <span className="hidden text-xs text-muted-foreground sm:block">
+                Actual progress & required pace
+              </span>
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="pt-4">
+              <RunPaceCard chartData={run.paceChart} isRunActive={run.status === 'active'} />
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
     </div>
   )
 }
