@@ -95,7 +95,7 @@ export function AppSidebar({ activeRun }: { activeRun: ActiveRun | null }): Reac
       <SidebarSeparator />
       <SidebarContent>
         <SidebarGroup>
-          <SidebarMenu>
+          <SidebarMenu className="gap-2">
           {isMobile && activeRun !== null && (
             <SidebarMenuItem>
               <SidebarMenuButton
