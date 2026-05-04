@@ -37,6 +37,7 @@ import {
 import { Button } from '../components/ui/button'
 import { UserAvatar } from '../components/UserAvatar'
 import { Badge } from '../components/ui/badge'
+import { StatusBadge } from '../components/StatusBadge'
 import {
   Table,
   TableBody,
@@ -249,13 +250,11 @@ export function TrainingPage(): React.ReactElement | null {
             username={schedule.createdBy.username}
             avatarUrl={schedule.createdBy.avatarUrl}
           />
-          <span className="flex-1 font-medium">{schedule.name}</span>
-          <Badge variant="outline" className="text-xs">
-            Locked
-          </Badge>
-          <span className="text-sm tabular-nums text-muted-foreground">{schedule.runCount} runs</span>
+          <span className="min-w-0 flex-1 truncate font-medium">{schedule.name}</span>
+          <StatusBadge status="locked" />
+          <span className="shrink-0 whitespace-nowrap text-sm tabular-nums text-muted-foreground">{schedule.runCount} runs</span>
           {schedule.totalHours > 0 && (
-            <span className="hidden text-sm text-muted-foreground sm:block">
+            <span className="hidden shrink-0 whitespace-nowrap text-sm text-muted-foreground sm:block">
               {formatDuration(schedule.totalHours)}
             </span>
           )}

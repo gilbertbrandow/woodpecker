@@ -13,6 +13,7 @@ type BoardCenterColumnProps = {
   runId: string
   activeAttemptId?: number | null
   stripInteractive?: boolean
+  pulseActive?: boolean
   boardAnimationEnabled?: boolean
   mobileHeader?: React.ReactNode
   mobileExtras?: React.ReactNode
@@ -27,6 +28,7 @@ export function BoardCenterColumn({
   runId,
   activeAttemptId,
   stripInteractive = true,
+  pulseActive = false,
   boardAnimationEnabled = true,
   mobileHeader,
   mobileExtras,
@@ -73,7 +75,7 @@ export function BoardCenterColumn({
         <BoardSurface {...boardSurfaceProps} />
         {overlay}
       </div>
-      <SessionAttemptStrip items={attemptHistory} runId={runId} activeAttemptId={activeAttemptId} interactive={stripInteractive} />
+      <SessionAttemptStrip items={attemptHistory} runId={runId} activeAttemptId={activeAttemptId} interactive={stripInteractive} pulseActive={pulseActive} />
       {mobileExtras && (
         <div className="lg:hidden">
           {mobileExtras}

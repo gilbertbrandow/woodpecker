@@ -29,6 +29,7 @@ export function UserAvatar({
         username={username}
         piece={av.type === 'default' ? av.piece : undefined}
         color={av.type === 'default' ? av.color : undefined}
+        style={av.type === 'default' ? av.style : undefined}
         className={`${className} shrink-0 text-[10px]`}
       />
     )
@@ -37,7 +38,7 @@ export function UserAvatar({
     <Tooltip delayDuration={100}>
       <TooltipTrigger asChild>
         <span
-          className="inline-flex cursor-default"
+          className={`inline-flex shrink-0 cursor-default ${className}`}
           onClick={(e) => e.stopPropagation()}
         >
           {avatar}
