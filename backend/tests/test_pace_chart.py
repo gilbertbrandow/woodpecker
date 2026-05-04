@@ -109,12 +109,12 @@ class TestLabelTicks:
         assert isinstance(ticks, list)
         assert len(ticks) == 7
 
-    def test_48_hour_run_produces_7_ticks(self) -> None:
+    def test_48_hour_run_produces_3_ticks(self) -> None:
         result = _call(0, target_hours=48.0, solved_offsets_ms=[], now_offset_ms=MS_PER_HOUR, total_puzzles=10)
         assert result is not None
         ticks = result["labelTicks"]
         assert isinstance(ticks, list)
-        assert len(ticks) == 7
+        assert len(ticks) == 3
 
     def test_1_day_run_uses_4h_intervals(self) -> None:
         result = _call(0, target_hours=24.0, solved_offsets_ms=[], now_offset_ms=MS_PER_HOUR, total_puzzles=10)
@@ -123,12 +123,12 @@ class TestLabelTicks:
         assert isinstance(ticks, list)
         assert ticks[1] - ticks[0] == 4 * MS_PER_HOUR
 
-    def test_48_hour_run_uses_8h_intervals(self) -> None:
+    def test_48_hour_run_uses_24h_intervals(self) -> None:
         result = _call(0, target_hours=48.0, solved_offsets_ms=[], now_offset_ms=MS_PER_HOUR, total_puzzles=10)
         assert result is not None
         ticks = result["labelTicks"]
         assert isinstance(ticks, list)
-        assert ticks[1] - ticks[0] == 8 * MS_PER_HOUR
+        assert ticks[1] - ticks[0] == 24 * MS_PER_HOUR
 
     def test_sub_day_run_uses_hourly_ticks(self) -> None:
         result = _call(0, target_hours=6.0, solved_offsets_ms=[], now_offset_ms=MS_PER_HOUR, total_puzzles=10)

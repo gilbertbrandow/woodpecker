@@ -399,14 +399,21 @@ def _create_attempt_for_puzzle(run_puzzle: RunPuzzle) -> PuzzleAttempt:
 
 
 _NICE_INTERVAL_HOURS: list[float] = [0.25, 0.5, 1.0, 2.0, 3.0, 4.0, 6.0, 8.0, 12.0, 24.0, 48.0, 72.0, 120.0, 168.0, 336.0]
-_MAX_INTERVALS = 7
+_MAX_INTRADAY_INTERVALS = 7
+_MAX_MULTIDAY_INTERVALS = 14
 
 
 def _tick_interval_ms(target_hours: float) -> int:
-    for interval_h in _NICE_INTERVAL_HOURS:
-        if math.ceil(target_hours / interval_h) <= _MAX_INTERVALS:
+    if target_hours > 24.0:
+        intervals = [h for h in _NICE_INTERVAL_HOURS if h >= 24.0]
+        max_count = _MAX_MULTIDAY_INTERVALS
+    else:
+        intervals = _NICE_INTERVAL_HOURS
+        max_count = _MAX_INTRADAY_INTERVALS
+    for interval_h in intervals:
+        if math.ceil(target_hours / interval_h) <= max_count:
             return int(interval_h * 3_600_000)
-    return int(_NICE_INTERVAL_HOURS[-1] * 3_600_000)
+    return int(intervals[-1] * 3_600_000)
 
 
 def _pace_chart_data(
@@ -450,7 +457,7 @@ def _pace_chart_data(
     interval_ms = _tick_interval_ms(target_hours)
     num_intervals = math.ceil(target_hours * 3_600_000 / interval_ms)
     label_ticks = [start_ms + i * interval_ms for i in range(num_intervals + 1)]
-    domain_start_ms = start_ms - interval_ms // 4
+    domain_start_ms = start_ms - interval_ms // 8
 
     last_actual_resolved = 0
     for t in terminal_timestamps:

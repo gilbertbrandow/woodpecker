@@ -85,7 +85,7 @@ export function RunPaceCard({ chartData, isRunActive, stretch = false }: RunPace
               tick={{ fontSize: 10 }}
               tickFormatter={tickFormatter}
             />
-            <YAxis hide domain={[0, totalPuzzles]} />
+            <YAxis hide width={0} domain={[0, totalPuzzles]} />
             <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeOpacity={1} />
             <ChartTooltip
               content={({ active, payload, label }) => {
