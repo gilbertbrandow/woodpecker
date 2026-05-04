@@ -29,6 +29,7 @@ export function UserAvatar({
         username={username}
         piece={av.type === 'default' ? av.piece : undefined}
         color={av.type === 'default' ? av.color : undefined}
+        style={av.type === 'default' ? av.style : undefined}
         className={`${className} shrink-0 text-[10px]`}
       />
     )
