@@ -88,6 +88,7 @@ def training_full_dict(training: Training) -> dict[str, object]:
         "completedAt": training.completed_at.isoformat() if training.completed_at else None,
         "abortedAt": training.aborted_at.isoformat() if training.aborted_at else None,
         "ownerUsername": owner.lichess_username,
+        "ownerAvatarUrl": owner.avatar_url,
         "runTargets": run_targets,
         "schedule": {
             "id": schedule.id,

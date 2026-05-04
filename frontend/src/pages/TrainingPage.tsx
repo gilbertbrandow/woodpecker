@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { useNavigate, Link, useParams } from '@tanstack/react-router'
 import { toast } from 'sonner'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Play } from 'lucide-react'
 import { useAuth } from '../context/auth'
 import {
   api,
@@ -208,9 +208,12 @@ export function TrainingPage(): React.ReactElement | null {
               {STATUS_LABELS[training.status]}
             </Badge>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Started {formatStartedAt(training.startedAt)}
-          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
+            <UserAvatar username={training.ownerUsername} avatarUrl={training.ownerAvatarUrl} className="h-4 w-4" />
+            <span>{training.ownerUsername}</span>
+            <span className="text-muted-foreground/40">·</span>
+            <span>Started {formatStartedAt(training.startedAt)}</span>
+          </div>
         </div>
         {isOwner && training.status === 'in_progress' && (
           <Button variant="ghost" size="sm" onClick={() => setShowAbortDialog(true)}>
@@ -370,13 +373,14 @@ export function TrainingPage(): React.ReactElement | null {
                               </Button>
                             )}
                             {slotStatus === 'active' && run !== null && (
-                              <Button
-                                size="sm"
-                                className="bg-foreground text-background hover:bg-foreground/90"
+                              <button
+                                type="button"
                                 onClick={(e) => { e.stopPropagation(); void navigate({ to: '/app/runs/$runId/solve', params: { runId: String(run.id) } }) }}
+                                className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                                aria-label="Continue run"
                               >
-                                Continue
-                              </Button>
+                                <Play className="h-3.5 w-3.5" />
+                              </button>
                             )}
                           </div>
                         </TableCell>

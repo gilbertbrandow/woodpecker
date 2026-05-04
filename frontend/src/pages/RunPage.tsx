@@ -46,6 +46,7 @@ import {
 } from '../components/ui/table'
 import { RunPuzzleTable } from '../components/runs/RunPuzzleTable'
 import { RunPaceCard } from '../features/board/RunPaceCard'
+import { UserAvatar } from '../components/UserAvatar'
 
 function InsightsTab({ run, puzzleList }: { run: Run; puzzleList: RunPuzzleList }): React.ReactElement {
   const [breakdownOpen, setBreakdownOpen] = useState(true)
@@ -439,7 +440,16 @@ export function RunPage(): React.ReactElement | null {
             <h1 className="text-xl font-semibold">Run {run.runIndex + 1}</h1>
             <Badge variant="outline">{RUN_STATUS_LABELS[run.status]}</Badge>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">{statsLine}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
+            {participation && (
+              <>
+                <UserAvatar username={participation.ownerUsername} avatarUrl={participation.ownerAvatarUrl} className="h-4 w-4" />
+                <span>{participation.ownerUsername}</span>
+                <span className="text-muted-foreground/40">·</span>
+              </>
+            )}
+            <span>{statsLine}</span>
+          </div>
         </div>
         {run.status === 'active' && isOwner && (
           <div className="flex items-center gap-2">
