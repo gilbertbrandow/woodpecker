@@ -466,7 +466,7 @@ export function SchedulePage(): React.ReactElement | null {
             </span>
           </div>
           <div
-            className="flex cursor-pointer items-center gap-4 overflow-x-auto px-4 py-3 transition-colors hover:bg-muted/50"
+            className="flex cursor-pointer items-center gap-4 px-4 py-3 transition-colors hover:bg-muted/50"
             onClick={() =>
               void navigate({
                 to: "/app/subsets/$subsetId",
@@ -474,8 +474,8 @@ export function SchedulePage(): React.ReactElement | null {
               })
             }
           >
-            <UserAvatar username={subset.ownedBy.username} avatarUrl={subset.ownedBy.avatarUrl} className="shrink-0" />
-            <span className="flex-1 shrink-0 whitespace-nowrap font-medium">{subset.name}</span>
+            <UserAvatar username={subset.ownedBy.username} avatarUrl={subset.ownedBy.avatarUrl} />
+            <span className="min-w-0 flex-1 truncate font-medium">{subset.name}</span>
             <StatusBadge status={subset.status} />
             <span className="shrink-0 whitespace-nowrap text-sm tabular-nums text-muted-foreground">
               {subset.puzzleCount} puzzles
@@ -516,7 +516,7 @@ export function SchedulePage(): React.ReactElement | null {
             </div>
           ) : (
             <div
-              className="flex cursor-pointer items-center gap-6 overflow-x-auto px-4 py-3 transition-colors hover:bg-muted/50"
+              className="flex cursor-pointer items-center gap-6 px-4 py-3 transition-colors hover:bg-muted/50"
               onClick={() =>
                 void navigate({
                   to: "/app/training/$trainingId",
@@ -524,13 +524,14 @@ export function SchedulePage(): React.ReactElement | null {
                 })
               }
             >
-              <UserAvatar username={user.username} avatarUrl={user.avatarUrl} className="h-7 w-7 shrink-0" />
+              <UserAvatar username={user.username} avatarUrl={user.avatarUrl} className="h-7 w-7" />
               <ProgressBar value={65} tooltipLabel="3/5 Runs, 67% completed" className="w-40 shrink-0" />
-              <div className="flex-1 shrink-0" />
-              <StatusBadge status={myTraining.status} />
-              <span className="hidden shrink-0 whitespace-nowrap text-xs text-muted-foreground sm:block">
-                {formatDate(myTraining.startedAt)}
-              </span>
+              <div className="flex shrink-0 flex-1 items-center justify-end gap-4">
+                <StatusBadge status={myTraining.status} />
+                <span className="hidden whitespace-nowrap text-xs text-muted-foreground sm:block">
+                  {formatDate(myTraining.startedAt)}
+                </span>
+              </div>
             </div>
           )}
         </div>

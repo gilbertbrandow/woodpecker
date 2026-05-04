@@ -238,7 +238,7 @@ export function TrainingPage(): React.ReactElement | null {
           </span>
         </div>
         <div
-          className="flex cursor-pointer items-center gap-4 overflow-x-auto px-4 py-3 transition-colors hover:bg-muted/50"
+          className="flex cursor-pointer items-center gap-4 px-4 py-3 transition-colors hover:bg-muted/50"
           onClick={() =>
             void navigate({
               to: '/app/schedules/$scheduleId',
@@ -249,9 +249,8 @@ export function TrainingPage(): React.ReactElement | null {
           <UserAvatar
             username={schedule.createdBy.username}
             avatarUrl={schedule.createdBy.avatarUrl}
-            className="shrink-0"
           />
-          <span className="flex-1 shrink-0 whitespace-nowrap font-medium">{schedule.name}</span>
+          <span className="min-w-0 flex-1 truncate font-medium">{schedule.name}</span>
           <StatusBadge status="locked" />
           <span className="shrink-0 whitespace-nowrap text-sm tabular-nums text-muted-foreground">{schedule.runCount} runs</span>
           {schedule.totalHours > 0 && (

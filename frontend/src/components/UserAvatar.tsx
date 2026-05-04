@@ -38,7 +38,7 @@ export function UserAvatar({
     <Tooltip delayDuration={100}>
       <TooltipTrigger asChild>
         <span
-          className="inline-flex cursor-default"
+          className={`inline-flex shrink-0 cursor-default ${className}`}
           onClick={(e) => e.stopPropagation()}
         >
           {avatar}
