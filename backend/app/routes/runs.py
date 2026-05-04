@@ -17,11 +17,9 @@ def get_active_run() -> tuple[Response, int] | Response:
 @login_required
 def get_run(run_id: int) -> tuple[Response, int] | Response:
     try:
-        run = run_svc.get_run(run_id, session["user_id"])
+        run = run_svc.get_run(run_id)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
-    except PermissionError as e:
-        return jsonify({"error": str(e)}), 403
     return jsonify(run_svc.run_dict(run))
 
 
@@ -44,11 +42,9 @@ def continue_run(run_id: int) -> tuple[Response, int] | Response:
 @login_required
 def list_run_puzzles(run_id: int) -> tuple[Response, int] | Response:
     try:
-        result = run_svc.list_run_puzzles(run_id, session["user_id"])
+        result = run_svc.list_run_puzzles(run_id)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
-    except PermissionError as e:
-        return jsonify({"error": str(e)}), 403
     return jsonify(result)
 
 

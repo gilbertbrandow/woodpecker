@@ -116,11 +116,9 @@ def start_run(training_id: int) -> tuple[Response, int]:
 @login_required
 def list_runs(training_id: int) -> tuple[Response, int] | Response:
     try:
-        runs = run_svc.list_runs(training_id, session["user_id"])
+        runs = run_svc.list_runs(training_id)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
-    except PermissionError as e:
-        return jsonify({"error": str(e)}), 403
     return jsonify([run_svc.run_dict(r) for r in runs])
 
 

@@ -16,10 +16,15 @@ from app.models.training import Training
 from app.models.subset import Subset, SubsetPuzzle
 
 
-def _get_owned_run(run_id: int, user_id: int) -> Run:
+def _get_run(run_id: int) -> Run:
     run = db.session.get(Run, run_id)
     if run is None:
         raise LookupError("Run not found.")
+    return run
+
+
+def _get_owned_run(run_id: int, user_id: int) -> Run:
+    run = _get_run(run_id)
     training = db.session.get(Training, run.training_id)
     if training is None or training.user_id != user_id:
         raise PermissionError("Access denied.")
@@ -633,12 +638,10 @@ def start_run(training_id: int, user_id: int, expected_run_index: int | None = N
     return run
 
 
-def list_runs(training_id: int, user_id: int) -> list[Run]:
+def list_runs(training_id: int) -> list[Run]:
     training = db.session.get(Training, training_id)
     if training is None:
         raise LookupError("Training not found.")
-    if training.user_id != user_id:
-        raise PermissionError("Access denied.")
     return list(
         db.session.scalars(
             sa.select(Run)
@@ -648,8 +651,8 @@ def list_runs(training_id: int, user_id: int) -> list[Run]:
     )
 
 
-def get_run(run_id: int, user_id: int) -> Run:
-    return _get_owned_run(run_id, user_id)
+def get_run(run_id: int) -> Run:
+    return _get_run(run_id)
 
 
 def continue_run(run_id: int, user_id: int) -> dict[str, object]:
@@ -692,8 +695,8 @@ def continue_run(run_id: int, user_id: int) -> dict[str, object]:
     }
 
 
-def list_run_puzzles(run_id: int, user_id: int) -> dict[str, object]:
-    run = _get_owned_run(run_id, user_id)
+def list_run_puzzles(run_id: int) -> dict[str, object]:
+    run = _get_run(run_id)
     _, config = _get_schedule_config(run)
     total_queue = _total_queue_attempts(config)
 

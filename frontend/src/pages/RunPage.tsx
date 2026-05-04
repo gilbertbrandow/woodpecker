@@ -139,11 +139,13 @@ function ConfigureTab({
   puzzleList,
   runIdStr,
   participation,
+  isOwner,
 }: {
   run: Run
   puzzleList: RunPuzzleList
   runIdStr: string
   participation: Training | null
+  isOwner: boolean
 }): React.ReactElement {
   const [targetsOpen, setTargetsOpen] = useState(true)
   const [puzzlesOpen, setPuzzlesOpen] = useState(false)
@@ -217,7 +219,7 @@ function ConfigureTab({
                 value={[accuracy ?? 0]}
                 onValueChange={([v]) => setAccuracy(v ?? 0)}
                 onValueCommit={([v]) => void saveTarget(v ?? 0, solveSeconds)}
-                disabled={!isActive || saving}
+                disabled={!isActive || saving || !isOwner}
                 className={accuracy === null ? 'opacity-40' : ''}
               />
               <div className="flex justify-between text-xs text-muted-foreground">
@@ -245,7 +247,7 @@ function ConfigureTab({
                 value={[solveSeconds ?? 0]}
                 onValueChange={([v]) => setSolveSeconds(v ?? 0)}
                 onValueCommit={([v]) => void saveTarget(accuracy, v ?? 0)}
-                disabled={!isActive || saving}
+                disabled={!isActive || saving || !isOwner}
                 className={solveSeconds === null ? 'opacity-40' : ''}
               />
               <div className="flex justify-between text-xs text-muted-foreground">
@@ -368,6 +370,7 @@ export function RunPage(): React.ReactElement | null {
 
   const scheduleName = participation?.schedule.name ?? '…'
   const trainingId = run.trainingId
+  const isOwner = !!participation && participation.ownerUsername === user.username
 
   const statsLine = `Started ${formatStartedAt(run.startedAt)}`
 
@@ -406,7 +409,7 @@ export function RunPage(): React.ReactElement | null {
           </div>
           <p className="mt-1 text-sm text-muted-foreground">{statsLine}</p>
         </div>
-        {run.status === 'active' && (
+        {run.status === 'active' && isOwner && (
           <div className="flex items-center gap-2">
             <Button
               onClick={() =>
@@ -435,7 +438,7 @@ export function RunPage(): React.ReactElement | null {
           <TabsTrigger value="insights">Insights</TabsTrigger>
         </TabsList>
         <TabsContent value="configure">
-          <ConfigureTab run={run} puzzleList={puzzleList} runIdStr={runIdStr} participation={participation} />
+          <ConfigureTab run={run} puzzleList={puzzleList} runIdStr={runIdStr} participation={participation} isOwner={isOwner} />
         </TabsContent>
         <TabsContent value="insights">
           <InsightsTab run={run} puzzleList={puzzleList} />
