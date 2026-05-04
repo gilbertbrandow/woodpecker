@@ -190,7 +190,27 @@ def list_my_trainings(user_id: int) -> list[dict[str, object]]:
                      WHEN t.completed_at IS NOT NULL THEN 'completed'
                      WHEN EXISTS (SELECT 1 FROM runs r WHERE r.training_id = t.id) THEN 'in_progress'
                      ELSE 'draft'
-                   END AS status
+                   END AS status,
+                   (
+                       SELECT COUNT(*)
+                       FROM subset_puzzles sp
+                       WHERE sp.subset_id = s.subset_id
+                   ) AS subset_puzzle_count,
+                   (
+                       SELECT COUNT(rp.id)
+                       FROM runs r
+                       JOIN run_puzzles rp ON rp.run_id = r.id
+                       WHERE r.training_id = t.id
+                         AND EXISTS (
+                             SELECT 1 FROM puzzle_attempts pa
+                             WHERE pa.run_puzzle_id = rp.id
+                         )
+                         AND NOT EXISTS (
+                             SELECT 1 FROM puzzle_attempts pa
+                             WHERE pa.run_puzzle_id = rp.id
+                               AND pa.status = 'in_progress'
+                         )
+                   ) AS completed_puzzles
             FROM trainings t
             JOIN schedules s ON s.id = t.schedule_id
             WHERE t.user_id = :uid
@@ -210,8 +230,9 @@ def list_my_trainings(user_id: int) -> list[dict[str, object]]:
             "scheduleName": row.schedule_name,
             "subsetId": row.subset_id,
             "status": row.status,
-            "runsCompleted": 0,
             "totalRuns": total_runs,
+            "completedPuzzles": row.completed_puzzles,
+            "totalPuzzles": row.subset_puzzle_count * total_runs,
             "startedAt": row.started_at.isoformat(),
             "completedAt": row.completed_at.isoformat() if row.completed_at else None,
             "abortedAt": row.aborted_at.isoformat() if row.aborted_at else None,
@@ -269,7 +290,27 @@ def list_all_trainings(schedule_id: int | None = None) -> list[dict[str, object]
                      WHEN t.completed_at IS NOT NULL THEN 'completed'
                      WHEN EXISTS (SELECT 1 FROM runs r WHERE r.training_id = t.id) THEN 'in_progress'
                      ELSE 'draft'
-                   END AS status
+                   END AS status,
+                   (
+                       SELECT COUNT(*)
+                       FROM subset_puzzles sp
+                       WHERE sp.subset_id = s.subset_id
+                   ) AS subset_puzzle_count,
+                   (
+                       SELECT COUNT(rp.id)
+                       FROM runs r
+                       JOIN run_puzzles rp ON rp.run_id = r.id
+                       WHERE r.training_id = t.id
+                         AND EXISTS (
+                             SELECT 1 FROM puzzle_attempts pa
+                             WHERE pa.run_puzzle_id = rp.id
+                         )
+                         AND NOT EXISTS (
+                             SELECT 1 FROM puzzle_attempts pa
+                             WHERE pa.run_puzzle_id = rp.id
+                               AND pa.status = 'in_progress'
+                         )
+                   ) AS completed_puzzles
             FROM trainings t
             JOIN schedules s ON s.id = t.schedule_id
             JOIN users u ON u.id = t.user_id
@@ -290,8 +331,9 @@ def list_all_trainings(schedule_id: int | None = None) -> list[dict[str, object]
             "scheduleName": row.schedule_name,
             "subsetId": row.subset_id,
             "status": row.status,
-            "runsCompleted": 0,
             "totalRuns": total_runs,
+            "completedPuzzles": row.completed_puzzles,
+            "totalPuzzles": row.subset_puzzle_count * total_runs,
             "startedAt": row.started_at.isoformat(),
             "completedAt": row.completed_at.isoformat() if row.completed_at else None,
             "abortedAt": row.aborted_at.isoformat() if row.aborted_at else None,

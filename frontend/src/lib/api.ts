@@ -193,8 +193,9 @@ export type MyTrainingSummary = {
   scheduleName: string
   subsetId: number
   status: TrainingStatus
-  runsCompleted: number
   totalRuns: number
+  completedPuzzles: number
+  totalPuzzles: number
   startedAt: string
   completedAt: string | null
   abortedAt: string | null

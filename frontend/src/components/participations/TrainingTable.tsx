@@ -67,17 +67,17 @@ export function TrainingTable({
     {
       id: 'progress',
       accessorFn: (row) =>
-        row.totalRuns > 0 ? row.runsCompleted / row.totalRuns : 0,
+        row.totalPuzzles > 0 ? row.completedPuzzles / row.totalPuzzles : 0,
       header: 'Progress',
       cell: ({ row }) => {
         const pct =
-          row.original.totalRuns > 0
-            ? Math.round((row.original.runsCompleted / row.original.totalRuns) * 100)
+          row.original.totalPuzzles > 0
+            ? Math.round((row.original.completedPuzzles / row.original.totalPuzzles) * 100)
             : 0
         return (
           <ProgressBar
             value={pct}
-            tooltipLabel={`${row.original.runsCompleted}/${row.original.totalRuns} runs`}
+            tooltipLabel={`${row.original.completedPuzzles}/${row.original.totalPuzzles} puzzles`}
             className="w-28"
           />
         )
