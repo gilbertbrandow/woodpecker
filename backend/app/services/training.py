@@ -421,3 +421,40 @@ def get_training_insights(
             raise ValueError("Some participant ids do not belong to this schedule.")
 
     return {"datapoints": []}
+
+
+def get_training_run_solve_times(training_id: int) -> list[dict[str, object]]:
+    training = db.session.get(Training, training_id)
+    if training is None:
+        raise LookupError("Training not found.")
+
+    rows = db.session.execute(
+        sa.text("""
+            SELECT
+                r.run_index,
+                AVG(last_attempt.time_spent_ms) AS avg_solve_time_ms
+            FROM runs r
+            JOIN run_puzzles rp ON rp.run_id = r.id
+            JOIN LATERAL (
+                SELECT pa.time_spent_ms
+                FROM puzzle_attempts pa
+                WHERE pa.run_puzzle_id = rp.id
+                  AND pa.status != 'in_progress'
+                ORDER BY pa.try_number DESC
+                LIMIT 1
+            ) last_attempt ON last_attempt.time_spent_ms IS NOT NULL
+            WHERE r.training_id = :training_id
+              AND r.status != 'aborted'
+            GROUP BY r.id, r.run_index
+            ORDER BY r.run_index
+        """),
+        {"training_id": training_id},
+    ).all()
+
+    return [
+        {
+            "runIndex": int(row.run_index),
+            "avgSolveTimeMs": float(row.avg_solve_time_ms) if row.avg_solve_time_ms is not None else None,
+        }
+        for row in rows
+    ]
