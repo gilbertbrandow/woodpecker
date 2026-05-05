@@ -1,7 +1,8 @@
 import 'chessground/assets/chessground.base.css'
 import * as React from 'react'
-import { useEffect } from 'react'
+import { useEffect, useCallback, useLayoutEffect } from 'react'
 import { Chess } from 'chess.js'
+import type { DrawShape } from 'chessground/draw'
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore — react-chessground ships no bundled type declarations
 import Chessground from 'react-chessground'
@@ -9,6 +10,8 @@ import { Check, X } from 'lucide-react'
 import type { Orientation, PendingPromotion, MoveFeedbackResult } from './boardPage.helpers'
 
 type CheckColor = 'white' | 'black' | false
+
+type ChessgroundInstance = { cg: { set: (config: { drawable?: { shapes?: DrawShape[] } }) => void } }
 
 type PromotionPickerProps = {
   pending: PendingPromotion
@@ -133,6 +136,28 @@ export function BoardSurface({
   onPromotionSelect,
   onPromotionCancel,
 }: BoardSurfaceProps): React.ReactElement {
+  const cgRef = React.useRef<ChessgroundInstance | null>(null)
+  const drawnShapesRef = React.useRef<DrawShape[]>([])
+  const prevBoardKeyRef = React.useRef(boardKey)
+  const prevFenRef = React.useRef(fen)
+
+  if (prevBoardKeyRef.current !== boardKey) {
+    prevBoardKeyRef.current = boardKey
+    drawnShapesRef.current = []
+  }
+  if (prevFenRef.current !== fen) {
+    prevFenRef.current = fen
+    drawnShapesRef.current = []
+  }
+
+  const handleDrawableChange = useCallback((shapes: DrawShape[]) => {
+    drawnShapesRef.current = shapes
+  }, [])
+
+  useLayoutEffect(() => {
+    cgRef.current?.cg.set({ drawable: { shapes: drawnShapesRef.current } })
+  })
+
   const check = React.useMemo((): CheckColor => {
     const chess = new Chess(fen)
     if (!chess.inCheck()) return false
@@ -142,6 +167,7 @@ export function BoardSurface({
   return (
     <div className="chess-board-container relative shrink-0" style={{ width: boardSize, height: boardSize }}>
       <Chessground
+        ref={cgRef}
         key={boardKey}
         width={boardSize}
         height={boardSize}
@@ -165,7 +191,10 @@ export function BoardSurface({
         drawable={{
           enabled: true,
           visible: true,
+          eraseOnClick: false,
+          defaultSnapToValidMove: false,
           autoShapes: hintSquare ? [{ orig: hintSquare, brush: 'yellow' }] : [],
+          onChange: handleDrawableChange,
         }}
       />
       {pendingPromotion && (
