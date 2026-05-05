@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Input } from '../ui/input'
 
 type Unit = 'hours' | 'days' | 'weeks' | 'months'
@@ -36,29 +36,52 @@ export function formatDuration(hours: number): string {
 
 export function DurationInput({ value, onChange, disabled, allowZero }: DurationInputProps): React.ReactElement {
   const [unit, setUnit] = useState<Unit>(() => smartUnit(value))
-  const [displayValue, setDisplayValue] = useState<number>(() => value / MULTIPLIERS[smartUnit(value)] || (allowZero ? 0 : 1))
+  const [displayValue, setDisplayValue] = useState<string>(() => {
+    const u = smartUnit(value)
+    return value === 0 ? (allowZero ? '0' : '1') : String(value / MULTIPLIERS[u])
+  })
+  const lastEmittedRef = useRef<number>(value)
 
   useEffect(() => {
-    const newUnit = smartUnit(value)
-    setUnit(newUnit)
-    setDisplayValue(value === 0 ? (allowZero ? 0 : 1) : value / MULTIPLIERS[newUnit])
+    if (value !== lastEmittedRef.current) {
+      lastEmittedRef.current = value
+      const newUnit = smartUnit(value)
+      setUnit(newUnit)
+      setDisplayValue(
+        value === 0
+          ? (allowZero ? '0' : '1')
+          : String(value / MULTIPLIERS[newUnit])
+      )
+    }
   }, [value, allowZero])
 
   const handleUnitChange = (e: React.ChangeEvent<HTMLSelectElement>): void => {
     const newUnit = e.target.value as Unit
-    const currentHours = displayValue * MULTIPLIERS[unit]
+    const parsed = parseInt(displayValue, 10)
+    const currentHours = (isNaN(parsed) ? (allowZero ? 0 : 1) : parsed) * MULTIPLIERS[unit]
     const newDisplay = Math.max(allowZero ? 0 : 1, Math.round(currentHours / MULTIPLIERS[newUnit]))
     setUnit(newUnit)
-    setDisplayValue(newDisplay)
+    setDisplayValue(String(newDisplay))
+    lastEmittedRef.current = newDisplay * MULTIPLIERS[newUnit]
     onChange(newDisplay * MULTIPLIERS[newUnit])
   }
 
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    const parsed = parseInt(e.target.value, 10)
-    if (isNaN(parsed)) return
-    const clamped = Math.max(allowZero ? 0 : 1, parsed)
-    setDisplayValue(clamped)
-    onChange(clamped * MULTIPLIERS[unit])
+    const raw = e.target.value
+    setDisplayValue(raw)
+    const parsed = parseInt(raw, 10)
+    if (!isNaN(parsed) && parsed >= (allowZero ? 0 : 1)) {
+      lastEmittedRef.current = parsed * MULTIPLIERS[unit]
+      onChange(parsed * MULTIPLIERS[unit])
+    }
+  }
+
+  const handleBlur = (): void => {
+    const parsed = parseInt(displayValue, 10)
+    const valid = !isNaN(parsed) ? Math.max(allowZero ? 0 : 1, parsed) : (allowZero ? 0 : 1)
+    setDisplayValue(String(valid))
+    lastEmittedRef.current = valid * MULTIPLIERS[unit]
+    onChange(valid * MULTIPLIERS[unit])
   }
 
   return (
@@ -68,6 +91,7 @@ export function DurationInput({ value, onChange, disabled, allowZero }: Duration
         min={allowZero ? 0 : 1}
         value={displayValue}
         onChange={handleNumberChange}
+        onBlur={handleBlur}
         disabled={disabled}
         className="h-8 w-20 text-sm tabular-nums"
       />
