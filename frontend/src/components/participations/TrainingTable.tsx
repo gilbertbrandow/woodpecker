@@ -57,6 +57,32 @@ export function TrainingTable({
         <UserAvatar username={row.original.user.username} avatarUrl={row.original.user.avatarUrl} />
       ),
     },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      enableSorting: false,
+      cell: ({ row }) => <StatusBadge status={row.original.status as TrainingStatus} />,
+      filterFn: 'equals',
+    },
+    {
+      id: 'progress',
+      accessorFn: (row) =>
+        row.totalPuzzles > 0 ? row.completedPuzzles / row.totalPuzzles : 0,
+      header: 'Progress',
+      cell: ({ row }) => {
+        const pct =
+          row.original.totalPuzzles > 0
+            ? Math.round((row.original.completedPuzzles / row.original.totalPuzzles) * 100)
+            : 0
+        return (
+          <ProgressBar
+            value={pct}
+            tooltipLabel={`${row.original.completedPuzzles}/${row.original.totalPuzzles} puzzles`}
+            className="w-28"
+          />
+        )
+      },
+    },
     ...(!hideSchedule
       ? ([
           {
@@ -77,32 +103,6 @@ export function TrainingTable({
           },
         ] as ColumnDef<AllTrainingSummary>[])
       : []),
-    {
-      accessorKey: 'status',
-      header: 'Status',
-      enableSorting: false,
-      cell: ({ row }) => <StatusBadge status={row.original.status as TrainingStatus} />,
-      filterFn: 'equals',
-    },
-    {
-      id: 'progress',
-      accessorFn: (row) =>
-        row.totalRuns > 0 ? row.runsCompleted / row.totalRuns : 0,
-      header: 'Progress',
-      cell: ({ row }) => {
-        const pct =
-          row.original.totalRuns > 0
-            ? Math.round((row.original.runsCompleted / row.original.totalRuns) * 100)
-            : 0
-        return (
-          <ProgressBar
-            value={pct}
-            tooltipLabel={`${row.original.runsCompleted}/${row.original.totalRuns} runs`}
-            className="w-28"
-          />
-        )
-      },
-    },
     {
       id: 'startedAt',
       accessorFn: (row) => new Date(row.startedAt).getTime(),

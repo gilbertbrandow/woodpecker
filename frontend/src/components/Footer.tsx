@@ -50,7 +50,7 @@ export function Footer({ className = '' }: FooterProps): React.ReactElement {
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 transition-colors hover:text-foreground"
           >
-            <span>Get the book</span>
+            <span className="sm:hidden">Get the book</span>
             <BookOpen className="h-3.5 w-3.5" />
           </a>
         </div>

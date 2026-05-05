@@ -116,11 +116,9 @@ def start_run(training_id: int) -> tuple[Response, int]:
 @login_required
 def list_runs(training_id: int) -> tuple[Response, int] | Response:
     try:
-        runs = run_svc.list_runs(training_id, session["user_id"])
+        runs = run_svc.list_runs(training_id)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
-    except PermissionError as e:
-        return jsonify({"error": str(e)}), 403
     return jsonify([run_svc.run_dict(r) for r in runs])
 
 
@@ -136,6 +134,16 @@ def get_cross_run_puzzle(training_id: int, puzzle_id: str) -> tuple[Response, in
     except PermissionError as e:
         return jsonify({"error": str(e)}), 403
     return jsonify(result)
+
+
+@training_bp.get("/<int:training_id>/insights")
+@login_required
+def get_training_insights(training_id: int) -> tuple[Response, int] | Response:
+    try:
+        runs = training_svc.get_training_run_solve_times(training_id)
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    return jsonify({"runs": runs})
 
 
 @training_bp.post("/<int:training_id>/abort")

@@ -88,6 +88,7 @@ def training_full_dict(training: Training) -> dict[str, object]:
         "completedAt": training.completed_at.isoformat() if training.completed_at else None,
         "abortedAt": training.aborted_at.isoformat() if training.aborted_at else None,
         "ownerUsername": owner.lichess_username,
+        "ownerAvatarUrl": owner.avatar_url,
         "runTargets": run_targets,
         "schedule": {
             "id": schedule.id,
@@ -190,7 +191,27 @@ def list_my_trainings(user_id: int) -> list[dict[str, object]]:
                      WHEN t.completed_at IS NOT NULL THEN 'completed'
                      WHEN EXISTS (SELECT 1 FROM runs r WHERE r.training_id = t.id) THEN 'in_progress'
                      ELSE 'draft'
-                   END AS status
+                   END AS status,
+                   (
+                       SELECT COUNT(*)
+                       FROM subset_puzzles sp
+                       WHERE sp.subset_id = s.subset_id
+                   ) AS subset_puzzle_count,
+                   (
+                       SELECT COUNT(rp.id)
+                       FROM runs r
+                       JOIN run_puzzles rp ON rp.run_id = r.id
+                       WHERE r.training_id = t.id
+                         AND EXISTS (
+                             SELECT 1 FROM puzzle_attempts pa
+                             WHERE pa.run_puzzle_id = rp.id
+                         )
+                         AND NOT EXISTS (
+                             SELECT 1 FROM puzzle_attempts pa
+                             WHERE pa.run_puzzle_id = rp.id
+                               AND pa.status = 'in_progress'
+                         )
+                   ) AS completed_puzzles
             FROM trainings t
             JOIN schedules s ON s.id = t.schedule_id
             WHERE t.user_id = :uid
@@ -210,8 +231,9 @@ def list_my_trainings(user_id: int) -> list[dict[str, object]]:
             "scheduleName": row.schedule_name,
             "subsetId": row.subset_id,
             "status": row.status,
-            "runsCompleted": 0,
             "totalRuns": total_runs,
+            "completedPuzzles": row.completed_puzzles,
+            "totalPuzzles": row.subset_puzzle_count * total_runs,
             "startedAt": row.started_at.isoformat(),
             "completedAt": row.completed_at.isoformat() if row.completed_at else None,
             "abortedAt": row.aborted_at.isoformat() if row.aborted_at else None,
@@ -269,7 +291,27 @@ def list_all_trainings(schedule_id: int | None = None) -> list[dict[str, object]
                      WHEN t.completed_at IS NOT NULL THEN 'completed'
                      WHEN EXISTS (SELECT 1 FROM runs r WHERE r.training_id = t.id) THEN 'in_progress'
                      ELSE 'draft'
-                   END AS status
+                   END AS status,
+                   (
+                       SELECT COUNT(*)
+                       FROM subset_puzzles sp
+                       WHERE sp.subset_id = s.subset_id
+                   ) AS subset_puzzle_count,
+                   (
+                       SELECT COUNT(rp.id)
+                       FROM runs r
+                       JOIN run_puzzles rp ON rp.run_id = r.id
+                       WHERE r.training_id = t.id
+                         AND EXISTS (
+                             SELECT 1 FROM puzzle_attempts pa
+                             WHERE pa.run_puzzle_id = rp.id
+                         )
+                         AND NOT EXISTS (
+                             SELECT 1 FROM puzzle_attempts pa
+                             WHERE pa.run_puzzle_id = rp.id
+                               AND pa.status = 'in_progress'
+                         )
+                   ) AS completed_puzzles
             FROM trainings t
             JOIN schedules s ON s.id = t.schedule_id
             JOIN users u ON u.id = t.user_id
@@ -290,8 +332,9 @@ def list_all_trainings(schedule_id: int | None = None) -> list[dict[str, object]
             "scheduleName": row.schedule_name,
             "subsetId": row.subset_id,
             "status": row.status,
-            "runsCompleted": 0,
             "totalRuns": total_runs,
+            "completedPuzzles": row.completed_puzzles,
+            "totalPuzzles": row.subset_puzzle_count * total_runs,
             "startedAt": row.started_at.isoformat(),
             "completedAt": row.completed_at.isoformat() if row.completed_at else None,
             "abortedAt": row.aborted_at.isoformat() if row.aborted_at else None,
@@ -378,3 +421,40 @@ def get_training_insights(
             raise ValueError("Some participant ids do not belong to this schedule.")
 
     return {"datapoints": []}
+
+
+def get_training_run_solve_times(training_id: int) -> list[dict[str, object]]:
+    training = db.session.get(Training, training_id)
+    if training is None:
+        raise LookupError("Training not found.")
+
+    rows = db.session.execute(
+        sa.text("""
+            SELECT
+                r.run_index,
+                AVG(last_attempt.time_spent_ms) AS avg_solve_time_ms
+            FROM runs r
+            JOIN run_puzzles rp ON rp.run_id = r.id
+            JOIN LATERAL (
+                SELECT pa.time_spent_ms
+                FROM puzzle_attempts pa
+                WHERE pa.run_puzzle_id = rp.id
+                  AND pa.status != 'in_progress'
+                ORDER BY pa.try_number DESC
+                LIMIT 1
+            ) last_attempt ON last_attempt.time_spent_ms IS NOT NULL
+            WHERE r.training_id = :training_id
+              AND r.status != 'aborted'
+            GROUP BY r.id, r.run_index
+            ORDER BY r.run_index
+        """),
+        {"training_id": training_id},
+    ).all()
+
+    return [
+        {
+            "runIndex": int(row.run_index),
+            "avgSolveTimeMs": float(row.avg_solve_time_ms) if row.avg_solve_time_ms is not None else None,
+        }
+        for row in rows
+    ]

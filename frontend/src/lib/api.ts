@@ -160,6 +160,15 @@ export type RunTarget = {
   targetSolveSeconds: number | null
 }
 
+export type TrainingRunInsight = {
+  runIndex: number
+  avgSolveTimeMs: number | null
+}
+
+export type TrainingInsights = {
+  runs: TrainingRunInsight[]
+}
+
 export type TrainingStatus = 'draft' | 'in_progress' | 'completed' | 'aborted'
 
 export type TrainingScheduleSummary = {
@@ -183,6 +192,7 @@ export type Training = {
   completedAt: string | null
   abortedAt: string | null
   ownerUsername: string
+  ownerAvatarUrl: string | null
   runTargets: RunTarget[]
   schedule: TrainingScheduleSummary
 }
@@ -193,8 +203,9 @@ export type MyTrainingSummary = {
   scheduleName: string
   subsetId: number
   status: TrainingStatus
-  runsCompleted: number
   totalRuns: number
+  completedPuzzles: number
+  totalPuzzles: number
   startedAt: string
   completedAt: string | null
   abortedAt: string | null
@@ -627,6 +638,8 @@ export const api = {
       }),
     getCrossRunPuzzle: (trainingId: number, puzzleId: string): Promise<PuzzleRunReference[]> =>
       request(`/training/${trainingId}/cross-run-puzzle/${encodeURIComponent(puzzleId)}`),
+    getInsights: (trainingId: number): Promise<TrainingInsights> =>
+      request(`/training/${trainingId}/insights`),
     abort: (trainingId: number): Promise<Training> =>
       request(`/training/${trainingId}/abort`, { method: 'POST' }),
   },

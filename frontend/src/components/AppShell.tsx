@@ -49,7 +49,7 @@ function AppShellHeader({ activeRun }: { activeRun: ActiveRun | null }): React.R
             className={cn(buttonVariants({ size: 'sm' }), 'ml-auto h-7 gap-1.5 whitespace-nowrap text-xs')}
           >
             <Play className="h-3 w-3 shrink-0" />
-            Continue Run {activeRun.runIndex + 1}
+            Continue training
           </Link>
         )}
       </div>
