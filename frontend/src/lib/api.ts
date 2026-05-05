@@ -192,6 +192,7 @@ export type Training = {
   completedAt: string | null
   abortedAt: string | null
   ownerUsername: string
+  ownerDisplayName: string
   ownerAvatarUrl: string | null
   runTargets: RunTarget[]
   schedule: TrainingScheduleSummary

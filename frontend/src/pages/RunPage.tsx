@@ -444,7 +444,7 @@ export function RunPage(): React.ReactElement | null {
             {participation && (
               <>
                 <UserAvatar username={participation.ownerUsername} avatarUrl={participation.ownerAvatarUrl} className="h-4 w-4" />
-                <span>{participation.ownerUsername}</span>
+                <span>{participation.ownerDisplayName}</span>
                 <span className="text-muted-foreground/40">·</span>
               </>
             )}
