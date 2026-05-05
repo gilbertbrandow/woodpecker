@@ -235,7 +235,7 @@ export function SchedulePage(): React.ReactElement | null {
 
   if (pageLoading) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+      <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
         <p className="text-sm text-muted-foreground">Loading…</p>
       </div>
     );
@@ -243,7 +243,7 @@ export function SchedulePage(): React.ReactElement | null {
 
   if (!schedule) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+      <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
         <p className="text-sm text-muted-foreground">Schedule not found.</p>
       </div>
     );
@@ -368,7 +368,7 @@ export function SchedulePage(): React.ReactElement | null {
   };
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
       <Breadcrumb className="mb-6">
         <BreadcrumbList>
           <BreadcrumbItem>
