@@ -424,7 +424,7 @@ export function SubsetPage(): React.ReactElement | null {
 
   if (pageLoading) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+      <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
         <p className="text-sm text-muted-foreground">Loading…</p>
       </div>
     );
@@ -432,7 +432,7 @@ export function SubsetPage(): React.ReactElement | null {
 
   if (!subset) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+      <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
         <p className="text-sm text-muted-foreground">Subset not found.</p>
       </div>
     );
@@ -446,7 +446,7 @@ export function SubsetPage(): React.ReactElement | null {
   const fillLabel = total === 0 ? "Fill" : "Refill";
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
       <Breadcrumb className="mb-6">
         <BreadcrumbList>
           <BreadcrumbItem>

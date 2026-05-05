@@ -12,8 +12,9 @@ import {
   type PuzzleOrder,
   type Subset,
   type ScheduleInsightPoint,
-  type MyScheduleTraining,
+  type MyTrainingSummary,
   type AllTrainingSummary,
+  type LeaderboardRun,
 } from "../lib/api";
 import { AreaChart, Area, XAxis, YAxis } from "recharts";
 import {
@@ -31,6 +32,7 @@ import { UserAvatar } from "../components/UserAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { StatusBadge } from "../components/StatusBadge";
 import { TrainingTable } from "../components/participations/TrainingTable";
+import { LeaderboardTable } from "../components/leaderboard/LeaderboardTable";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
@@ -154,7 +156,7 @@ export function SchedulePage(): React.ReactElement | null {
   const [orderOpen, setOrderOpen] = useState(true);
   const [repetitionOpen, setRepetitionOpen] = useState(true);
 
-  const [myTraining, setMyTraining] = useState<MyScheduleTraining | null | undefined>(undefined)
+  const [myTraining, setMyTraining] = useState<MyTrainingSummary | null | undefined>(undefined)
   const [enrolling, setEnrolling] = useState(false)
   const [scheduleTrainings, setScheduleTrainings] = useState<AllTrainingSummary[] | null>(null)
 
@@ -164,6 +166,8 @@ export function SchedulePage(): React.ReactElement | null {
   const [chartsReady, setChartsReady] = useState(false);
   const [statsOpen, setStatsOpen] = useState(true);
   const [usedByOpen, setUsedByOpen] = useState(true);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(true);
+  const [leaderboardRuns, setLeaderboardRuns] = useState<LeaderboardRun[] | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -189,9 +193,9 @@ export function SchedulePage(): React.ReactElement | null {
           setOrderOpen(false);
           setRepetitionOpen(false);
           setActiveTab("insights");
-          api.schedules
-            .getMyTraining(s.id)
-            .then((p) => setMyTraining(p))
+          api.training
+            .listMine()
+            .then((list) => setMyTraining(list.find((t) => t.scheduleId === s.id) ?? null))
             .catch(() => setMyTraining(null));
         }
         return api.subsets.get(s.subsetId);
@@ -231,11 +235,16 @@ export function SchedulePage(): React.ReactElement | null {
       .finally(() => setInsightsLoading(false));
   }, [activeTab, id, user, insightsData]);
 
+  useEffect(() => {
+    if (activeTab !== "insights" || leaderboardRuns !== null || !user) return;
+    api.leaderboard.list(id).then(setLeaderboardRuns).catch(() => {});
+  }, [activeTab, id, user, leaderboardRuns]);
+
   if (authLoading || !user) return null;
 
   if (pageLoading) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+      <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
         <p className="text-sm text-muted-foreground">Loading…</p>
       </div>
     );
@@ -243,7 +252,7 @@ export function SchedulePage(): React.ReactElement | null {
 
   if (!schedule) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+      <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
         <p className="text-sm text-muted-foreground">Schedule not found.</p>
       </div>
     );
@@ -280,8 +289,8 @@ export function SchedulePage(): React.ReactElement | null {
       });
     } catch (err) {
       if (err instanceof Error && err.message.includes("409")) {
-        const p = await api.schedules.getMyTraining(id);
-        setMyTraining(p);
+        const list = await api.training.listMine();
+        setMyTraining(list.find((t) => t.scheduleId === id) ?? null);
       } else {
         const msg = err instanceof Error ? err.message : "Please try again.";
         toast.error("Enroll failed", { description: msg });
@@ -368,7 +377,7 @@ export function SchedulePage(): React.ReactElement | null {
   };
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
       <Breadcrumb className="mb-6">
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -525,7 +534,11 @@ export function SchedulePage(): React.ReactElement | null {
               }
             >
               <UserAvatar username={user.username} avatarUrl={user.avatarUrl} className="h-7 w-7" />
-              <ProgressBar value={65} tooltipLabel="3/5 Runs, 67% completed" className="w-40 shrink-0" />
+              <ProgressBar
+                value={myTraining.totalPuzzles > 0 ? Math.round((myTraining.completedPuzzles / myTraining.totalPuzzles) * 100) : 0}
+                tooltipLabel={`${myTraining.completedPuzzles} / ${myTraining.totalPuzzles} puzzles`}
+                className="w-40 shrink-0"
+              />
               <div className="flex shrink-0 flex-1 items-center justify-end gap-4">
                 <StatusBadge status={myTraining.status} />
                 <span className="hidden whitespace-nowrap text-xs text-muted-foreground sm:block">
@@ -778,6 +791,35 @@ export function SchedulePage(): React.ReactElement | null {
 
         <TabsContent value="insights">
           <div className="flex flex-col gap-4">
+            <Collapsible open={leaderboardOpen} onOpenChange={setLeaderboardOpen}>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between border-b pb-2.5 text-left"
+                >
+                  <span className="flex items-center gap-2 text-sm font-medium">
+                    <ChevronDown
+                      className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
+                      style={{ transform: leaderboardOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+                    />
+                    Leaderboard
+                  </span>
+                  <span className="hidden text-xs text-muted-foreground sm:block">
+                    One row per run — sort by accuracy, solve time or attempts
+                  </span>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="pt-4">
+                  {leaderboardRuns === null ? (
+                    <p className="text-sm text-muted-foreground">Loading…</p>
+                  ) : (
+                    <LeaderboardTable runs={leaderboardRuns} hideSchedule />
+                  )}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
             <Collapsible open={statsOpen} onOpenChange={setStatsOpen}>
               <CollapsibleTrigger asChild>
                 <button

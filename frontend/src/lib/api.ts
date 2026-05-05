@@ -241,6 +241,25 @@ export type MyScheduleTraining = {
 
 export type RunStatus = 'active' | 'completed' | 'aborted'
 
+export type LeaderboardRun = {
+  runId: number
+  trainingId: number
+  runIndex: number
+  startedAt: string
+  completedAt: string | null
+  abortedAt: string | null
+  status: RunStatus
+  username: string
+  avatarUrl: string | null
+  scheduleId: number
+  scheduleName: string
+  firstSolvedCount: number
+  resolvedCount: number
+  totalPuzzles: number
+  accuracyPct: number | null
+  avgSolveTimeMs: number | null
+}
+
 export type PositionStatus =
   | 'not_started'
   | 'in_progress'
@@ -683,6 +702,12 @@ export const api = {
       request(`/runs/${runId}/puzzles/${runPuzzleId}/attempts`, { method: 'POST' }),
     continue: (runId: number): Promise<ContinueRunResult> =>
       request(`/runs/${runId}/continue`, { method: 'POST' }),
+  },
+  leaderboard: {
+    list: (scheduleId?: number): Promise<LeaderboardRun[]> =>
+      request<{ runs: LeaderboardRun[] }>(
+        `/leaderboard${scheduleId !== undefined ? `?scheduleId=${scheduleId}` : ''}`,
+      ).then((r) => r.runs),
   },
   attempts: {
     complete: (

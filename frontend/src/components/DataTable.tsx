@@ -35,6 +35,7 @@ type DataTableProps<T> = {
   globalFilterPlaceholder?: string
   filterableColumns?: FilterableColumn[]
   pageSize?: number
+  initialSorting?: SortingState
   onRowClick?: (row: T) => void
   emptyMessage?: string
 }
@@ -45,10 +46,11 @@ export function DataTable<T>({
   globalFilterPlaceholder = 'Search…',
   filterableColumns = [],
   pageSize = 10,
+  initialSorting = [],
   onRowClick,
   emptyMessage = 'No results.',
 }: DataTableProps<T>): React.ReactElement {
-  const [sorting, setSorting] = useState<SortingState>([])
+  const [sorting, setSorting] = useState<SortingState>(initialSorting)
   const [globalFilter, setGlobalFilter] = useState('')
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 
@@ -97,6 +99,7 @@ export function DataTable<T>({
     getPaginationRowModel: getPaginationRowModel(),
     initialState: {
       pagination: { pageIndex: 0, pageSize },
+      sorting: initialSorting,
     },
   })
 

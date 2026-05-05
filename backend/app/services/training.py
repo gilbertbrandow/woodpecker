@@ -444,7 +444,7 @@ def get_training_run_solve_times(training_id: int) -> list[dict[str, object]]:
                 LIMIT 1
             ) last_attempt ON last_attempt.time_spent_ms IS NOT NULL
             WHERE r.training_id = :training_id
-              AND r.status != 'aborted'
+              AND r.aborted_at IS NULL
             GROUP BY r.id, r.run_index
             ORDER BY r.run_index
         """),
