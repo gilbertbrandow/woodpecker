@@ -6,12 +6,14 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip'
 
 type UserAvatarProps = {
   username: string
+  displayName?: string
   avatarUrl: string | null
   className?: string
 }
 
 export function UserAvatar({
   username,
+  displayName,
   avatarUrl,
   className = 'h-6 w-6',
 }: UserAvatarProps): React.ReactElement {
@@ -44,7 +46,7 @@ export function UserAvatar({
           {avatar}
         </span>
       </TooltipTrigger>
-      <TooltipContent>{username}</TooltipContent>
+      <TooltipContent>{displayName ?? username}</TooltipContent>
     </Tooltip>
   )
 }
