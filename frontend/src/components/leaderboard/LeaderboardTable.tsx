@@ -72,13 +72,13 @@ export function LeaderboardTable({ runs, hideSchedule = false }: LeaderboardTabl
   const columns: ColumnDef<LeaderboardRun>[] = [
     {
       id: 'user',
-      accessorFn: (row) => row.username,
+      accessorFn: (row) => row.nickname ?? row.username,
       header: 'User',
       enableSorting: false,
       cell: ({ row }) => (
         <span className="flex items-center gap-2">
           <UserAvatar username={row.original.username} avatarUrl={row.original.avatarUrl} />
-          <span className="font-medium">{row.original.username}</span>
+          <span className="font-medium">{row.original.nickname ?? row.original.username}</span>
         </span>
       ),
     },

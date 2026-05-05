@@ -250,6 +250,7 @@ export type LeaderboardRun = {
   abortedAt: string | null
   status: RunStatus
   username: string
+  nickname: string | null
   avatarUrl: string | null
   scheduleId: number
   scheduleName: string

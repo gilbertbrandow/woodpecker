@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import woodpeckerLogo from '../assets/woodpecker.svg'
 import { useAuth } from '../context/auth'
 import { parseAvatarValue } from '../lib/avatar'
+import { displayName } from '../lib/utils'
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar'
 import { DefaultAvatar } from './DefaultAvatar'
 import { useIsMobile } from '../hooks/use-mobile'
@@ -138,14 +139,14 @@ export function AppSidebar({ activeRun }: { activeRun: ActiveRun | null }): Reac
                 <DropdownMenuTrigger asChild>
                   <SidebarMenuButton
                     size="lg"
-                    tooltip={user.username}
+                    tooltip={displayName(user)}
                     className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                   >
                     <div className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg">
                       {avatarEl}
                     </div>
                     <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-                      <span className="truncate font-medium">{user.username}</span>
+                      <span className="truncate font-medium">{displayName(user)}</span>
                     </div>
                     <ChevronsUpDown className="ml-auto size-4 group-data-[collapsible=icon]:hidden" />
                   </SidebarMenuButton>
@@ -160,7 +161,7 @@ export function AppSidebar({ activeRun }: { activeRun: ActiveRun | null }): Reac
                     <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                       <div className="flex shrink-0 items-center justify-center">{avatarEl}</div>
                       <div className="grid flex-1 text-left text-sm leading-tight">
-                        <span className="truncate font-medium">{user.username}</span>
+                        <span className="truncate font-medium">{displayName(user)}</span>
                       </div>
                     </div>
                   </DropdownMenuLabel>
