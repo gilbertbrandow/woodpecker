@@ -12,7 +12,7 @@ import {
   type PuzzleOrder,
   type Subset,
   type ScheduleInsightPoint,
-  type MyScheduleTraining,
+  type MyTrainingSummary,
   type AllTrainingSummary,
   type LeaderboardRun,
 } from "../lib/api";
@@ -156,7 +156,7 @@ export function SchedulePage(): React.ReactElement | null {
   const [orderOpen, setOrderOpen] = useState(true);
   const [repetitionOpen, setRepetitionOpen] = useState(true);
 
-  const [myTraining, setMyTraining] = useState<MyScheduleTraining | null | undefined>(undefined)
+  const [myTraining, setMyTraining] = useState<MyTrainingSummary | null | undefined>(undefined)
   const [enrolling, setEnrolling] = useState(false)
   const [scheduleTrainings, setScheduleTrainings] = useState<AllTrainingSummary[] | null>(null)
 
@@ -193,9 +193,9 @@ export function SchedulePage(): React.ReactElement | null {
           setOrderOpen(false);
           setRepetitionOpen(false);
           setActiveTab("insights");
-          api.schedules
-            .getMyTraining(s.id)
-            .then((p) => setMyTraining(p))
+          api.training
+            .listMine()
+            .then((list) => setMyTraining(list.find((t) => t.scheduleId === s.id) ?? null))
             .catch(() => setMyTraining(null));
         }
         return api.subsets.get(s.subsetId);
@@ -289,8 +289,8 @@ export function SchedulePage(): React.ReactElement | null {
       });
     } catch (err) {
       if (err instanceof Error && err.message.includes("409")) {
-        const p = await api.schedules.getMyTraining(id);
-        setMyTraining(p);
+        const list = await api.training.listMine();
+        setMyTraining(list.find((t) => t.scheduleId === id) ?? null);
       } else {
         const msg = err instanceof Error ? err.message : "Please try again.";
         toast.error("Enroll failed", { description: msg });
@@ -534,7 +534,11 @@ export function SchedulePage(): React.ReactElement | null {
               }
             >
               <UserAvatar username={user.username} avatarUrl={user.avatarUrl} className="h-7 w-7" />
-              <ProgressBar value={65} tooltipLabel="3/5 Runs, 67% completed" className="w-40 shrink-0" />
+              <ProgressBar
+                value={myTraining.totalPuzzles > 0 ? Math.round((myTraining.completedPuzzles / myTraining.totalPuzzles) * 100) : 0}
+                tooltipLabel={`${myTraining.completedPuzzles} / ${myTraining.totalPuzzles} puzzles`}
+                className="w-40 shrink-0"
+              />
               <div className="flex shrink-0 flex-1 items-center justify-end gap-4">
                 <StatusBadge status={myTraining.status} />
                 <span className="hidden whitespace-nowrap text-xs text-muted-foreground sm:block">
