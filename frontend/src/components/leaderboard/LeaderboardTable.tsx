@@ -10,6 +10,7 @@ import type { LeaderboardRun, RunStatus, TrainingStatus } from '../../lib/api'
 
 type LeaderboardTableProps = {
   runs: LeaderboardRun[]
+  hideSchedule?: boolean
 }
 
 function formatDate(iso: string): string {
@@ -26,7 +27,7 @@ function runStatusToTrainingStatus(status: RunStatus): TrainingStatus {
   return 'aborted'
 }
 
-export function LeaderboardTable({ runs }: LeaderboardTableProps): React.ReactElement {
+export function LeaderboardTable({ runs, hideSchedule = false }: LeaderboardTableProps): React.ReactElement {
   const navigate = useNavigate()
 
   const scheduleOptions = useMemo(
@@ -46,9 +47,27 @@ export function LeaderboardTable({ runs }: LeaderboardTableProps): React.ReactEl
   )
 
   const filterableColumns: FilterableColumn[] = [
-    { id: 'schedule', label: 'schedules', options: scheduleOptions },
+    ...(!hideSchedule ? [{ id: 'schedule', label: 'schedules', options: scheduleOptions }] : []),
     { id: 'runNumber', label: 'runs', options: runNumberOptions },
   ]
+
+  const scheduleColumn: ColumnDef<LeaderboardRun> = {
+    id: 'schedule',
+    accessorFn: (row) => String(row.scheduleId),
+    header: 'Schedule',
+    enableSorting: false,
+    filterFn: 'equals',
+    cell: ({ row }) => (
+      <Link
+        to="/app/schedules/$scheduleId"
+        params={{ scheduleId: String(row.original.scheduleId) }}
+        className="font-medium hover:underline"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {row.original.scheduleName}
+      </Link>
+    ),
+  }
 
   const columns: ColumnDef<LeaderboardRun>[] = [
     {
@@ -63,23 +82,7 @@ export function LeaderboardTable({ runs }: LeaderboardTableProps): React.ReactEl
         </span>
       ),
     },
-    {
-      id: 'schedule',
-      accessorFn: (row) => String(row.scheduleId),
-      header: 'Schedule',
-      enableSorting: false,
-      filterFn: 'equals',
-      cell: ({ row }) => (
-        <Link
-          to="/app/schedules/$scheduleId"
-          params={{ scheduleId: String(row.original.scheduleId) }}
-          className="font-medium hover:underline"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {row.original.scheduleName}
-        </Link>
-      ),
-    },
+    ...(!hideSchedule ? [scheduleColumn] : []),
     {
       id: 'runNumber',
       accessorFn: (row) => String(row.runIndex + 1),

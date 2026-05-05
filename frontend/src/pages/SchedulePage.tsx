@@ -14,6 +14,7 @@ import {
   type ScheduleInsightPoint,
   type MyScheduleTraining,
   type AllTrainingSummary,
+  type LeaderboardRun,
 } from "../lib/api";
 import { AreaChart, Area, XAxis, YAxis } from "recharts";
 import {
@@ -31,6 +32,7 @@ import { UserAvatar } from "../components/UserAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { StatusBadge } from "../components/StatusBadge";
 import { TrainingTable } from "../components/participations/TrainingTable";
+import { LeaderboardTable } from "../components/leaderboard/LeaderboardTable";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
@@ -164,6 +166,8 @@ export function SchedulePage(): React.ReactElement | null {
   const [chartsReady, setChartsReady] = useState(false);
   const [statsOpen, setStatsOpen] = useState(true);
   const [usedByOpen, setUsedByOpen] = useState(true);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(true);
+  const [leaderboardRuns, setLeaderboardRuns] = useState<LeaderboardRun[] | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -230,6 +234,11 @@ export function SchedulePage(): React.ReactElement | null {
       )
       .finally(() => setInsightsLoading(false));
   }, [activeTab, id, user, insightsData]);
+
+  useEffect(() => {
+    if (activeTab !== "insights" || leaderboardRuns !== null || !user) return;
+    api.leaderboard.list(id).then(setLeaderboardRuns).catch(() => {});
+  }, [activeTab, id, user, leaderboardRuns]);
 
   if (authLoading || !user) return null;
 
@@ -778,6 +787,35 @@ export function SchedulePage(): React.ReactElement | null {
 
         <TabsContent value="insights">
           <div className="flex flex-col gap-4">
+            <Collapsible open={leaderboardOpen} onOpenChange={setLeaderboardOpen}>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between border-b pb-2.5 text-left"
+                >
+                  <span className="flex items-center gap-2 text-sm font-medium">
+                    <ChevronDown
+                      className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
+                      style={{ transform: leaderboardOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+                    />
+                    Leaderboard
+                  </span>
+                  <span className="hidden text-xs text-muted-foreground sm:block">
+                    One row per run — sort by accuracy, solve time or attempts
+                  </span>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="pt-4">
+                  {leaderboardRuns === null ? (
+                    <p className="text-sm text-muted-foreground">Loading…</p>
+                  ) : (
+                    <LeaderboardTable runs={leaderboardRuns} hideSchedule />
+                  )}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
             <Collapsible open={statsOpen} onOpenChange={setStatsOpen}>
               <CollapsibleTrigger asChild>
                 <button
