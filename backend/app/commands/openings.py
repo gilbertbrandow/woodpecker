@@ -1,5 +1,6 @@
 import csv
 import re
+import unicodedata
 from typing import cast
 
 import click
@@ -14,8 +15,9 @@ openings_cli = AppGroup("openings")
 
 
 def opening_name_to_key(display_name: str) -> str:
-    key = display_name.replace(": ", "_").replace(", ", "_").replace(" ", "_")
-    return re.sub(r"[^A-Za-z0-9_]", "", key)
+    normalized = unicodedata.normalize("NFKD", display_name).encode("ascii", "ignore").decode("ascii")
+    key = normalized.replace(": ", "_").replace(", ", "_").replace(" ", "_")
+    return re.sub(r"[^A-Za-z0-9_-]", "", key)
 
 
 def parent_display_name(display_name: str) -> str | None:

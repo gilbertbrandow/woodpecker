@@ -188,3 +188,77 @@ def import_puzzles(
         click.echo(f"Warning: {len(unknown_themes)} unknown theme key(s) skipped: {', '.join(sorted(unknown_themes))}")
     if unknown_openings:
         click.echo(f"Warning: {len(unknown_openings)} unknown opening key(s) skipped: {', '.join(sorted(unknown_openings))}")
+
+
+@puzzles_cli.command("relink")
+@click.option("--file", "file_path", required=True, type=click.Path(exists=True), help="Path to Lichess puzzle file (.csv or .csv.zst)")
+@click.option("--min-rating", default=0, type=int, help="Skip puzzles below this rating")
+@click.option("--max-rating", default=9999, type=int, help="Skip puzzles above this rating")
+@click.option("--batch-size", default=500, type=int, help="Rows per database batch")
+def relink_puzzles(file_path: str, min_rating: int, max_rating: int, batch_size: int) -> None:
+    theme_cache: dict[str, int] = _load_cache(Theme)
+    opening_cache: dict[str, int] = _load_cache(Opening)
+
+    rows_read = 0
+    rows_processed = 0
+
+    batch: list[tuple[str, list[str], list[str]]] = []
+
+    def flush() -> int:
+        if not batch:
+            return 0
+        puzzle_id_strs = [b[0] for b in batch]
+        puzzle_id_map = {
+            row.puzzle_id: row.id
+            for row in db.session.execute(
+                db.select(Puzzle.puzzle_id, Puzzle.id).where(Puzzle.puzzle_id.in_(puzzle_id_strs))
+            ).all()
+        }
+        theme_assoc: list[dict] = []
+        opening_assoc: list[dict] = []
+        for pid_str, themes, openings in batch:
+            pid = puzzle_id_map.get(pid_str)
+            if pid is None:
+                continue
+            for t in themes:
+                if (tid := theme_cache.get(t)) is not None:
+                    theme_assoc.append({"puzzle_id": pid, "theme_id": tid})
+            for o in openings:
+                if (oid := opening_cache.get(o)) is not None:
+                    opening_assoc.append({"puzzle_id": pid, "opening_id": oid})
+        if theme_assoc:
+            db.session.execute(pg_insert(puzzle_themes).values(theme_assoc).on_conflict_do_nothing())
+        if opening_assoc:
+            db.session.execute(pg_insert(puzzle_openings).values(opening_assoc).on_conflict_do_nothing())
+        db.session.commit()
+        return len(puzzle_id_map)
+
+    stream, fh = _open_stream(file_path)
+    try:
+        if file_path.endswith(".zst"):
+            text_stream: IO = io.TextIOWrapper(stream, encoding="utf-8", newline="")
+        else:
+            text_stream = stream
+
+        reader = csv.DictReader(text_stream)
+        for row in reader:
+            rows_read += 1
+            rating = int(row["Rating"])
+            if rating < min_rating or rating > max_rating:
+                continue
+            batch.append((
+                row["PuzzleId"],
+                row["Themes"].split() if row["Themes"] else [],
+                row["OpeningTags"].split() if row["OpeningTags"] else [],
+            ))
+            if len(batch) >= batch_size:
+                rows_processed += flush()
+                batch.clear()
+            if rows_read % PROGRESS_INTERVAL == 0:
+                click.echo(f"Read {rows_read} | Linked {rows_processed}")
+
+        rows_processed += flush()
+    finally:
+        fh.close()
+
+    click.echo(f"\nDone. Puzzles processed: {rows_processed}")
