@@ -12,3 +12,8 @@ output "name_servers" {
   description = "Set these as the nameservers at your domain registrar (only shown when domain_name is set)"
   value       = length(aws_route53_zone.woodpecker) > 0 ? aws_route53_zone.woodpecker[0].name_servers : []
 }
+
+output "backup_bucket_name" {
+  description = "S3 bucket name for DB backups — set as BACKUP_BUCKET in GitHub secrets"
+  value       = aws_s3_bucket.backups.bucket
+}
