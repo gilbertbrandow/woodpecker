@@ -142,12 +142,6 @@ docker compose -f docker-compose.yml -f docker-compose-prod.yml start backend
 rm /tmp/restore.sql.gz
 ```
 
-### Initial setup (one-time, after terraform apply)
-
-1. `cd deploy/terraform && terraform output -raw backup_bucket_name`
-2. Add `BACKUP_BUCKET` GitHub secret with that value
-3. Publish a release — the deploy workflow installs the timer automatically
-
 ## Database access
 
 ```bash
