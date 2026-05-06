@@ -32,11 +32,20 @@ Four Docker containers managed by Docker Compose at `/opt/woodpecker`:
 ## How deploys work
 
 1. PR → CI runs lint, typecheck, tests. Merge blocked until all pass.
-2. Merge to `main` → `deploy.yml` triggers.
-3. Builds `backend` and `frontend` Docker images, tags `sha-<sha>` + `latest`, pushes to GHCR.
+2. Maintainer publishes a GitHub Release → `deploy.yml` triggers.
+3. Builds `backend` and `frontend` Docker images, tags `<version>` + `latest`, pushes to GHCR.
 4. SSHes into EC2, pulls images, restarts containers, waits for backend health, runs `flask db upgrade`.
 
 Migrations run on every deploy via Alembic. Idempotent.
+
+## Releasing
+
+1. Go to **GitHub → Releases → Draft a new release**.
+2. Click **"Choose a tag"** and type a new semver tag (e.g. `v1.2.3`), targeting `main`.
+3. Click **"Generate release notes"** — PRs are automatically categorised by label.
+4. Review the notes and click **Publish release**.
+
+**Tag format:** `vMAJOR.MINOR.PATCH` — follow [semver](https://semver.org). Increment PATCH for fixes, MINOR for new features, MAJOR for breaking changes.
 
 The nginx config on the server (`/opt/woodpecker/deploy/nginx/default.conf`) is **not touched by deploys** — it lives on the host and is managed manually to protect the SSL config from being overwritten.
 
@@ -90,11 +99,11 @@ GUI tools: run `db-expose-ec2` + `db-tunnel-ec2`, connect to `localhost:5433`.
 ```bash
 ssh ubuntu@54.216.71.166
 cd /opt/woodpecker
-IMAGE_TAG=sha-<previous-sha> docker compose -f docker-compose.yml -f docker-compose-prod.yml up -d
+IMAGE_TAG=v1.2.2 docker compose -f docker-compose.yml -f docker-compose-prod.yml up -d
 docker compose -f docker-compose.yml -f docker-compose-prod.yml exec -T backend flask --app app db downgrade -1
 ```
 
-SHA values are in the GHCR package history and the GitHub Actions deploy logs.
+Version tags are in the GHCR package history and the GitHub Releases page.
 
 ## Known quirks
 
