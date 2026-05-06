@@ -56,6 +56,7 @@ The nginx config on the server (`/opt/woodpecker/deploy/nginx/default.conf`) is 
 | `EC2_HOST` | `54.216.71.166` |
 | `EC2_SSH_KEY` | Private key for `woodpecker-key` |
 | `GHCR_TOKEN` | GitHub PAT with `write:packages` |
+| `BACKUP_BUCKET` | Output of `cd deploy/terraform && terraform output -raw backup_bucket_name` |
 
 Application secrets live in `/opt/woodpecker/.env` on the server only.
 
@@ -81,7 +82,71 @@ make puzzle-seed-ec2 EC2_HOST=54.216.71.166 file=~/path/to/lichess.csv.zst args=
 
 **Themes and openings** are seeded automatically by `flask db upgrade`.
 
-**Postgres data** lives in the `pgdata` Docker volume on the EBS root disk. No automated backup yet — set this up before the app has real users.
+**Postgres data** lives in the `pgdata` Docker volume on the EBS root disk. Backed up daily to S3 — see Backups section below.
+
+## Backups
+
+A systemd timer (`woodpecker-backup.timer`) fires daily at 02:00 UTC. It runs `/opt/woodpecker/scripts/backup-db.sh` as the `ubuntu` user, which streams `pg_dump` from the `db` container through gzip and uploads to S3 under `YYYY/MM/woodpecker_TIMESTAMP.sql.gz`. Backups are kept for 30 days via an S3 lifecycle rule.
+
+The EC2 instance has an IAM instance profile that grants write access to the backup bucket — no credentials in `.env` are needed.
+
+### Files on the server
+
+| Path | Purpose |
+| ---- | ------- |
+| `/opt/woodpecker/scripts/backup-db.sh` | Backup script (deployed by CI) |
+| `/etc/systemd/system/woodpecker-backup.service` | oneshot service unit |
+| `/etc/systemd/system/woodpecker-backup.timer` | daily timer unit |
+
+### Checking backup status
+
+```bash
+ssh ubuntu@54.216.71.166
+
+# Is the timer active and when does it next fire?
+systemctl list-timers woodpecker-backup.timer
+
+# Logs from the last run
+journalctl -u woodpecker-backup.service -n 50
+
+# List files in S3
+source /opt/woodpecker/.env
+aws s3 ls s3://${BACKUP_BUCKET}/ --recursive
+```
+
+### Running a backup manually
+
+```bash
+ssh ubuntu@54.216.71.166
+sudo systemctl start woodpecker-backup.service
+journalctl -u woodpecker-backup.service -f
+```
+
+### Restoring from backup
+
+```bash
+ssh ubuntu@54.216.71.166
+
+# Find the backup to restore
+source /opt/woodpecker/.env
+aws s3 ls s3://${BACKUP_BUCKET}/ --recursive
+
+# Download and restore (stop backend first for a clean restore)
+cd /opt/woodpecker
+docker compose -f docker-compose.yml -f docker-compose-prod.yml stop backend
+aws s3 cp s3://${BACKUP_BUCKET}/YYYY/MM/woodpecker_TIMESTAMP.sql.gz /tmp/restore.sql.gz
+gunzip -c /tmp/restore.sql.gz | docker compose \
+  -f docker-compose.yml -f docker-compose-prod.yml \
+  exec -T db psql -U woodpecker woodpecker
+docker compose -f docker-compose.yml -f docker-compose-prod.yml start backend
+rm /tmp/restore.sql.gz
+```
+
+### Initial setup (one-time, after terraform apply)
+
+1. `cd deploy/terraform && terraform output -raw backup_bucket_name`
+2. Add `BACKUP_BUCKET` GitHub secret with that value
+3. Publish a release — the deploy workflow installs the timer automatically
 
 ## Database access
 
