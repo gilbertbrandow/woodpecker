@@ -1,8 +1,8 @@
 name: deploy
 
 on:
-  push:
-    branches: [main]
+  release:
+    types: [published]
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -28,7 +28,7 @@ jobs:
 
       - name: Set image tag
         id: tag
-        run: echo "value=sha-${{ github.sha }}" >> $GITHUB_OUTPUT
+        run: echo "value=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
 
       - name: Build and push backend
         uses: docker/build-push-action@v5
