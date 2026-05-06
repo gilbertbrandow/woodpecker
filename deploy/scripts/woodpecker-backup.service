@@ -1,0 +1,13 @@
+[Unit]
+Description=Woodpecker daily PostgreSQL backup to S3
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/opt/woodpecker
+ExecStart=/opt/woodpecker/scripts/backup-db.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=woodpecker-backup

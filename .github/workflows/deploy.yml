@@ -1,8 +1,8 @@
 name: deploy
 
 on:
-  push:
-    branches: [main]
+  release:
+    types: [published]
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -28,7 +28,7 @@ jobs:
 
       - name: Set image tag
         id: tag
-        run: echo "value=sha-${{ github.sha }}" >> $GITHUB_OUTPUT
+        run: echo "value=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
 
       - name: Build and push backend
         uses: docker/build-push-action@v5
@@ -63,8 +63,18 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.yml,docker-compose-prod.yml"
+          source: "docker-compose.yml,docker-compose-prod.yml,docker-compose-db-tunnel.yml"
           target: /opt/woodpecker
+
+      - name: Copy scripts to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "deploy/scripts/backup-db.sh,deploy/scripts/woodpecker-backup.service,deploy/scripts/woodpecker-backup.timer"
+          target: /opt/woodpecker/scripts/
+          strip_components: 2
 
       - name: Pull, restart, migrate
         uses: appleboy/ssh-action@v1.0.3
@@ -72,13 +82,39 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
           GHCR_ACTOR: ${{ github.actor }}
           IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+          BACKUP_BUCKET: ${{ secrets.BACKUP_BUCKET }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: GHCR_TOKEN,GHCR_ACTOR,IMAGE_TAG
+          envs: GHCR_TOKEN,GHCR_ACTOR,IMAGE_TAG,BACKUP_BUCKET
           script: |
             set -e
+
+            # Inject BACKUP_BUCKET into .env (idempotent)
+            if grep -qxF "BACKUP_BUCKET=${BACKUP_BUCKET}" /opt/woodpecker/.env 2>/dev/null; then
+              echo "BACKUP_BUCKET already set correctly"
+            else
+              sed -i '/^BACKUP_BUCKET=/d' /opt/woodpecker/.env
+              echo "BACKUP_BUCKET=${BACKUP_BUCKET}" >> /opt/woodpecker/.env
+            fi
+
+            # Install AWS CLI if not present (idempotent)
+            if ! command -v aws &>/dev/null; then
+              echo "Installing AWS CLI..."
+              curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+              unzip -q /tmp/awscliv2.zip -d /tmp/
+              sudo /tmp/aws/install
+              rm -rf /tmp/awscliv2.zip /tmp/aws
+            fi
+
+            # Install / refresh systemd backup units
+            chmod +x /opt/woodpecker/scripts/backup-db.sh
+            sudo cp /opt/woodpecker/scripts/woodpecker-backup.service /etc/systemd/system/
+            sudo cp /opt/woodpecker/scripts/woodpecker-backup.timer   /etc/systemd/system/
+            sudo systemctl daemon-reload
+            sudo systemctl enable --now woodpecker-backup.timer
+
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
             cd /opt/woodpecker
             docker compose -f docker-compose.yml -f docker-compose-prod.yml pull
