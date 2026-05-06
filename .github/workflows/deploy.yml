@@ -77,7 +77,7 @@ jobs:
           strip_components: 2
 
       - name: Pull, restart, migrate
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.2.5
         env:
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
           GHCR_ACTOR: ${{ github.actor }}
