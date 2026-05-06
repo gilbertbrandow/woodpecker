@@ -31,7 +31,7 @@ jobs:
         run: echo "value=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
 
       - name: Build and push backend
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: backend
           target: prod
@@ -41,7 +41,7 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/woodpecker-backend:latest
 
       - name: Build and push frontend
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: frontend
           target: prod
