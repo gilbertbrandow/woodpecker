@@ -403,8 +403,8 @@ export function TrainingPage(): React.ReactElement | null {
             </Badge>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
-            <UserAvatar username={training.ownerUsername} avatarUrl={training.ownerAvatarUrl} className="h-4 w-4" />
-            <span>{training.ownerUsername}</span>
+            <UserAvatar username={training.ownerUsername} displayName={training.ownerDisplayName} avatarUrl={training.ownerAvatarUrl} className="h-4 w-4" />
+            <span>{training.ownerDisplayName}</span>
             <span className="text-muted-foreground/40">·</span>
             <span>Started {formatStartedAt(training.startedAt)}</span>
           </div>

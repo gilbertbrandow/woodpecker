@@ -443,8 +443,8 @@ export function RunPage(): React.ReactElement | null {
           <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
             {participation && (
               <>
-                <UserAvatar username={participation.ownerUsername} avatarUrl={participation.ownerAvatarUrl} className="h-4 w-4" />
-                <span>{participation.ownerUsername}</span>
+                <UserAvatar username={participation.ownerUsername} displayName={participation.ownerDisplayName} avatarUrl={participation.ownerAvatarUrl} className="h-4 w-4" />
+                <span>{participation.ownerDisplayName}</span>
                 <span className="text-muted-foreground/40">·</span>
               </>
             )}
