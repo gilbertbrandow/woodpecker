@@ -53,7 +53,7 @@
     "jsdom": "^26.1.0",
     "postcss": "^8.5.14",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.5.0",
+    "typescript": "^6.0.3",
     "vite": "^5.4.0",
     "vitest": "^2.1.9"
   }
