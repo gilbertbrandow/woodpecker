@@ -115,6 +115,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const failedRetryPliesRef = useRef<string[]>([])
   const solutionMovesRef = useRef<string[]>([])
   const currentAttemptIdRef = useRef<number | null>(null)
+  const currentRunPuzzleIdRef = useRef<number>(runPuzzleId)
   const displayFenRef = useRef('')
   const elapsedRef = useRef(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -269,6 +270,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     setAllPliesPlayed([])
     setLiveFocusStatus('in_progress')
     currentAttemptIdRef.current = data.attempt.id
+    currentRunPuzzleIdRef.current = data.runPuzzle.id
     concludingRef.current = false
     latestResolvedAttemptIdRef.current = null
     elapsedRef.current = 0
@@ -488,7 +490,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
     concludingRef.current = true
     try {
-      const result = await api.attempts.complete(runId, runPuzzleId, id, movesPlayedRef.current, Math.round(elapsedRef.current * 100))
+      const result = await api.attempts.complete(runId, currentRunPuzzleIdRef.current, id, movesPlayedRef.current, Math.round(elapsedRef.current * 100))
 
       if (currentAttemptIdRef.current !== id) {
         markAttemptResolved(id, result.outcome)
@@ -520,7 +522,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     } finally {
       concludingRef.current = false
     }
-  }, [enterFailed, markAttemptResolved, navigateToOverview, runId, runPuzzleId])
+  }, [enterFailed, markAttemptResolved, navigateToOverview, runId])
 
   concludeFnRef.current = conclude
 
