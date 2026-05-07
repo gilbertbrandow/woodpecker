@@ -47,6 +47,9 @@ function PulsingDot({ cx = 0, cy = 0, active }: { cx?: number; cy?: number; acti
 }
 
 export function RunPaceCard({ chartData, isRunActive, stretch = false }: RunPaceCardProps): React.ReactElement {
+  const [mounted, setMounted] = React.useState(false)
+  React.useEffect(() => { setMounted(true) }, [])
+
   const series = chartData?.series ?? []
   const labelTicks = chartData?.labelTicks ?? []
   const domainStartMs = chartData?.domainStartMs ?? 0
@@ -63,7 +66,7 @@ export function RunPaceCard({ chartData, isRunActive, stretch = false }: RunPace
         <p className="text-xs text-muted-foreground">Actual progress & required pace</p>
       </div>
 
-      {chartData === null ? (
+      {!mounted || chartData === null ? (
         <div className={`${stretch ? 'flex-1 min-h-0' : 'h-48'} w-full animate-pulse rounded-md bg-muted`} />
       ) : (
         <ChartContainer config={CHART_CONFIG} className={`${stretch ? 'flex-1 min-h-0' : 'h-48'} min-w-0 w-full`}>
