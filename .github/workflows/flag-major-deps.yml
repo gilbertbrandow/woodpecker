@@ -16,8 +16,8 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          OLD=$(echo "$PR_TITLE" | grep -oP 'from \K[0-9]+')
-          NEW=$(echo "$PR_TITLE" | grep -oP 'to \K[0-9]+')
+          OLD=$(echo "$PR_TITLE" | grep -oP 'from \K[0-9]+' || true)
+          NEW=$(echo "$PR_TITLE" | grep -oP 'to \K[0-9]+' || true)
           if [ -n "$OLD" ] && [ -n "$NEW" ] && [ "$OLD" != "$NEW" ]; then
             echo "is_major=true" >> "$GITHUB_OUTPUT"
           else
