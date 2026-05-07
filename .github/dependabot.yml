@@ -6,6 +6,15 @@ updates:
       interval: weekly
     labels:
       - dependencies
+      - frontend
+    open-pull-requests-limit: 5
+    groups:
+      frontend-minor-patch:
+        update-types:
+          - minor
+          - patch
+        patterns:
+          - "*"
 
   - package-ecosystem: pip
     directory: /backend
@@ -13,6 +22,15 @@ updates:
       interval: weekly
     labels:
       - dependencies
+      - backend
+    open-pull-requests-limit: 5
+    groups:
+      backend-minor-patch:
+        update-types:
+          - minor
+          - patch
+        patterns:
+          - "*"
 
   - package-ecosystem: docker
     directory: /backend
@@ -20,6 +38,12 @@ updates:
       interval: weekly
     labels:
       - dependencies
+      - docker
+      - backend
+    groups:
+      backend-docker:
+        patterns:
+          - "*"
 
   - package-ecosystem: docker
     directory: /frontend
@@ -27,6 +51,12 @@ updates:
       interval: weekly
     labels:
       - dependencies
+      - docker
+      - frontend
+    groups:
+      frontend-docker:
+        patterns:
+          - "*"
 
   - package-ecosystem: github-actions
     directory: /
@@ -34,3 +64,8 @@ updates:
       interval: weekly
     labels:
       - dependencies
+      - github-actions
+    groups:
+      github-actions:
+        patterns:
+          - "*"

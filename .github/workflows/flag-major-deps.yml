@@ -1,0 +1,48 @@
+name: Flag major Dependabot updates
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+jobs:
+  flag-major:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Detect major version bump
+        id: check
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          OLD=$(echo "$PR_TITLE" | grep -oP 'from \K[0-9]+')
+          NEW=$(echo "$PR_TITLE" | grep -oP 'to \K[0-9]+')
+          if [ -n "$OLD" ] && [ -n "$NEW" ] && [ "$OLD" != "$NEW" ]; then
+            echo "is_major=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_major=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Add label and warning comment
+        if: steps.check.outputs.is_major == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['major-version'],
+            });
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                '## ⚠️ Major version bump — do not merge without reading the changelog',
+                '',
+                'This PR upgrades a **major** version, which may contain breaking changes.',
+                'Please review the changelog and verify the app still builds and passes CI before merging.',
+              ].join('\n'),
+            });

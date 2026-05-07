@@ -18,7 +18,6 @@ import {
   FOOTER_H,
   H_PAD_MD,
   MIN_SIDEBAR,
-  MAX_BOARD,
   BOARD_GAP,
   LG_BREAKPOINT,
   V_PAD_DESKTOP,
@@ -168,10 +167,10 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       if (isDesktop) {
         const availH = window.innerHeight - HEADER_H - FOOTER_H - V_PAD_DESKTOP
         const availW = window.innerWidth - H_PAD_MD - 2 * MIN_SIDEBAR - 2 * BOARD_GAP
-        setBoardSize(Math.max(200, Math.min(availH, availW, MAX_BOARD)))
+        setBoardSize(Math.max(200, Math.min(availH, availW)))
       } else {
         const availWMobile = window.innerWidth - MOBILE_H_PAD
-        setBoardSize(Math.max(200, Math.min(availWMobile, MAX_BOARD)))
+        setBoardSize(Math.max(200, availWMobile))
       }
     }
     compute()

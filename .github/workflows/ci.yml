@@ -64,6 +64,13 @@ jobs:
           .venv/bin/pip install --upgrade pip
           .venv/bin/pip install -r requirements.txt
 
+      - name: Check Alembic migrations
+        working-directory: backend
+        env:
+          SECRET_KEY: ci-test-secret
+          DATABASE_URL: postgresql://woodpecker:woodpecker@localhost:5432/woodpecker_test
+        run: .venv/bin/flask --app app db upgrade
+
       - name: pytest
         working-directory: backend
         env:
