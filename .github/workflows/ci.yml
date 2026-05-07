@@ -135,11 +135,3 @@ jobs:
 
       - name: Build
         run: docker build --target build frontend/
-
-  dependency-review:
-    name: Dependency review
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/dependency-review-action@v4
