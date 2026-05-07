@@ -5,7 +5,10 @@ import { Chess } from 'chess.js'
 import type { DrawShape } from 'chessground/draw'
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore — react-chessground ships no bundled type declarations
-import Chessground from 'react-chessground'
+import ReactChessground from 'react-chessground'
+// Vite 8 (rolldown) wraps CJS module.exports as { default: … }; fall back for older bundlers
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const Chessground = (ReactChessground as any).default ?? ReactChessground
 import { Check, X } from 'lucide-react'
 import type { Orientation, PendingPromotion, MoveFeedbackResult } from './boardPage.helpers'
 
