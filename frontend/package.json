@@ -2,6 +2,9 @@
   "name": "woodpecker-frontend",
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
