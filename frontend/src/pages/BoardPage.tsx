@@ -104,7 +104,10 @@ export function BoardPage(): React.ReactElement | null {
 
   React.useEffect(() => {
     const data = ctrl.overview.data
-    if (!data) return
+    if (!data) {
+      setSelectedAttemptId(null)
+      return
+    }
     if (data.runPuzzle.id !== Number(runPuzzleIdStr)) return
     const allIds = new Set(allAttempts.map((a) => a.id))
     const validRequested =
@@ -671,6 +674,16 @@ export function BoardPage(): React.ReactElement | null {
   const mobileDrawerContent =
     ctrl.mode === 'overview' && overviewData !== null ? (
       <div className="flex flex-col gap-5">
+        {overviewPgnDisplay !== null && (
+          <PuzzleMetaCard
+            puzzleId={overviewData.puzzle.puzzleId}
+            rating={overviewData.puzzle.rating}
+            themes={overviewData.puzzle.themes}
+            pgnDisplay={overviewPgnDisplay}
+            selectedPly={ctrl.mode === 'overview' ? selectedPly : null}
+            onPlyClick={ctrl.mode === 'overview' ? setSelectedPly : undefined}
+          />
+        )}
         <OverviewStatsSection
           runIndex={overviewData.stats.runIndex}
           accuracy={overviewData.stats.accuracy}
@@ -691,16 +704,6 @@ export function BoardPage(): React.ReactElement | null {
           selectedAttemptId={selectedAttemptId}
           onSelectAttempt={handleSelectAttemptForTable}
         />
-        {overviewPgnDisplay !== null && (
-          <PuzzleMetaCard
-            puzzleId={overviewData.puzzle.puzzleId}
-            rating={overviewData.puzzle.rating}
-            themes={overviewData.puzzle.themes}
-            pgnDisplay={overviewPgnDisplay}
-            selectedPly={ctrl.mode === 'overview' ? selectedPly : null}
-            onPlyClick={ctrl.mode === 'overview' ? setSelectedPly : undefined}
-          />
-        )}
       </div>
     ) : undefined
 

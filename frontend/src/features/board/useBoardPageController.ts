@@ -243,11 +243,11 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
     void navigate({
       to: '/app/runs/$runId/puzzles/$runPuzzleId/overview',
-      params: { runId: runIdStr, runPuzzleId: runPuzzleIdStr },
+      params: { runId: runIdStr, runPuzzleId: String(currentRunPuzzleIdRef.current) },
       search: selectedAttemptId === null ? {} : { attempt: selectedAttemptId },
       replace,
     })
-  }, [navigate, runIdStr, runPuzzleIdStr])
+  }, [navigate, runIdStr])
 
   const applyFreshActiveState = useCallback((data: RunPuzzleAttemptView): void => {
     clearPendingTimeouts()
@@ -325,6 +325,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     const boardLastMove: [string, string] | undefined =
       selectedAttemptEntry?.board?.lastMove ?? undefined
 
+    currentRunPuzzleIdRef.current = data.runPuzzle.id
     chessRef.current = new Chess(data.puzzle.fen)
     solutionMovesRef.current = solutionMoves
     moveIndexRef.current = 1
@@ -771,7 +772,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const handleRetake = useCallback(async (): Promise<void> => {
     setIsLoadingNextPuzzle(true)
     try {
-      const data = await api.runs.startPuzzle(runId, runPuzzleId)
+      const data = await api.runs.startPuzzle(runId, currentRunPuzzleIdRef.current)
       if (data.puzzle.solution.length < 2) {
         toast.error('Invalid puzzle', { description: 'Puzzle solution is too short.' })
         return
@@ -796,7 +797,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     } finally {
       setIsLoadingNextPuzzle(false)
     }
-  }, [navigate, runId, runPuzzleId, runIdStr, applyFreshActiveState, clearOverviewState])
+  }, [navigate, runId, runIdStr, applyFreshActiveState, clearOverviewState])
 
   const dismissRunComplete = useCallback((): void => {
     setRunJustCompleted(false)
