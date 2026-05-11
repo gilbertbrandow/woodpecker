@@ -1,7 +1,5 @@
 # woodpecker
 
-See [DEPLOYMENT.md](deploy/DEPLOYMENT.md) for release and deployment instructions.
-
 ## Local development
 
 Prerequisites: Docker + Docker Compose
@@ -25,3 +23,7 @@ make puzzle-copy file=/path/to/lichess_db_puzzle.csv.zst
 make puzzle-import
 make openings-import
 ```
+
+## Deployment
+
+See [DEPLOYMENT.md](deploy/DEPLOYMENT.md) for release and deployment instructions.
