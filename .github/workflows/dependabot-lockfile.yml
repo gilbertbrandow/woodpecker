@@ -20,7 +20,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: "26"
+          node-version-file: ".nvmrc"
 
       - name: Regenerate lockfile
         working-directory: frontend

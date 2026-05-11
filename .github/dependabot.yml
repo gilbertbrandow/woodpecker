@@ -3,7 +3,7 @@ updates:
   - package-ecosystem: npm
     directory: /frontend
     schedule:
-      interval: weekly
+      interval: daily
     labels:
       - dependencies
       - frontend
@@ -19,7 +19,7 @@ updates:
   - package-ecosystem: pip
     directory: /backend
     schedule:
-      interval: weekly
+      interval: daily
     labels:
       - dependencies
       - backend
@@ -35,7 +35,7 @@ updates:
   - package-ecosystem: docker
     directory: /backend
     schedule:
-      interval: weekly
+      interval: daily
     labels:
       - dependencies
       - docker
@@ -48,7 +48,7 @@ updates:
   - package-ecosystem: docker
     directory: /frontend
     schedule:
-      interval: weekly
+      interval: daily
     labels:
       - dependencies
       - docker
@@ -61,7 +61,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: daily
     labels:
       - dependencies
       - github-actions
