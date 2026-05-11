@@ -68,6 +68,7 @@ def update_user_settings(
     avatar_url: str | None,
     board_theme: str | None,
     piece_theme: str | None,
+    show_timer_tenths: bool | None = None,
 ) -> User:
     user = db.session.get(User, user_id)
     if not user:
@@ -81,6 +82,8 @@ def update_user_settings(
         user.board_theme = _validate_board_theme(board_theme)
     if piece_theme is not None:
         user.piece_theme = _validate_piece_set(piece_theme)
+    if show_timer_tenths is not None:
+        user.show_timer_tenths = show_timer_tenths
 
     db.session.commit()
     return user

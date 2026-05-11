@@ -79,11 +79,12 @@ export function playerColor(fen: string): Orientation {
   return fen.split(' ')[1] === 'w' ? 'black' : 'white'
 }
 
-export function formatTimer(tenths: number): string {
+export function formatTimer(tenths: number, showTenths = true): string {
   const capped = Math.min(tenths, 6_000)
   const wholeTenths = Math.floor(capped)
   const m = Math.floor(wholeTenths / 600)
   const s = Math.floor((wholeTenths % 600) / 10)
+  if (!showTenths) return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
   const t = wholeTenths % 10
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${t}`
 }

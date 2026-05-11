@@ -70,4 +70,5 @@ def me() -> tuple[Response, int] | Response:
         "avatarUrl": user.avatar_url,
         "boardTheme": user.board_theme,
         "pieceTheme": user.piece_theme,
+        "showTimerTenths": user.show_timer_tenths,
     })
