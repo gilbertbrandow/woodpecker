@@ -4,7 +4,7 @@ See [DEPLOYMENT.md](deploy/DEPLOYMENT.md) for release and deployment instruction
 
 ## Local development
 
-**Prerequisites:** Docker + Docker Compose
+Prerequisites: Docker + Docker Compose
 
 ```bash
 cp .env.example .env
@@ -12,7 +12,7 @@ make up-build
 make migrate-upgrade
 ```
 
-Open **[http://localhost:5173](http://localhost:5173)** and sign in with your Lichess account.
+Open [http://localhost:5173](http://localhost:5173) and sign in with your Lichess account.
 
 On subsequent starts, `make up` is enough (no rebuild needed).
 
