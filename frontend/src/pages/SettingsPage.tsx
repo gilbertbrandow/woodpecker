@@ -42,6 +42,7 @@ export function SettingsPage(): React.ReactElement | null {
   const [selectedStyle, setSelectedStyle] = useState<AvatarStyle>(AVATAR_STYLES[0])
   const [savingBoard, setSavingBoard] = useState(false)
   const [savingPiece, setSavingPiece] = useState(false)
+  const [savingTimerTenths, setSavingTimerTenths] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -125,6 +126,19 @@ export function SettingsPage(): React.ReactElement | null {
       toast.error('Something went wrong', { description: 'Please try again.' })
     } finally {
       setSavingPiece(false)
+    }
+  }
+
+  const toggleTimerTenths = async (checked: boolean): Promise<void> => {
+    if (savingTimerTenths) return
+    setSavingTimerTenths(true)
+    try {
+      const updated = await api.settings.update({ showTimerTenths: checked })
+      updateUser(updated)
+    } catch {
+      toast.error('Something went wrong', { description: 'Please try again.' })
+    } finally {
+      setSavingTimerTenths(false)
     }
   }
 
@@ -365,12 +379,30 @@ export function SettingsPage(): React.ReactElement | null {
 
       <section className="py-6">
         <h2 className="text-sm font-semibold mb-4">Appearance</h2>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-6">
           <div>
             <p className="text-sm">Application theme</p>
             <p className="text-xs text-muted-foreground mt-4">Switches between light and dark mode.</p>
           </div>
           <ThemeToggle />
+        </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm">Show tenths of seconds</p>
+            <p className="text-xs text-muted-foreground mt-1">Display a tenths digit on the puzzle timer (e.g. 01:23.4).</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={user.showTimerTenths}
+            disabled={savingTimerTenths}
+            onClick={() => void toggleTimerTenths(!user.showTimerTenths)}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait ${user.showTimerTenths ? 'bg-foreground' : 'bg-input'}`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-background shadow-sm transition-transform ${user.showTimerTenths ? 'translate-x-5' : 'translate-x-0'}`}
+            />
+          </button>
         </div>
       </section>
     </div>

@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useParams, useSearch } from '@tanstack/react-router'
+import { useAuth } from '../context/auth'
 import { Clock, CheckCircle2, XCircle, RotateCcw, ExternalLink, SkipForward } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
 import { Button, buttonVariants } from '../components/ui/button'
@@ -36,9 +37,11 @@ function parsePositiveInt(value: unknown): number | null {
   return null
 }
 
-const ZERO_TIMER = formatTimer(0)
-
 export function BoardPage(): React.ReactElement | null {
+  const { user } = useAuth()
+  const showTenths = user?.showTimerTenths ?? true
+  const ZERO_TIMER = formatTimer(0, showTenths)
+
   const params = useParams({ strict: false })
   const search = useSearch({ strict: false })
   const location = useLocation({
@@ -317,7 +320,7 @@ export function BoardPage(): React.ReactElement | null {
 
   const overviewData = ctrl.overview.data
 
-  const currentOverviewTimerText = formatTimer(frozenTimerTenths)
+  const currentOverviewTimerText = formatTimer(frozenTimerTenths, showTenths)
   if (currentOverviewTimerText !== ZERO_TIMER) lastOverviewTimerTextRef.current = currentOverviewTimerText
   const displayedOverviewTimerText =
     currentOverviewTimerText !== ZERO_TIMER
@@ -336,7 +339,7 @@ export function BoardPage(): React.ReactElement | null {
       : null
 
   const timerText =
-    ctrl.mode === 'overview' ? displayedOverviewTimerText : formatTimer(ctrl.timer.elapsedTenths)
+    ctrl.mode === 'overview' ? displayedOverviewTimerText : formatTimer(ctrl.timer.elapsedTenths, showTenths)
   const timerElapsedTenths = ctrl.mode === 'overview' ? frozenTimerTenths : ctrl.timer.elapsedTenths
   const timerTargetSolveTenths = ctrl.mode === 'focus' ? ctrl.timer.targetSolveTenths : null
 

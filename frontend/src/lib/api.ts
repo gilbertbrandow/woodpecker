@@ -37,6 +37,7 @@ export type AuthUser = {
   avatarUrl: string | null
   boardTheme: string
   pieceTheme: string
+  showTimerTenths: boolean
 }
 
 export type SettingsPayload = {
@@ -44,6 +45,7 @@ export type SettingsPayload = {
   avatarUrl?: string
   boardTheme?: string
   pieceTheme?: string
+  showTimerTenths?: boolean
 }
 
 export type Subset = {
