@@ -18,7 +18,7 @@ On subsequent starts, `make up` is enough (no rebuild needed).
 
 ## Importing puzzles
 
-Download `lichess_db_puzzle.csv.zst` from [database.lichess.org](https://database.lichess.org/#puzzles), then:
+Download [lichess_db_puzzle.csv.zst](https://database.lichess.org/lichess_db_puzzle.csv.zst), then:
 
 ```bash
 make puzzle-copy file=/path/to/lichess_db_puzzle.csv.zst
