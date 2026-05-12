@@ -135,3 +135,18 @@ jobs:
 
       - name: Build
         run: docker build --target build frontend/
+
+  build-pipeline:
+    name: Build pipeline images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build base image
+        run: docker build -f pipeline/base.Dockerfile -t woodpecker-pipeline-base .
+
+      - name: Build shared image
+        run: docker build -f pipeline/shared/Dockerfile -t woodpecker-pipeline-shared .
+
+      - name: Build lichess-tactics image
+        run: docker build -f pipeline/sources/lichess_tactics/Dockerfile -t woodpecker-pipeline-lichess-tactics .
