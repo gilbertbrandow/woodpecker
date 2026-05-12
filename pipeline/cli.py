@@ -1,3 +1,11 @@
+import sys
+from pathlib import Path
+
+# Allow running without PYTHONPATH set in local dev — find backend relative to this file
+_backend = Path(__file__).parent.parent / "backend"
+if _backend.exists() and str(_backend) not in sys.path:
+    sys.path.insert(0, str(_backend))
+
 import click
 
 from shared.openings.commands import openings
