@@ -3,7 +3,7 @@ from pathlib import Path
 import click
 
 from db import Session
-from sources.lichess_tactics.downloader import ensure_theme_file
+from sources.lichess_tactics.downloader import ensure_theme_file, ensure_tactics_file
 from sources.lichess_tactics.theme_importer import import_themes
 from sources.lichess_tactics.tactic_importer import import_tactics
 from sources.lichess_tactics.validators import validate_links as _validate_links
@@ -39,22 +39,30 @@ def tactics() -> None:
     """Import Lichess tactics."""
 
 
+@tactics.command("ensure-data")
+def tactics_ensure_data() -> None:
+    """Download the Lichess puzzle CSV if not present locally."""
+    path = ensure_tactics_file()
+    click.echo(f"Ready: {path}")
+
+
 @tactics.command("import")
-@click.option("--file", "file_path", required=True, type=click.Path(exists=True), help="Path to lichess_db_puzzle.csv or .csv.zst")
+@click.option("--file", "file_path", default=None, type=click.Path(exists=True), help="Path to lichess_db_puzzle.csv or .csv.zst (downloaded automatically if omitted)")
 @click.option("--limit", type=int, default=None, help="Maximum number of tactics to import")
 @click.option("--min-rating", type=int, default=0, show_default=True, help="Minimum puzzle rating")
 @click.option("--max-rating", type=int, default=9999, show_default=True, help="Maximum puzzle rating")
 @click.option("--batch-size", type=int, default=500, show_default=True, help="DB insert batch size")
 def tactics_import(
-    file_path: str,
+    file_path: str | None,
     limit: int | None,
     min_rating: int,
     max_rating: int,
     batch_size: int,
 ) -> None:
     """Import Lichess tactics with theme and opening links (idempotent)."""
+    file = Path(file_path) if file_path else ensure_tactics_file()
     with Session() as session:
-        import_tactics(session, Path(file_path), limit, min_rating, max_rating, batch_size)
+        import_tactics(session, file, limit, min_rating, max_rating, batch_size)
 
 
 @lichess_tactics.command("validate-links")
