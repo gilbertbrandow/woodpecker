@@ -12,8 +12,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 
 from app.extensions import db
-from app.models.puzzle import Puzzle, puzzle_themes, puzzle_openings
-from app.models.theme import Theme
+from app.models.lichess_tactic import LichessTactic, lichess_tactic_theme_links, lichess_tactic_openings
+from app.models.lichess_tactic_theme import LichessTacticTheme
 from app.models.opening import Opening
 
 puzzles_cli = AppGroup("puzzles")
@@ -42,7 +42,7 @@ def _player_oriented_game_url(game_url: str, fen: str) -> str:
     return urlunsplit((parsed.scheme, parsed.netloc, normalized_path, parsed.query, parsed.fragment))
 
 
-def _load_cache(model: type[Theme] | type[Opening]) -> dict[str, int]:
+def _load_cache(model: type[LichessTacticTheme] | type[Opening]) -> dict[str, int]:
     rows = db.session.execute(db.select(model.name, model.id)).all()
     return {name: id_ for name, id_ in rows}
 
@@ -76,30 +76,63 @@ def import_puzzles(
     unknown_themes: set[str] = set()
     unknown_openings: set[str] = set()
 
-    theme_cache: dict[str, int] = _load_cache(Theme)
+    theme_cache: dict[str, int] = _load_cache(LichessTacticTheme)
     opening_cache: dict[str, int] = _load_cache(Opening)
 
-    puzzle_batch: list[dict[str, str | int]] = []
+    tactic_batch: list[dict[str, str | int]] = []
     batch_themes: list[list[str]] = []
     batch_openings: list[list[str]] = []
 
     def flush() -> int:
-        if not puzzle_batch:
+        if not tactic_batch:
             return 0
 
-        stmt = pg_insert(cast(sa.Table, Puzzle.__table__)).values(puzzle_batch).on_conflict_do_nothing(
-            index_elements=["puzzle_id"]
-        )
-        result = cast(CursorResult[sa.Any], db.session.execute(stmt))
-        db.session.commit()
+        # Insert into training_items first to get IDs, then into lichess_tactics
+        tactic_puzzle_ids = [t["puzzle_id"] for t in tactic_batch]
 
-        inserted_count = result.rowcount if result.rowcount >= 0 else 0
+        # Find which lichess_tactic puzzle_ids already exist
+        existing_rows = db.session.execute(
+            db.select(LichessTactic.puzzle_id, LichessTactic.training_item_id).where(
+                LichessTactic.puzzle_id.in_(tactic_puzzle_ids)
+            )
+        ).all()
+        existing_map: dict[str, int] = {r.puzzle_id: r.training_item_id for r in existing_rows}
+
+        new_tactics = [t for t in tactic_batch if t["puzzle_id"] not in existing_map]
+
+        inserted_count = 0
+        if new_tactics:
+            # 1. Insert training_items rows (no data needed other than source_type)
+            ti_result = cast(
+                CursorResult[sa.Any],
+                db.session.execute(
+                    sa.text(
+                        "INSERT INTO training_items (source_type) "
+                        "SELECT 'LICHESS_TACTIC' FROM generate_series(1, :n) "
+                        "RETURNING id"
+                    ),
+                    {"n": len(new_tactics)},
+                ),
+            )
+            new_ids = [row.id for row in ti_result]
+
+            # 2. Insert lichess_tactics rows with the new training_item_ids
+            lichess_tactic_rows = [
+                {**tactic, "training_item_id": new_ids[i]}
+                for i, tactic in enumerate(new_tactics)
+            ]
+            stmt = pg_insert(cast(sa.Table, LichessTactic.__table__)).values(lichess_tactic_rows).on_conflict_do_nothing(
+                index_elements=["puzzle_id"]
+            )
+            result = cast(CursorResult[sa.Any], db.session.execute(stmt))
+            db.session.commit()
+            inserted_count = result.rowcount if result.rowcount >= 0 else 0
 
         if inserted_count > 0:
-            puzzle_id_map = {
+            all_tactic_id_map = {
                 row.puzzle_id: row.id for row in db.session.execute(
-                    db.select(Puzzle.puzzle_id, Puzzle.id).where(
-                        Puzzle.puzzle_id.in_([p["puzzle_id"] for p in puzzle_batch])
+                    db.select(LichessTactic.puzzle_id, LichessTactic.id).where(
+                        LichessTactic.puzzle_id.in_(tactic_puzzle_ids)
                     )
                 ).all()
             }
@@ -107,34 +140,34 @@ def import_puzzles(
             theme_assoc: list[dict] = []
             opening_assoc: list[dict] = []
 
-            for puzzle_row, t_list, o_list in zip(puzzle_batch, batch_themes, batch_openings):
-                pid = puzzle_id_map.get(puzzle_row["puzzle_id"])
-                if pid is None:
+            for tactic_row, t_list, o_list in zip(tactic_batch, batch_themes, batch_openings):
+                tid = all_tactic_id_map.get(str(tactic_row["puzzle_id"]))
+                if tid is None:
                     continue
                 for t in t_list:
-                    tid = theme_cache.get(t)
-                    if tid is not None:
-                        theme_assoc.append({"puzzle_id": pid, "theme_id": tid})
+                    theme_id = theme_cache.get(t)
+                    if theme_id is not None:
+                        theme_assoc.append({"lichess_tactic_id": tid, "lichess_tactic_theme_id": theme_id})
                     else:
                         unknown_themes.add(t)
                 for o in o_list:
                     oid = opening_cache.get(o)
                     if oid is not None:
-                        opening_assoc.append({"puzzle_id": pid, "opening_id": oid})
+                        opening_assoc.append({"lichess_tactic_id": tid, "opening_id": oid})
                     else:
                         unknown_openings.add(o)
 
             if theme_assoc:
                 db.session.execute(
-                    pg_insert(puzzle_themes).values(theme_assoc).on_conflict_do_nothing()
+                    pg_insert(lichess_tactic_theme_links).values(theme_assoc).on_conflict_do_nothing()
                 )
             if opening_assoc:
                 db.session.execute(
-                    pg_insert(puzzle_openings).values(opening_assoc).on_conflict_do_nothing()
+                    pg_insert(lichess_tactic_openings).values(opening_assoc).on_conflict_do_nothing()
                 )
             db.session.commit()
 
-        puzzle_batch.clear()
+        tactic_batch.clear()
         batch_themes.clear()
         batch_openings.clear()
         return inserted_count
@@ -155,7 +188,7 @@ def import_puzzles(
                 rows_skipped += 1
             else:
                 fen = row["FEN"]
-                puzzle_batch.append({
+                tactic_batch.append({
                     "puzzle_id": row["PuzzleId"],
                     "fen": fen,
                     "moves": row["Moves"],
@@ -168,7 +201,7 @@ def import_puzzles(
                 batch_themes.append(row["Themes"].split() if row["Themes"] else [])
                 batch_openings.append(row["OpeningTags"].split() if row["OpeningTags"] else [])
 
-                if len(puzzle_batch) >= batch_size:
+                if len(tactic_batch) >= batch_size:
                     rows_inserted += flush()
 
                     if limit is not None and rows_inserted >= limit:
@@ -196,7 +229,7 @@ def import_puzzles(
 @click.option("--max-rating", default=9999, type=int, help="Skip puzzles above this rating")
 @click.option("--batch-size", default=500, type=int, help="Rows per database batch")
 def relink_puzzles(file_path: str, min_rating: int, max_rating: int, batch_size: int) -> None:
-    theme_cache: dict[str, int] = _load_cache(Theme)
+    theme_cache: dict[str, int] = _load_cache(LichessTacticTheme)
     opening_cache: dict[str, int] = _load_cache(Opening)
 
     rows_read = 0
@@ -208,30 +241,32 @@ def relink_puzzles(file_path: str, min_rating: int, max_rating: int, batch_size:
         if not batch:
             return 0
         puzzle_id_strs = [b[0] for b in batch]
-        puzzle_id_map = {
+        tactic_id_map = {
             row.puzzle_id: row.id
             for row in db.session.execute(
-                db.select(Puzzle.puzzle_id, Puzzle.id).where(Puzzle.puzzle_id.in_(puzzle_id_strs))
+                db.select(LichessTactic.puzzle_id, LichessTactic.id).where(
+                    LichessTactic.puzzle_id.in_(puzzle_id_strs)
+                )
             ).all()
         }
         theme_assoc: list[dict] = []
         opening_assoc: list[dict] = []
         for pid_str, themes, openings in batch:
-            pid = puzzle_id_map.get(pid_str)
-            if pid is None:
+            tid = tactic_id_map.get(pid_str)
+            if tid is None:
                 continue
             for t in themes:
-                if (tid := theme_cache.get(t)) is not None:
-                    theme_assoc.append({"puzzle_id": pid, "theme_id": tid})
+                if (theme_id := theme_cache.get(t)) is not None:
+                    theme_assoc.append({"lichess_tactic_id": tid, "lichess_tactic_theme_id": theme_id})
             for o in openings:
                 if (oid := opening_cache.get(o)) is not None:
-                    opening_assoc.append({"puzzle_id": pid, "opening_id": oid})
+                    opening_assoc.append({"lichess_tactic_id": tid, "opening_id": oid})
         if theme_assoc:
-            db.session.execute(pg_insert(puzzle_themes).values(theme_assoc).on_conflict_do_nothing())
+            db.session.execute(pg_insert(lichess_tactic_theme_links).values(theme_assoc).on_conflict_do_nothing())
         if opening_assoc:
-            db.session.execute(pg_insert(puzzle_openings).values(opening_assoc).on_conflict_do_nothing())
+            db.session.execute(pg_insert(lichess_tactic_openings).values(opening_assoc).on_conflict_do_nothing())
         db.session.commit()
-        return len(puzzle_id_map)
+        return len(tactic_id_map)
 
     stream, fh = _open_stream(file_path)
     try:

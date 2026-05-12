@@ -120,6 +120,33 @@ export type Opening = {
   eco: string | null
 }
 
+export type TrainingItemSource = 'LICHESS_TACTIC' | 'DECOY' | 'POSITIONAL'
+
+export type TrainingItem = {
+  id: number
+  sourceType: TrainingItemSource
+  createdAt: string
+}
+
+export type LichessTacticTheme = {
+  name: string
+  displayName: string | null
+  description: string | null
+}
+
+export type LichessTactic = {
+  id: number
+  trainingItemId: number
+  puzzleId: string
+  fen: string
+  moves: string
+  rating: number
+  ratingDeviation: number
+  popularity: number
+  nbPlays: number
+  gameUrl: string
+}
+
 export type ScheduleRunDef = {
   target_hours: number
   break_after_hours: number

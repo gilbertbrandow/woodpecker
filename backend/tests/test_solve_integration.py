@@ -29,8 +29,8 @@ class TestSolveHappyPath:
         assert body["outcome"] == "solved"
         assert body["completedAttemptId"] == attempt_id
 
-        from app.models.run import PuzzleAttempt
-        attempt_row = db_session.get(PuzzleAttempt, attempt_id)
+        from app.models.run import TrainingAttempt
+        attempt_row = db_session.get(TrainingAttempt, attempt_id)
         assert attempt_row is not None
         assert attempt_row.status == "solved"
         assert attempt_row.time_spent_ms == 3000
@@ -94,8 +94,8 @@ class TestCheckmateAlternative:
             f"Solution move was {solution_move!r}."
         )
 
-        from app.models.run import PuzzleAttempt
-        attempt_row = db_session.get(PuzzleAttempt, attempt_id)
+        from app.models.run import TrainingAttempt
+        attempt_row = db_session.get(TrainingAttempt, attempt_id)
         assert attempt_row is not None
         assert attempt_row.moves == [alt_move]
 
@@ -165,7 +165,7 @@ class TestFailedAttempt:
         assert len(matching) == 1
         assert matching[0]["status"] == "failed"
 
-        from app.models.run import PuzzleAttempt
-        attempt_row = db_session.get(PuzzleAttempt, attempt_id)
+        from app.models.run import TrainingAttempt
+        attempt_row = db_session.get(TrainingAttempt, attempt_id)
         assert attempt_row is not None
         assert attempt_row.status == "failed"

@@ -7,8 +7,8 @@ from flask import Flask
 from flask.testing import FlaskClient
 
 _TRUNCATE_TABLES = (
-    "puzzle_attempts, run_puzzles, runs, trainings, "
-    "schedules, subset_puzzles, subsets, users, puzzles"
+    "training_attempts, run_training_items, runs, trainings, "
+    "schedules, subset_training_items, subsets, users, lichess_tactics, training_items"
 )
 
 
@@ -52,18 +52,24 @@ def db_session(app: Flask, _db_schema: None):  # type: ignore[misc]
 
 def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
     from app.models.user import User
-    from app.models.puzzle import Puzzle
-    from app.models.subset import Subset, SubsetPuzzle
+    from app.models.training_item import TrainingItem, TrainingItemSource
+    from app.models.lichess_tactic import LichessTactic
+    from app.models.subset import Subset, SubsetTrainingItem
     from app.models.schedule import Schedule
     from app.models.training import Training
-    from app.models.run import Run, RunPuzzle, PuzzleAttempt
+    from app.models.run import Run, RunTrainingItem, TrainingAttempt
 
     PUZZLE_ID = "test_spec17_001"
     PUZZLE_FEN = "4k3/1Q5R/8/8/3K4/8/8/R7 b - - 0 1"
     PUZZLE_SOLUTION = "e8d8 a1a8"
     CHECKMATE_ALT = "h7h8"
 
-    puzzle = Puzzle(
+    training_item = TrainingItem(source_type=TrainingItemSource.LICHESS_TACTIC)
+    session.add(training_item)
+    session.flush()
+
+    tactic = LichessTactic(
+        training_item_id=training_item.id,
         puzzle_id=PUZZLE_ID,
         fen=PUZZLE_FEN,
         moves=PUZZLE_SOLUTION,
@@ -73,11 +79,11 @@ def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
         nb_plays=100,
         game_url="https://lichess.org/test",
     )
-    session.add(puzzle)
+    session.add(tactic)
     session.flush()
 
     user = User(
-        lichess_username=f"testuser_{puzzle.id}",
+        lichess_username=f"testuser_{tactic.id}",
         created_at=datetime.now(timezone.utc),
     )
     session.add(user)
@@ -93,7 +99,7 @@ def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
     session.add(subset)
     session.flush()
 
-    session.add(SubsetPuzzle(subset_id=subset.id, puzzle_id=puzzle.id, position=0))
+    session.add(SubsetTrainingItem(subset_id=subset.id, training_item_id=training_item.id, position=0))
     session.flush()
 
     schedule_config: dict[str, object] = {
@@ -126,12 +132,12 @@ def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
     session.add(run)
     session.flush()
 
-    run_puzzle = RunPuzzle(run_id=run.id, position=0, puzzle_id=puzzle.id)
-    session.add(run_puzzle)
+    run_training_item = RunTrainingItem(run_id=run.id, position=0, training_item_id=training_item.id)
+    session.add(run_training_item)
     session.flush()
 
-    attempt = PuzzleAttempt(
-        run_puzzle_id=run_puzzle.id,
+    attempt = TrainingAttempt(
+        run_training_item_id=run_training_item.id,
         try_number=1,
         status="in_progress",
         started_at=datetime.now(timezone.utc),
@@ -143,7 +149,7 @@ def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
     return {
         "user_id": user.id,
         "run_id": run.id,
-        "run_puzzle_id": run_puzzle.id,
+        "run_puzzle_id": run_training_item.id,
         "attempt_id": attempt.id,
         "puzzle_fen": PUZZLE_FEN,
         "puzzle_solution": PUZZLE_SOLUTION,

@@ -1,5 +1,5 @@
 import chess as python_chess
-from app.models.run import PuzzleAttempt
+from app.models.run import TrainingAttempt
 from app.services.run import _derive_attempt_outcome, _derive_position_status
 
 STANDARD_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -7,8 +7,8 @@ TWO_PLY_SOLUTION = "e2e4 d7d5"
 FOUR_PLY_SOLUTION = "e2e4 d7d5 e4d5 d8d5"
 
 
-def _make_attempt(try_number: int, status: str) -> PuzzleAttempt:
-    a = PuzzleAttempt()
+def _make_attempt(try_number: int, status: str) -> TrainingAttempt:
+    a = TrainingAttempt()
     a.try_number = try_number
     a.status = status
     return a
