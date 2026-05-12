@@ -23,26 +23,26 @@ build-lichess-tactics: build-base
 # ── Shared openings ────────────────────────────────────────────────────────────
 
 shared-openings-ensure-data: build-shared
-	docker run --rm $(RAW_MOUNT) woodpecker-pipeline-shared python cli.py shared openings ensure-data
+	docker run --rm --add-host=host.docker.internal:host-gateway $(RAW_MOUNT) woodpecker-pipeline-shared python cli.py shared openings ensure-data
 
 shared-openings-import: build-shared
-	docker run --rm $(RAW_MOUNT) -e DATABASE_URL=$(DOCKER_DB_URL) woodpecker-pipeline-shared python cli.py shared openings import
+	docker run --rm --add-host=host.docker.internal:host-gateway $(RAW_MOUNT) -e DATABASE_URL=$(DOCKER_DB_URL) woodpecker-pipeline-shared python cli.py shared openings import
 
 # ── Lichess tactic themes ──────────────────────────────────────────────────────
 
 lichess-tactics-themes-ensure-data: build-lichess-tactics
-	docker run --rm $(RAW_MOUNT) woodpecker-pipeline-lichess-tactics python cli.py lichess-tactics themes ensure-data
+	docker run --rm --add-host=host.docker.internal:host-gateway $(RAW_MOUNT) woodpecker-pipeline-lichess-tactics python cli.py lichess-tactics themes ensure-data
 
 lichess-tactics-themes-import: build-lichess-tactics
-	docker run --rm $(RAW_MOUNT) -e DATABASE_URL=$(DOCKER_DB_URL) woodpecker-pipeline-lichess-tactics python cli.py lichess-tactics themes import
+	docker run --rm --add-host=host.docker.internal:host-gateway $(RAW_MOUNT) -e DATABASE_URL=$(DOCKER_DB_URL) woodpecker-pipeline-lichess-tactics python cli.py lichess-tactics themes import
 
 # ── Lichess tactics ────────────────────────────────────────────────────────────
 
 lichess-tactics-ensure-data: build-lichess-tactics
-	docker run --rm $(RAW_MOUNT) woodpecker-pipeline-lichess-tactics python cli.py lichess-tactics tactics ensure-data
+	docker run --rm --add-host=host.docker.internal:host-gateway $(RAW_MOUNT) woodpecker-pipeline-lichess-tactics python cli.py lichess-tactics tactics ensure-data
 
 lichess-tactics-import: build-lichess-tactics
-	docker run --rm $(RAW_MOUNT) -e DATABASE_URL=$(DOCKER_DB_URL) woodpecker-pipeline-lichess-tactics python cli.py lichess-tactics tactics import $(ARGS)
+	docker run --rm --add-host=host.docker.internal:host-gateway $(RAW_MOUNT) -e DATABASE_URL=$(DOCKER_DB_URL) woodpecker-pipeline-lichess-tactics python cli.py lichess-tactics tactics import $(ARGS)
 
 lichess-tactics-validate: build-lichess-tactics
-	docker run --rm -e DATABASE_URL=$(DOCKER_DB_URL) woodpecker-pipeline-lichess-tactics python cli.py lichess-tactics validate-links
+	docker run --rm --add-host=host.docker.internal:host-gateway -e DATABASE_URL=$(DOCKER_DB_URL) woodpecker-pipeline-lichess-tactics python cli.py lichess-tactics validate-links

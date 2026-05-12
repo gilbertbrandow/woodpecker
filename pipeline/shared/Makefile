@@ -12,7 +12,7 @@ build:
 	docker build -f $(SHARED_DIR)/Dockerfile -t woodpecker-pipeline-shared $(REPO_DIR)
 
 ensure-data: build
-	docker run --rm $(RAW_MOUNT) woodpecker-pipeline-shared python cli.py shared openings ensure-data
+	docker run --rm --add-host=host.docker.internal:host-gateway $(RAW_MOUNT) woodpecker-pipeline-shared python cli.py shared openings ensure-data
 
 import: build
-	docker run --rm $(RAW_MOUNT) -e DATABASE_URL=$(DOCKER_DB_URL) woodpecker-pipeline-shared python cli.py shared openings import
+	docker run --rm --add-host=host.docker.internal:host-gateway $(RAW_MOUNT) -e DATABASE_URL=$(DOCKER_DB_URL) woodpecker-pipeline-shared python cli.py shared openings import
