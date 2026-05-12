@@ -11,8 +11,6 @@ from app.routes.runs import runs_bp
 from app.routes.themes import themes_bp
 from app.routes.openings import openings_bp
 from app.routes.leaderboard import leaderboard_bp
-from app.commands.puzzles import puzzles_cli
-from app.commands.openings import openings_cli
 
 
 def create_app() -> Flask:
@@ -38,8 +36,5 @@ def create_app() -> Flask:
     app.register_blueprint(themes_bp)
     app.register_blueprint(openings_bp)
     app.register_blueprint(leaderboard_bp)
-
-    app.cli.add_command(puzzles_cli)
-    app.cli.add_command(openings_cli)
 
     return app

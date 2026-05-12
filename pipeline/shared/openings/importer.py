@@ -1,17 +1,15 @@
 import csv
 import re
 import unicodedata
-from typing import cast
+from pathlib import Path
+from typing import Any, cast
 
 import click
 import sqlalchemy as sa
-from flask.cli import AppGroup
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import Session
 
-from app.extensions import db
 from app.models.opening import Opening
-
-openings_cli = AppGroup("openings")
 
 
 def opening_name_to_key(display_name: str) -> str:
@@ -28,12 +26,9 @@ def parent_display_name(display_name: str) -> str | None:
     return None
 
 
-@openings_cli.command("import")
-@click.option("--file", "file_paths", required=True, multiple=True, type=click.Path(exists=True), help="Path to a TSV file (repeatable)")
-def import_openings(file_paths: tuple[str, ...]) -> None:
+def import_openings(session: Session, files: list[Path]) -> None:
     rows: list[dict[str, str]] = []
-
-    for file_path in file_paths:
+    for file_path in files:
         with open(file_path, newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f, delimiter="\t")
             for row in reader:
@@ -49,6 +44,11 @@ def import_openings(file_paths: tuple[str, ...]) -> None:
         click.echo("No rows found.")
         return
 
+    seen: dict[str, dict[str, str]] = {}
+    for row in rows:
+        seen[row["name"]] = row
+    rows = list(seen.values())
+
     opening_table = cast(sa.Table, Opening.__table__)
     stmt = (
         pg_insert(opening_table)
@@ -62,18 +62,18 @@ def import_openings(file_paths: tuple[str, ...]) -> None:
             },
         )
     )
-    db.session.execute(stmt)
-    db.session.commit()
+    session.execute(stmt)
+    session.commit()
     click.echo(f"Upserted {len(rows)} openings.")
 
     display_to_id: dict[str, int] = {
         row.display_name: row.id
-        for row in db.session.execute(
-            db.select(Opening.display_name, Opening.id).where(Opening.display_name.isnot(None))
+        for row in session.execute(
+            sa.select(Opening.display_name, Opening.id).where(Opening.display_name.isnot(None))
         ).all()
     }
 
-    updates: list[dict] = []
+    updates: list[dict[str, Any]] = []
     for row in rows:
         parent = parent_display_name(row["display_name"])
         if parent is not None:
@@ -82,13 +82,13 @@ def import_openings(file_paths: tuple[str, ...]) -> None:
                 updates.append({"_name": row["name"], "_parent_id": parent_id})
 
     if updates:
-        db.session.execute(
-            db.update(Opening)
-            .where(Opening.name == db.bindparam("_name"))
-            .values(parent_id=db.bindparam("_parent_id")),
+        session.execute(
+            sa.update(opening_table)
+            .where(opening_table.c.name == sa.bindparam("_name"))
+            .values(parent_id=sa.bindparam("_parent_id")),
             updates,
         )
-        db.session.commit()
+        session.commit()
 
     roots = sum(1 for r in rows if parent_display_name(r["display_name"]) is None)
     click.echo(f"Parent links assigned: {len(updates)} | Root openings: {roots}")

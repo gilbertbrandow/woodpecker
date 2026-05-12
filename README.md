@@ -16,13 +16,16 @@ On subsequent starts, `make up` is enough (no rebuild needed).
 
 ## Importing puzzles
 
-Download [lichess_db_puzzle.csv.zst](https://database.lichess.org/lichess_db_puzzle.csv.zst), then:
+Puzzle data is managed by the standalone pipeline package. See [pipeline/data/README.md](pipeline/data/README.md) for full instructions. The short version:
 
 ```bash
-make puzzle-copy file=/path/to/lichess_db_puzzle.csv.zst
-make puzzle-import
-make openings-import
+make -C pipeline shared-openings-import
+make -C pipeline lichess-tactics-themes-import
+make -C pipeline lichess-tactics-import
+make -C pipeline lichess-tactics-validate
 ```
+
+Each step downloads its source data automatically on first run.
 
 ## Deployment
 

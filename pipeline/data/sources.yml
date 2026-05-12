@@ -1,0 +1,19 @@
+openings:
+  - name: a.tsv
+    url: https://raw.githubusercontent.com/lichess-org/chess-openings/master/a.tsv
+  - name: b.tsv
+    url: https://raw.githubusercontent.com/lichess-org/chess-openings/master/b.tsv
+  - name: c.tsv
+    url: https://raw.githubusercontent.com/lichess-org/chess-openings/master/c.tsv
+  - name: d.tsv
+    url: https://raw.githubusercontent.com/lichess-org/chess-openings/master/d.tsv
+  - name: e.tsv
+    url: https://raw.githubusercontent.com/lichess-org/chess-openings/master/e.tsv
+
+lichess_tactic_themes:
+  - name: themes.xml
+    url: https://raw.githubusercontent.com/lichess-org/lila/master/translation/source/puzzleTheme.xml
+
+lichess_tactics:
+  - name: lichess_db_puzzle.csv.zst
+    url: https://database.lichess.org/lichess_db_puzzle.csv.zst
