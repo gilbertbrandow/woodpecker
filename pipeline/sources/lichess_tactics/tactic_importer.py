@@ -217,6 +217,9 @@ def import_tactics(
     if unknown_themes:
         click.echo(f"Warning: {len(unknown_themes)} unknown theme key(s): {', '.join(sorted(unknown_themes))}")
     if unknown_openings:
-        click.echo(f"Warning: {len(unknown_openings)} unknown opening key(s) skipped.")
-    if rows_inserted > 0 and len(unknown_openings) > rows_inserted * 0.05:
-        click.echo("WARNING: High unknown opening rate — run 'validate-links' to check coverage.")
+        click.echo(
+            f"ERROR: {len(unknown_openings)} opening key(s) in the CSV had no match in the openings table:\n"
+            + "\n".join(f"  {k}" for k in sorted(unknown_openings))
+        )
+        click.echo("Run 'make -C pipeline shared-openings-import' and retry.")
+        raise SystemExit(1)
