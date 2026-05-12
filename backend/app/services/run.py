@@ -9,11 +9,12 @@ import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.models.lichess_tactic import LichessTactic
+from app.models.lichess_tactic import LichessTactic  # used only in get_puzzle_history (Lichess-specific until Step 3)
 from app.models.run import MAX_PUZZLE_TIME_MS, TrainingAttempt, Run, RunTrainingItem
 from app.models.schedule import Schedule
 from app.models.training import Training
 from app.models.subset import Subset, SubsetTrainingItem
+from app.services.training_item_content import TrainingItemContent, get_content, get_content_batch
 
 
 def _get_run(run_id: int) -> Run:
@@ -213,11 +214,7 @@ def _session_attempt_strip_item(
 
 
 def _run_puzzle_attempt_view_dict(run_puzzle: RunTrainingItem) -> dict[str, object]:
-    puzzle = db.session.execute(
-        sa.select(LichessTactic).where(LichessTactic.training_item_id == run_puzzle.training_item_id)
-    ).scalar_one_or_none()
-    if puzzle is None:
-        raise LookupError("Puzzle not found.")
+    content = get_content(run_puzzle.training_item_id)
     run = db.session.get(Run, run_puzzle.run_id)
     if run is None:
         raise LookupError("Run not found.")
@@ -263,15 +260,12 @@ def _run_puzzle_attempt_view_dict(run_puzzle: RunTrainingItem) -> dict[str, obje
             "scheduleName": schedule_name,
         },
         "puzzle": {
-            "puzzleId": puzzle.puzzle_id,
-            "fen": puzzle.fen,
-            "solution": puzzle.moves.split(),
-            "rating": puzzle.rating,
-            "themes": [
-                {"name": t.name, "displayName": t.display_name}
-                for t in puzzle.themes
-            ],
-            "gameUrl": puzzle.game_url,
+            "puzzleId": content.display_id,
+            "fen": content.fen,
+            "solution": content.moves.split(),
+            "rating": content.rating,
+            "themes": content.themes,
+            "gameUrl": content.game_url,
         },
         "attempt": {
             "id": in_progress_attempt.id,
@@ -294,11 +288,7 @@ def _run_puzzle_attempt_view_dict(run_puzzle: RunTrainingItem) -> dict[str, obje
 
 
 def _run_puzzle_full_dict(run_puzzle: RunTrainingItem) -> dict[str, object]:
-    puzzle = db.session.execute(
-        sa.select(LichessTactic).where(LichessTactic.training_item_id == run_puzzle.training_item_id)
-    ).scalar_one_or_none()
-    if puzzle is None:
-        raise LookupError("Puzzle not found.")
+    content = get_content(run_puzzle.training_item_id)
     run = db.session.get(Run, run_puzzle.run_id)
     if run is None:
         raise LookupError("Run not found.")
@@ -328,11 +318,11 @@ def _run_puzzle_full_dict(run_puzzle: RunTrainingItem) -> dict[str, object]:
         "runPuzzleId": run_puzzle.id,
         "position": run_puzzle.position,
         "positionStatus": _derive_position_status(sorted_attempts, total_queue),
-        "puzzleId": puzzle.puzzle_id,
-        "fen": puzzle.fen,
-        "solution": puzzle.moves,
-        "rating": puzzle.rating,
-        "gameUrl": puzzle.game_url,
+        "puzzleId": content.display_id,
+        "fen": content.fen,
+        "solution": content.moves,
+        "rating": content.rating,
+        "gameUrl": content.game_url,
         "maxTriesPerPuzzle": total_queue,
         "currentTryNumber": current_try_number,
         "currentAttemptId": current_attempt_id,
@@ -340,10 +330,7 @@ def _run_puzzle_full_dict(run_puzzle: RunTrainingItem) -> dict[str, object]:
         "totalPuzzles": total_puzzles,
         "scheduleName": schedule.name,
         "runIndex": run.run_index,
-        "themes": [
-            {"name": t.name, "displayName": t.display_name}
-            for t in puzzle.themes
-        ],
+        "themes": content.themes,
         **attempt_type_data,
     }
 
@@ -715,8 +702,7 @@ def list_run_puzzles(run_id: int) -> dict[str, object]:
         sa.text("""
             SELECT rp.id AS run_training_item_id,
                    rp.position,
-                   p.puzzle_id,
-                   p.rating,
+                   rp.training_item_id,
                    COUNT(pa.id) FILTER (WHERE pa.status != 'in_progress') AS try_count,
                    (
                        SELECT pa2.time_spent_ms
@@ -727,14 +713,16 @@ def list_run_puzzles(run_id: int) -> dict[str, object]:
                        LIMIT 1
                    ) AS time_ms
             FROM run_training_items rp
-            JOIN lichess_tactics p ON p.training_item_id = rp.training_item_id
             LEFT JOIN training_attempts pa ON pa.run_training_item_id = rp.id
             WHERE rp.run_id = :run_id
-            GROUP BY rp.id, rp.position, p.puzzle_id, p.rating
+            GROUP BY rp.id, rp.position, rp.training_item_id
             ORDER BY rp.position
         """),
         {"run_id": run_id},
     ).all()
+
+    training_item_ids = [row.training_item_id for row in rows]
+    contents = get_content_batch(training_item_ids)
 
     rp_ids = [row.run_training_item_id for row in rows]
     attempts_by_puzzle: dict[int, list[TrainingAttempt]] = {rp_id: [] for rp_id in rp_ids}
@@ -747,8 +735,8 @@ def list_run_puzzles(run_id: int) -> dict[str, object]:
         {
             "runPuzzleId": row.run_training_item_id,
             "position": row.position,
-            "puzzleId": row.puzzle_id,
-            "rating": row.rating,
+            "puzzleId": contents[row.training_item_id].display_id,
+            "rating": contents[row.training_item_id].rating,
             "positionStatus": _derive_position_status(
                 attempts_by_puzzle[row.run_training_item_id], total_queue
             ),
@@ -1137,11 +1125,7 @@ def _same_puzzle_run_overview_items(
         other_run = db.session.get(Run, rp.run_id)
         if other_run is None:
             continue
-        puzzle = db.session.execute(
-            sa.select(LichessTactic).where(LichessTactic.training_item_id == rp.training_item_id)
-        ).scalar_one_or_none()
-        if puzzle is None:
-            continue
+        rp_content = get_content(rp.training_item_id)
 
         sorted_attempts = sorted(rp.attempts, key=lambda a: a.try_number)
         q_id = _qualifying_attempt_id(sorted_attempts, total_queue)
@@ -1155,7 +1139,7 @@ def _same_puzzle_run_overview_items(
         attempt_views = [
             _overview_attempt_view(
                 a, other_run, rp, q_id, total_queue,
-                puzzle.fen, puzzle.moves,
+                rp_content.fen, rp_content.moves,
                 other_run_puzzles_for_run, training_id,
             )
             for a in sorted_attempts
@@ -1255,7 +1239,7 @@ def _compute_progress_card(
     return {"runProgress": run_progress_row, "trainingProgress": training_progress_row}
 
 
-def _compute_overview_actions(run: Run, puzzle: LichessTactic) -> dict[str, object]:
+def _compute_overview_actions(run: Run, content: TrainingItemContent) -> dict[str, object]:
     next_enabled = run.completed_at is None and run.aborted_at is None
     disabled_reason: str | None = None
     if run.completed_at is not None:
@@ -1266,7 +1250,7 @@ def _compute_overview_actions(run: Run, puzzle: LichessTactic) -> dict[str, obje
     return {
         "runStatus": run.status,
         "retake": {"enabled": True},
-        "analyze": {"enabled": True, "url": puzzle.game_url},
+        "analyze": {"enabled": True, "url": content.game_url},
         "nextPuzzle": {"enabled": next_enabled, "disabledReason": disabled_reason},
     }
 
@@ -1339,11 +1323,7 @@ def _build_run_puzzle_overview(
     run_just_completed: bool = False,
     completing_attempt_id: int | None = None,
 ) -> dict[str, object]:
-    puzzle = db.session.execute(
-        sa.select(LichessTactic).where(LichessTactic.training_item_id == run_puzzle.training_item_id)
-    ).scalar_one_or_none()
-    if puzzle is None:
-        raise LookupError("Puzzle not found.")
+    content = get_content(run_puzzle.training_item_id)
 
     _, config = _get_schedule_config(run)
     total_queue = _total_queue_attempts(config)
@@ -1395,7 +1375,7 @@ def _build_run_puzzle_overview(
     for a in sorted_attempts:
         view = _overview_attempt_view(
             a, run, run_puzzle, qualifying_attempt_id, total_queue,
-            puzzle.fen, puzzle.moves, all_run_puzzles, training_id,
+            content.fen, content.moves, all_run_puzzles, training_id,
         )
         if a.id == qualifying_attempt_id:
             impact = cast(dict[str, object], view["impact"])
@@ -1434,15 +1414,12 @@ def _build_run_puzzle_overview(
             "scheduleName": schedule_name,
         },
         "puzzle": {
-            "puzzleId": puzzle.puzzle_id,
-            "fen": puzzle.fen,
-            "solution": puzzle.moves.split(),
-            "rating": puzzle.rating,
-            "themes": [
-                {"name": t.name, "displayName": t.display_name}
-                for t in puzzle.themes
-            ],
-            "gameUrl": puzzle.game_url,
+            "puzzleId": content.display_id,
+            "fen": content.fen,
+            "solution": content.moves.split(),
+            "rating": content.rating,
+            "themes": content.themes,
+            "gameUrl": content.game_url,
         },
         "selectedAttemptId": resolved_selected_id,
         "attempts": attempt_views,
@@ -1461,7 +1438,7 @@ def _build_run_puzzle_overview(
         "progress": _compute_progress_card(
             run, all_run_puzzles, total_queue, run_progress_delta_pct, training_id
         ),
-        "actions": _compute_overview_actions(run, puzzle),
+        "actions": _compute_overview_actions(run, content),
         "timer": {
             "targetSolveTenths": target_solve_tenths,
         },
@@ -1559,13 +1536,9 @@ def complete_attempt(
     total_queue = _total_queue_attempts(config)
     is_queue_attempt = attempt.try_number <= total_queue
 
-    puzzle = db.session.execute(
-        sa.select(LichessTactic).where(LichessTactic.training_item_id == run_puzzle.training_item_id)
-    ).scalar_one_or_none()
-    if puzzle is None:
-        raise LookupError("Puzzle not found.")
+    content = get_content(run_puzzle.training_item_id)
 
-    outcome = _derive_attempt_outcome(puzzle.fen, puzzle.moves, uci_moves)
+    outcome = _derive_attempt_outcome(content.fen, content.moves, uci_moves)
 
     now = datetime.now(timezone.utc)
     attempt.status = outcome
