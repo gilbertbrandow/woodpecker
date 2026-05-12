@@ -4,6 +4,7 @@ import click
 
 from db import Session
 from sources.lichess_tactics.downloader import ensure_theme_file, ensure_tactics_file
+from sources.lichess_tactics.opening_relinker import relink_openings as _relink_openings
 from sources.lichess_tactics.theme_importer import import_themes
 from sources.lichess_tactics.tactic_importer import import_tactics
 from sources.lichess_tactics.validators import validate_links as _validate_links
@@ -63,6 +64,19 @@ def tactics_import(
     file = Path(file_path) if file_path else ensure_tactics_file()
     with Session() as session:
         import_tactics(session, file, limit, min_rating, max_rating, batch_size)
+
+
+@tactics.command("relink-openings")
+@click.option("--file", "file_path", default=None, type=click.Path(exists=True), help="Path to lichess_db_puzzle.csv or .csv.zst (downloaded automatically if omitted)")
+@click.option("--batch-size", type=int, default=500, show_default=True, help="DB insert batch size")
+def tactics_relink_openings(file_path: str | None, batch_size: int) -> None:
+    """Add any missing opening links to existing tactics (safe to run on production).
+
+    Run 'validate-links' before and after to measure the improvement.
+    """
+    file = Path(file_path) if file_path else ensure_tactics_file()
+    with Session() as session:
+        _relink_openings(session, file, batch_size)
 
 
 @lichess_tactics.command("validate-links")

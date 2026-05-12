@@ -7,7 +7,7 @@ RAW_MOUNT      = -v $(PIPELINE_DIR)/data/raw:/app/pipeline/data/raw
 .PHONY: build-base build-shared build-lichess-tactics \
         shared-openings-ensure-data shared-openings-import \
         lichess-tactics-themes-ensure-data lichess-tactics-themes-import \
-        lichess-tactics-ensure-data lichess-tactics-import lichess-tactics-validate
+        lichess-tactics-ensure-data lichess-tactics-import lichess-tactics-relink-openings lichess-tactics-validate
 
 # ── Images ─────────────────────────────────────────────────────────────────────
 
@@ -43,6 +43,9 @@ lichess-tactics-ensure-data: build-lichess-tactics
 
 lichess-tactics-import: build-lichess-tactics
 	docker run --rm --add-host=host.docker.internal:host-gateway $(RAW_MOUNT) -e DATABASE_URL=$(DOCKER_DB_URL) woodpecker-pipeline-lichess-tactics lichess-tactics tactics import $(ARGS)
+
+lichess-tactics-relink-openings: build-lichess-tactics
+	docker run --rm --add-host=host.docker.internal:host-gateway $(RAW_MOUNT) -e DATABASE_URL=$(DOCKER_DB_URL) woodpecker-pipeline-lichess-tactics lichess-tactics tactics relink-openings $(ARGS)
 
 lichess-tactics-validate: build-lichess-tactics
 	docker run --rm --add-host=host.docker.internal:host-gateway -e DATABASE_URL=$(DOCKER_DB_URL) woodpecker-pipeline-lichess-tactics lichess-tactics validate-links
