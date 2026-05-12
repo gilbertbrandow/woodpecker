@@ -19,6 +19,42 @@ from app.models.opening import Opening
 
 PROGRESS_INTERVAL = 10_000
 
+# Lichess puzzles CSV uses different opening names than the chess-openings TSV in some cases.
+# These aliases map puzzle tags to the equivalent DB key so they resolve without fuzzy matching.
+OPENING_ALIASES: dict[str, str] = {
+    # Russian Game = Petrov's Defense (same opening, different naming convention)
+    "Russian_Game": "Petrovs_Defense",
+    "Russian_Game_Classical_Attack": "Petrovs_Defense_Classical_Attack",
+    "Russian_Game_Cochrane_Gambit": "Petrovs_Defense_Cochrane_Gambit",
+    "Russian_Game_Cozio_Attack": "Petrovs_Defense_Cozio_Attack",
+    "Russian_Game_Damiano_Variation": "Petrovs_Defense_Damiano_Variation",
+    "Russian_Game_French_Attack": "Petrovs_Defense_French_Attack",
+    "Russian_Game_Italian_Variation": "Petrovs_Defense_Italian_Variation",
+    "Russian_Game_Karklins-Martinovsky_Variation": "Petrovs_Defense_Karklins-Martinovsky_Variation",
+    "Russian_Game_Millennium_Attack": "Petrovs_Defense_Millennium_Attack",
+    "Russian_Game_Modern_Attack": "Petrovs_Defense_Modern_Attack",
+    "Russian_Game_Nimzowitsch_Attack": "Petrovs_Defense_Nimzowitsch_Attack",
+    "Russian_Game_Other_variations": "Petrovs_Defense",
+    "Russian_Game_Paulsen_Attack": "Petrovs_Defense_Paulsen_Attack",
+    "Russian_Game_Stafford_Gambit": "Petrovs_Defense_Stafford_Gambit",
+    "Russian_Game_Three_Knights_Game": "Petrovs_Defense_Three_Knights_Game",
+    # Giuoco Piano is a variation under Italian Game in the TSV
+    "Giuoco_Piano": "Italian_Game_Giuoco_Piano",
+    "Giuoco_Piano_Other_variations": "Italian_Game_Giuoco_Piano",
+    # Bronstein Gambit = Latvian Gambit Accepted: Bronstein Gambit (C40)
+    "Bronstein_Gambit": "Latvian_Gambit_Accepted_Bronstein_Gambit",
+    "Bronstein_Gambit_Other_variations": "Latvian_Gambit_Accepted_Bronstein_Gambit",
+    # Guatemala Defense = Owen Defense: Guatemala Defense
+    "Guatemala_Defense": "Owen_Defense_Guatemala_Defense",
+    "Guatemala_Defense_Other_variations": "Owen_Defense_Guatemala_Defense",
+    # Crab Opening = Ware Opening: Crab Variation
+    "Crab_Opening": "Ware_Opening_Crab_Variation",
+    "Crab_Opening_Other_variations": "Ware_Opening_Crab_Variation",
+    # Gedult's Opening = Barnes Opening (both start with 1. f3)
+    "Gedults_Opening": "Barnes_Opening",
+    "Gedults_Opening_Other_variations": "Barnes_Opening",
+}
+
 
 def _player_oriented_game_url(game_url: str, fen: str) -> str:
     fen_parts = fen.split(" ")
@@ -186,7 +222,8 @@ def import_tactics(
                     else:
                         unknown_themes.add(t)
                 for o in o_list:
-                    oid = opening_cache.get(o)
+                    lookup_key = OPENING_ALIASES.get(o, o)
+                    oid = opening_cache.get(lookup_key)
                     if oid is None:
                         if o not in fuzzy_opening_cache:
                             fuzzy_opening_cache[o] = _fuzzy_match_opening(o, opening_cache)
