@@ -1,27 +1,48 @@
-PIPELINE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-DATABASE_URL ?= postgresql://woodpecker:woodpecker@localhost:5432/woodpecker
+PIPELINE_DIR  := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
+REPO_DIR      := $(abspath $(PIPELINE_DIR)/..)
+DATABASE_URL  ?= postgresql://woodpecker:woodpecker@localhost:5432/woodpecker
+DOCKER_DB_URL  = $(subst localhost,host.docker.internal,$(DATABASE_URL))
+RAW_MOUNT      = -v $(PIPELINE_DIR)/data/raw:/app/pipeline/data/raw
 
-.PHONY: shared-openings-ensure-data shared-openings-import \
+.PHONY: build-base build-shared build-lichess-tactics \
+        shared-openings-ensure-data shared-openings-import \
         lichess-tactics-themes-ensure-data lichess-tactics-themes-import \
         lichess-tactics-ensure-data lichess-tactics-import lichess-tactics-validate
 
-shared-openings-ensure-data:
-	cd $(PIPELINE_DIR) && python cli.py shared openings ensure-data
+# ── Images ─────────────────────────────────────────────────────────────────────
 
-shared-openings-import:
-	cd $(PIPELINE_DIR) && DATABASE_URL=$(DATABASE_URL) python cli.py shared openings import
+build-base:
+	docker build -f $(PIPELINE_DIR)/base.Dockerfile -t woodpecker-pipeline-base $(REPO_DIR)
 
-lichess-tactics-themes-ensure-data:
-	cd $(PIPELINE_DIR) && python cli.py lichess-tactics themes ensure-data
+build-shared: build-base
+	docker build -f $(PIPELINE_DIR)/shared/Dockerfile -t woodpecker-pipeline-shared $(REPO_DIR)
 
-lichess-tactics-themes-import:
-	cd $(PIPELINE_DIR) && DATABASE_URL=$(DATABASE_URL) python cli.py lichess-tactics themes import
+build-lichess-tactics: build-base
+	docker build -f $(PIPELINE_DIR)/sources/lichess_tactics/Dockerfile -t woodpecker-pipeline-lichess-tactics $(REPO_DIR)
 
-lichess-tactics-ensure-data:
-	cd $(PIPELINE_DIR) && python cli.py lichess-tactics tactics ensure-data
+# ── Shared openings ────────────────────────────────────────────────────────────
 
-lichess-tactics-import:
-	cd $(PIPELINE_DIR) && DATABASE_URL=$(DATABASE_URL) python cli.py lichess-tactics tactics import $(ARGS)
+shared-openings-ensure-data: build-shared
+	docker run --rm $(RAW_MOUNT) woodpecker-pipeline-shared python cli.py shared openings ensure-data
 
-lichess-tactics-validate:
-	cd $(PIPELINE_DIR) && DATABASE_URL=$(DATABASE_URL) python cli.py lichess-tactics validate-links
+shared-openings-import: build-shared
+	docker run --rm $(RAW_MOUNT) -e DATABASE_URL=$(DOCKER_DB_URL) woodpecker-pipeline-shared python cli.py shared openings import
+
+# ── Lichess tactic themes ──────────────────────────────────────────────────────
+
+lichess-tactics-themes-ensure-data: build-lichess-tactics
+	docker run --rm $(RAW_MOUNT) woodpecker-pipeline-lichess-tactics python cli.py lichess-tactics themes ensure-data
+
+lichess-tactics-themes-import: build-lichess-tactics
+	docker run --rm $(RAW_MOUNT) -e DATABASE_URL=$(DOCKER_DB_URL) woodpecker-pipeline-lichess-tactics python cli.py lichess-tactics themes import
+
+# ── Lichess tactics ────────────────────────────────────────────────────────────
+
+lichess-tactics-ensure-data: build-lichess-tactics
+	docker run --rm $(RAW_MOUNT) woodpecker-pipeline-lichess-tactics python cli.py lichess-tactics tactics ensure-data
+
+lichess-tactics-import: build-lichess-tactics
+	docker run --rm $(RAW_MOUNT) -e DATABASE_URL=$(DOCKER_DB_URL) woodpecker-pipeline-lichess-tactics python cli.py lichess-tactics tactics import $(ARGS)
+
+lichess-tactics-validate: build-lichess-tactics
+	docker run --rm -e DATABASE_URL=$(DOCKER_DB_URL) woodpecker-pipeline-lichess-tactics python cli.py lichess-tactics validate-links
