@@ -2,7 +2,7 @@ import csv
 import io
 import time
 from pathlib import Path
-from typing import IO, cast
+from typing import IO, Any, cast
 from urllib.parse import urlsplit, urlunsplit
 
 import click
@@ -37,12 +37,12 @@ def _player_oriented_game_url(game_url: str, fen: str) -> str:
     return urlunsplit((parsed.scheme, parsed.netloc, normalized_path, parsed.query, parsed.fragment))
 
 
-def _load_cache(session: Session, model: type) -> dict[str, int]:
+def _load_cache(session: Session, model: type[LichessTacticTheme] | type[Opening]) -> dict[str, int]:
     rows = session.execute(select(model.name, model.id)).all()
     return {name: id_ for name, id_ in rows}
 
 
-def _open_stream(file: Path) -> tuple[IO, IO]:
+def _open_stream(file: Path) -> tuple[IO[Any], IO[Any]]:
     if str(file).endswith(".zst"):
         fh = open(file, "rb")
         dctx = zstandard.ZstdDecompressor()
@@ -84,7 +84,7 @@ def import_tactics(
     theme_cache: dict[str, int] = _load_cache(session, LichessTacticTheme)
     opening_cache: dict[str, int] = _load_cache(session, Opening)
 
-    tactic_batch: list[dict] = []
+    tactic_batch: list[dict[str, Any]] = []
     batch_themes: list[list[str]] = []
     batch_openings: list[list[str]] = []
 
@@ -106,7 +106,7 @@ def import_tactics(
         inserted_count = 0
         if new_tactics:
             ti_result = cast(
-                CursorResult[sa.Any],
+                CursorResult[Any],
                 session.execute(
                     sa.text(
                         "INSERT INTO training_items (source_type) "
@@ -125,7 +125,7 @@ def import_tactics(
             stmt = pg_insert(cast(sa.Table, LichessTactic.__table__)).values(lichess_tactic_rows).on_conflict_do_nothing(
                 index_elements=["puzzle_id"]
             )
-            result = cast(CursorResult[sa.Any], session.execute(stmt))
+            result = cast(CursorResult[Any], session.execute(stmt))
             session.commit()
             inserted_count = result.rowcount if result.rowcount >= 0 else 0
 
@@ -139,8 +139,8 @@ def import_tactics(
                 ).all()
             }
 
-            theme_assoc: list[dict] = []
-            opening_assoc: list[dict] = []
+            theme_assoc: list[dict[str, int]] = []
+            opening_assoc: list[dict[str, int]] = []
 
             for tactic_row, t_list, o_list in zip(tactic_batch, batch_themes, batch_openings):
                 tid = all_tactic_id_map.get(str(tactic_row["puzzle_id"]))
@@ -176,7 +176,7 @@ def import_tactics(
 
     stream, fh = _open_stream(file)
     try:
-        text_stream: IO = io.TextIOWrapper(stream, encoding="utf-8", newline="") if str(file).endswith(".zst") else stream
+        text_stream: IO[str] = io.TextIOWrapper(stream, encoding="utf-8", newline="") if str(file).endswith(".zst") else stream
         reader = csv.DictReader(text_stream)
 
         for row in reader:

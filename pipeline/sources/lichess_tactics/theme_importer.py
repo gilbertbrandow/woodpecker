@@ -10,11 +10,11 @@ from sqlalchemy.orm import Session
 from app.models.lichess_tactic_theme import LichessTacticTheme
 
 
-def _parse_themes_xml(file: Path) -> list[dict]:
+def _parse_themes_xml(file: Path) -> list[dict[str, str]]:
     tree = ET.parse(file)
     root = tree.getroot()
 
-    themes: dict[str, dict] = {}
+    themes: dict[str, dict[str, str]] = {}
     for el in root.findall("string"):
         name = el.get("name", "")
         text = (el.text or "").strip()

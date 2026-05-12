@@ -2,7 +2,7 @@ import csv
 import re
 import unicodedata
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import click
 import sqlalchemy as sa
@@ -68,7 +68,7 @@ def import_openings(session: Session, files: list[Path]) -> None:
         ).all()
     }
 
-    updates: list[dict] = []
+    updates: list[dict[str, Any]] = []
     for row in rows:
         parent = parent_display_name(row["display_name"])
         if parent is not None:

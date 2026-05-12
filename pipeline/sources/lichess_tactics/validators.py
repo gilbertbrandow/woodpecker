@@ -6,17 +6,17 @@ from app.models.lichess_tactic import LichessTactic, lichess_tactic_theme_links,
 
 
 def validate_links(session: Session) -> None:
-    total = session.scalar(select(func.count()).select_from(LichessTactic))
+    total = session.scalar(select(func.count()).select_from(LichessTactic)) or 0
     if not total:
         click.echo("No tactics in database.")
         return
 
     with_themes = session.scalar(
         select(func.count(distinct(lichess_tactic_theme_links.c.lichess_tactic_id)))
-    )
+    ) or 0
     with_openings = session.scalar(
         select(func.count(distinct(lichess_tactic_openings.c.lichess_tactic_id)))
-    )
+    ) or 0
 
     click.echo(f"Total tactics:          {total:,}")
     click.echo(f"Tactics with themes:    {with_themes:,} ({with_themes / total:.1%})")

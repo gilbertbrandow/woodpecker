@@ -3,10 +3,10 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session as SASession
 
-_factory: sessionmaker | None = None
+_factory: sessionmaker[SASession] | None = None
 
 
-def _get_factory() -> sessionmaker:
+def _get_factory() -> sessionmaker[SASession]:
     global _factory
     if _factory is None:
         url = os.environ.get("DATABASE_URL")
