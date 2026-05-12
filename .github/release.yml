@@ -15,6 +15,6 @@ changelog:
     - title: Dependencies
       labels:
         - dependencies
-    - title: Other Changes
+    - title: Uncategorized Changes
       labels:
         - "*"
