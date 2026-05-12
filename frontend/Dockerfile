@@ -1,3 +1,4 @@
+# Keep this version in sync with frontend/.nvmrc
 FROM node:26-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
