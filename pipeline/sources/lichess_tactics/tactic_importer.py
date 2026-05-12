@@ -42,6 +42,38 @@ def _load_cache(session: Session, model: type[LichessTacticTheme] | type[Opening
     return {name: id_ for name, id_ in rows}
 
 
+def _fuzzy_match_opening(tag: str, opening_cache: dict[str, int]) -> int | None:
+    """Return the id of the opening whose key shares the most consecutive leading
+    underscore-words with *tag*.  At least 2 words must match.  Ties are broken
+    by preferring the shorter (more general) DB key.
+    """
+    tag_words = tag.split("_")
+    if len(tag_words) < 2:
+        return None
+
+    best_id: int | None = None
+    best_match_len: int = 1       # must exceed this — i.e. >= 2 to qualify
+    best_key_len: int = 999       # tie-break: shorter key = more general = preferred
+
+    for db_key, db_id in opening_cache.items():
+        db_words = db_key.split("_")
+        match_len = 0
+        for a, b in zip(tag_words, db_words):
+            if a == b:
+                match_len += 1
+            else:
+                break
+        key_len = len(db_words)
+        if match_len > best_match_len or (
+            match_len == best_match_len and key_len < best_key_len
+        ):
+            best_match_len = match_len
+            best_key_len = key_len
+            best_id = db_id
+
+    return best_id
+
+
 def _open_stream(file: Path) -> tuple[IO[Any], IO[Any]]:
     if str(file).endswith(".zst"):
         fh = open(file, "rb")
@@ -83,6 +115,7 @@ def import_tactics(
 
     theme_cache: dict[str, int] = _load_cache(session, LichessTacticTheme)
     opening_cache: dict[str, int] = _load_cache(session, Opening)
+    fuzzy_opening_cache: dict[str, int | None] = {}  # computed once per unique unknown tag
 
     tactic_batch: list[dict[str, Any]] = []
     batch_themes: list[list[str]] = []
@@ -154,6 +187,10 @@ def import_tactics(
                         unknown_themes.add(t)
                 for o in o_list:
                     oid = opening_cache.get(o)
+                    if oid is None:
+                        if o not in fuzzy_opening_cache:
+                            fuzzy_opening_cache[o] = _fuzzy_match_opening(o, opening_cache)
+                        oid = fuzzy_opening_cache[o]
                     if oid is not None:
                         opening_assoc.append({"lichess_tactic_id": tid, "opening_id": oid})
                     else:
@@ -218,8 +255,6 @@ def import_tactics(
         click.echo(f"Warning: {len(unknown_themes)} unknown theme key(s): {', '.join(sorted(unknown_themes))}")
     if unknown_openings:
         click.echo(
-            f"ERROR: {len(unknown_openings)} opening key(s) in the CSV had no match in the openings table:\n"
-            + "\n".join(f"  {k}" for k in sorted(unknown_openings))
+            f"Note: {len(unknown_openings)} opening tag(s) could not be resolved (no exact or fuzzy match): "
+            + ", ".join(sorted(unknown_openings))
         )
-        click.echo("Run 'make -C pipeline shared-openings-import' and retry.")
-        raise SystemExit(1)
