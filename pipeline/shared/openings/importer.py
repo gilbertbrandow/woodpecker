@@ -44,6 +44,11 @@ def import_openings(session: Session, files: list[Path]) -> None:
         click.echo("No rows found.")
         return
 
+    seen: dict[str, dict[str, str]] = {}
+    for row in rows:
+        seen[row["name"]] = row
+    rows = list(seen.values())
+
     opening_table = cast(sa.Table, Opening.__table__)
     stmt = (
         pg_insert(opening_table)
@@ -78,8 +83,8 @@ def import_openings(session: Session, files: list[Path]) -> None:
 
     if updates:
         session.execute(
-            sa.update(Opening)
-            .where(Opening.name == sa.bindparam("_name"))
+            sa.update(opening_table)
+            .where(opening_table.c.name == sa.bindparam("_name"))
             .values(parent_id=sa.bindparam("_parent_id")),
             updates,
         )
