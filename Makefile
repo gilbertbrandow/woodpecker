@@ -1,3 +1,6 @@
+NODE_VERSION := $(shell cat frontend/.nvmrc)
+export NODE_VERSION
+
 LOCAL_COMPOSE = sudo docker compose -f docker-compose.yml -f docker-compose-local.yml
 PROD_COMPOSE  = sudo docker compose -f docker-compose.yml -f docker-compose-prod.yml
 

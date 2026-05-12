@@ -1,10 +1,10 @@
-# Keep this version in sync with frontend/.nvmrc
-FROM node:26-alpine AS deps
+ARG NODE_VERSION=26
+FROM node:${NODE_VERSION}-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-FROM node:26-alpine AS dev
+FROM node:${NODE_VERSION}-alpine AS dev
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
