@@ -5,6 +5,7 @@ node_modules/
 __pycache__/
 *.pyc
 .vscode/
+.DS_Store
 deploy/terraform/terraform.tfvars
 deploy/terraform/.terraform/
 deploy/terraform/*.tfstate
