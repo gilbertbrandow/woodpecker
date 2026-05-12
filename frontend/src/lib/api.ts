@@ -73,24 +73,24 @@ export type SubsetConfig = {
   }
 }
 
-export type PuzzleLabel = { name: string; displayName: string }
-export type PuzzleOpening = { name: string; displayName: string; eco: string }
+export type LichessTacticTheme = { name: string; displayName: string | null }
+export type LichessTacticOpening = { name: string; displayName: string; eco: string }
 
-export type Puzzle = {
+export type LichessTactic = {
   puzzleId: string
   rating: number
   popularity: number
   nbPlays: number
   gameUrl: string
-  themes: PuzzleLabel[]
-  openings: PuzzleOpening[]
+  themes: LichessTacticTheme[]
+  openings: LichessTacticOpening[]
 }
 
 export type SortColumn = 'rating' | 'popularity' | 'nb_plays'
 export type SortOrder = 'asc' | 'desc'
 
-export type PuzzlePage = {
-  puzzles: Puzzle[]
+export type LichessTacticPage = {
+  puzzles: LichessTactic[]
   page: number
   pageSize: number
   totalPages: number
@@ -126,25 +126,6 @@ export type TrainingItem = {
   id: number
   sourceType: TrainingItemSource
   createdAt: string
-}
-
-export type LichessTacticTheme = {
-  name: string
-  displayName: string | null
-  description: string | null
-}
-
-export type LichessTactic = {
-  id: number
-  trainingItemId: number
-  puzzleId: string
-  fen: string
-  moves: string
-  rating: number
-  ratingDeviation: number
-  popularity: number
-  nbPlays: number
-  gameUrl: string
 }
 
 export type ScheduleRunDef = {
@@ -300,41 +281,41 @@ export type PositionStatus =
 
 type PaceChartTick = { timeMs: number; actual: number | null; projection: number | null; target: number }
 
-export type RunPuzzleAttemptEntry = {
+export type RunTrainingItemAttemptEntry = {
   id: number
   tryNumber: number
   status: 'in_progress' | 'solved' | 'failed'
   timeSpentMs: number | null
 }
 
-export type RunPuzzleFull = {
-  runPuzzleId: number
+export type RunTrainingItemFull = {
+  runTrainingItemId: number
   position: number
   positionStatus: PositionStatus
-  puzzleId: string
+  displayId: string
   fen: string
   solution: string
   rating: number
   gameUrl: string
-  maxTriesPerPuzzle: number
+  maxTriesPerItem: number
   currentTryNumber: number
   currentAttemptId: number | null
-  tries: RunPuzzleAttemptEntry[]
-  totalPuzzles: number
+  tries: RunTrainingItemAttemptEntry[]
+  totalItems: number
   scheduleName: string
   runIndex: number
-  themes: PuzzleLabel[]
+  themes: LichessTacticTheme[]
 }
 
 export type PaceChartData = {
   startMs: number
   deadlineMs: number
-  totalPuzzles: number
+  totalItems: number
   labelTicks: number[]
   domainStartMs: number
   series: PaceChartTick[]
   status: 'ahead' | 'on_pace' | 'behind'
-  puzzleDelta: number
+  itemDelta: number
   timeRemainingMs: number
 }
 
@@ -352,28 +333,28 @@ export type Run = {
   startedAt: string
   completedAt: string | null
   abortedAt: string | null
-  totalPuzzles: number
+  totalItems: number
   solvedCount: number
   solvedWithRetriesCount: number
   failedCount: number
   inProgressCount: number
-  currentRunPuzzleId: number | null
+  currentRunTrainingItemId: number | null
   paceChart: PaceChartData | null
 }
 
-export type RunPuzzleListItem = {
-  runPuzzleId: number
+export type RunTrainingItemListItem = {
+  runTrainingItemId: number
   position: number
-  puzzleId: string
+  displayId: string
   rating: number
   positionStatus: PositionStatus
   tryCount: number
   timeMs: number | null
 }
 
-export type RunPuzzleList = {
-  maxTriesPerPuzzle: number
-  puzzles: RunPuzzleListItem[]
+export type RunTrainingItemList = {
+  maxTriesPerItem: number
+  trainingItems: RunTrainingItemListItem[]
 }
 
 export type Schedule = {
@@ -400,7 +381,7 @@ export type DisplayMove = {
   moveStatus: 'correct' | 'wrong' | 'opponent' | null
 }
 
-export type PuzzleMetaPgnDisplay = {
+export type TrainingItemMetaPgnDisplay = {
   mainline: DisplayMove[]
   variation: DisplayMove[] | null
 }
@@ -415,7 +396,7 @@ export type OverviewAttemptView = {
   id: number
   runId: number
   runIndex: number
-  runPuzzleId: number
+  runTrainingItemId: number
   tryNumber: number
   status: 'solved' | 'failed' | 'in_progress'
   startedAt: string
@@ -429,7 +410,7 @@ export type OverviewAttemptView = {
   countsTowardsAccuracy: boolean
   countsTowardsAverageTime: boolean
   board: OverviewAttemptBoardView | null
-  pgnDisplay: PuzzleMetaPgnDisplay | null
+  pgnDisplay: TrainingItemMetaPgnDisplay | null
   impact: {
     runProgressDeltaPct: number | null
     trainingProgressDeltaPct: number | null
@@ -438,11 +419,11 @@ export type OverviewAttemptView = {
   }
 }
 
-export type SamePuzzleRunOverview = {
+export type SameTrainingItemRunOverview = {
   runId: number
   runIndex: number
-  runPuzzleId: number
-  runPuzzleStatus: PositionStatus
+  runTrainingItemId: number
+  runTrainingItemStatus: PositionStatus
   attempts: OverviewAttemptView[]
 }
 
@@ -453,30 +434,31 @@ export type ProgressRowView = {
   delta: number | null
 }
 
-export type RunPuzzleOverview = {
-  runPuzzle: {
+export type RunTrainingItemOverview = {
+  runTrainingItem: {
     id: number
+    trainingItemId: number
     runId: number
     runIndex: number
     position: number
     status: PositionStatus
     triesRemaining: number
-    maxTriesPerPuzzle: number
+    maxTriesPerItem: number
     qualifyingAttemptId: number | null
     trainingId: number | null
     scheduleName: string | null
   }
-  puzzle: {
-    puzzleId: string
+  trainingItem: {
+    displayId: string
     fen: string
     solution: string[]
     rating: number
-    themes: PuzzleLabel[]
+    themes: LichessTacticTheme[]
     gameUrl: string
   }
   selectedAttemptId: number | null
   attempts: OverviewAttemptView[]
-  samePuzzleAcrossRuns: SamePuzzleRunOverview[]
+  sameTrainingItemAcrossRuns: SameTrainingItemRunOverview[]
   runPace: {
     chartData: PaceChartData | null
     isRunActive: boolean
@@ -503,7 +485,7 @@ export type RunPuzzleOverview = {
     runStatus: RunStatus
     retake: { enabled: boolean }
     analyze: { enabled: boolean; url: string }
-    nextPuzzle: { enabled: boolean; disabledReason: string | null }
+    nextTrainingItem: { enabled: boolean; disabledReason: string | null }
   }
   timer: {
     targetSolveTenths: number | null
@@ -515,7 +497,7 @@ export type RunPuzzleOverview = {
     breakDuration: string | null
     isTrainingComplete: boolean
     summary: {
-      totalPuzzles: number
+      totalItems: number
       solvedCount: number
       solvedWithRetriesCount: number
       failedCount: number
@@ -532,25 +514,26 @@ export type SessionAttemptStripItemView = {
   attemptType: 'scored' | 'practice'
 }
 
-export type RunPuzzleAttemptView = {
-  runPuzzle: {
+export type RunTrainingItemAttemptView = {
+  runTrainingItem: {
     id: number
+    trainingItemId: number
     runId: number
     runIndex: number
     position: number
     status: PositionStatus
     triesRemaining: number
     currentTryNumber: number
-    maxTriesPerPuzzle: number
+    maxTriesPerItem: number
     trainingId: number | null
     scheduleName: string | null
   }
-  puzzle: {
-    puzzleId: string
+  trainingItem: {
+    displayId: string
     fen: string
     solution: string[]
     rating: number
-    themes: PuzzleLabel[]
+    themes: LichessTacticTheme[]
     gameUrl: string
   }
   attempt: {
@@ -573,21 +556,21 @@ export type CompleteAttemptResult = {
   completedAttemptId: number
   outcome: 'solved' | 'failed'
   runCompletedByThisAttempt: boolean
-  overview: RunPuzzleOverview
+  overview: RunTrainingItemOverview
 }
 
 export type GetAttemptResponse =
-  | { kind: 'active_attempt'; attemptView: RunPuzzleAttemptView }
-  | { kind: 'completed_attempt'; overviewUrl: string; overview: RunPuzzleOverview }
+  | { kind: 'active_attempt'; attemptView: RunTrainingItemAttemptView }
+  | { kind: 'completed_attempt'; overviewUrl: string; overview: RunTrainingItemOverview }
 
 export type ContinueRunResult =
   | { runCompleted: true; attemptView: null }
-  | { runCompleted: false; attemptView: RunPuzzleAttemptView }
+  | { runCompleted: false; attemptView: RunTrainingItemAttemptView }
 
-export type PuzzleRunReference = {
+export type TrainingItemRunReference = {
   runId: number
   runIndex: number
-  runPuzzleId: number
+  runTrainingItemId: number
   hasAttempts: boolean
 }
 
@@ -619,12 +602,12 @@ export const api = {
       request(`/subsets/${id}/refill`, { method: 'POST' }),
     delete: (id: number): Promise<void> => request(`/subsets/${id}`, { method: 'DELETE' }),
     lock: (id: number): Promise<Subset> => request(`/subsets/${id}/lock`, { method: 'POST' }),
-    getPuzzles: (
+    getTrainingItems: (
       id: number,
       page?: number,
       sort?: SortColumn,
       order?: SortOrder,
-    ): Promise<PuzzlePage> => {
+    ): Promise<LichessTacticPage> => {
       const params = new URLSearchParams()
       if (page !== undefined) params.set('page', String(page))
       if (sort) params.set('sort', sort)
@@ -632,7 +615,7 @@ export const api = {
       const qs = params.toString()
       return request(`/subsets/${id}/puzzles${qs ? `?${qs}` : ''}`)
     },
-    discardPuzzle: (id: number, puzzleId: string): Promise<void> =>
+    discardTrainingItem: (id: number, puzzleId: string): Promise<void> =>
       request(`/subsets/${id}/puzzles/${puzzleId}`, { method: 'DELETE' }),
     getStats: (id: number): Promise<SubsetStats> => request(`/subsets/${id}/stats`),
   },
@@ -686,8 +669,8 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(target),
       }),
-    getCrossRunPuzzle: (trainingId: number, puzzleId: string): Promise<PuzzleRunReference[]> =>
-      request(`/training/${trainingId}/cross-run-puzzle/${encodeURIComponent(puzzleId)}`),
+    getCrossRunItem: (trainingId: number, trainingItemId: number): Promise<TrainingItemRunReference[]> =>
+      request(`/training/${trainingId}/cross-run-item/${trainingItemId}`),
     getInsights: (trainingId: number): Promise<TrainingInsights> =>
       request(`/training/${trainingId}/insights`),
     abort: (trainingId: number): Promise<Training> =>
@@ -712,25 +695,26 @@ export const api = {
     get: (runId: number): Promise<Run> => request(`/runs/${runId}`),
     abort: (runId: number): Promise<Run> =>
       request(`/runs/${runId}/abort`, { method: 'POST' }),
-    puzzles: (runId: number): Promise<RunPuzzleList> => request(`/runs/${runId}/puzzles`),
-    getPuzzle: (runId: number, runPuzzleId: number): Promise<RunPuzzleFull> =>
-      request(`/runs/${runId}/puzzles/${runPuzzleId}`),
+    trainingItems: (runId: number): Promise<RunTrainingItemList> =>
+      request(`/runs/${runId}/training-items`),
+    getTrainingItem: (runId: number, runTrainingItemId: number): Promise<RunTrainingItemFull> =>
+      request(`/runs/${runId}/training-items/${runTrainingItemId}`),
     getOverview: (
       runId: number,
-      runPuzzleId: number,
+      runTrainingItemId: number,
       attemptId?: number,
-    ): Promise<{ overview: RunPuzzleOverview; selectedAttemptId: number | null }> => {
+    ): Promise<{ overview: RunTrainingItemOverview; selectedAttemptId: number | null }> => {
       const qs = attemptId !== undefined ? `?attempt=${attemptId}` : ''
-      return request(`/runs/${runId}/puzzles/${runPuzzleId}/overview${qs}`)
+      return request(`/runs/${runId}/training-items/${runTrainingItemId}/overview${qs}`)
     },
     getAttempt: (
       runId: number,
-      runPuzzleId: number,
+      runTrainingItemId: number,
       attemptId: number,
     ): Promise<GetAttemptResponse> =>
-      request(`/runs/${runId}/puzzles/${runPuzzleId}/attempts/${attemptId}`),
-    startPuzzle: (runId: number, runPuzzleId: number): Promise<RunPuzzleAttemptView> =>
-      request(`/runs/${runId}/puzzles/${runPuzzleId}/attempts`, { method: 'POST' }),
+      request(`/runs/${runId}/training-items/${runTrainingItemId}/attempts/${attemptId}`),
+    startTrainingItem: (runId: number, runTrainingItemId: number): Promise<RunTrainingItemAttemptView> =>
+      request(`/runs/${runId}/training-items/${runTrainingItemId}/attempts`, { method: 'POST' }),
     continue: (runId: number): Promise<ContinueRunResult> =>
       request(`/runs/${runId}/continue`, { method: 'POST' }),
   },
@@ -743,12 +727,12 @@ export const api = {
   attempts: {
     complete: (
       runId: number,
-      runPuzzleId: number,
+      runTrainingItemId: number,
       attemptId: number,
       uciMoves: string[],
       clientTimeSpentMs: number,
     ): Promise<CompleteAttemptResult> =>
-      request(`/runs/${runId}/puzzles/${runPuzzleId}/attempts/${attemptId}/complete`, {
+      request(`/runs/${runId}/training-items/${runTrainingItemId}/attempts/${attemptId}/complete`, {
         method: 'POST',
         body: JSON.stringify({ uciMoves, clientTimeSpentMs }),
       }),

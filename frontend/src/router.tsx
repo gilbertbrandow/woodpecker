@@ -17,7 +17,7 @@ import { TrainingNewPage } from './pages/TrainingNewPage'
 import { AboutPage } from './pages/AboutPage'
 import { RunPage } from './pages/RunPage'
 import { RunResolverPage } from './pages/RunResolverPage'
-import { PuzzleResolverPage } from './pages/PuzzleResolverPage'
+import { TrainingItemResolverPage } from './pages/TrainingItemResolverPage'
 import { BoardPage } from './pages/BoardPage'
 import { SolveFlowLayout } from './components/SolveFlowLayout'
 
@@ -25,11 +25,11 @@ type RouterContext = {
   auth: AuthContextValue
 }
 
-export type RunPuzzleOverviewSearch = {
+export type RunTrainingItemOverviewSearch = {
   attempt?: number
 }
 
-function validateRunPuzzleOverviewSearch(search: Record<string, unknown>): RunPuzzleOverviewSearch {
+function validateRunPuzzleOverviewSearch(search: Record<string, unknown>): RunTrainingItemOverviewSearch {
   const rawAttempt = search.attempt
   if (rawAttempt === undefined || rawAttempt === null || rawAttempt === '') {
     return {}
@@ -167,21 +167,21 @@ const runSolveRoute = createRoute({
   component: RunResolverPage,
 })
 
-const puzzleResolverRoute = createRoute({
+const trainingItemResolverRoute = createRoute({
   getParentRoute: () => solveFlowRoute,
-  path: '/runs/$runId/puzzles/$runPuzzleId',
-  component: PuzzleResolverPage,
+  path: '/runs/$runId/training-items/$runTrainingItemId',
+  component: TrainingItemResolverPage,
 })
 
 const attemptRoute = createRoute({
   getParentRoute: () => solveFlowRoute,
-  path: '/runs/$runId/puzzles/$runPuzzleId/attempts/$attemptId',
+  path: '/runs/$runId/training-items/$runTrainingItemId/attempts/$attemptId',
   component: BoardPage,
 })
 
 const runPuzzleOverviewRoute = createRoute({
   getParentRoute: () => solveFlowRoute,
-  path: '/runs/$runId/puzzles/$runPuzzleId/overview',
+  path: '/runs/$runId/training-items/$runTrainingItemId/overview',
   validateSearch: validateRunPuzzleOverviewSearch,
   component: BoardPage,
 })
@@ -206,7 +206,7 @@ const routeTree = rootRoute.addChildren([
     ]),
     solveFlowRoute.addChildren([
       runSolveRoute,
-      puzzleResolverRoute,
+      trainingItemResolverRoute,
       attemptRoute,
       runPuzzleOverviewRoute,
     ]),

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Chess, type Square } from 'chess.js'
 import { toast } from 'sonner'
-import { api, type RunPuzzleAttemptView, type RunPuzzleOverview } from '../../lib/api'
+import { api, type RunTrainingItemAttemptView, type RunTrainingItemOverview } from '../../lib/api'
 import { useAuth } from '../../context/auth'
 import { useChessTheme } from '../../hooks/useChessTheme'
 import { resolvePieceSet } from '../../lib/themes'
@@ -57,7 +57,7 @@ export type TimerState = {
 }
 
 export type OverviewState = {
-  data: RunPuzzleOverview | null
+  data: RunTrainingItemOverview | null
 }
 
 export type BoardPageActions = {
@@ -73,7 +73,7 @@ export type BoardPageActions = {
 
 export type BoardPageControllerResult = {
   mode: Mode
-  solvingView: RunPuzzleAttemptView | null
+  solvingView: RunTrainingItemAttemptView | null
   board: BoardState
   timer: TimerState
   session: {
@@ -92,15 +92,15 @@ export type BoardPageControllerResult = {
 
 export type BoardPageControllerParams = {
   runId: number
-  runPuzzleId: number
+  runTrainingItemId: number
   attemptId: number | null
   runIdStr: string
-  runPuzzleIdStr: string
+  runTrainingItemIdStr: string
   routeKind: 'attempt' | 'overview'
 }
 
 export function useBoardPageController(params: BoardPageControllerParams): BoardPageControllerResult {
-  const { runId, runPuzzleId, attemptId, runIdStr, runPuzzleIdStr, routeKind } = params
+  const { runId, runTrainingItemId, attemptId, runIdStr, runTrainingItemIdStr, routeKind } = params
   const navigate = useNavigate()
   const { user } = useAuth()
   const { attemptHistory, registerAttemptStart, markAttemptResolved } = useSolveSession()
@@ -115,7 +115,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const failedRetryPliesRef = useRef<string[]>([])
   const solutionMovesRef = useRef<string[]>([])
   const currentAttemptIdRef = useRef<number | null>(null)
-  const currentRunPuzzleIdRef = useRef<number>(runPuzzleId)
+  const currentRunTrainingItemIdRef = useRef<number>(runTrainingItemId)
   const displayFenRef = useRef('')
   const elapsedRef = useRef(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -129,7 +129,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const concludeFnRef = useRef<() => Promise<void>>(async () => {})
   const concludingRef = useRef(false)
   const skipNextLoadRef = useRef(false)
-  const cachedOverviewPuzzleRef = useRef<RunPuzzleOverview | null>(null)
+  const cachedOverviewPuzzleRef = useRef<RunTrainingItemOverview | null>(null)
   const loadRequestIdRef = useRef(0)
   const isAttemptReadyRef = useRef(false)
   const latestResolvedAttemptIdRef = useRef<number | null>(null)
@@ -137,8 +137,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const pendingTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
 
   const [mode, setMode] = useState<Mode>('loading')
-  const [solvingView, setSolvingView] = useState<RunPuzzleAttemptView | null>(null)
-  const [overview, setOverview] = useState<RunPuzzleOverview | null>(null)
+  const [solvingView, setSolvingView] = useState<RunTrainingItemAttemptView | null>(null)
+  const [overview, setOverview] = useState<RunTrainingItemOverview | null>(null)
   const [orientation, setOrientation] = useState<Orientation>('white')
   const [currentAttemptId, setCurrentAttemptId] = useState<number | null>(null)
   const [displayFen, setDisplayFen] = useState('')
@@ -242,14 +242,14 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     }
 
     void navigate({
-      to: '/app/runs/$runId/puzzles/$runPuzzleId/overview',
-      params: { runId: runIdStr, runPuzzleId: runPuzzleIdStr },
+      to: '/app/runs/$runId/training-items/$runTrainingItemId/overview',
+      params: { runId: runIdStr, runTrainingItemId: runTrainingItemIdStr },
       search: selectedAttemptId === null ? {} : { attempt: selectedAttemptId },
       replace,
     })
-  }, [navigate, runIdStr, runPuzzleIdStr])
+  }, [navigate, runIdStr, runTrainingItemIdStr])
 
-  const applyFreshActiveState = useCallback((data: RunPuzzleAttemptView): void => {
+  const applyFreshActiveState = useCallback((data: RunTrainingItemAttemptView): void => {
     clearPendingTimeouts()
 
     if (primeTimeoutRef.current !== null) {
@@ -257,8 +257,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       primeTimeoutRef.current = null
     }
 
-    const solutionMoves = data.puzzle.solution
-    const chess = new Chess(data.puzzle.fen)
+    const solutionMoves = data.trainingItem.solution
+    const chess = new Chess(data.trainingItem.fen)
 
     chessRef.current = chess
     solutionMovesRef.current = solutionMoves
@@ -270,7 +270,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     setAllPliesPlayed([])
     setLiveFocusStatus('in_progress')
     currentAttemptIdRef.current = data.attempt.id
-    currentRunPuzzleIdRef.current = data.runPuzzle.id
+    currentRunTrainingItemIdRef.current = data.runTrainingItem.id
     concludingRef.current = false
     latestResolvedAttemptIdRef.current = null
     elapsedRef.current = 0
@@ -279,13 +279,13 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
     setSolvingView(data)
     setCurrentAttemptId(data.attempt.id)
-    setOrientation(playerColor(data.puzzle.fen))
+    setOrientation(playerColor(data.trainingItem.fen))
     setElapsedSeconds(0)
     setPendingPromotionBoth(null)
     setBlocked(true)
     clearMoveFeedback()
     setHintSquare(null)
-    setFen(data.puzzle.fen)
+    setFen(data.trainingItem.fen)
     setDests(new Map())
     setLastMove(undefined)
     setIsAttemptReady(false)
@@ -316,16 +316,16 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     }, INITIAL_OPPONENT_MOVE_DELAY_MS)
   }, [clearMoveFeedback, clearPendingTimeouts, setFen, setBlocked, setPendingPromotionBoth])
 
-  const applyOverviewDisplayState = useCallback((data: RunPuzzleOverview): void => {
-    const solutionMoves = data.puzzle.solution
+  const applyOverviewDisplayState = useCallback((data: RunTrainingItemOverview): void => {
+    const solutionMoves = data.trainingItem.solution
     const selectedAttemptEntry = data.attempts.find((a) => a.id === data.selectedAttemptId) ?? null
     const boardFen =
       selectedAttemptEntry?.board?.terminalFen ??
-      computeFinalFen(data.puzzle.fen, solutionMoves)
+      computeFinalFen(data.trainingItem.fen, solutionMoves)
     const boardLastMove: [string, string] | undefined =
       selectedAttemptEntry?.board?.lastMove ?? undefined
 
-    chessRef.current = new Chess(data.puzzle.fen)
+    chessRef.current = new Chess(data.trainingItem.fen)
     solutionMovesRef.current = solutionMoves
     moveIndexRef.current = 1
     inputBlockedRef.current = false
@@ -335,7 +335,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     committedLastMoveRef.current = undefined
 
     setCurrentAttemptId(null)
-    setOrientation(playerColor(data.puzzle.fen))
+    setOrientation(playerColor(data.trainingItem.fen))
     setElapsedSeconds(0)
     setPendingPromotionBoth(null)
     setBlocked(false)
@@ -375,7 +375,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     void (async () => {
       try {
         if (routeKind === 'overview') {
-          const { overview: overviewData } = await api.runs.getOverview(runId, runPuzzleId, attemptId ?? undefined)
+          const { overview: overviewData } = await api.runs.getOverview(runId, runTrainingItemId, attemptId ?? undefined)
 
           if (requestId !== loadRequestIdRef.current) return
 
@@ -390,7 +390,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
           return
         }
 
-        const attemptResponse = await api.runs.getAttempt(runId, runPuzzleId, attemptId)
+        const attemptResponse = await api.runs.getAttempt(runId, runTrainingItemId, attemptId)
 
         if (requestId !== loadRequestIdRef.current) return
 
@@ -412,7 +412,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     })()
   }, [
     runId,
-    runPuzzleId,
+    runTrainingItemId,
     attemptId,
     navigate,
     runIdStr,
@@ -426,11 +426,11 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     if (routeKind !== 'overview') return
     if (currentAttemptId === null) return
     void navigate({
-      to: '/app/runs/$runId/puzzles/$runPuzzleId/attempts/$attemptId',
-      params: { runId: runIdStr, runPuzzleId: runPuzzleIdStr, attemptId: String(currentAttemptId) },
+      to: '/app/runs/$runId/training-items/$runTrainingItemId/attempts/$attemptId',
+      params: { runId: runIdStr, runTrainingItemId: runTrainingItemIdStr, attemptId: String(currentAttemptId) },
       replace: true,
     })
-  }, [routeKind, currentAttemptId, navigate, runIdStr, runPuzzleIdStr])
+  }, [routeKind, currentAttemptId, navigate, runIdStr, runTrainingItemIdStr])
 
   useEffect(() => {
     if (mode !== 'focus' || !isAttemptReady) return
@@ -467,8 +467,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     if (solvingView === null || currentAttemptId === null) return
     registerAttemptStart({
       attemptId: currentAttemptId,
-      runPuzzleId: solvingView.runPuzzle.id,
-      puzzlePosition: solvingView.runPuzzle.position + 1,
+      runTrainingItemId: solvingView.runTrainingItem.id,
+      puzzlePosition: solvingView.runTrainingItem.position + 1,
     })
   }, [mode, solvingView, currentAttemptId, registerAttemptStart])
 
@@ -490,7 +490,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
     concludingRef.current = true
     try {
-      const result = await api.attempts.complete(runId, currentRunPuzzleIdRef.current, id, movesPlayedRef.current, Math.round(elapsedRef.current * 100))
+      const result = await api.attempts.complete(runId, currentRunTrainingItemIdRef.current, id, movesPlayedRef.current, Math.round(elapsedRef.current * 100))
 
       if (currentAttemptIdRef.current !== id) {
         markAttemptResolved(id, result.outcome)
@@ -741,7 +741,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       }
 
       const av = data.attemptView
-      if (av.puzzle.solution.length < 2) {
+      if (av.trainingItem.solution.length < 2) {
         toast.error('Invalid puzzle', { description: 'Puzzle solution is too short.' })
         void navigate({ to: '/app/runs/$runId', params: { runId: runIdStr }, replace: true })
         return
@@ -754,10 +754,10 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
       skipNextLoadRef.current = true
       void navigate({
-        to: '/app/runs/$runId/puzzles/$runPuzzleId/attempts/$attemptId',
+        to: '/app/runs/$runId/training-items/$runTrainingItemId/attempts/$attemptId',
         params: {
           runId: runIdStr,
-          runPuzzleId: String(av.runPuzzle.id),
+          runTrainingItemId: String(av.runTrainingItem.id),
           attemptId: String(av.attempt.id),
         },
       })
@@ -771,8 +771,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const handleRetake = useCallback(async (): Promise<void> => {
     setIsLoadingNextPuzzle(true)
     try {
-      const data = await api.runs.startPuzzle(runId, runPuzzleId)
-      if (data.puzzle.solution.length < 2) {
+      const data = await api.runs.startTrainingItem(runId, runTrainingItemId)
+      if (data.trainingItem.solution.length < 2) {
         toast.error('Invalid puzzle', { description: 'Puzzle solution is too short.' })
         return
       }
@@ -784,10 +784,10 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
       skipNextLoadRef.current = true
       void navigate({
-        to: '/app/runs/$runId/puzzles/$runPuzzleId/attempts/$attemptId',
+        to: '/app/runs/$runId/training-items/$runTrainingItemId/attempts/$attemptId',
         params: {
           runId: runIdStr,
-          runPuzzleId: String(data.runPuzzle.id),
+          runTrainingItemId: String(data.runTrainingItem.id),
           attemptId: String(data.attempt.id),
         },
       })
@@ -796,7 +796,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     } finally {
       setIsLoadingNextPuzzle(false)
     }
-  }, [navigate, runId, runPuzzleId, runIdStr, applyFreshActiveState, clearOverviewState])
+  }, [navigate, runId, runTrainingItemId, runIdStr, applyFreshActiveState, clearOverviewState])
 
   const dismissRunComplete = useCallback((): void => {
     setRunJustCompleted(false)

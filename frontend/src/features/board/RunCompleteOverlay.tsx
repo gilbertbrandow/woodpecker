@@ -3,10 +3,10 @@ import confetti from 'canvas-confetti'
 import { X } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { Button } from '../../components/ui/button'
-import type { RunPuzzleOverview } from '../../lib/api'
+import type { RunTrainingItemOverview } from '../../lib/api'
 
 type RunCompleteOverlayProps = {
-  overlayData: NonNullable<RunPuzzleOverview['runCompleteOverlay']>
+  overlayData: NonNullable<RunTrainingItemOverview['runCompleteOverlay']>
   onClose: () => void
 }
 

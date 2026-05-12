@@ -1,5 +1,5 @@
 import { Chess } from 'chess.js'
-import type { DisplayMove, PositionStatus, PuzzleMetaPgnDisplay } from '../../lib/api'
+import type { DisplayMove, PositionStatus, TrainingItemMetaPgnDisplay } from '../../lib/api'
 
 export type Mode = 'loading' | 'focus' | 'failed' | 'overview'
 export type Orientation = 'white' | 'black'
@@ -175,7 +175,7 @@ export function buildPgnDisplay(
   attemptStatus: 'solved' | 'failed' | 'in_progress',
   retryPlies: string[] = [],
   autoVariation: boolean = true,
-): PuzzleMetaPgnDisplay {
+): TrainingItemMetaPgnDisplay {
   const solutionMoves = solutionMovesStr.split(' ').filter(Boolean)
   if (solutionMoves.length === 0) return { mainline: [], variation: null }
 

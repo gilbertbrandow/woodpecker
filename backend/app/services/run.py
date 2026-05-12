@@ -9,7 +9,6 @@ import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.models.lichess_tactic import LichessTactic  # used only in get_puzzle_history (Lichess-specific until Step 3)
 from app.models.run import MAX_PUZZLE_TIME_MS, TrainingAttempt, Run, RunTrainingItem
 from app.models.schedule import Schedule
 from app.models.training import Training
@@ -247,20 +246,21 @@ def _run_puzzle_attempt_view_dict(run_puzzle: RunTrainingItem) -> dict[str, obje
     )
 
     return {
-        "runPuzzle": {
+        "runTrainingItem": {
             "id": run_puzzle.id,
+            "trainingItemId": run_puzzle.training_item_id,
             "runId": run.id,
             "runIndex": run.run_index,
             "position": run_puzzle.position,
             "status": position_status,
             "triesRemaining": tries_remaining,
             "currentTryNumber": in_progress_attempt.try_number,
-            "maxTriesPerPuzzle": total_queue,
+            "maxTriesPerItem": total_queue,
             "trainingId": run.training_id,
             "scheduleName": schedule_name,
         },
-        "puzzle": {
-            "puzzleId": content.display_id,
+        "trainingItem": {
+            "displayId": content.display_id,
             "fen": content.fen,
             "solution": content.moves.split(),
             "rating": content.rating,
@@ -315,19 +315,19 @@ def _run_puzzle_full_dict(run_puzzle: RunTrainingItem) -> dict[str, object]:
     attempt_type_data = _attempt_type_fields(sorted_attempts, current_try_number, total_queue)
 
     return {
-        "runPuzzleId": run_puzzle.id,
+        "runTrainingItemId": run_puzzle.id,
         "position": run_puzzle.position,
         "positionStatus": _derive_position_status(sorted_attempts, total_queue),
-        "puzzleId": content.display_id,
+        "displayId": content.display_id,
         "fen": content.fen,
         "solution": content.moves,
         "rating": content.rating,
         "gameUrl": content.game_url,
-        "maxTriesPerPuzzle": total_queue,
+        "maxTriesPerItem": total_queue,
         "currentTryNumber": current_try_number,
         "currentAttemptId": current_attempt_id,
         "tries": [_attempt_dict(a) for a in sorted_attempts],
-        "totalPuzzles": total_puzzles,
+        "totalItems": total_puzzles,
         "scheduleName": schedule.name,
         "runIndex": run.run_index,
         "themes": content.themes,
@@ -498,12 +498,12 @@ def _pace_chart_data(
     return {
         "startMs": start_ms,
         "deadlineMs": deadline_ms,
-        "totalPuzzles": total_puzzles,
+        "totalItems": total_puzzles,
         "labelTicks": label_ticks,
         "domainStartMs": domain_start_ms,
         "series": series,
         "status": status,
-        "puzzleDelta": puzzle_delta,
+        "itemDelta": puzzle_delta,
         "timeRemainingMs": deadline_ms - now_ms,
     }
 
@@ -549,12 +549,12 @@ def run_dict(run: Run) -> dict[str, object]:
         "startedAt": run.started_at.isoformat(),
         "completedAt": run.completed_at.isoformat() if run.completed_at else None,
         "abortedAt": run.aborted_at.isoformat() if run.aborted_at else None,
-        "totalPuzzles": total,
+        "totalItems": total,
         "solvedCount": counts.get("solved", 0),
         "solvedWithRetriesCount": counts.get("solved_with_retries", 0),
         "failedCount": counts.get("failed", 0),
         "inProgressCount": counts.get("in_progress", 0) + counts.get("not_started", 0),
-        "currentRunPuzzleId": _current_run_puzzle_id(run.id, total_queue),
+        "currentRunTrainingItemId": _current_run_puzzle_id(run.id, total_queue),
         "targetAccuracy": run.target_accuracy,
         "targetSolveSeconds": run.target_solve_seconds,
         "paceChart": _pace_chart_data(run, run_puzzles, config, total_queue),
@@ -731,11 +731,11 @@ def list_run_puzzles(run_id: int) -> dict[str, object]:
     ).all():
         attempts_by_puzzle[a.run_training_item_id].append(a)
 
-    puzzles: list[dict[str, object]] = [
+    training_items: list[dict[str, object]] = [
         {
-            "runPuzzleId": row.run_training_item_id,
+            "runTrainingItemId": row.run_training_item_id,
             "position": row.position,
-            "puzzleId": contents[row.training_item_id].display_id,
+            "displayId": contents[row.training_item_id].display_id,
             "rating": contents[row.training_item_id].rating,
             "positionStatus": _derive_position_status(
                 attempts_by_puzzle[row.run_training_item_id], total_queue
@@ -745,7 +745,7 @@ def list_run_puzzles(run_id: int) -> dict[str, object]:
         }
         for row in rows
     ]
-    return {"maxTriesPerPuzzle": total_queue, "puzzles": puzzles}
+    return {"maxTriesPerItem": total_queue, "trainingItems": training_items}
 
 
 def get_run_puzzle(run_id: int, run_puzzle_id: int, user_id: int) -> dict[str, object]:
@@ -1084,7 +1084,7 @@ def _overview_attempt_view(
         "id": attempt.id,
         "runId": run.id,
         "runIndex": run.run_index,
-        "runPuzzleId": run_puzzle.id,
+        "runTrainingItemId": run_puzzle.id,
         "tryNumber": attempt.try_number,
         "status": attempt.status,
         "startedAt": attempt.started_at.isoformat(),
@@ -1149,8 +1149,8 @@ def _same_puzzle_run_overview_items(
         items.append({
             "runId": other_run.id,
             "runIndex": other_run.run_index,
-            "runPuzzleId": rp.id,
-            "runPuzzleStatus": _derive_position_status(sorted_attempts, total_queue),
+            "runTrainingItemId": rp.id,
+            "runTrainingItemStatus": _derive_position_status(sorted_attempts, total_queue),
             "attempts": attempt_views,
         })
 
@@ -1251,7 +1251,7 @@ def _compute_overview_actions(run: Run, content: TrainingItemContent) -> dict[st
         "runStatus": run.status,
         "retake": {"enabled": True},
         "analyze": {"enabled": True, "url": content.game_url},
-        "nextPuzzle": {"enabled": next_enabled, "disabledReason": disabled_reason},
+        "nextTrainingItem": {"enabled": next_enabled, "disabledReason": disabled_reason},
     }
 
 
@@ -1305,7 +1305,7 @@ def _compute_run_complete_overlay(
         "breakDuration": break_duration,
         "isTrainingComplete": is_training_complete,
         "summary": {
-            "totalPuzzles": total,
+            "totalItems": total,
             "solvedCount": solved,
             "solvedWithRetriesCount": solved_with_retries,
             "failedCount": failed,
@@ -1401,20 +1401,21 @@ def _build_run_puzzle_overview(
     )
 
     return {
-        "runPuzzle": {
+        "runTrainingItem": {
             "id": run_puzzle.id,
+            "trainingItemId": run_puzzle.training_item_id,
             "runId": run.id,
             "runIndex": run.run_index,
             "position": run_puzzle.position,
             "status": position_status,
             "triesRemaining": tries_remaining,
-            "maxTriesPerPuzzle": total_queue,
+            "maxTriesPerItem": total_queue,
             "qualifyingAttemptId": qualifying_attempt_id,
             "trainingId": training_id,
             "scheduleName": schedule_name,
         },
-        "puzzle": {
-            "puzzleId": content.display_id,
+        "trainingItem": {
+            "displayId": content.display_id,
             "fen": content.fen,
             "solution": content.moves.split(),
             "rating": content.rating,
@@ -1423,7 +1424,7 @@ def _build_run_puzzle_overview(
         },
         "selectedAttemptId": resolved_selected_id,
         "attempts": attempt_views,
-        "samePuzzleAcrossRuns": _same_puzzle_run_overview_items(
+        "sameTrainingItemAcrossRuns": _same_puzzle_run_overview_items(
             run_puzzle, training_id, total_queue
         ),
         "runPace": {
@@ -1589,33 +1590,28 @@ def complete_attempt(
     }
 
 
-def get_puzzle_history(run_id: int, puzzle_id: str, user_id: int) -> dict[str, object]:
+def get_training_item_history(run_id: int, training_item_id: int, user_id: int) -> dict[str, object]:
     run = _get_owned_run(run_id, user_id)
-
-    tactic = db.session.scalar(
-        sa.select(LichessTactic).where(LichessTactic.puzzle_id == puzzle_id)
-    )
-    if tactic is None:
-        raise LookupError("Puzzle not found in this run.")
+    content = get_content(training_item_id)
 
     _, config = _get_schedule_config(run)
     total_queue = _total_queue_attempts(config)
 
-    run_puzzles = list(
+    run_training_items = list(
         db.session.scalars(
             sa.select(RunTrainingItem)
             .where(
                 RunTrainingItem.run_id == run_id,
-                RunTrainingItem.training_item_id == tactic.training_item_id,
+                RunTrainingItem.training_item_id == training_item_id,
             )
             .order_by(RunTrainingItem.position)
         ).all()
     )
-    if not run_puzzles:
-        raise LookupError("Puzzle not found in this run.")
+    if not run_training_items:
+        raise LookupError("Training item not found in this run.")
 
     positions: list[dict[str, object]] = []
-    for rp in run_puzzles:
+    for rp in run_training_items:
         completed = [a for a in rp.attempts if a.status != "in_progress"]
         if not completed:
             continue
@@ -1628,9 +1624,9 @@ def get_puzzle_history(run_id: int, puzzle_id: str, user_id: int) -> dict[str, o
         })
 
     return {
-        "puzzleId": puzzle_id,
-        "solution": tactic.moves,
-        "maxTriesPerPuzzle": total_queue,
+        "displayId": content.display_id,
+        "solution": content.moves,
+        "maxTriesPerItem": total_queue,
         "positions": positions,
     }
 
@@ -1662,7 +1658,7 @@ def get_attempt(
         }
 
     overview_url = (
-        f"/app/runs/{run_id}/puzzles/{run_puzzle_id}/overview?attempt={attempt_id}"
+        f"/app/runs/{run_id}/training-items/{run_puzzle_id}/overview?attempt={attempt_id}"
     )
     overview = _build_run_puzzle_overview(
         run, run_puzzle, attempt_id, run.training_id

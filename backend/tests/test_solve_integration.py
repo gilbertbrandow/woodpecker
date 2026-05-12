@@ -19,7 +19,7 @@ class TestSolveHappyPath:
         player_move = world["solution_player_move"]
 
         resp = client.post(
-            f"/runs/{run_id}/puzzles/{run_puzzle_id}/attempts/{attempt_id}/complete",
+            f"/runs/{run_id}/training-items/{run_puzzle_id}/attempts/{attempt_id}/complete",
             json={"uciMoves": [player_move], "clientTimeSpentMs": 3000},
         )
 
@@ -37,7 +37,7 @@ class TestSolveHappyPath:
         assert attempt_row.moves == [player_move]
 
         overview = body["overview"]
-        assert "puzzle" in overview
+        assert "trainingItem" in overview
         assert "attempts" in overview
         assert "stats" in overview
         assert "progress" in overview
@@ -48,7 +48,7 @@ class TestSolveHappyPath:
 
         assert overview.get("selectedAttemptId") == attempt_id
 
-        assert "nextPuzzle" in overview["actions"]
+        assert "nextTrainingItem" in overview["actions"]
 
         pgn = None
         for attempt_view in overview["attempts"]:
@@ -82,7 +82,7 @@ class TestCheckmateAlternative:
         assert alt_move != solution_move
 
         resp = client.post(
-            f"/runs/{run_id}/puzzles/{run_puzzle_id}/attempts/{attempt_id}/complete",
+            f"/runs/{run_id}/training-items/{run_puzzle_id}/attempts/{attempt_id}/complete",
             json={"uciMoves": [alt_move], "clientTimeSpentMs": 5000},
         )
 
@@ -127,7 +127,7 @@ class TestAuthProtection:
         world = _seed_world(db_session)
 
         resp = client.post(
-            f"/runs/{world['run_id']}/puzzles/{world['run_puzzle_id']}"
+            f"/runs/{world['run_id']}/training-items/{world['run_puzzle_id']}"
             f"/attempts/{world['attempt_id']}/complete",
             json={"uciMoves": ["a1a8"], "clientTimeSpentMs": 1000},
         )
@@ -152,7 +152,7 @@ class TestFailedAttempt:
         wrong_move = "a1b1"
 
         resp = client.post(
-            f"/runs/{run_id}/puzzles/{run_puzzle_id}/attempts/{attempt_id}/complete",
+            f"/runs/{run_id}/training-items/{run_puzzle_id}/attempts/{attempt_id}/complete",
             json={"uciMoves": [wrong_move], "clientTimeSpentMs": 2000},
         )
 

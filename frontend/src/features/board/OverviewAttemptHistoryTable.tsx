@@ -17,7 +17,7 @@ export type OverviewAttemptHistoryRow = {
   runId: number
   runLabel: string
   runOrder: number
-  runPuzzleId: number
+  runTrainingItemId: number
   tryNumber: number
   countsTowardsTraining: boolean
   result: 'solved' | 'failed'

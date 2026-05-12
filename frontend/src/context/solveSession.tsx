@@ -7,7 +7,7 @@ export type SessionAttemptStatus = 'ongoing' | 'solved' | 'failed'
 
 export type SessionAttemptHistoryItem = {
   attemptId: number
-  runPuzzleId: number
+  runTrainingItemId: number
   puzzlePosition: number
   status: SessionAttemptStatus
   startedAt: number
@@ -20,7 +20,7 @@ type SolveSessionState = {
 
 type RegisterAttemptStartInput = {
   attemptId: number
-  runPuzzleId: number
+  runTrainingItemId: number
   puzzlePosition: number
 }
 
@@ -47,7 +47,7 @@ function isSessionAttemptHistoryItem(value: unknown): value is SessionAttemptHis
 
   const candidate = value as Record<string, unknown>
   if (typeof candidate.attemptId !== 'number') return false
-  if (typeof candidate.runPuzzleId !== 'number') return false
+  if (typeof candidate.runTrainingItemId !== 'number') return false
   if (typeof candidate.puzzlePosition !== 'number') return false
   if (!isSessionAttemptStatus(candidate.status)) return false
   if (typeof candidate.startedAt !== 'number') return false
@@ -92,7 +92,7 @@ function solveSessionReducer(state: SolveSessionState, action: SolveSessionActio
           ...state.attemptHistory,
           {
             attemptId: action.payload.attemptId,
-            runPuzzleId: action.payload.runPuzzleId,
+            runTrainingItemId: action.payload.runTrainingItemId,
             puzzlePosition: action.payload.puzzlePosition,
             status: 'ongoing',
             startedAt: Date.now(),

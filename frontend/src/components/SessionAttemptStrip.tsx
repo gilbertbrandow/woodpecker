@@ -63,8 +63,8 @@ export function SessionAttemptStrip({ items, runId, activeAttemptId, interactive
 
           const trigger = isClickable ? (
             <Link
-              to="/app/runs/$runId/puzzles/$runPuzzleId/overview"
-              params={{ runId, runPuzzleId: String(item.runPuzzleId) }}
+              to="/app/runs/$runId/training-items/$runTrainingItemId/overview"
+              params={{ runId, runTrainingItemId: String(item.runTrainingItemId) }}
               search={{ attempt: item.attemptId }}
               aria-label={tooltip}
               className={wrapperClassName}

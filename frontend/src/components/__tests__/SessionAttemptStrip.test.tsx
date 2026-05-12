@@ -22,7 +22,7 @@ function renderWithProvider(ui: React.ReactElement) {
 function makeItem(overrides: Partial<SessionAttemptHistoryItem>): SessionAttemptHistoryItem {
   return {
     attemptId: 1,
-    runPuzzleId: 10,
+    runTrainingItemId: 10,
     puzzlePosition: 1,
     status: 'ongoing',
     startedAt: Date.now(),

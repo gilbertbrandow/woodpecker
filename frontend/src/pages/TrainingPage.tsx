@@ -127,7 +127,7 @@ function buildProgressData(training: Training, runs: Run[]): ProgressPoint[] {
     const runStartMs = new Date(run.startedAt).getTime()
     if (run.status === 'completed' && run.completedAt !== null) {
       actualAnchors.push({ timeMs: runStartMs, value: cumulative })
-      cumulative += run.totalPuzzles
+      cumulative += run.totalItems
       const runEndMs = new Date(run.completedAt).getTime()
       actualAnchors.push({ timeMs: runEndMs, value: cumulative })
       lastActualMs = runEndMs
@@ -510,9 +510,9 @@ export function TrainingPage(): React.ReactElement | null {
                   const canStartThisRow = startableRunIndex === i && slotStatus !== 'active' && slotStatus !== 'completed'
                   const starting = startingIndex === i
                   const resolved = run !== null ? run.solvedCount + run.solvedWithRetriesCount + run.failedCount : 0
-                  const progressValue = run !== null && run.totalPuzzles > 0 ? (resolved / run.totalPuzzles) * 100 : 0
+                  const progressValue = run !== null && run.totalItems > 0 ? (resolved / run.totalItems) * 100 : 0
                   const progressTooltip = run !== null
-                    ? `${resolved} / ${run.totalPuzzles} puzzles completed`
+                    ? `${resolved} / ${run.totalItems} puzzles completed`
                     : 'Not started yet'
 
                   return (

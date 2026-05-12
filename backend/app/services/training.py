@@ -4,7 +4,6 @@ from typing import cast
 import sqlalchemy as sa
 
 from app.extensions import db
-from app.models.lichess_tactic import LichessTactic
 from app.models.run import TrainingAttempt, Run, RunTrainingItem
 from app.models.schedule import Schedule
 from app.models.training import Training
@@ -113,16 +112,16 @@ def training_full_dict(training: Training) -> dict[str, object]:
     }
 
 
-def get_cross_run_puzzle_refs(
+def get_cross_run_item_refs(
     training_id: int,
-    puzzle_id: str,
+    training_item_id: int,
     user_id: int,
 ) -> list[dict[str, object]]:
     _get_owned_training(training_id, user_id)
 
     rows = db.session.execute(
         sa.select(
-            RunTrainingItem.id.label("run_puzzle_id"),
+            RunTrainingItem.id.label("run_training_item_id"),
             Run.id.label("run_id"),
             Run.run_index,
             sa.exists()
@@ -130,10 +129,9 @@ def get_cross_run_puzzle_refs(
             .label("has_attempts"),
         )
         .join(Run, Run.id == RunTrainingItem.run_id)
-        .join(LichessTactic, LichessTactic.training_item_id == RunTrainingItem.training_item_id)
         .where(
             Run.training_id == training_id,
-            LichessTactic.puzzle_id == puzzle_id,
+            RunTrainingItem.training_item_id == training_item_id,
         )
         .order_by(Run.run_index)
     ).all()
@@ -142,7 +140,7 @@ def get_cross_run_puzzle_refs(
         {
             "runId": int(row.run_id),
             "runIndex": int(row.run_index),
-            "runPuzzleId": int(row.run_puzzle_id),
+            "runTrainingItemId": int(row.run_training_item_id),
             "hasAttempts": bool(row.has_attempts),
         }
         for row in rows

@@ -10,7 +10,7 @@ import { BoardPageShell } from '../features/board/BoardPageShell'
 import { BoardBreadcrumbs } from '../features/board/BoardBreadcrumbs'
 import { BoardCenterColumn } from '../features/board/BoardCenterColumn'
 import { TimerCard } from '../features/board/TimerCard'
-import { PuzzleMetaCard } from '../features/board/PuzzleMetaCard'
+import { TrainingItemMetaCard } from '../features/board/TrainingItemMetaCard'
 import { MoveStatusCard } from '../features/board/MoveStatusCard'
 import { AttemptTypeCard } from '../features/board/AttemptTypeCard'
 import { OverviewSidebarLeft } from '../features/board/OverviewSidebarLeft'
@@ -50,10 +50,10 @@ export function BoardPage(): React.ReactElement | null {
   const navigate = useNavigate()
 
   const runIdStr = typeof params.runId === 'string' ? params.runId : ''
-  const runPuzzleIdStr = typeof params.runPuzzleId === 'string' ? params.runPuzzleId : ''
+  const runTrainingItemIdStr = typeof params.runTrainingItemId === 'string' ? params.runTrainingItemId : ''
   const routeKind = typeof params.attemptId === 'string' ? 'attempt' : 'overview'
   const runId = parsePositiveInt(runIdStr) ?? Number.NaN
-  const runPuzzleId = parsePositiveInt(runPuzzleIdStr) ?? Number.NaN
+  const runTrainingItemId = parsePositiveInt(runTrainingItemIdStr) ?? Number.NaN
   const attemptId = routeKind === 'attempt' ? parsePositiveInt(params.attemptId) : null
   const requestedOverviewAttemptId = React.useMemo(() => {
     if (routeKind !== 'overview') return null
@@ -62,10 +62,10 @@ export function BoardPage(): React.ReactElement | null {
 
   const ctrl = useBoardPageController({
     runId,
-    runPuzzleId,
+    runTrainingItemId,
     attemptId,
     runIdStr,
-    runPuzzleIdStr,
+    runTrainingItemIdStr,
     routeKind,
   })
 
@@ -73,7 +73,7 @@ export function BoardPage(): React.ReactElement | null {
   const [showOverlay, setShowOverlay] = React.useState(false)
 
   const isOverviewPath = React.useMemo(
-    () => /^\/app\/runs\/\d+\/puzzles\/\d+\/overview$/.test(location),
+    () => /^\/app\/runs\/\d+\/training-items\/\d+\/overview$/.test(location),
     [location],
   )
 
@@ -81,13 +81,13 @@ export function BoardPage(): React.ReactElement | null {
     (aId: number | null, replace: boolean): void => {
       if (!isOverviewPath) return
       void navigate({
-        to: '/app/runs/$runId/puzzles/$runPuzzleId/overview',
-        params: { runId: runIdStr, runPuzzleId: runPuzzleIdStr },
+        to: '/app/runs/$runId/training-items/$runTrainingItemId/overview',
+        params: { runId: runIdStr, runTrainingItemId: runTrainingItemIdStr },
         search: aId === null ? {} : { attempt: aId },
         replace,
       })
     },
-    [isOverviewPath, navigate, runIdStr, runPuzzleIdStr],
+    [isOverviewPath, navigate, runIdStr, runTrainingItemIdStr],
   )
 
   const allAttempts = React.useMemo((): OverviewAttemptView[] => {
@@ -97,7 +97,7 @@ export function BoardPage(): React.ReactElement | null {
     for (const attempt of data.attempts) {
       if (attempt.status !== 'in_progress') result.push(attempt)
     }
-    for (const samePuzzle of data.samePuzzleAcrossRuns) {
+    for (const samePuzzle of data.sameTrainingItemAcrossRuns) {
       for (const attempt of samePuzzle.attempts) {
         if (attempt.status !== 'in_progress') result.push(attempt)
       }
@@ -108,7 +108,7 @@ export function BoardPage(): React.ReactElement | null {
   React.useEffect(() => {
     const data = ctrl.overview.data
     if (!data) return
-    if (data.runPuzzle.id !== Number(runPuzzleIdStr)) return
+    if (data.runTrainingItem.id !== Number(runTrainingItemIdStr)) return
     const allIds = new Set(allAttempts.map((a) => a.id))
     const validRequested =
       requestedOverviewAttemptId !== null && allIds.has(requestedOverviewAttemptId)
@@ -119,7 +119,7 @@ export function BoardPage(): React.ReactElement | null {
     if (validRequested !== null && nextId !== null && nextId !== requestedOverviewAttemptId) {
       setOverviewAttemptInUrl(nextId, true)
     }
-  }, [ctrl.overview.data, allAttempts, requestedOverviewAttemptId, setOverviewAttemptInUrl, runPuzzleIdStr])
+  }, [ctrl.overview.data, allAttempts, requestedOverviewAttemptId, setOverviewAttemptInUrl, runTrainingItemIdStr])
 
   React.useEffect(() => {
     if (ctrl.overview.data !== null && ctrl.runJustCompleted) {
@@ -159,7 +159,7 @@ export function BoardPage(): React.ReactElement | null {
       runId: attempt.runId,
       runLabel: `Run ${attempt.runIndex + 1}`,
       runOrder: attempt.runIndex,
-      runPuzzleId: attempt.runPuzzleId,
+      runTrainingItemId: attempt.runTrainingItemId,
       tryNumber: attempt.tryNumber,
       countsTowardsTraining: attempt.countsTowardsTraining,
       result: attempt.status as 'solved' | 'failed',
@@ -175,8 +175,8 @@ export function BoardPage(): React.ReactElement | null {
         handleSelectAttempt(aId)
       } else {
         void navigate({
-          to: '/app/runs/$runId/puzzles/$runPuzzleId/overview',
-          params: { runId: String(row.runId), runPuzzleId: String(row.runPuzzleId) },
+          to: '/app/runs/$runId/training-items/$runTrainingItemId/overview',
+          params: { runId: String(row.runId), runTrainingItemId: String(row.runTrainingItemId) },
           search: { attempt: aId },
         })
       }
@@ -198,9 +198,9 @@ export function BoardPage(): React.ReactElement | null {
         ? ctrl.session.allPliesPlayed
         : ctrl.session.movesPlayed
     return buildPgnDisplay(
-      ctrl.solvingView.puzzle.fen,
+      ctrl.solvingView.trainingItem.fen,
       moves,
-      ctrl.solvingView.puzzle.solution.join(' '),
+      ctrl.solvingView.trainingItem.solution.join(' '),
       ctrl.mode === 'failed' ? 'failed' : ctrl.session.liveFocusStatus,
       ctrl.mode === 'failed' ? ctrl.session.failedRetryPlies : undefined,
       false,
@@ -424,18 +424,18 @@ export function BoardPage(): React.ReactElement | null {
       </>
     )
 
-  const puzzleId =
+  const displayId =
     ctrl.mode === 'overview' && overviewData !== null
-      ? overviewData.puzzle.puzzleId
-      : (ctrl.solvingView?.puzzle.puzzleId ?? '')
+      ? overviewData.trainingItem.displayId
+      : (ctrl.solvingView?.trainingItem.displayId ?? '')
   const rating =
     ctrl.mode === 'overview' && overviewData !== null
-      ? overviewData.puzzle.rating
-      : (ctrl.solvingView?.puzzle.rating ?? 0)
+      ? overviewData.trainingItem.rating
+      : (ctrl.solvingView?.trainingItem.rating ?? 0)
   const themes =
     ctrl.mode === 'overview' && overviewData !== null
-      ? overviewData.puzzle.themes
-      : (ctrl.solvingView?.puzzle.themes ?? [])
+      ? overviewData.trainingItem.themes
+      : (ctrl.solvingView?.trainingItem.themes ?? [])
 
   const timerBar =
     ctrl.mode === 'focus' && ctrl.session.allPliesPlayed.length > 0
@@ -481,18 +481,18 @@ export function BoardPage(): React.ReactElement | null {
   const mobileHeader =
     ctrl.mode === 'overview' && overviewData !== null ? (
       <BoardBreadcrumbs
-        runIndex={overviewData.runPuzzle.runIndex}
-        position={overviewData.runPuzzle.position}
-        trainingId={overviewData.runPuzzle.trainingId}
-        scheduleName={overviewData.runPuzzle.scheduleName}
+        runIndex={overviewData.runTrainingItem.runIndex}
+        position={overviewData.runTrainingItem.position}
+        trainingId={overviewData.runTrainingItem.trainingId}
+        scheduleName={overviewData.runTrainingItem.scheduleName}
         runIdStr={runIdStr}
       />
     ) : ctrl.solvingView !== null ? (
       <BoardBreadcrumbs
-        runIndex={ctrl.solvingView.runPuzzle.runIndex}
-        position={ctrl.solvingView.runPuzzle.position}
-        trainingId={ctrl.solvingView.runPuzzle.trainingId}
-        scheduleName={ctrl.solvingView.runPuzzle.scheduleName}
+        runIndex={ctrl.solvingView.runTrainingItem.runIndex}
+        position={ctrl.solvingView.runTrainingItem.position}
+        trainingId={ctrl.solvingView.runTrainingItem.trainingId}
+        scheduleName={ctrl.solvingView.runTrainingItem.scheduleName}
         runIdStr={runIdStr}
         linksDisabled={ctrl.mode === 'focus'}
       />
@@ -502,17 +502,17 @@ export function BoardPage(): React.ReactElement | null {
     ctrl.solvingView !== null ? (
       <AttemptTypeCard
         isPractice={ctrl.solvingView.attempt.attemptType === 'practice'}
-        currentTryNumber={ctrl.solvingView.runPuzzle.currentTryNumber}
-        maxTriesPerPuzzle={ctrl.solvingView.runPuzzle.maxTriesPerPuzzle}
+        currentTryNumber={ctrl.solvingView.runTrainingItem.currentTryNumber}
+        maxTriesPerPuzzle={ctrl.solvingView.runTrainingItem.maxTriesPerItem}
         compact={true}
       />
     ) : overviewData !== null ? (
       <AttemptTypeCard
         isPractice={false}
         currentTryNumber={
-          overviewData.runPuzzle.maxTriesPerPuzzle - overviewData.runPuzzle.triesRemaining + 1
+          overviewData.runTrainingItem.maxTriesPerItem - overviewData.runTrainingItem.triesRemaining + 1
         }
-        maxTriesPerPuzzle={overviewData.runPuzzle.maxTriesPerPuzzle}
+        maxTriesPerPuzzle={overviewData.runTrainingItem.maxTriesPerItem}
         compact={true}
       />
     ) : null
@@ -652,7 +652,7 @@ export function BoardPage(): React.ReactElement | null {
               <Button
                 className="w-full bg-foreground text-background hover:bg-foreground/90"
                 disabled={
-                  overviewData.actions.nextPuzzle.disabledReason !== null ||
+                  overviewData.actions.nextTrainingItem.disabledReason !== null ||
                   ctrl.isLoadingNextPuzzle
                 }
                 onClick={() => void ctrl.actions.handleNextPuzzle()}
@@ -663,8 +663,8 @@ export function BoardPage(): React.ReactElement | null {
             </span>
           </TooltipTrigger>
           <TooltipContent>
-            {overviewData.actions.nextPuzzle.disabledReason !== null
-              ? overviewData.actions.nextPuzzle.disabledReason
+            {overviewData.actions.nextTrainingItem.disabledReason !== null
+              ? overviewData.actions.nextTrainingItem.disabledReason
               : null}
           </TooltipContent>
         </Tooltip>
@@ -695,10 +695,10 @@ export function BoardPage(): React.ReactElement | null {
           onSelectAttempt={handleSelectAttemptForTable}
         />
         {overviewPgnDisplay !== null && (
-          <PuzzleMetaCard
-            puzzleId={overviewData.puzzle.puzzleId}
-            rating={overviewData.puzzle.rating}
-            themes={overviewData.puzzle.themes}
+          <TrainingItemMetaCard
+            displayId={overviewData.trainingItem.displayId}
+            rating={overviewData.trainingItem.rating}
+            themes={overviewData.trainingItem.themes}
             pgnDisplay={overviewPgnDisplay}
             selectedPly={ctrl.mode === 'overview' ? selectedPly : null}
             onPlyClick={ctrl.mode === 'overview' ? setSelectedPly : undefined}
@@ -719,10 +719,10 @@ export function BoardPage(): React.ReactElement | null {
         trainingProgress={overviewData.progress.trainingProgress}
         breadcrumbs={
           <BoardBreadcrumbs
-            runIndex={overviewData.runPuzzle.runIndex}
-            position={overviewData.runPuzzle.position}
-            trainingId={overviewData.runPuzzle.trainingId}
-            scheduleName={overviewData.runPuzzle.scheduleName}
+            runIndex={overviewData.runTrainingItem.runIndex}
+            position={overviewData.runTrainingItem.position}
+            trainingId={overviewData.runTrainingItem.trainingId}
+            scheduleName={overviewData.runTrainingItem.scheduleName}
             runIdStr={runIdStr}
           />
         }
@@ -730,17 +730,17 @@ export function BoardPage(): React.ReactElement | null {
     ) : ctrl.solvingView !== null ? (
       <>
         <BoardBreadcrumbs
-          runIndex={ctrl.solvingView.runPuzzle.runIndex}
-          position={ctrl.solvingView.runPuzzle.position}
-          trainingId={ctrl.solvingView.runPuzzle.trainingId}
-          scheduleName={ctrl.solvingView.runPuzzle.scheduleName}
+          runIndex={ctrl.solvingView.runTrainingItem.runIndex}
+          position={ctrl.solvingView.runTrainingItem.position}
+          trainingId={ctrl.solvingView.runTrainingItem.trainingId}
+          scheduleName={ctrl.solvingView.runTrainingItem.scheduleName}
           runIdStr={runIdStr}
           linksDisabled={ctrl.mode === 'focus'}
         />
         <AttemptTypeCard
           isPractice={ctrl.solvingView.attempt.attemptType === 'practice'}
-          currentTryNumber={ctrl.solvingView.runPuzzle.currentTryNumber}
-          maxTriesPerPuzzle={ctrl.solvingView.runPuzzle.maxTriesPerPuzzle}
+          currentTryNumber={ctrl.solvingView.runTrainingItem.currentTryNumber}
+          maxTriesPerPuzzle={ctrl.solvingView.runTrainingItem.maxTriesPerItem}
         />
       </>
     ) : null
@@ -753,8 +753,8 @@ export function BoardPage(): React.ReactElement | null {
         targetSolveTenths={timerTargetSolveTenths}
         rightSlot={timerRightSlot}
       />
-      <PuzzleMetaCard
-        puzzleId={puzzleId}
+      <TrainingItemMetaCard
+        displayId={displayId}
         rating={rating}
         themes={themes}
         pgnDisplay={pgnDisplay}
@@ -804,7 +804,7 @@ export function BoardPage(): React.ReactElement | null {
           isLoadingNextPuzzle={ctrl.isLoadingNextPuzzle}
           onNextPuzzle={() => void ctrl.actions.handleNextPuzzle()}
           onRetake={() => void ctrl.actions.handleRetake()}
-          nextPuzzleDisabledReason={overviewData.actions.nextPuzzle.disabledReason}
+          nextPuzzleDisabledReason={overviewData.actions.nextTrainingItem.disabledReason}
           analyzeUrl={overviewData.actions.analyze.url}
         />
       )}
