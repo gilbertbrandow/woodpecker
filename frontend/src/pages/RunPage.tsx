@@ -7,7 +7,7 @@ import { useAuth } from '../context/auth'
 import {
   api,
   type Run,
-  type RunPuzzleList,
+  type RunTrainingItemList,
   type Training,
 } from '../lib/api'
 import { formatNumber, formatSolveTime, formatSolveTimeMs, formatStartedAt } from '../lib/utils'
@@ -44,11 +44,11 @@ import {
   TableCell,
   TableRow,
 } from '../components/ui/table'
-import { RunPuzzleTable } from '../components/runs/RunPuzzleTable'
+import { RunTrainingItemTable } from '../components/runs/RunTrainingItemTable'
 import { RunPaceCard } from '../features/board/RunPaceCard'
 import { UserAvatar } from '../components/UserAvatar'
 
-function InsightsTab({ run, puzzleList }: { run: Run; puzzleList: RunPuzzleList }): React.ReactElement {
+function InsightsTab({ run, puzzleList }: { run: Run; puzzleList: RunTrainingItemList }): React.ReactElement {
   const [breakdownOpen, setBreakdownOpen] = useState(true)
   const [paceOpen, setPaceOpen] = useState(true)
 
@@ -56,9 +56,9 @@ function InsightsTab({ run, puzzleList }: { run: Run; puzzleList: RunPuzzleList 
   const accuracyPct =
     resolvedCount > 0 ? ((run.solvedCount / resolvedCount) * 100).toFixed(1) : null
   const completionPct =
-    run.totalPuzzles > 0 ? ((resolvedCount / run.totalPuzzles) * 100).toFixed(1) : null
+    run.totalItems > 0 ? ((resolvedCount / run.totalItems) * 100).toFixed(1) : null
 
-  const solvedTimes = puzzleList.puzzles
+  const solvedTimes = puzzleList.trainingItems
     .filter((p) => p.positionStatus === 'solved' || p.positionStatus === 'solved_with_retries')
     .map((p) => p.timeMs)
     .filter((ms): ms is number => ms !== null)
@@ -106,7 +106,7 @@ function InsightsTab({ run, puzzleList }: { run: Run; puzzleList: RunPuzzleList 
                       ['Solved with retries', run.solvedWithRetriesCount],
                       ['Failed', run.failedCount],
                       ['Remaining', run.inProgressCount],
-                      ['Total', run.totalPuzzles],
+                      ['Total', run.totalItems],
                     ] as [string, number][]
                   ).map(([label, count]) => (
                     <TableRow key={label}>
@@ -175,7 +175,7 @@ function ConfigureTab({
   isOwner,
 }: {
   run: Run
-  puzzleList: RunPuzzleList
+  puzzleList: RunTrainingItemList
   runIdStr: string
   participation: Training | null
   isOwner: boolean
@@ -305,7 +305,7 @@ function ConfigureTab({
                 className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
                 style={{ transform: puzzlesOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
               />
-              Puzzles{puzzleList.puzzles.length > 0 ? ` (${puzzleList.puzzles.length})` : ''}
+              Puzzles{puzzleList.trainingItems.length > 0 ? ` (${puzzleList.trainingItems.length})` : ''}
             </span>
             <span className="hidden text-xs text-muted-foreground sm:block">
               All puzzles in this run
@@ -314,8 +314,8 @@ function ConfigureTab({
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="pt-6">
-            <RunPuzzleTable
-              puzzles={puzzleList.puzzles}
+            <RunTrainingItemTable
+              trainingItems={puzzleList.trainingItems}
               runIdStr={runIdStr}
               isActive={isActive}
             />
@@ -339,7 +339,7 @@ export function RunPage(): React.ReactElement | null {
   const runId = parseInt(runIdStr, 10)
 
   const [run, setRun] = useState<Run | null>(null)
-  const [puzzleList, setPuzzleList] = useState<RunPuzzleList | null>(null)
+  const [puzzleList, setPuzzleList] = useState<RunTrainingItemList | null>(null)
   const [participation, setParticipation] = useState<Training | null>(null)
   const [pageLoading, setPageLoading] = useState(true)
   const [showAbortDialog, setShowAbortDialog] = useState(false)
@@ -353,7 +353,7 @@ export function RunPage(): React.ReactElement | null {
 
   useEffect(() => {
     if (!user) return
-    Promise.all([api.runs.get(runId), api.runs.puzzles(runId)])
+    Promise.all([api.runs.get(runId), api.runs.trainingItems(runId)])
       .then(([fetchedRun, fetchedPuzzles]) => {
         setRun(fetchedRun)
         setPuzzleList(fetchedPuzzles)

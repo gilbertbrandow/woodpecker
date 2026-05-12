@@ -5,7 +5,7 @@ type SolveSessionState = { attemptHistory: SessionAttemptHistoryItem[] }
 
 type RegisterAttemptStartInput = {
   attemptId: number
-  runPuzzleId: number
+  runTrainingItemId: number
   puzzlePosition: number
 }
 
@@ -24,7 +24,7 @@ function solveSessionReducer(state: SolveSessionState, action: SolveSessionActio
           ...state.attemptHistory,
           {
             attemptId: action.payload.attemptId,
-            runPuzzleId: action.payload.runPuzzleId,
+            runTrainingItemId: action.payload.runTrainingItemId,
             puzzlePosition: action.payload.puzzlePosition,
             status: 'ongoing' as SessionAttemptStatus,
             startedAt: Date.now(),
@@ -55,11 +55,11 @@ describe('solveSession reducer — no duplicate attempt dots', () => {
 
     state = solveSessionReducer(state, {
       type: 'registerAttemptStart',
-      payload: { attemptId: 1, runPuzzleId: 10, puzzlePosition: 1 },
+      payload: { attemptId: 1, runTrainingItemId: 10, puzzlePosition: 1 },
     })
     state = solveSessionReducer(state, {
       type: 'registerAttemptStart',
-      payload: { attemptId: 1, runPuzzleId: 10, puzzlePosition: 1 },
+      payload: { attemptId: 1, runTrainingItemId: 10, puzzlePosition: 1 },
     })
 
     expect(state.attemptHistory).toHaveLength(1)
@@ -71,7 +71,7 @@ describe('solveSession reducer — no duplicate attempt dots', () => {
 
     state = solveSessionReducer(state, {
       type: 'registerAttemptStart',
-      payload: { attemptId: 1, runPuzzleId: 10, puzzlePosition: 1 },
+      payload: { attemptId: 1, runTrainingItemId: 10, puzzlePosition: 1 },
     })
     state = solveSessionReducer(state, {
       type: 'markAttemptResolved',
@@ -80,7 +80,7 @@ describe('solveSession reducer — no duplicate attempt dots', () => {
 
     state = solveSessionReducer(state, {
       type: 'registerAttemptStart',
-      payload: { attemptId: 2, runPuzzleId: 10, puzzlePosition: 1 },
+      payload: { attemptId: 2, runTrainingItemId: 10, puzzlePosition: 1 },
     })
     state = solveSessionReducer(state, {
       type: 'markAttemptResolved',
@@ -97,7 +97,7 @@ describe('solveSession reducer — no duplicate attempt dots', () => {
 
     state = solveSessionReducer(state, {
       type: 'registerAttemptStart',
-      payload: { attemptId: 1, runPuzzleId: 10, puzzlePosition: 1 },
+      payload: { attemptId: 1, runTrainingItemId: 10, puzzlePosition: 1 },
     })
     state = solveSessionReducer(state, {
       type: 'markAttemptResolved',
@@ -106,7 +106,7 @@ describe('solveSession reducer — no duplicate attempt dots', () => {
 
     state = solveSessionReducer(state, {
       type: 'registerAttemptStart',
-      payload: { attemptId: 2, runPuzzleId: 11, puzzlePosition: 2 },
+      payload: { attemptId: 2, runTrainingItemId: 11, puzzlePosition: 2 },
     })
 
     expect(state.attemptHistory).toHaveLength(2)
@@ -120,7 +120,7 @@ describe('solveSession reducer — no duplicate attempt dots', () => {
 
     state = solveSessionReducer(state, {
       type: 'registerAttemptStart',
-      payload: { attemptId: 5, runPuzzleId: 20, puzzlePosition: 3 },
+      payload: { attemptId: 5, runTrainingItemId: 20, puzzlePosition: 3 },
     })
     state = solveSessionReducer(state, {
       type: 'markAttemptResolved',

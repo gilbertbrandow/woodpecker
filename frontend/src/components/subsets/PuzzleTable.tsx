@@ -11,7 +11,7 @@ import {
 } from '@tanstack/react-table'
 import { ChevronUp, ChevronDown, ChevronsUpDown, Trash2, Loader2, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
-import { api, type Puzzle, type SortColumn, type SortOrder } from '../../lib/api'
+import { api, type LichessTactic, type SortColumn, type SortOrder } from '../../lib/api'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '../ui/tooltip'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
@@ -39,7 +39,7 @@ function SortHeader({
   column,
   label,
 }: {
-  column: Column<Puzzle, unknown>
+  column: Column<LichessTactic, unknown>
   label: string
 }): React.ReactElement {
   const sorted = column.getIsSorted()
@@ -61,14 +61,14 @@ function SortHeader({
   )
 }
 
-function LabelBadges({ items }: { items: { name: string; displayName: string }[] }): React.ReactElement {
+function LabelBadges({ items }: { items: { name: string; displayName: string | null }[] }): React.ReactElement {
   const shown = items.slice(0, 2)
   const extra = items.length - 2
   return (
     <div className="flex flex-wrap gap-1">
       {shown.map((t) => (
         <Badge key={t.name} variant="outline" className="text-xs font-normal">
-          {t.displayName}
+          {t.displayName ?? t.name}
         </Badge>
       ))}
       {extra > 0 && (
@@ -81,7 +81,7 @@ function LabelBadges({ items }: { items: { name: string; displayName: string }[]
 }
 
 export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProps): React.ReactElement {
-  const [puzzles, setPuzzles] = useState<Puzzle[]>([])
+  const [puzzles, setPuzzles] = useState<LichessTactic[]>([])
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [pageIndex, setPageIndex] = useState(0)
@@ -108,7 +108,7 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
       }
       try {
         const { sort, order } = toSortParams(s)
-        const result = await api.subsets.getPuzzles(subsetId, pi + 1, sort, order)
+        const result = await api.subsets.getTrainingItems(subsetId, pi + 1, sort, order)
         setPuzzles(result.puzzles)
         setTotalPages(result.totalPages)
         setTotal(result.total)
@@ -130,7 +130,7 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
   const handleDiscard = async (puzzleId: string): Promise<void> => {
     setDiscarding(puzzleId)
     try {
-      await api.subsets.discardPuzzle(subsetId, puzzleId)
+      await api.subsets.discardTrainingItem(subsetId, puzzleId)
       const isLastOnPage = puzzles.length === 1
       const newPageIndex = isLastOnPage && pageIndex > 0 ? pageIndex - 1 : pageIndex
       setRowSelection({})
@@ -151,7 +151,7 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
     if (ids.length === 0) return
     setDiscardingSelected(true)
     try {
-      await Promise.all(ids.map((id) => api.subsets.discardPuzzle(subsetId, id)))
+      await Promise.all(ids.map((id) => api.subsets.discardTrainingItem(subsetId, id)))
       setRowSelection({})
       const remaining = puzzles.length - ids.length
       const newPageIndex = remaining === 0 && pageIndex > 0 ? pageIndex - 1 : pageIndex
@@ -167,7 +167,7 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
     }
   }
 
-  const selectColumn: ColumnDef<Puzzle> = {
+  const selectColumn: ColumnDef<LichessTactic> = {
     id: 'select',
     header: ({ table }) => (
       <Checkbox
@@ -186,7 +186,7 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
     enableSorting: false,
   }
 
-  const actionColumn: ColumnDef<Puzzle> = {
+  const actionColumn: ColumnDef<LichessTactic> = {
     id: 'action',
     header: '',
     enableSorting: false,
@@ -208,7 +208,7 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
     ),
   }
 
-  const columns: ColumnDef<Puzzle>[] = [
+  const columns: ColumnDef<LichessTactic>[] = [
     ...(!locked ? [selectColumn] : []),
     {
       accessorKey: 'rating',

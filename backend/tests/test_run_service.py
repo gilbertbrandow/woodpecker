@@ -1,10 +1,10 @@
 import pytest
-from app.models.run import PuzzleAttempt
+from app.models.run import TrainingAttempt
 from app.services.run import _attempt_type_fields, _total_queue_attempts
 
 
-def _make_attempt(try_number: int, status: str) -> PuzzleAttempt:
-    a = PuzzleAttempt()
+def _make_attempt(try_number: int, status: str) -> TrainingAttempt:
+    a = TrainingAttempt()
     a.try_number = try_number
     a.status = status
     return a

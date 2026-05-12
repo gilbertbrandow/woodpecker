@@ -23,7 +23,7 @@ import {
   TableHead,
   TableCell,
 } from '../ui/table'
-import { type RunPuzzleListItem } from '../../lib/api'
+import { type RunTrainingItemListItem } from '../../lib/api'
 import { formatSolveTimeMs } from '../../lib/utils'
 
 const PAGE_SIZE = 25
@@ -32,8 +32,8 @@ const PAGE_SIZE = 25
 
 type ColMeta = { className?: string }
 
-type RunPuzzleTableProps = {
-  puzzles: RunPuzzleListItem[]
+type RunTrainingItemTableProps = {
+  trainingItems: RunTrainingItemListItem[]
   runIdStr: string
   isActive: boolean
 }
@@ -42,7 +42,7 @@ function SortHeader({
   column,
   label,
 }: {
-  column: Column<RunPuzzleListItem, unknown>
+  column: Column<RunTrainingItemListItem, unknown>
   label: string
 }): React.ReactElement {
   const sorted = column.getIsSorted()
@@ -95,19 +95,19 @@ function ActionButton({ tooltip, onClick, disabled = false, children }: ActionBu
   )
 }
 
-export function RunPuzzleTable({ puzzles, runIdStr, isActive }: RunPuzzleTableProps): React.ReactElement {
+export function RunTrainingItemTable({ trainingItems, runIdStr, isActive }: RunTrainingItemTableProps): React.ReactElement {
   const navigate = useNavigate()
   const [sorting, setSorting] = useState<SortingState>([])
 
-  const openSolvePuzzle = (runPuzzleId: number): void => {
+  const openSolveItem = (runTrainingItemId: number): void => {
     if (!isActive) return
     void navigate({
-      to: '/app/runs/$runId/puzzles/$runPuzzleId',
-      params: { runId: runIdStr, runPuzzleId: String(runPuzzleId) },
+      to: '/app/runs/$runId/training-items/$runTrainingItemId',
+      params: { runId: runIdStr, runTrainingItemId: String(runTrainingItemId) },
     })
   }
 
-  const columns: ColumnDef<RunPuzzleListItem>[] = [
+  const columns: ColumnDef<RunTrainingItemListItem>[] = [
     {
       accessorKey: 'position',
       header: '#',
@@ -162,7 +162,7 @@ export function RunPuzzleTable({ puzzles, runIdStr, isActive }: RunPuzzleTablePr
               tooltip="Open puzzle on Lichess"
               onClick={(e) => {
                 e.stopPropagation()
-                window.open(`https://lichess.org/training/${item.puzzleId}`, '_blank', 'noopener,noreferrer')
+                window.open(`https://lichess.org/training/${item.displayId}`, '_blank', 'noopener,noreferrer')
               }}
             >
               <ExternalLink className="h-4 w-4" />
@@ -172,7 +172,7 @@ export function RunPuzzleTable({ puzzles, runIdStr, isActive }: RunPuzzleTablePr
               disabled={!isActive}
               onClick={(e) => {
                 e.stopPropagation()
-                openSolvePuzzle(item.runPuzzleId)
+                openSolveItem(item.runTrainingItemId)
               }}
             >
               <Play className="h-4 w-4" />
@@ -182,10 +182,10 @@ export function RunPuzzleTable({ puzzles, runIdStr, isActive }: RunPuzzleTablePr
               onClick={(e) => {
                 e.stopPropagation()
                 void navigate({
-                  to: '/app/runs/$runId/puzzles/$runPuzzleId/overview',
+                  to: '/app/runs/$runId/training-items/$runTrainingItemId/overview',
                   params: {
                     runId: runIdStr,
-                    runPuzzleId: String(item.runPuzzleId),
+                    runTrainingItemId: String(item.runTrainingItemId),
                   },
                 })
               }}
@@ -199,7 +199,7 @@ export function RunPuzzleTable({ puzzles, runIdStr, isActive }: RunPuzzleTablePr
   ]
 
   const table = useReactTable({
-    data: puzzles,
+    data: trainingItems,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -216,7 +216,7 @@ export function RunPuzzleTable({ puzzles, runIdStr, isActive }: RunPuzzleTablePr
   })
 
   const { pageIndex } = table.getState().pagination
-  const total = puzzles.length
+  const total = trainingItems.length
   const start = pageIndex * PAGE_SIZE + 1
   const end = Math.min(pageIndex * PAGE_SIZE + table.getRowModel().rows.length, total)
 
@@ -247,7 +247,7 @@ export function RunPuzzleTable({ puzzles, runIdStr, isActive }: RunPuzzleTablePr
                 <TableRow
                   key={row.id}
                   className={isActive ? 'cursor-pointer' : undefined}
-                  onClick={() => openSolvePuzzle(row.original.runPuzzleId)}
+                  onClick={() => openSolveItem(row.original.runTrainingItemId)}
                 >
                   {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id} className={`whitespace-nowrap ${(cell.column.columnDef.meta as ColMeta | undefined)?.className ?? ''}`}>

@@ -2,12 +2,12 @@ import * as React from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 import { DeltaBadge } from './DeltaBadge'
 import { formatSolveTimeMs } from '../../lib/utils'
-import type { RunPuzzleOverview } from '../../lib/api'
+import type { RunTrainingItemOverview } from '../../lib/api'
 
 type OverviewStatsSectionProps = {
   runIndex: number
-  accuracy: RunPuzzleOverview['stats']['accuracy']
-  averageSolveTime: RunPuzzleOverview['stats']['averageSolveTime']
+  accuracy: RunTrainingItemOverview['stats']['accuracy']
+  averageSolveTime: RunTrainingItemOverview['stats']['averageSolveTime']
 }
 
 export function OverviewStatsSection({ runIndex, accuracy, averageSolveTime }: OverviewStatsSectionProps): React.ReactElement {

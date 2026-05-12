@@ -142,7 +142,7 @@ class TestRequiredFields:
     def test_required_keys_present(self) -> None:
         result = _call(0, target_hours=168.0, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=10)
         assert result is not None
-        for key in ("startMs", "deadlineMs", "totalPuzzles", "labelTicks", "domainStartMs", "series", "status", "puzzleDelta", "timeRemainingMs"):
+        for key in ("startMs", "deadlineMs", "totalItems", "labelTicks", "domainStartMs", "series", "status", "itemDelta", "timeRemainingMs"):
             assert key in result, f"Missing key: {key}"
 
     def test_start_and_deadline_ms(self) -> None:
@@ -154,7 +154,7 @@ class TestRequiredFields:
     def test_total_puzzles_matches_input(self) -> None:
         result = _call(0, target_hours=168.0, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=42)
         assert result is not None
-        assert result["totalPuzzles"] == 42
+        assert result["totalItems"] == 42
 
 
 class TestPaceStatus:

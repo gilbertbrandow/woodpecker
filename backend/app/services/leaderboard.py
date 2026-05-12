@@ -12,22 +12,22 @@ def get_leaderboard_runs(schedule_id: int | None = None) -> list[dict[str, objec
                     rp.run_id,
                     COUNT(*)                                              AS total_puzzles,
                     COUNT(*) FILTER (WHERE EXISTS (
-                        SELECT 1 FROM puzzle_attempts pa
-                        WHERE pa.run_puzzle_id = rp.id
+                        SELECT 1 FROM training_attempts pa
+                        WHERE pa.run_training_item_id = rp.id
                           AND pa.status = 'solved'
                           AND pa.try_number = 1
                     ))                                                    AS first_solved_count,
                     COUNT(*) FILTER (WHERE EXISTS (
-                        SELECT 1 FROM puzzle_attempts pa
-                        WHERE pa.run_puzzle_id = rp.id
+                        SELECT 1 FROM training_attempts pa
+                        WHERE pa.run_training_item_id = rp.id
                           AND pa.status != 'in_progress'
                     ))                                                    AS resolved_count,
                     AVG(la.time_spent_ms)                                AS avg_solve_time_ms
-                FROM run_puzzles rp
+                FROM run_training_items rp
                 LEFT JOIN LATERAL (
                     SELECT pa.time_spent_ms
-                    FROM puzzle_attempts pa
-                    WHERE pa.run_puzzle_id = rp.id
+                    FROM training_attempts pa
+                    WHERE pa.run_training_item_id = rp.id
                       AND pa.status != 'in_progress'
                     ORDER BY pa.try_number DESC
                     LIMIT 1

@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Badge } from '../../components/ui/badge'
 import { cn } from '../../lib/utils'
-import type { PuzzleLabel } from '../../lib/api'
+import type { LichessTacticTheme } from '../../lib/api'
 import type { PlySelection } from './boardPage.helpers'
 
 type DisplayMoveMin = {
@@ -11,7 +11,7 @@ type DisplayMoveMin = {
   moveStatus: 'correct' | 'wrong' | 'opponent' | null
 }
 
-type PuzzleMetaPgnDisplayMin = {
+type TrainingItemMetaPgnDisplayMin = {
   mainline: DisplayMoveMin[]
   variation: DisplayMoveMin[] | null
 }
@@ -97,7 +97,7 @@ function MoveSequence({
 
 function computeNextPly(
   selected: PlySelection | null | undefined,
-  pgnDisplay: PuzzleMetaPgnDisplayMin,
+  pgnDisplay: TrainingItemMetaPgnDisplayMin,
 ): PlySelection | null {
   const mainLen = pgnDisplay.mainline.length
   const varLen = pgnDisplay.variation?.length ?? 0
@@ -127,25 +127,25 @@ function computePrevPly(
   return selected.index > 0 ? { line: 'main', index: selected.index - 1 } : null
 }
 
-type PuzzleMetaCardProps = {
-  puzzleId: string
+type TrainingItemMetaCardProps = {
+  displayId: string
   rating: number
-  themes: PuzzleLabel[]
-  pgnDisplay: PuzzleMetaPgnDisplayMin | null
+  themes: LichessTacticTheme[]
+  pgnDisplay: TrainingItemMetaPgnDisplayMin | null
   focusMode?: boolean
   selectedPly?: PlySelection | null
   onPlyClick?: (ply: PlySelection) => void
 }
 
-export function PuzzleMetaCard({
-  puzzleId,
+export function TrainingItemMetaCard({
+  displayId,
   rating,
   themes,
   pgnDisplay,
   focusMode = false,
   selectedPly,
   onPlyClick,
-}: PuzzleMetaCardProps): React.ReactElement {
+}: TrainingItemMetaCardProps): React.ReactElement {
   React.useEffect(() => {
     if (!onPlyClick || !pgnDisplay) return
 
@@ -170,12 +170,12 @@ export function PuzzleMetaCard({
           <div>
             <span className="text-xs text-muted-foreground">Puzzle </span>
             <a
-              href={`https://lichess.org/training/${puzzleId}`}
+              href={`https://lichess.org/training/${displayId}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm font-mono text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
             >
-              #{puzzleId}
+              #{displayId}
             </a>
           </div>
           {!focusMode && (

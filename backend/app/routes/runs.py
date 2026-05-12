@@ -38,9 +38,9 @@ def continue_run(run_id: int) -> tuple[Response, int] | Response:
     return jsonify(result)
 
 
-@runs_bp.get("/<int:run_id>/puzzles")
+@runs_bp.get("/<int:run_id>/training-items")
 @login_required
-def list_run_puzzles(run_id: int) -> tuple[Response, int] | Response:
+def list_run_training_items(run_id: int) -> tuple[Response, int] | Response:
     try:
         result = run_svc.list_run_puzzles(run_id)
     except LookupError as e:
@@ -48,11 +48,11 @@ def list_run_puzzles(run_id: int) -> tuple[Response, int] | Response:
     return jsonify(result)
 
 
-@runs_bp.get("/<int:run_id>/puzzles/<int:run_puzzle_id>")
+@runs_bp.get("/<int:run_id>/training-items/<int:run_training_item_id>")
 @login_required
-def get_run_puzzle(run_id: int, run_puzzle_id: int) -> tuple[Response, int] | Response:
+def get_run_training_item(run_id: int, run_training_item_id: int) -> tuple[Response, int] | Response:
     try:
-        result = run_svc.get_run_puzzle(run_id, run_puzzle_id, session["user_id"])
+        result = run_svc.get_run_puzzle(run_id, run_training_item_id, session["user_id"])
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
     except PermissionError as e:
@@ -60,13 +60,13 @@ def get_run_puzzle(run_id: int, run_puzzle_id: int) -> tuple[Response, int] | Re
     return jsonify(result)
 
 
-@runs_bp.get("/<int:run_id>/puzzles/<int:run_puzzle_id>/overview")
+@runs_bp.get("/<int:run_id>/training-items/<int:run_training_item_id>/overview")
 @login_required
-def get_run_puzzle_overview(run_id: int, run_puzzle_id: int) -> tuple[Response, int] | Response:
+def get_run_training_item_overview(run_id: int, run_training_item_id: int) -> tuple[Response, int] | Response:
     selected_attempt_id = request.args.get("attempt", type=int)
     try:
         result = run_svc.get_run_puzzle_overview(
-            run_id, run_puzzle_id, session["user_id"], selected_attempt_id
+            run_id, run_training_item_id, session["user_id"], selected_attempt_id
         )
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
@@ -75,11 +75,11 @@ def get_run_puzzle_overview(run_id: int, run_puzzle_id: int) -> tuple[Response, 
     return jsonify(result)
 
 
-@runs_bp.post("/<int:run_id>/puzzles/<int:run_puzzle_id>/attempts")
+@runs_bp.post("/<int:run_id>/training-items/<int:run_training_item_id>/attempts")
 @login_required
-def start_attempt(run_id: int, run_puzzle_id: int) -> tuple[Response, int] | Response:
+def start_attempt(run_id: int, run_training_item_id: int) -> tuple[Response, int] | Response:
     try:
-        result = run_svc.start_puzzle(run_id, run_puzzle_id, session["user_id"])
+        result = run_svc.start_puzzle(run_id, run_training_item_id, session["user_id"])
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
     except PermissionError as e:
@@ -90,10 +90,10 @@ def start_attempt(run_id: int, run_puzzle_id: int) -> tuple[Response, int] | Res
     return jsonify(result)
 
 
-@runs_bp.post("/<int:run_id>/puzzles/<int:run_puzzle_id>/attempts/<int:attempt_id>/complete")
+@runs_bp.post("/<int:run_id>/training-items/<int:run_training_item_id>/attempts/<int:attempt_id>/complete")
 @login_required
 def complete_run_attempt(
-    run_id: int, run_puzzle_id: int, attempt_id: int
+    run_id: int, run_training_item_id: int, attempt_id: int
 ) -> tuple[Response, int] | Response:
     data: dict[str, object] = request.get_json(silent=True) or {}
     uci_moves_raw = data.get("uciMoves")
@@ -111,7 +111,7 @@ def complete_run_attempt(
     )
 
     try:
-        result = run_svc.complete_attempt(attempt_id, session["user_id"], run_id, run_puzzle_id, uci_moves, client_time_ms)
+        result = run_svc.complete_attempt(attempt_id, session["user_id"], run_id, run_training_item_id, uci_moves, client_time_ms)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
     except PermissionError as e:
@@ -122,13 +122,13 @@ def complete_run_attempt(
     return jsonify(result)
 
 
-@runs_bp.get("/<int:run_id>/puzzles/<int:run_puzzle_id>/attempts/<int:attempt_id>")
+@runs_bp.get("/<int:run_id>/training-items/<int:run_training_item_id>/attempts/<int:attempt_id>")
 @login_required
 def get_attempt(
-    run_id: int, run_puzzle_id: int, attempt_id: int
+    run_id: int, run_training_item_id: int, attempt_id: int
 ) -> tuple[Response, int] | Response:
     try:
-        result = run_svc.get_attempt(run_id, run_puzzle_id, attempt_id, session["user_id"])
+        result = run_svc.get_attempt(run_id, run_training_item_id, attempt_id, session["user_id"])
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
     except PermissionError as e:
@@ -136,11 +136,11 @@ def get_attempt(
     return jsonify(result)
 
 
-@runs_bp.get("/<int:run_id>/puzzles/<puzzle_id>/history")
+@runs_bp.get("/<int:run_id>/training-items/<int:training_item_id>/history")
 @login_required
-def get_puzzle_history(run_id: int, puzzle_id: str) -> tuple[Response, int] | Response:
+def get_training_item_history(run_id: int, training_item_id: int) -> tuple[Response, int] | Response:
     try:
-        result = run_svc.get_puzzle_history(run_id, puzzle_id, session["user_id"])
+        result = run_svc.get_training_item_history(run_id, training_item_id, session["user_id"])
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
     except PermissionError as e:

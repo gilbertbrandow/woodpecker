@@ -55,7 +55,7 @@ export function RunPaceCard({ chartData, isRunActive, stretch = false }: RunPace
   const domainStartMs = chartData?.domainStartMs ?? 0
   const spanMs = chartData !== null ? chartData.deadlineMs - chartData.startMs : 0
   const tickFormatter = formatPaceAxisTick(spanMs)
-  const totalPuzzles = chartData?.totalPuzzles ?? 0
+  const totalItems = chartData?.totalItems ?? 0
   const lastActualArr = series.filter((t) => t.actual !== null)
   const lastActual = lastActualArr.length > 0 ? lastActualArr[lastActualArr.length - 1] : null
 
@@ -88,7 +88,7 @@ export function RunPaceCard({ chartData, isRunActive, stretch = false }: RunPace
               tick={{ fontSize: 10 }}
               tickFormatter={tickFormatter}
             />
-            <YAxis hide width={0} domain={[0, totalPuzzles]} />
+            <YAxis hide width={0} domain={[0, totalItems]} />
             <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeOpacity={1} />
             <ChartTooltip
               content={({ active, payload, label }) => {
@@ -179,9 +179,9 @@ export function RunPaceCard({ chartData, isRunActive, stretch = false }: RunPace
             ? <TrendingDown className="h-4 w-4" />
             : <Minus className="h-4 w-4" />
         const statusLabel = chartData.status === 'ahead'
-          ? `${chartData.puzzleDelta} puzzle${chartData.puzzleDelta === 1 ? '' : 's'} ahead of pace`
+          ? `${chartData.itemDelta} puzzle${chartData.itemDelta === 1 ? '' : 's'} ahead of pace`
           : chartData.status === 'behind'
-            ? `${chartData.puzzleDelta} puzzle${chartData.puzzleDelta === 1 ? '' : 's'} behind pace`
+            ? `${chartData.itemDelta} puzzle${chartData.itemDelta === 1 ? '' : 's'} behind pace`
             : 'On pace'
         const timeLabel = chartData.timeRemainingMs > 0
           ? `Due in ${formatTimeRemaining(chartData.timeRemainingMs)}`
@@ -193,7 +193,7 @@ export function RunPaceCard({ chartData, isRunActive, stretch = false }: RunPace
                 {statusLabel}{statusIcon}
               </div>
               <div className="flex items-center gap-1 leading-none text-muted-foreground text-xs mt-1">
-                {timeLabel}<span className="text-muted-foreground/50">·</span>{chartData.totalPuzzles - (lastActual !== null ? (lastActual.actual as number) : 0)} puzzles left
+                {timeLabel}<span className="text-muted-foreground/50">·</span>{chartData.totalItems - (lastActual !== null ? (lastActual.actual as number) : 0)} puzzles left
               </div>
             </div>
           </div>

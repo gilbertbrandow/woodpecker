@@ -1,20 +1,25 @@
-from app.models.theme import Theme
+from app.models.training_item import TrainingItem, TrainingItemSource
+from app.models.lichess_tactic import LichessTactic, lichess_tactic_theme_links, lichess_tactic_openings
+from app.models.lichess_tactic_theme import LichessTacticTheme
 from app.models.opening import Opening
-from app.models.puzzle import Puzzle
-from app.models.subset import Subset, SubsetPuzzle
+from app.models.subset import Subset, SubsetTrainingItem
 from app.models.schedule import Schedule
 from app.models.training import Training
-from app.models.run import Run, RunPuzzle, PuzzleAttempt
+from app.models.run import Run, RunTrainingItem, TrainingAttempt
 
 __all__ = [
-    "Theme",
+    "TrainingItem",
+    "TrainingItemSource",
+    "LichessTactic",
+    "lichess_tactic_theme_links",
+    "lichess_tactic_openings",
+    "LichessTacticTheme",
     "Opening",
-    "Puzzle",
     "Subset",
-    "SubsetPuzzle",
+    "SubsetTrainingItem",
     "Schedule",
     "Training",
     "Run",
-    "RunPuzzle",
-    "PuzzleAttempt",
+    "RunTrainingItem",
+    "TrainingAttempt",
 ]

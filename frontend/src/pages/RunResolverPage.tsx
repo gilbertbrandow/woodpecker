@@ -20,10 +20,10 @@ export function RunResolverPage(): React.ReactElement {
         }
         const av = result.attemptView
         void navigate({
-          to: '/app/runs/$runId/puzzles/$runPuzzleId/attempts/$attemptId',
+          to: '/app/runs/$runId/training-items/$runTrainingItemId/attempts/$attemptId',
           params: {
             runId: runIdStr,
-            runPuzzleId: String(av.runPuzzle.id),
+            runTrainingItemId: String(av.runTrainingItem.id),
             attemptId: String(av.attempt.id),
           },
           replace: true,

@@ -34,8 +34,8 @@ class Run(Base):
             return "completed"
         return "active"
 
-    puzzles: Mapped[list["RunPuzzle"]] = relationship(
-        "RunPuzzle", order_by="RunPuzzle.position", cascade="all, delete-orphan"
+    training_items: Mapped[list["RunTrainingItem"]] = relationship(
+        "RunTrainingItem", order_by="RunTrainingItem.position", cascade="all, delete-orphan"
     )
 
     __table_args__ = (
@@ -43,29 +43,31 @@ class Run(Base):
     )
 
 
-class RunPuzzle(Base):
-    __tablename__ = "run_puzzles"
+class RunTrainingItem(Base):
+    __tablename__ = "run_training_items"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     run_id: Mapped[int] = mapped_column(Integer, ForeignKey("runs.id"), nullable=False)
     position: Mapped[int] = mapped_column(Integer, nullable=False)
-    puzzle_id: Mapped[int] = mapped_column(Integer, ForeignKey("puzzles.id"), nullable=False)
+    training_item_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("training_items.id"), nullable=False
+    )
 
-    attempts: Mapped[list["PuzzleAttempt"]] = relationship(
-        "PuzzleAttempt", cascade="all, delete-orphan"
+    attempts: Mapped[list["TrainingAttempt"]] = relationship(
+        "TrainingAttempt", cascade="all, delete-orphan"
     )
 
     __table_args__ = (
-        UniqueConstraint("run_id", "position", name="uq_run_puzzle_position"),
+        UniqueConstraint("run_id", "position", name="uq_run_training_item_position"),
     )
 
 
-class PuzzleAttempt(Base):
-    __tablename__ = "puzzle_attempts"
+class TrainingAttempt(Base):
+    __tablename__ = "training_attempts"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    run_puzzle_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("run_puzzles.id"), nullable=False
+    run_training_item_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("run_training_items.id"), nullable=False
     )
     try_number: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(15), nullable=False)
@@ -75,6 +77,8 @@ class PuzzleAttempt(Base):
     moves: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
 
     __table_args__ = (
-        UniqueConstraint("run_puzzle_id", "try_number", name="uq_attempt_run_puzzle_try"),
-        Index("ix_puzzle_attempts_run_puzzle_id", "run_puzzle_id"),
+        UniqueConstraint(
+            "run_training_item_id", "try_number", name="uq_attempt_run_training_item_try"
+        ),
+        Index("ix_training_attempts_run_training_item_id", "run_training_item_id"),
     )

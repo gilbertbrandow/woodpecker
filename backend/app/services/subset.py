@@ -4,9 +4,9 @@ from datetime import datetime, timezone
 import sqlalchemy as sa
 
 from app.extensions import db
-from app.models.puzzle import Puzzle
+from app.models.lichess_tactic import LichessTactic
 from app.models.schedule import Schedule
-from app.models.subset import Subset, SubsetPuzzle
+from app.models.subset import Subset, SubsetTrainingItem
 from app.models.user import User
 
 DEFAULT_RATING_MIN = 0
@@ -24,7 +24,7 @@ def subset_status(subset: Subset) -> str:
     if subset.locked_at is not None:
         return "locked"
     count = db.session.scalar(
-        sa.select(sa.func.count()).where(SubsetPuzzle.subset_id == subset.id)
+        sa.select(sa.func.count()).where(SubsetTrainingItem.subset_id == subset.id)
     ) or 0
     return "filled" if count > 0 else "draft"
 
@@ -80,26 +80,28 @@ def _sample_puzzles(
                 JOIN opening_descendants d ON o.parent_id = d.id
             ),
             opening_matches AS (
-                SELECT DISTINCT puzzle_id
-                FROM puzzle_openings
+                SELECT DISTINCT lichess_tactic_id
+                FROM lichess_tactic_openings
                 WHERE opening_id IN (SELECT id FROM opening_descendants)
             ),
             eligible AS (
-                SELECT p.id, p.rating
-                FROM puzzles p
+                SELECT ti.id, p.rating
+                FROM training_items ti
+                JOIN lichess_tactics p ON p.training_item_id = ti.id
                 WHERE p.rating BETWEEN :min_r AND :max_r
-                  AND p.id NOT IN (
-                      SELECT puzzle_id FROM subset_puzzles
+                  AND ti.id NOT IN (
+                      SELECT training_item_id FROM subset_training_items
                       WHERE subset_id = :sid
                   )
             ),
             theme_scores AS (
-                SELECT pt.puzzle_id,
+                SELECT ltl.lichess_tactic_id,
                        SUM(COALESCE(CAST(:theme_weights AS jsonb)->>(t.name), '1')::float) AS score
-                FROM puzzle_themes pt
-                JOIN themes t ON t.id = pt.theme_id
-                WHERE pt.puzzle_id IN (SELECT id FROM eligible)
-                GROUP BY pt.puzzle_id
+                FROM lichess_tactic_theme_links ltl
+                JOIN lichess_tactic_themes t ON t.id = ltl.lichess_tactic_theme_id
+                JOIN lichess_tactics lt ON lt.id = ltl.lichess_tactic_id
+                WHERE lt.training_item_id IN (SELECT id FROM eligible)
+                GROUP BY ltl.lichess_tactic_id
             ),
             weighted AS (
                 SELECT
@@ -111,11 +113,12 @@ def _sample_puzzles(
                       END
                     * CASE
                         WHEN :opening_strength = 0 THEN 1.0
-                        WHEN e.id IN (SELECT puzzle_id FROM opening_matches) THEN 1.0
+                        WHEN e.id IN (SELECT lt.training_item_id FROM lichess_tactic_openings lto JOIN lichess_tactics lt ON lt.id = lto.lichess_tactic_id WHERE lto.lichess_tactic_id IN (SELECT lichess_tactic_id FROM opening_matches)) THEN 1.0
                         ELSE 1.0 - :opening_strength
                       END AS weight
                 FROM eligible e
-                LEFT JOIN theme_scores ts ON ts.puzzle_id = e.id
+                LEFT JOIN lichess_tactics lt2 ON lt2.training_item_id = e.id
+                LEFT JOIN theme_scores ts ON ts.lichess_tactic_id = lt2.id
             )
             SELECT id
             FROM weighted
@@ -150,21 +153,21 @@ def _sample_and_insert(
         return 0
 
     existing_max: int | None = db.session.execute(
-        db.select(db.func.max(SubsetPuzzle.position)).where(
-            SubsetPuzzle.subset_id == subset_id,
+        db.select(db.func.max(SubsetTrainingItem.position)).where(
+            SubsetTrainingItem.subset_id == subset_id,
         )
     ).scalar()
     start_pos = (existing_max + 1) if existing_max is not None else 0
 
     db.session.execute(
-        sa.insert(SubsetPuzzle).values(
+        sa.insert(SubsetTrainingItem).values(
             [
                 {
                     "subset_id": subset_id,
-                    "puzzle_id": pid,
+                    "training_item_id": tid,
                     "position": start_pos + i,
                 }
-                for i, pid in enumerate(sampled_ids)
+                for i, tid in enumerate(sampled_ids)
             ]
         )
     )
@@ -196,7 +199,7 @@ def save_config(
         raise ValueError("puzzle_count must be between 5 and 1000.")
 
     db.session.execute(
-        sa.delete(SubsetPuzzle).where(SubsetPuzzle.subset_id == subset_id)
+        sa.delete(SubsetTrainingItem).where(SubsetTrainingItem.subset_id == subset_id)
     )
 
     subset.puzzle_count = puzzle_count
@@ -213,7 +216,7 @@ def fill(subset_id: int, user_id: int) -> tuple[int, int]:
         raise ValueError("Configuration is not set.")
 
     db.session.execute(
-        sa.delete(SubsetPuzzle).where(SubsetPuzzle.subset_id == subset_id)
+        sa.delete(SubsetTrainingItem).where(SubsetTrainingItem.subset_id == subset_id)
     )
 
     filled = _sample_and_insert(
@@ -233,7 +236,7 @@ def refill(subset_id: int, user_id: int) -> tuple[int, int]:
         raise ValueError("Configuration is not set.")
 
     active_count: int = db.session.execute(
-        db.select(db.func.count()).where(SubsetPuzzle.subset_id == subset_id)
+        db.select(db.func.count()).where(SubsetTrainingItem.subset_id == subset_id)
     ).scalar_one()
 
     needed = subset.puzzle_count - active_count
@@ -254,16 +257,16 @@ def discard_puzzle(subset_id: int, lichess_puzzle_id: str, user_id: int) -> None
     if subset.locked_at is not None:
         raise PermissionError("Subset is locked.")
 
-    puzzle = db.session.execute(
-        db.select(Puzzle).where(Puzzle.puzzle_id == lichess_puzzle_id)
+    tactic = db.session.execute(
+        db.select(LichessTactic).where(LichessTactic.puzzle_id == lichess_puzzle_id)
     ).scalar_one_or_none()
-    if puzzle is None:
+    if tactic is None:
         raise LookupError("Puzzle not found.")
 
     row = db.session.execute(
-        db.select(SubsetPuzzle).where(
-            SubsetPuzzle.subset_id == subset_id,
-            SubsetPuzzle.puzzle_id == puzzle.id,
+        db.select(SubsetTrainingItem).where(
+            SubsetTrainingItem.subset_id == subset_id,
+            SubsetTrainingItem.training_item_id == tactic.training_item_id,
         )
     ).scalar_one_or_none()
     if row is None:
@@ -279,7 +282,7 @@ def lock_subset(subset_id: int, user_id: int) -> Subset:
         raise ValueError("Already locked.")
 
     active_count: int = db.session.execute(
-        db.select(db.func.count()).where(SubsetPuzzle.subset_id == subset_id)
+        db.select(db.func.count()).where(SubsetTrainingItem.subset_id == subset_id)
     ).scalar_one()
     if active_count == 0:
         raise ValueError("Cannot lock a subset with no active puzzles.")
@@ -300,22 +303,23 @@ def list_active_puzzles(
     _get_viewable_subset(subset_id, user_id)
 
     total: int = db.session.execute(
-        db.select(db.func.count()).where(SubsetPuzzle.subset_id == subset_id)
+        db.select(db.func.count()).where(SubsetTrainingItem.subset_id == subset_id)
     ).scalar_one()
 
     total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
     page = max(1, min(page, total_pages))
     offset = (page - 1) * PAGE_SIZE
 
-    sort_col = VALID_SORT_COLUMNS.get(sort or "", "sp.position")
+    sort_col = VALID_SORT_COLUMNS.get(sort or "", "sti.position")
     order_dir = "DESC" if order == "desc" else "ASC"
 
     rows = db.session.execute(
         sa.text(f"""
-            SELECT p.id, p.puzzle_id, p.rating, p.popularity, p.nb_plays, p.game_url
-            FROM subset_puzzles sp
-            JOIN puzzles p ON p.id = sp.puzzle_id
-            WHERE sp.subset_id = :sid
+            SELECT p.id, p.puzzle_id, p.rating, p.popularity, p.nb_plays, p.game_url,
+                   p.training_item_id
+            FROM subset_training_items sti
+            JOIN lichess_tactics p ON p.training_item_id = sti.training_item_id
+            WHERE sti.subset_id = :sid
             ORDER BY {sort_col} {order_dir}
             LIMIT :limit OFFSET :offset
         """),
@@ -325,33 +329,33 @@ def list_active_puzzles(
     if not rows:
         return {"puzzles": [], "page": page, "pageSize": PAGE_SIZE, "totalPages": total_pages, "total": total}
 
-    int_ids = [r.id for r in rows]
+    lichess_tactic_ids = [r.id for r in rows]
 
     theme_rows = db.session.execute(
         sa.text("""
-            SELECT pt.puzzle_id, t.name, t.display_name
-            FROM puzzle_themes pt JOIN themes t ON t.id = pt.theme_id
-            WHERE pt.puzzle_id = ANY(:ids)
+            SELECT ltl.lichess_tactic_id, t.name, t.display_name
+            FROM lichess_tactic_theme_links ltl JOIN lichess_tactic_themes t ON t.id = ltl.lichess_tactic_theme_id
+            WHERE ltl.lichess_tactic_id = ANY(:ids)
         """),
-        {"ids": int_ids},
+        {"ids": lichess_tactic_ids},
     ).all()
     theme_map: dict[int, list[dict[str, str]]] = {}
     for tr in theme_rows:
-        theme_map.setdefault(tr.puzzle_id, []).append(
+        theme_map.setdefault(tr.lichess_tactic_id, []).append(
             {"name": tr.name, "displayName": tr.display_name or tr.name}
         )
 
     opening_rows = db.session.execute(
         sa.text("""
-            SELECT po.puzzle_id, o.name, o.display_name, o.eco
-            FROM puzzle_openings po JOIN openings o ON o.id = po.opening_id
-            WHERE po.puzzle_id = ANY(:ids)
+            SELECT lto.lichess_tactic_id, o.name, o.display_name, o.eco
+            FROM lichess_tactic_openings lto JOIN openings o ON o.id = lto.opening_id
+            WHERE lto.lichess_tactic_id = ANY(:ids)
         """),
-        {"ids": int_ids},
+        {"ids": lichess_tactic_ids},
     ).all()
     opening_map: dict[int, list[dict[str, str]]] = {}
     for or_ in opening_rows:
-        opening_map.setdefault(or_.puzzle_id, []).append(
+        opening_map.setdefault(or_.lichess_tactic_id, []).append(
             {"name": or_.name, "displayName": or_.display_name or or_.name, "eco": or_.eco}
         )
 
@@ -377,8 +381,8 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
     active_rows = db.session.execute(
         sa.text("""
             SELECT p.id, p.rating, p.popularity, p.nb_plays
-            FROM subset_puzzles sp JOIN puzzles p ON p.id = sp.puzzle_id
-            WHERE sp.subset_id = :sid
+            FROM subset_training_items sti JOIN lichess_tactics p ON p.training_item_id = sti.training_item_id
+            WHERE sti.subset_id = :sid
         """),
         {"sid": subset_id},
     ).all()
@@ -445,8 +449,8 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
     theme_rows = db.session.execute(
         sa.text("""
             SELECT t.name, t.display_name, t.description, COUNT(*) AS cnt
-            FROM puzzle_themes pt JOIN themes t ON t.id = pt.theme_id
-            WHERE pt.puzzle_id = ANY(:ids)
+            FROM lichess_tactic_theme_links ltl JOIN lichess_tactic_themes t ON t.id = ltl.lichess_tactic_theme_id
+            WHERE ltl.lichess_tactic_id = ANY(:ids)
             GROUP BY t.name, t.display_name, t.description
             ORDER BY cnt DESC
         """),
@@ -460,8 +464,8 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
     opening_rows = db.session.execute(
         sa.text("""
             SELECT o.name, o.display_name, COUNT(*) AS cnt
-            FROM puzzle_openings po JOIN openings o ON o.id = po.opening_id
-            WHERE po.puzzle_id = ANY(:ids)
+            FROM lichess_tactic_openings lto JOIN openings o ON o.id = lto.opening_id
+            WHERE lto.lichess_tactic_id = ANY(:ids)
             GROUP BY o.name, o.display_name
             ORDER BY cnt DESC
         """),
@@ -472,7 +476,7 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
     ]
 
     with_opening = db.session.execute(
-        sa.text("SELECT COUNT(DISTINCT puzzle_id) FROM puzzle_openings WHERE puzzle_id = ANY(:ids)"),
+        sa.text("SELECT COUNT(DISTINCT lichess_tactic_id) FROM lichess_tactic_openings WHERE lichess_tactic_id = ANY(:ids)"),
         {"ids": int_ids},
     ).scalar()
     no_opening_count = total - int(with_opening or 0)

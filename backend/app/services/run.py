@@ -9,11 +9,11 @@ import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.models.puzzle import Puzzle
-from app.models.run import MAX_PUZZLE_TIME_MS, PuzzleAttempt, Run, RunPuzzle
+from app.models.run import MAX_PUZZLE_TIME_MS, TrainingAttempt, Run, RunTrainingItem
 from app.models.schedule import Schedule
 from app.models.training import Training
-from app.models.subset import Subset, SubsetPuzzle
+from app.models.subset import Subset, SubsetTrainingItem
+from app.services.training_item_content import TrainingItemContent, get_content, get_content_batch
 
 
 def _get_run(run_id: int) -> Run:
@@ -33,11 +33,11 @@ def _get_owned_run(run_id: int, user_id: int) -> Run:
 
 def _get_owned_attempt(
     attempt_id: int, user_id: int
-) -> tuple[PuzzleAttempt, RunPuzzle, Run]:
-    attempt = db.session.get(PuzzleAttempt, attempt_id)
+) -> tuple[TrainingAttempt, RunTrainingItem, Run]:
+    attempt = db.session.get(TrainingAttempt, attempt_id)
     if attempt is None:
         raise LookupError("Attempt not found.")
-    run_puzzle = db.session.get(RunPuzzle, attempt.run_puzzle_id)
+    run_puzzle = db.session.get(RunTrainingItem, attempt.run_training_item_id)
     if run_puzzle is None:
         raise LookupError("Run puzzle not found.")
     run = _get_owned_run(run_puzzle.run_id, user_id)
@@ -79,7 +79,7 @@ def _total_queue_attempts(config: dict[str, object]) -> int:
 
 
 def _derive_position_status(
-    attempts: list[PuzzleAttempt], total_queue: int
+    attempts: list[TrainingAttempt], total_queue: int
 ) -> str:
     if not attempts:
         return "not_started"
@@ -98,7 +98,7 @@ def _derive_position_status(
     return "in_progress"
 
 
-def _is_puzzle_terminal(attempts: list[PuzzleAttempt], total_queue: int) -> bool:
+def _is_puzzle_terminal(attempts: list[TrainingAttempt], total_queue: int) -> bool:
     completed = [a for a in attempts if a.status != "in_progress"]
     if any(a.status == "solved" and a.try_number <= total_queue for a in completed):
         return True
@@ -108,17 +108,17 @@ def _is_puzzle_terminal(attempts: list[PuzzleAttempt], total_queue: int) -> bool
 def _all_puzzles_terminal(run_id: int, total_queue: int) -> bool:
     non_terminal = db.session.scalar(
         sa.text("""
-            SELECT COUNT(*) FROM run_puzzles rp
+            SELECT COUNT(*) FROM run_training_items rp
             WHERE rp.run_id = :run_id
               AND NOT EXISTS(
-                  SELECT 1 FROM puzzle_attempts pa
-                  WHERE pa.run_puzzle_id = rp.id
+                  SELECT 1 FROM training_attempts pa
+                  WHERE pa.run_training_item_id = rp.id
                     AND pa.status = 'solved'
                     AND pa.try_number <= :total_queue
               )
               AND (
-                  SELECT COUNT(*) FROM puzzle_attempts pa
-                  WHERE pa.run_puzzle_id = rp.id
+                  SELECT COUNT(*) FROM training_attempts pa
+                  WHERE pa.run_training_item_id = rp.id
                     AND pa.status != 'in_progress'
                     AND pa.try_number <= :total_queue
               ) < :total_queue
@@ -132,28 +132,28 @@ def _current_run_puzzle_id(run_id: int, total_queue: int) -> int | None:
     row = db.session.execute(
         sa.text("""
             SELECT rp.id
-            FROM run_puzzles rp
+            FROM run_training_items rp
             WHERE rp.run_id = :run_id
               AND NOT EXISTS(
-                  SELECT 1 FROM puzzle_attempts pa
-                  WHERE pa.run_puzzle_id = rp.id
+                  SELECT 1 FROM training_attempts pa
+                  WHERE pa.run_training_item_id = rp.id
                     AND pa.status = 'solved'
                     AND pa.try_number <= :total_queue
               )
               AND (
-                  SELECT COUNT(*) FROM puzzle_attempts pa
-                  WHERE pa.run_puzzle_id = rp.id
+                  SELECT COUNT(*) FROM training_attempts pa
+                  WHERE pa.run_training_item_id = rp.id
                     AND pa.status != 'in_progress'
                     AND pa.try_number <= :total_queue
               ) < :total_queue
             ORDER BY
               CASE WHEN EXISTS(
-                  SELECT 1 FROM puzzle_attempts pa
-                  WHERE pa.run_puzzle_id = rp.id AND pa.status = 'in_progress'
+                  SELECT 1 FROM training_attempts pa
+                  WHERE pa.run_training_item_id = rp.id AND pa.status = 'in_progress'
               ) THEN 0 ELSE 1 END,
               CASE WHEN NOT EXISTS(
-                  SELECT 1 FROM puzzle_attempts pa
-                  WHERE pa.run_puzzle_id = rp.id
+                  SELECT 1 FROM training_attempts pa
+                  WHERE pa.run_training_item_id = rp.id
               ) THEN 0 ELSE 1 END,
               rp.position
             LIMIT 1
@@ -165,7 +165,7 @@ def _current_run_puzzle_id(run_id: int, total_queue: int) -> int | None:
     return int(row.id)
 
 
-def _attempt_dict(attempt: PuzzleAttempt) -> dict[str, object]:
+def _attempt_dict(attempt: TrainingAttempt) -> dict[str, object]:
     return {
         "id": attempt.id,
         "tryNumber": attempt.try_number,
@@ -178,7 +178,7 @@ def _attempt_dict(attempt: PuzzleAttempt) -> dict[str, object]:
 
 
 def _attempt_type_fields(
-    sorted_attempts: list[PuzzleAttempt],
+    sorted_attempts: list[TrainingAttempt],
     current_try_number: int,
     total_queue: int,
 ) -> dict[str, object]:
@@ -200,7 +200,7 @@ def _attempt_type_fields(
 
 
 def _session_attempt_strip_item(
-    attempt: PuzzleAttempt, total_queue: int
+    attempt: TrainingAttempt, total_queue: int
 ) -> dict[str, object]:
     sorted_for_type = [attempt]
     type_data = _attempt_type_fields(sorted_for_type, attempt.try_number, total_queue)
@@ -212,10 +212,8 @@ def _session_attempt_strip_item(
     }
 
 
-def _run_puzzle_attempt_view_dict(run_puzzle: RunPuzzle) -> dict[str, object]:
-    puzzle = db.session.get(Puzzle, run_puzzle.puzzle_id)
-    if puzzle is None:
-        raise LookupError("Puzzle not found.")
+def _run_puzzle_attempt_view_dict(run_puzzle: RunTrainingItem) -> dict[str, object]:
+    content = get_content(run_puzzle.training_item_id)
     run = db.session.get(Run, run_puzzle.run_id)
     if run is None:
         raise LookupError("Run not found.")
@@ -248,28 +246,26 @@ def _run_puzzle_attempt_view_dict(run_puzzle: RunPuzzle) -> dict[str, object]:
     )
 
     return {
-        "runPuzzle": {
+        "runTrainingItem": {
             "id": run_puzzle.id,
+            "trainingItemId": run_puzzle.training_item_id,
             "runId": run.id,
             "runIndex": run.run_index,
             "position": run_puzzle.position,
             "status": position_status,
             "triesRemaining": tries_remaining,
             "currentTryNumber": in_progress_attempt.try_number,
-            "maxTriesPerPuzzle": total_queue,
+            "maxTriesPerItem": total_queue,
             "trainingId": run.training_id,
             "scheduleName": schedule_name,
         },
-        "puzzle": {
-            "puzzleId": puzzle.puzzle_id,
-            "fen": puzzle.fen,
-            "solution": puzzle.moves.split(),
-            "rating": puzzle.rating,
-            "themes": [
-                {"name": t.name, "displayName": t.display_name}
-                for t in puzzle.themes
-            ],
-            "gameUrl": puzzle.game_url,
+        "trainingItem": {
+            "displayId": content.display_id,
+            "fen": content.fen,
+            "solution": content.moves.split(),
+            "rating": content.rating,
+            "themes": content.themes,
+            "gameUrl": content.game_url,
         },
         "attempt": {
             "id": in_progress_attempt.id,
@@ -291,10 +287,8 @@ def _run_puzzle_attempt_view_dict(run_puzzle: RunPuzzle) -> dict[str, object]:
     }
 
 
-def _run_puzzle_full_dict(run_puzzle: RunPuzzle) -> dict[str, object]:
-    puzzle = db.session.get(Puzzle, run_puzzle.puzzle_id)
-    if puzzle is None:
-        raise LookupError("Puzzle not found.")
+def _run_puzzle_full_dict(run_puzzle: RunTrainingItem) -> dict[str, object]:
+    content = get_content(run_puzzle.training_item_id)
     run = db.session.get(Run, run_puzzle.run_id)
     if run is None:
         raise LookupError("Run not found.")
@@ -302,7 +296,7 @@ def _run_puzzle_full_dict(run_puzzle: RunPuzzle) -> dict[str, object]:
     total_queue = _total_queue_attempts(config)
 
     total_puzzles = db.session.scalar(
-        sa.select(sa.func.count()).where(RunPuzzle.run_id == run_puzzle.run_id)
+        sa.select(sa.func.count()).where(RunTrainingItem.run_id == run_puzzle.run_id)
     ) or 0
 
     sorted_attempts = sorted(run_puzzle.attempts, key=lambda a: a.try_number)
@@ -321,57 +315,54 @@ def _run_puzzle_full_dict(run_puzzle: RunPuzzle) -> dict[str, object]:
     attempt_type_data = _attempt_type_fields(sorted_attempts, current_try_number, total_queue)
 
     return {
-        "runPuzzleId": run_puzzle.id,
+        "runTrainingItemId": run_puzzle.id,
         "position": run_puzzle.position,
         "positionStatus": _derive_position_status(sorted_attempts, total_queue),
-        "puzzleId": puzzle.puzzle_id,
-        "fen": puzzle.fen,
-        "solution": puzzle.moves,
-        "rating": puzzle.rating,
-        "gameUrl": puzzle.game_url,
-        "maxTriesPerPuzzle": total_queue,
+        "displayId": content.display_id,
+        "fen": content.fen,
+        "solution": content.moves,
+        "rating": content.rating,
+        "gameUrl": content.game_url,
+        "maxTriesPerItem": total_queue,
         "currentTryNumber": current_try_number,
         "currentAttemptId": current_attempt_id,
         "tries": [_attempt_dict(a) for a in sorted_attempts],
-        "totalPuzzles": total_puzzles,
+        "totalItems": total_puzzles,
         "scheduleName": schedule.name,
         "runIndex": run.run_index,
-        "themes": [
-            {"name": t.name, "displayName": t.display_name}
-            for t in puzzle.themes
-        ],
+        "themes": content.themes,
         **attempt_type_data,
     }
 
 
-def _create_attempt_for_puzzle(run_puzzle: RunPuzzle) -> PuzzleAttempt:
+def _create_attempt_for_puzzle(run_puzzle: RunTrainingItem) -> TrainingAttempt:
     db.session.execute(
-        sa.select(RunPuzzle.id)
-        .where(RunPuzzle.id == run_puzzle.id)
+        sa.select(RunTrainingItem.id)
+        .where(RunTrainingItem.id == run_puzzle.id)
         .with_for_update()
     )
 
     existing_in_progress = db.session.scalar(
-        sa.select(PuzzleAttempt)
+        sa.select(TrainingAttempt)
         .where(
-            PuzzleAttempt.run_puzzle_id == run_puzzle.id,
-            PuzzleAttempt.status == "in_progress",
+            TrainingAttempt.run_training_item_id == run_puzzle.id,
+            TrainingAttempt.status == "in_progress",
         )
-        .order_by(PuzzleAttempt.try_number.desc())
+        .order_by(TrainingAttempt.try_number.desc())
         .limit(1)
     )
     if existing_in_progress is not None:
         return existing_in_progress
 
     max_try_number = db.session.scalar(
-        sa.select(sa.func.max(PuzzleAttempt.try_number)).where(
-            PuzzleAttempt.run_puzzle_id == run_puzzle.id
+        sa.select(sa.func.max(TrainingAttempt.try_number)).where(
+            TrainingAttempt.run_training_item_id == run_puzzle.id
         )
     )
     next_try_number = int(max_try_number) + 1 if max_try_number is not None else 1
 
-    attempt = PuzzleAttempt(
-        run_puzzle_id=run_puzzle.id,
+    attempt = TrainingAttempt(
+        run_training_item_id=run_puzzle.id,
         try_number=next_try_number,
         status="in_progress",
         started_at=datetime.now(timezone.utc),
@@ -385,12 +376,12 @@ def _create_attempt_for_puzzle(run_puzzle: RunPuzzle) -> PuzzleAttempt:
     except IntegrityError:
         db.session.rollback()
         existing_after_race = db.session.scalar(
-            sa.select(PuzzleAttempt)
+            sa.select(TrainingAttempt)
             .where(
-                PuzzleAttempt.run_puzzle_id == run_puzzle.id,
-                PuzzleAttempt.status == "in_progress",
+                TrainingAttempt.run_training_item_id == run_puzzle.id,
+                TrainingAttempt.status == "in_progress",
             )
-            .order_by(PuzzleAttempt.try_number.desc())
+            .order_by(TrainingAttempt.try_number.desc())
             .limit(1)
         )
         if existing_after_race is not None:
@@ -418,7 +409,7 @@ def _tick_interval_ms(target_hours: float) -> int:
 
 def _pace_chart_data(
     run: Run,
-    run_puzzles: list[RunPuzzle],
+    run_puzzles: list[RunTrainingItem],
     config: dict[str, object],
     total_queue: int,
 ) -> dict[str, object] | None:
@@ -507,12 +498,12 @@ def _pace_chart_data(
     return {
         "startMs": start_ms,
         "deadlineMs": deadline_ms,
-        "totalPuzzles": total_puzzles,
+        "totalItems": total_puzzles,
         "labelTicks": label_ticks,
         "domainStartMs": domain_start_ms,
         "series": series,
         "status": status,
-        "puzzleDelta": puzzle_delta,
+        "itemDelta": puzzle_delta,
         "timeRemainingMs": deadline_ms - now_ms,
     }
 
@@ -541,7 +532,7 @@ def run_dict(run: Run) -> dict[str, object]:
     total_queue = _total_queue_attempts(config)
 
     run_puzzles = list(
-        db.session.scalars(sa.select(RunPuzzle).where(RunPuzzle.run_id == run.id)).all()
+        db.session.scalars(sa.select(RunTrainingItem).where(RunTrainingItem.run_id == run.id)).all()
     )
 
     counts: dict[str, int] = {}
@@ -558,12 +549,12 @@ def run_dict(run: Run) -> dict[str, object]:
         "startedAt": run.started_at.isoformat(),
         "completedAt": run.completed_at.isoformat() if run.completed_at else None,
         "abortedAt": run.aborted_at.isoformat() if run.aborted_at else None,
-        "totalPuzzles": total,
+        "totalItems": total,
         "solvedCount": counts.get("solved", 0),
         "solvedWithRetriesCount": counts.get("solved_with_retries", 0),
         "failedCount": counts.get("failed", 0),
         "inProgressCount": counts.get("in_progress", 0) + counts.get("not_started", 0),
-        "currentRunPuzzleId": _current_run_puzzle_id(run.id, total_queue),
+        "currentRunTrainingItemId": _current_run_puzzle_id(run.id, total_queue),
         "targetAccuracy": run.target_accuracy,
         "targetSolveSeconds": run.target_solve_seconds,
         "paceChart": _pace_chart_data(run, run_puzzles, config, total_queue),
@@ -612,9 +603,9 @@ def start_run(training_id: int, user_id: int, expected_run_index: int | None = N
 
     puzzle_ids: list[int] = list(
         db.session.scalars(
-            sa.select(SubsetPuzzle.puzzle_id)
-            .where(SubsetPuzzle.subset_id == schedule.subset_id)
-            .order_by(SubsetPuzzle.position)
+            sa.select(SubsetTrainingItem.training_item_id)
+            .where(SubsetTrainingItem.subset_id == schedule.subset_id)
+            .order_by(SubsetTrainingItem.position)
         ).all()
     )
 
@@ -630,12 +621,12 @@ def start_run(training_id: int, user_id: int, expected_run_index: int | None = N
         puzzle_ids = sorted(puzzle_ids, key=lambda _: rng.random())
 
     db.session.execute(
-        sa.insert(RunPuzzle),
+        sa.insert(RunTrainingItem),
         [
             {
                 "run_id": run.id,
                 "position": idx,
-                "puzzle_id": pid,
+                "training_item_id": pid,
             }
             for idx, pid in enumerate(puzzle_ids)
         ],
@@ -671,15 +662,15 @@ def continue_run(run_id: int, user_id: int) -> dict[str, object]:
     total_queue = _total_queue_attempts(config)
 
     existing_attempt = db.session.scalar(
-        sa.select(PuzzleAttempt)
-        .join(RunPuzzle, PuzzleAttempt.run_puzzle_id == RunPuzzle.id)
+        sa.select(TrainingAttempt)
+        .join(RunTrainingItem, TrainingAttempt.run_training_item_id == RunTrainingItem.id)
         .where(
-            RunPuzzle.run_id == run_id,
-            PuzzleAttempt.status == "in_progress",
+            RunTrainingItem.run_id == run_id,
+            TrainingAttempt.status == "in_progress",
         )
     )
     if existing_attempt is not None:
-        run_puzzle = db.session.get(RunPuzzle, existing_attempt.run_puzzle_id)
+        run_puzzle = db.session.get(RunTrainingItem, existing_attempt.run_training_item_id)
         if run_puzzle is None:
             raise LookupError("Run puzzle not found.")
         return {
@@ -691,7 +682,7 @@ def continue_run(run_id: int, user_id: int) -> dict[str, object]:
     if next_id is None:
         return {"runCompleted": True, "attemptView": None}
 
-    run_puzzle = db.session.get(RunPuzzle, next_id)
+    run_puzzle = db.session.get(RunTrainingItem, next_id)
     if run_puzzle is None:
         raise LookupError("Run puzzle not found.")
     _create_attempt_for_puzzle(run_puzzle)
@@ -709,63 +700,64 @@ def list_run_puzzles(run_id: int) -> dict[str, object]:
 
     rows = db.session.execute(
         sa.text("""
-            SELECT rp.id AS run_puzzle_id,
+            SELECT rp.id AS run_training_item_id,
                    rp.position,
-                   p.puzzle_id,
-                   p.rating,
+                   rp.training_item_id,
                    COUNT(pa.id) FILTER (WHERE pa.status != 'in_progress') AS try_count,
                    (
                        SELECT pa2.time_spent_ms
-                       FROM puzzle_attempts pa2
-                       WHERE pa2.run_puzzle_id = rp.id
+                       FROM training_attempts pa2
+                       WHERE pa2.run_training_item_id = rp.id
                          AND pa2.status != 'in_progress'
                        ORDER BY pa2.try_number DESC
                        LIMIT 1
                    ) AS time_ms
-            FROM run_puzzles rp
-            JOIN puzzles p ON p.id = rp.puzzle_id
-            LEFT JOIN puzzle_attempts pa ON pa.run_puzzle_id = rp.id
+            FROM run_training_items rp
+            LEFT JOIN training_attempts pa ON pa.run_training_item_id = rp.id
             WHERE rp.run_id = :run_id
-            GROUP BY rp.id, rp.position, p.puzzle_id, p.rating
+            GROUP BY rp.id, rp.position, rp.training_item_id
             ORDER BY rp.position
         """),
         {"run_id": run_id},
     ).all()
 
-    rp_ids = [row.run_puzzle_id for row in rows]
-    attempts_by_puzzle: dict[int, list[PuzzleAttempt]] = {rp_id: [] for rp_id in rp_ids}
-    for a in db.session.scalars(
-        sa.select(PuzzleAttempt).where(PuzzleAttempt.run_puzzle_id.in_(rp_ids))
-    ).all():
-        attempts_by_puzzle[a.run_puzzle_id].append(a)
+    training_item_ids = [row.training_item_id for row in rows]
+    contents = get_content_batch(training_item_ids)
 
-    puzzles: list[dict[str, object]] = [
+    rp_ids = [row.run_training_item_id for row in rows]
+    attempts_by_puzzle: dict[int, list[TrainingAttempt]] = {rp_id: [] for rp_id in rp_ids}
+    for a in db.session.scalars(
+        sa.select(TrainingAttempt).where(TrainingAttempt.run_training_item_id.in_(rp_ids))
+    ).all():
+        attempts_by_puzzle[a.run_training_item_id].append(a)
+
+    training_items: list[dict[str, object]] = [
         {
-            "runPuzzleId": row.run_puzzle_id,
+            "runTrainingItemId": row.run_training_item_id,
             "position": row.position,
-            "puzzleId": row.puzzle_id,
-            "rating": row.rating,
+            "displayId": contents[row.training_item_id].display_id,
+            "rating": contents[row.training_item_id].rating,
             "positionStatus": _derive_position_status(
-                attempts_by_puzzle[row.run_puzzle_id], total_queue
+                attempts_by_puzzle[row.run_training_item_id], total_queue
             ),
             "tryCount": int(row.try_count) if row.try_count is not None else 0,
             "timeMs": int(row.time_ms) if row.time_ms is not None else None,
         }
         for row in rows
     ]
-    return {"maxTriesPerPuzzle": total_queue, "puzzles": puzzles}
+    return {"maxTriesPerItem": total_queue, "trainingItems": training_items}
 
 
 def get_run_puzzle(run_id: int, run_puzzle_id: int, user_id: int) -> dict[str, object]:
     run = _get_owned_run(run_id, user_id)
-    run_puzzle = db.session.get(RunPuzzle, run_puzzle_id)
+    run_puzzle = db.session.get(RunTrainingItem, run_puzzle_id)
     if run_puzzle is None or run_puzzle.run_id != run.id:
         raise LookupError("Run puzzle not found.")
     return _run_puzzle_full_dict(run_puzzle)
 
 
 def _qualifying_attempt_id(
-    sorted_attempts: list[PuzzleAttempt], total_queue: int
+    sorted_attempts: list[TrainingAttempt], total_queue: int
 ) -> int | None:
     for a in sorted_attempts:
         if a.status == "solved" and a.try_number <= total_queue:
@@ -780,7 +772,7 @@ def _qualifying_attempt_id(
 
 
 def _compute_overview_stats(
-    run_puzzles: list[RunPuzzle],
+    run_puzzles: list[RunTrainingItem],
     total_queue: int,
     focus_run_puzzle_id: int,
     selected_attempt_id: int | None,
@@ -875,7 +867,7 @@ def _compute_overview_stats(
 def _compute_attempt_board(
     fen: str,
     solution: str,
-    attempt: PuzzleAttempt,
+    attempt: TrainingAttempt,
 ) -> dict[str, object] | None:
     if attempt.status == "in_progress":
         return None
@@ -933,7 +925,7 @@ def _compute_attempt_board(
 def _compute_attempt_pgn(
     fen: str,
     solution: str,
-    attempt: PuzzleAttempt,
+    attempt: TrainingAttempt,
 ) -> dict[str, object] | None:
     if attempt.status == "in_progress":
         return None
@@ -1033,9 +1025,9 @@ def _compute_attempt_pgn(
 
 
 def _compute_attempt_impact(
-    attempt: PuzzleAttempt,
+    attempt: TrainingAttempt,
     qualifying_attempt_id: int | None,
-    run_puzzles: list[RunPuzzle],
+    run_puzzles: list[RunTrainingItem],
     total_queue: int,
     training_id: int,
 ) -> dict[str, object]:
@@ -1055,7 +1047,7 @@ def _compute_attempt_impact(
         )
         total_training_puzzles = sum(
             db.session.scalar(
-                sa.select(sa.func.count()).where(RunPuzzle.run_id == r.id)
+                sa.select(sa.func.count()).where(RunTrainingItem.run_id == r.id)
             ) or 0
             for r in all_training_runs
         )
@@ -1071,14 +1063,14 @@ def _compute_attempt_impact(
 
 
 def _overview_attempt_view(
-    attempt: PuzzleAttempt,
+    attempt: TrainingAttempt,
     run: Run,
-    run_puzzle: RunPuzzle,
+    run_puzzle: RunTrainingItem,
     qualifying_attempt_id: int | None,
     total_queue: int,
     puzzle_fen: str,
     puzzle_solution: str,
-    run_puzzles: list[RunPuzzle],
+    run_puzzles: list[RunTrainingItem],
     training_id: int,
 ) -> dict[str, object]:
     sorted_for_type = sorted(run_puzzle.attempts, key=lambda a: a.try_number)
@@ -1092,7 +1084,7 @@ def _overview_attempt_view(
         "id": attempt.id,
         "runId": run.id,
         "runIndex": run.run_index,
-        "runPuzzleId": run_puzzle.id,
+        "runTrainingItemId": run_puzzle.id,
         "tryNumber": attempt.try_number,
         "status": attempt.status,
         "startedAt": attempt.started_at.isoformat(),
@@ -1112,18 +1104,18 @@ def _overview_attempt_view(
 
 
 def _same_puzzle_run_overview_items(
-    run_puzzle: RunPuzzle,
+    run_puzzle: RunTrainingItem,
     training_id: int,
     total_queue: int,
 ) -> list[dict[str, object]]:
     other_run_puzzles = list(
         db.session.scalars(
-            sa.select(RunPuzzle)
-            .join(Run, RunPuzzle.run_id == Run.id)
+            sa.select(RunTrainingItem)
+            .join(Run, RunTrainingItem.run_id == Run.id)
             .where(
                 Run.training_id == training_id,
-                RunPuzzle.puzzle_id == run_puzzle.puzzle_id,
-                RunPuzzle.id != run_puzzle.id,
+                RunTrainingItem.training_item_id == run_puzzle.training_item_id,
+                RunTrainingItem.id != run_puzzle.id,
             )
         ).all()
     )
@@ -1133,23 +1125,21 @@ def _same_puzzle_run_overview_items(
         other_run = db.session.get(Run, rp.run_id)
         if other_run is None:
             continue
-        puzzle = db.session.get(Puzzle, rp.puzzle_id)
-        if puzzle is None:
-            continue
+        rp_content = get_content(rp.training_item_id)
 
         sorted_attempts = sorted(rp.attempts, key=lambda a: a.try_number)
         q_id = _qualifying_attempt_id(sorted_attempts, total_queue)
 
         other_run_puzzles_for_run = list(
             db.session.scalars(
-                sa.select(RunPuzzle).where(RunPuzzle.run_id == other_run.id)
+                sa.select(RunTrainingItem).where(RunTrainingItem.run_id == other_run.id)
             ).all()
         )
 
         attempt_views = [
             _overview_attempt_view(
                 a, other_run, rp, q_id, total_queue,
-                puzzle.fen, puzzle.moves,
+                rp_content.fen, rp_content.moves,
                 other_run_puzzles_for_run, training_id,
             )
             for a in sorted_attempts
@@ -1159,8 +1149,8 @@ def _same_puzzle_run_overview_items(
         items.append({
             "runId": other_run.id,
             "runIndex": other_run.run_index,
-            "runPuzzleId": rp.id,
-            "runPuzzleStatus": _derive_position_status(sorted_attempts, total_queue),
+            "runTrainingItemId": rp.id,
+            "runTrainingItemStatus": _derive_position_status(sorted_attempts, total_queue),
             "attempts": attempt_views,
         })
 
@@ -1170,7 +1160,7 @@ def _same_puzzle_run_overview_items(
 
 def _compute_progress_card(
     run: Run,
-    run_puzzles: list[RunPuzzle],
+    run_puzzles: list[RunTrainingItem],
     total_queue: int,
     run_progress_delta_pct: float | None,
     training_id: int,
@@ -1224,7 +1214,7 @@ def _compute_progress_card(
     training_resolved = 0
     for r in all_runs:
         all_rps = list(
-            db.session.scalars(sa.select(RunPuzzle).where(RunPuzzle.run_id == r.id)).all()
+            db.session.scalars(sa.select(RunTrainingItem).where(RunTrainingItem.run_id == r.id)).all()
         )
         for rp in all_rps:
             if _derive_position_status(rp.attempts, total_queue) in (
@@ -1249,7 +1239,7 @@ def _compute_progress_card(
     return {"runProgress": run_progress_row, "trainingProgress": training_progress_row}
 
 
-def _compute_overview_actions(run: Run, puzzle: Puzzle) -> dict[str, object]:
+def _compute_overview_actions(run: Run, content: TrainingItemContent) -> dict[str, object]:
     next_enabled = run.completed_at is None and run.aborted_at is None
     disabled_reason: str | None = None
     if run.completed_at is not None:
@@ -1260,14 +1250,14 @@ def _compute_overview_actions(run: Run, puzzle: Puzzle) -> dict[str, object]:
     return {
         "runStatus": run.status,
         "retake": {"enabled": True},
-        "analyze": {"enabled": True, "url": puzzle.game_url},
-        "nextPuzzle": {"enabled": next_enabled, "disabledReason": disabled_reason},
+        "analyze": {"enabled": True, "url": content.game_url},
+        "nextTrainingItem": {"enabled": next_enabled, "disabledReason": disabled_reason},
     }
 
 
 def _compute_run_complete_overlay(
     run: Run,
-    run_puzzles: list[RunPuzzle],
+    run_puzzles: list[RunTrainingItem],
     total_queue: int,
     run_just_completed: bool,
     completing_attempt_id: int | None,
@@ -1315,7 +1305,7 @@ def _compute_run_complete_overlay(
         "breakDuration": break_duration,
         "isTrainingComplete": is_training_complete,
         "summary": {
-            "totalPuzzles": total,
+            "totalItems": total,
             "solvedCount": solved,
             "solvedWithRetriesCount": solved_with_retries,
             "failedCount": failed,
@@ -1327,15 +1317,13 @@ def _compute_run_complete_overlay(
 
 def _build_run_puzzle_overview(
     run: Run,
-    run_puzzle: RunPuzzle,
+    run_puzzle: RunTrainingItem,
     selected_attempt_id: int | None,
     training_id: int,
     run_just_completed: bool = False,
     completing_attempt_id: int | None = None,
 ) -> dict[str, object]:
-    puzzle = db.session.get(Puzzle, run_puzzle.puzzle_id)
-    if puzzle is None:
-        raise LookupError("Puzzle not found.")
+    content = get_content(run_puzzle.training_item_id)
 
     _, config = _get_schedule_config(run)
     total_queue = _total_queue_attempts(config)
@@ -1355,7 +1343,7 @@ def _build_run_puzzle_overview(
     break_duration = _format_break_duration(break_hours)
 
     all_run_puzzles = list(
-        db.session.scalars(sa.select(RunPuzzle).where(RunPuzzle.run_id == run.id)).all()
+        db.session.scalars(sa.select(RunTrainingItem).where(RunTrainingItem.run_id == run.id)).all()
     )
 
     sorted_attempts = sorted(
@@ -1387,7 +1375,7 @@ def _build_run_puzzle_overview(
     for a in sorted_attempts:
         view = _overview_attempt_view(
             a, run, run_puzzle, qualifying_attempt_id, total_queue,
-            puzzle.fen, puzzle.moves, all_run_puzzles, training_id,
+            content.fen, content.moves, all_run_puzzles, training_id,
         )
         if a.id == qualifying_attempt_id:
             impact = cast(dict[str, object], view["impact"])
@@ -1413,32 +1401,30 @@ def _build_run_puzzle_overview(
     )
 
     return {
-        "runPuzzle": {
+        "runTrainingItem": {
             "id": run_puzzle.id,
+            "trainingItemId": run_puzzle.training_item_id,
             "runId": run.id,
             "runIndex": run.run_index,
             "position": run_puzzle.position,
             "status": position_status,
             "triesRemaining": tries_remaining,
-            "maxTriesPerPuzzle": total_queue,
+            "maxTriesPerItem": total_queue,
             "qualifyingAttemptId": qualifying_attempt_id,
             "trainingId": training_id,
             "scheduleName": schedule_name,
         },
-        "puzzle": {
-            "puzzleId": puzzle.puzzle_id,
-            "fen": puzzle.fen,
-            "solution": puzzle.moves.split(),
-            "rating": puzzle.rating,
-            "themes": [
-                {"name": t.name, "displayName": t.display_name}
-                for t in puzzle.themes
-            ],
-            "gameUrl": puzzle.game_url,
+        "trainingItem": {
+            "displayId": content.display_id,
+            "fen": content.fen,
+            "solution": content.moves.split(),
+            "rating": content.rating,
+            "themes": content.themes,
+            "gameUrl": content.game_url,
         },
         "selectedAttemptId": resolved_selected_id,
         "attempts": attempt_views,
-        "samePuzzleAcrossRuns": _same_puzzle_run_overview_items(
+        "sameTrainingItemAcrossRuns": _same_puzzle_run_overview_items(
             run_puzzle, training_id, total_queue
         ),
         "runPace": {
@@ -1453,7 +1439,7 @@ def _build_run_puzzle_overview(
         "progress": _compute_progress_card(
             run, all_run_puzzles, total_queue, run_progress_delta_pct, training_id
         ),
-        "actions": _compute_overview_actions(run, puzzle),
+        "actions": _compute_overview_actions(run, content),
         "timer": {
             "targetSolveTenths": target_solve_tenths,
         },
@@ -1471,7 +1457,7 @@ def get_run_puzzle_overview(
     selected_attempt_id: int | None = None,
 ) -> dict[str, object]:
     run = _get_owned_run(run_id, user_id)
-    run_puzzle = db.session.get(RunPuzzle, run_puzzle_id)
+    run_puzzle = db.session.get(RunTrainingItem, run_puzzle_id)
     if run_puzzle is None or run_puzzle.run_id != run.id:
         raise LookupError("Run puzzle not found.")
     overview = _build_run_puzzle_overview(
@@ -1485,14 +1471,14 @@ def get_run_puzzle_overview(
 
 def start_puzzle(run_id: int, run_puzzle_id: int, user_id: int) -> dict[str, object]:
     run = _get_owned_run(run_id, user_id)
-    run_puzzle = db.session.get(RunPuzzle, run_puzzle_id)
+    run_puzzle = db.session.get(RunTrainingItem, run_puzzle_id)
     if run_puzzle is None or run_puzzle.run_id != run.id:
         raise LookupError("Run puzzle not found.")
 
     existing = db.session.scalar(
-        sa.select(PuzzleAttempt).where(
-            PuzzleAttempt.run_puzzle_id == run_puzzle_id,
-            PuzzleAttempt.status == "in_progress",
+        sa.select(TrainingAttempt).where(
+            TrainingAttempt.run_training_item_id == run_puzzle_id,
+            TrainingAttempt.status == "in_progress",
         )
     )
     if existing is None:
@@ -1551,11 +1537,9 @@ def complete_attempt(
     total_queue = _total_queue_attempts(config)
     is_queue_attempt = attempt.try_number <= total_queue
 
-    puzzle = db.session.get(Puzzle, run_puzzle.puzzle_id)
-    if puzzle is None:
-        raise LookupError("Puzzle not found.")
+    content = get_content(run_puzzle.training_item_id)
 
-    outcome = _derive_attempt_outcome(puzzle.fen, puzzle.moves, uci_moves)
+    outcome = _derive_attempt_outcome(content.fen, content.moves, uci_moves)
 
     now = datetime.now(timezone.utc)
     attempt.status = outcome
@@ -1606,31 +1590,28 @@ def complete_attempt(
     }
 
 
-def get_puzzle_history(run_id: int, puzzle_id: str, user_id: int) -> dict[str, object]:
+def get_training_item_history(run_id: int, training_item_id: int, user_id: int) -> dict[str, object]:
     run = _get_owned_run(run_id, user_id)
-
-    puzzle = db.session.scalar(sa.select(Puzzle).where(Puzzle.puzzle_id == puzzle_id))
-    if puzzle is None:
-        raise LookupError("Puzzle not found in this run.")
+    content = get_content(training_item_id)
 
     _, config = _get_schedule_config(run)
     total_queue = _total_queue_attempts(config)
 
-    run_puzzles = list(
+    run_training_items = list(
         db.session.scalars(
-            sa.select(RunPuzzle)
+            sa.select(RunTrainingItem)
             .where(
-                RunPuzzle.run_id == run_id,
-                RunPuzzle.puzzle_id == puzzle.id,
+                RunTrainingItem.run_id == run_id,
+                RunTrainingItem.training_item_id == training_item_id,
             )
-            .order_by(RunPuzzle.position)
+            .order_by(RunTrainingItem.position)
         ).all()
     )
-    if not run_puzzles:
-        raise LookupError("Puzzle not found in this run.")
+    if not run_training_items:
+        raise LookupError("Training item not found in this run.")
 
     positions: list[dict[str, object]] = []
-    for rp in run_puzzles:
+    for rp in run_training_items:
         completed = [a for a in rp.attempts if a.status != "in_progress"]
         if not completed:
             continue
@@ -1643,9 +1624,9 @@ def get_puzzle_history(run_id: int, puzzle_id: str, user_id: int) -> dict[str, o
         })
 
     return {
-        "puzzleId": puzzle_id,
-        "solution": puzzle.moves,
-        "maxTriesPerPuzzle": total_queue,
+        "displayId": content.display_id,
+        "solution": content.moves,
+        "maxTriesPerItem": total_queue,
         "positions": positions,
     }
 
@@ -1663,11 +1644,11 @@ def get_attempt(
     run_id: int, run_puzzle_id: int, attempt_id: int, user_id: int
 ) -> dict[str, object]:
     run = _get_owned_run(run_id, user_id)
-    run_puzzle = db.session.get(RunPuzzle, run_puzzle_id)
+    run_puzzle = db.session.get(RunTrainingItem, run_puzzle_id)
     if run_puzzle is None or run_puzzle.run_id != run.id:
         raise LookupError("Run puzzle not found.")
-    attempt = db.session.get(PuzzleAttempt, attempt_id)
-    if attempt is None or attempt.run_puzzle_id != run_puzzle.id:
+    attempt = db.session.get(TrainingAttempt, attempt_id)
+    if attempt is None or attempt.run_training_item_id != run_puzzle.id:
         raise LookupError("Attempt not found.")
 
     if attempt.status == "in_progress":
@@ -1677,7 +1658,7 @@ def get_attempt(
         }
 
     overview_url = (
-        f"/app/runs/{run_id}/puzzles/{run_puzzle_id}/overview?attempt={attempt_id}"
+        f"/app/runs/{run_id}/training-items/{run_puzzle_id}/overview?attempt={attempt_id}"
     )
     overview = _build_run_puzzle_overview(
         run, run_puzzle, attempt_id, run.training_id

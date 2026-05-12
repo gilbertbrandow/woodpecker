@@ -22,14 +22,16 @@ class Subset(Base):
     locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     locked_puzzle_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    puzzles: Mapped[list["SubsetPuzzle"]] = relationship(
-        "SubsetPuzzle", order_by="SubsetPuzzle.position", cascade="all, delete-orphan"
+    training_items: Mapped[list["SubsetTrainingItem"]] = relationship(
+        "SubsetTrainingItem", order_by="SubsetTrainingItem.position", cascade="all, delete-orphan"
     )
 
 
-class SubsetPuzzle(Base):
-    __tablename__ = "subset_puzzles"
+class SubsetTrainingItem(Base):
+    __tablename__ = "subset_training_items"
 
     subset_id: Mapped[int] = mapped_column(Integer, ForeignKey("subsets.id"), primary_key=True)
-    puzzle_id: Mapped[int] = mapped_column(Integer, ForeignKey("puzzles.id"), primary_key=True)
+    training_item_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("training_items.id"), primary_key=True
+    )
     position: Mapped[int] = mapped_column(Integer, nullable=False)

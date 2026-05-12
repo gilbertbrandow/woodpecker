@@ -6,36 +6,36 @@ import { api } from '../lib/api'
 
 const TERMINAL_STATUSES = new Set(['solved', 'solved_with_retries', 'failed'])
 
-export function PuzzleResolverPage(): React.ReactElement {
+export function TrainingItemResolverPage(): React.ReactElement {
   const navigate = useNavigate()
-  const { runId: runIdStr, runPuzzleId: runPuzzleIdStr } = useParams({
-    from: '/app/solve-flow/runs/$runId/puzzles/$runPuzzleId',
+  const { runId: runIdStr, runTrainingItemId: runTrainingItemIdStr } = useParams({
+    from: '/app/solve-flow/runs/$runId/training-items/$runTrainingItemId',
   })
   const runId = parseInt(runIdStr, 10)
-  const runPuzzleId = parseInt(runPuzzleIdStr, 10)
+  const runTrainingItemId = parseInt(runTrainingItemIdStr, 10)
 
   useEffect(() => {
     api.runs
-      .getPuzzle(runId, runPuzzleId)
-      .then(async (puzzle) => {
+      .getTrainingItem(runId, runTrainingItemId)
+      .then(async (item) => {
         const base = {
           runId: runIdStr,
-          runPuzzleId: runPuzzleIdStr,
+          runTrainingItemId: runTrainingItemIdStr,
         }
 
-        if (puzzle.currentAttemptId !== null) {
+        if (item.currentAttemptId !== null) {
           void navigate({
-            to: '/app/runs/$runId/puzzles/$runPuzzleId/attempts/$attemptId',
-            params: { ...base, attemptId: String(puzzle.currentAttemptId) },
+            to: '/app/runs/$runId/training-items/$runTrainingItemId/attempts/$attemptId',
+            params: { ...base, attemptId: String(item.currentAttemptId) },
             replace: true,
           })
           return
         }
 
-        if (!TERMINAL_STATUSES.has(puzzle.positionStatus)) {
-          const started = await api.runs.startPuzzle(runId, runPuzzleId)
+        if (!TERMINAL_STATUSES.has(item.positionStatus)) {
+          const started = await api.runs.startTrainingItem(runId, runTrainingItemId)
           void navigate({
-            to: '/app/runs/$runId/puzzles/$runPuzzleId/attempts/$attemptId',
+            to: '/app/runs/$runId/training-items/$runTrainingItemId/attempts/$attemptId',
             params: { ...base, attemptId: String(started.attempt.id) },
             replace: true,
           })
@@ -43,8 +43,8 @@ export function PuzzleResolverPage(): React.ReactElement {
         }
 
         void navigate({
-          to: '/app/runs/$runId/puzzles/$runPuzzleId/overview',
-          params: { runId: runIdStr, runPuzzleId: runPuzzleIdStr },
+          to: '/app/runs/$runId/training-items/$runTrainingItemId/overview',
+          params: { runId: runIdStr, runTrainingItemId: runTrainingItemIdStr },
           replace: true,
         })
       })
@@ -52,7 +52,7 @@ export function PuzzleResolverPage(): React.ReactElement {
         toast.error('Failed to load puzzle', { description: 'Please try again.' })
         void navigate({ to: '/app/runs/$runId', params: { runId: runIdStr }, replace: true })
       })
-  }, [runId, runPuzzleId])
+  }, [runId, runTrainingItemId])
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">

@@ -122,12 +122,12 @@ def list_runs(training_id: int) -> tuple[Response, int] | Response:
     return jsonify([run_svc.run_dict(r) for r in runs])
 
 
-@training_bp.get("/<int:training_id>/cross-run-puzzle/<puzzle_id>")
+@training_bp.get("/<int:training_id>/cross-run-item/<int:training_item_id>")
 @login_required
-def get_cross_run_puzzle(training_id: int, puzzle_id: str) -> tuple[Response, int] | Response:
+def get_cross_run_item(training_id: int, training_item_id: int) -> tuple[Response, int] | Response:
     try:
-        result = training_svc.get_cross_run_puzzle_refs(
-            training_id, puzzle_id, session["user_id"]
+        result = training_svc.get_cross_run_item_refs(
+            training_id, training_item_id, session["user_id"]
         )
     except LookupError as e:
         return jsonify({"error": str(e)}), 404

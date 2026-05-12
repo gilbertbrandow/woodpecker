@@ -4,8 +4,7 @@ from typing import cast
 import sqlalchemy as sa
 
 from app.extensions import db
-from app.models.puzzle import Puzzle
-from app.models.run import PuzzleAttempt, Run, RunPuzzle
+from app.models.run import TrainingAttempt, Run, RunTrainingItem
 from app.models.schedule import Schedule
 from app.models.training import Training
 from app.models.subset import Subset
@@ -113,27 +112,26 @@ def training_full_dict(training: Training) -> dict[str, object]:
     }
 
 
-def get_cross_run_puzzle_refs(
+def get_cross_run_item_refs(
     training_id: int,
-    puzzle_id: str,
+    training_item_id: int,
     user_id: int,
 ) -> list[dict[str, object]]:
     _get_owned_training(training_id, user_id)
 
     rows = db.session.execute(
         sa.select(
-            RunPuzzle.id.label("run_puzzle_id"),
+            RunTrainingItem.id.label("run_training_item_id"),
             Run.id.label("run_id"),
             Run.run_index,
             sa.exists()
-            .where(PuzzleAttempt.run_puzzle_id == RunPuzzle.id)
+            .where(TrainingAttempt.run_training_item_id == RunTrainingItem.id)
             .label("has_attempts"),
         )
-        .join(Run, Run.id == RunPuzzle.run_id)
-        .join(Puzzle, Puzzle.id == RunPuzzle.puzzle_id)
+        .join(Run, Run.id == RunTrainingItem.run_id)
         .where(
             Run.training_id == training_id,
-            Puzzle.puzzle_id == puzzle_id,
+            RunTrainingItem.training_item_id == training_item_id,
         )
         .order_by(Run.run_index)
     ).all()
@@ -142,7 +140,7 @@ def get_cross_run_puzzle_refs(
         {
             "runId": int(row.run_id),
             "runIndex": int(row.run_index),
-            "runPuzzleId": int(row.run_puzzle_id),
+            "runTrainingItemId": int(row.run_training_item_id),
             "hasAttempts": bool(row.has_attempts),
         }
         for row in rows
@@ -195,21 +193,21 @@ def list_my_trainings(user_id: int) -> list[dict[str, object]]:
                    END AS status,
                    (
                        SELECT COUNT(*)
-                       FROM subset_puzzles sp
+                       FROM subset_training_items sp
                        WHERE sp.subset_id = s.subset_id
                    ) AS subset_puzzle_count,
                    (
                        SELECT COUNT(rp.id)
                        FROM runs r
-                       JOIN run_puzzles rp ON rp.run_id = r.id
+                       JOIN run_training_items rp ON rp.run_id = r.id
                        WHERE r.training_id = t.id
                          AND EXISTS (
-                             SELECT 1 FROM puzzle_attempts pa
-                             WHERE pa.run_puzzle_id = rp.id
+                             SELECT 1 FROM training_attempts pa
+                             WHERE pa.run_training_item_id = rp.id
                          )
                          AND NOT EXISTS (
-                             SELECT 1 FROM puzzle_attempts pa
-                             WHERE pa.run_puzzle_id = rp.id
+                             SELECT 1 FROM training_attempts pa
+                             WHERE pa.run_training_item_id = rp.id
                                AND pa.status = 'in_progress'
                          )
                    ) AS completed_puzzles
@@ -295,21 +293,21 @@ def list_all_trainings(schedule_id: int | None = None) -> list[dict[str, object]
                    END AS status,
                    (
                        SELECT COUNT(*)
-                       FROM subset_puzzles sp
+                       FROM subset_training_items sp
                        WHERE sp.subset_id = s.subset_id
                    ) AS subset_puzzle_count,
                    (
                        SELECT COUNT(rp.id)
                        FROM runs r
-                       JOIN run_puzzles rp ON rp.run_id = r.id
+                       JOIN run_training_items rp ON rp.run_id = r.id
                        WHERE r.training_id = t.id
                          AND EXISTS (
-                             SELECT 1 FROM puzzle_attempts pa
-                             WHERE pa.run_puzzle_id = rp.id
+                             SELECT 1 FROM training_attempts pa
+                             WHERE pa.run_training_item_id = rp.id
                          )
                          AND NOT EXISTS (
-                             SELECT 1 FROM puzzle_attempts pa
-                             WHERE pa.run_puzzle_id = rp.id
+                             SELECT 1 FROM training_attempts pa
+                             WHERE pa.run_training_item_id = rp.id
                                AND pa.status = 'in_progress'
                          )
                    ) AS completed_puzzles
@@ -435,11 +433,11 @@ def get_training_run_solve_times(training_id: int) -> list[dict[str, object]]:
                 r.run_index,
                 AVG(last_attempt.time_spent_ms) AS avg_solve_time_ms
             FROM runs r
-            JOIN run_puzzles rp ON rp.run_id = r.id
+            JOIN run_training_items rp ON rp.run_id = r.id
             JOIN LATERAL (
                 SELECT pa.time_spent_ms
-                FROM puzzle_attempts pa
-                WHERE pa.run_puzzle_id = rp.id
+                FROM training_attempts pa
+                WHERE pa.run_training_item_id = rp.id
                   AND pa.status != 'in_progress'
                 ORDER BY pa.try_number DESC
                 LIMIT 1
