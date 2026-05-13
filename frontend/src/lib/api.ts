@@ -748,6 +748,22 @@ export const api = {
         request('/sources/lichess-tactics/rating-distribution'),
       topThemes: (): Promise<LichessTacticsTopThemes> =>
         request('/sources/lichess-tactics/top-themes'),
+      items: (params: {
+        page?: number
+        ratingMin?: number
+        ratingMax?: number
+        theme?: string
+        openings?: string[]
+      }): Promise<LichessTacticPage> => {
+        const p = new URLSearchParams()
+        if (params.page !== undefined) p.set('page', String(params.page))
+        if (params.ratingMin !== undefined) p.set('ratingMin', String(params.ratingMin))
+        if (params.ratingMax !== undefined) p.set('ratingMax', String(params.ratingMax))
+        if (params.theme) p.set('theme', params.theme)
+        if (params.openings?.length) p.set('openings', params.openings.join(','))
+        const qs = p.toString()
+        return request(`/sources/lichess-tactics/items${qs ? `?${qs}` : ''}`)
+      },
     },
   },
   attempts: {

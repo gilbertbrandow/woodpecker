@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { useAuth } from '../context/auth'
 import { api, type LichessTacticsStats, type LichessTacticsRatingDistribution, type LichessTacticsTopThemes } from '../lib/api'
 import { LichessTacticsDashboard } from '../components/sources/LichessTacticsDashboard'
+import { LichessTacticsItemsSection } from '../components/sources/LichessTacticsItemsSection'
 
 export function LichessTacticsDashboardPage(): React.ReactElement | null {
   const { user } = useAuth()
@@ -42,12 +43,15 @@ export function LichessTacticsDashboardPage(): React.ReactElement | null {
         <span className="text-foreground">Lichess Tactics</span>
       </nav>
 
-      <h1 className="text-base font-semibold">Lichess Tactics</h1>
+      <h1 className="text-base font-semibold">Collection insights</h1>
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : stats && distribution && topThemes ? (
-        <LichessTacticsDashboard stats={stats} distribution={distribution} topThemes={topThemes} />
+        <>
+          <LichessTacticsDashboard stats={stats} distribution={distribution} topThemes={topThemes} />
+          <LichessTacticsItemsSection />
+        </>
       ) : (
         <p className="text-sm text-muted-foreground">No data available.</p>
       )}
