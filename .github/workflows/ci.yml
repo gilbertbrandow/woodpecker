@@ -133,8 +133,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Check Node version consistency
+        run: bash scripts/check-node-version.sh
+
       - name: Build
-        run: docker build --target build --build-arg NODE_VERSION=$(cat frontend/.nvmrc) frontend/
+        run: docker build --target build frontend/
 
   build-pipeline:
     name: Build pipeline images
