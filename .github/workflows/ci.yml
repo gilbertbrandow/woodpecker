@@ -86,7 +86,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version-file: ".nvmrc"
+          node-version-file: "frontend/.nvmrc"
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
@@ -106,7 +106,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version-file: ".nvmrc"
+          node-version-file: "frontend/.nvmrc"
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
@@ -132,6 +132,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
+      - name: Check Node version consistency
+        run: bash frontend/scripts/check-node-version.sh
 
       - name: Build
         run: docker build --target build frontend/

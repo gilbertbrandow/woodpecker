@@ -1,9 +1,12 @@
-FROM node:26-alpine AS deps
+# Docker cannot read frontend/.nvmrc in FROM before the build context is copied.
+# Keep this default in sync with frontend/.nvmrc; CI verifies they match.
+ARG NODE_VERSION=26
+FROM node:${NODE_VERSION}-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-FROM node:26-alpine AS dev
+FROM node:${NODE_VERSION}-alpine AS dev
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
