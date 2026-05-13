@@ -1,0 +1,186 @@
+import * as React from 'react'
+import { useEffect, useState } from 'react'
+import { AreaChart, Area, XAxis, YAxis, BarChart, Bar, Cell } from 'recharts'
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from '../ui/chart'
+import { formatNumber } from '../../lib/utils'
+import type {
+  LichessTacticsStats,
+  LichessTacticsRatingDistribution,
+  LichessTacticsTopThemes,
+} from '../../lib/api'
+
+const THEME_BAR_LABEL_MAX_CHARS = 8
+const CHART_COLOR = 'hsl(var(--chart-1))'
+const CHART_CONFIG: ChartConfig = { count: { label: 'Tactics', color: CHART_COLOR } }
+
+type StatCardProps = {
+  label: string
+  value: string
+  secondary?: string
+}
+
+function StatCard({ label, value, secondary }: StatCardProps): React.ReactElement {
+  return (
+    <div className="flex flex-col gap-0.5 rounded-md border p-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-lg font-semibold tabular-nums">{value}</p>
+      {secondary && <p className="text-xs text-muted-foreground">{secondary}</p>}
+    </div>
+  )
+}
+
+type Props = {
+  stats: LichessTacticsStats
+  distribution: LichessTacticsRatingDistribution
+  topThemes: LichessTacticsTopThemes
+}
+
+export function LichessTacticsDashboard({ stats, distribution, topThemes }: Props): React.ReactElement {
+  const [chartsReady, setChartsReady] = useState(false)
+  useEffect(() => { setChartsReady(true) }, [])
+
+  const themeBars = topThemes.themes.map((t) => ({
+    ...t,
+    shortLabel:
+      t.displayName.length > THEME_BAR_LABEL_MAX_CHARS
+        ? t.displayName.slice(0, THEME_BAR_LABEL_MAX_CHARS - 1) + '…'
+        : t.displayName,
+  }))
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="grid grid-cols-2 gap-4">
+        <StatCard
+          label="Total tactics"
+          value={formatNumber(stats.totalCount)}
+        />
+        <StatCard
+          label="With openings"
+          value={formatNumber(stats.withOpeningsCount)}
+          secondary={stats.totalCount > 0 ? `${stats.withOpeningsPct}%` : undefined}
+        />
+      </div>
+
+      {chartsReady && (
+        <div className="rounded-md border p-4">
+          <div className="mb-4">
+            <p className="text-sm font-semibold">Rating distribution</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              How imported tactics are spread across rating ranges
+            </p>
+          </div>
+          {distribution.buckets.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No rating data available.</p>
+          ) : (
+            <ChartContainer config={CHART_CONFIG} className="h-56 min-w-0 w-full">
+              <AreaChart
+                data={distribution.buckets}
+                margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id="ratingSourceGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-count)" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="var(--color-count)" stopOpacity={0.1} />
+                  </linearGradient>
+                </defs>
+                <XAxis
+                  dataKey="min"
+                  tickLine={false}
+                  axisLine={false}
+                  interval="preserveStartEnd"
+                  tick={{ fontSize: 10 }}
+                />
+                <YAxis hide />
+                <ChartTooltip
+                  content={({ active, payload }) => (
+                    <ChartTooltipContent
+                      active={active}
+                      payload={payload}
+                      hideLabel
+                      formatter={(value: unknown, _name: string, item: unknown) => {
+                        const b = (item as { payload?: { min: number; max: number } }).payload
+                        return b
+                          ? `${b.min}–${b.max - 1}: ${formatNumber(Number(value))} tactics`
+                          : String(value)
+                      }}
+                    />
+                  )}
+                />
+                <Area
+                  dataKey="count"
+                  type="monotone"
+                  stroke="var(--color-count)"
+                  fill="url(#ratingSourceGradient)"
+                  fillOpacity={1}
+                  strokeWidth={2}
+                  dot={false}
+                  isAnimationActive={false}
+                />
+              </AreaChart>
+            </ChartContainer>
+          )}
+        </div>
+      )}
+
+      {chartsReady && themeBars.length > 0 && (
+        <div className="rounded-md border p-4">
+          <div className="mb-4">
+            <p className="text-sm font-semibold">Most common themes</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              The most frequent tactical motifs across all imported tactics
+            </p>
+          </div>
+          <ChartContainer config={CHART_CONFIG} className="h-64 min-w-0 w-full">
+            <BarChart
+              data={themeBars}
+              margin={{ top: 4, right: 4, left: 16, bottom: 8 }}
+              barCategoryGap="20%"
+            >
+              <XAxis
+                type="category"
+                dataKey="shortLabel"
+                tickLine={false}
+                axisLine={false}
+                interval={0}
+                tick={{ fontSize: 10, angle: -45, textAnchor: 'end' }}
+                height={52}
+              />
+              <YAxis hide />
+              <ChartTooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null
+                  const t = payload[0]?.payload as {
+                    displayName: string
+                    description: string
+                    count: number
+                  }
+                  return (
+                    <div className="rounded border bg-background px-3 py-2 text-xs shadow-md">
+                      <p className="font-medium text-foreground">{t.displayName}</p>
+                      <p className="mt-0.5 text-muted-foreground">{t.description}</p>
+                      <p className="mt-1.5 tabular-nums text-foreground">{formatNumber(t.count)} tactics</p>
+                    </div>
+                  )
+                }}
+              />
+              <Bar dataKey="count" isAnimationActive={false} radius={[2, 2, 0, 0]}>
+                {themeBars.map((_, i) => (
+                  <Cell
+                    key={i}
+                    fill={CHART_COLOR}
+                    fillOpacity={themeBars.length > 1 ? 1 - (i / (themeBars.length - 1)) * 0.75 : 1}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ChartContainer>
+        </div>
+      )}
+    </div>
+  )
+}

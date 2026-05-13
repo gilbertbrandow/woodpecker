@@ -1,10 +1,34 @@
 import * as React from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { ChevronRight } from 'lucide-react'
+import { toast } from 'sonner'
 import { useAuth } from '../context/auth'
+import { api, type LichessTacticsStats, type LichessTacticsRatingDistribution, type LichessTacticsTopThemes } from '../lib/api'
+import { LichessTacticsDashboard } from '../components/sources/LichessTacticsDashboard'
 
 export function LichessTacticsDashboardPage(): React.ReactElement | null {
   const { user } = useAuth()
+  const [stats, setStats] = useState<LichessTacticsStats | null>(null)
+  const [distribution, setDistribution] = useState<LichessTacticsRatingDistribution | null>(null)
+  const [topThemes, setTopThemes] = useState<LichessTacticsTopThemes | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!user) return
+    Promise.all([
+      api.sources.lichessTactics.stats(),
+      api.sources.lichessTactics.ratingDistribution(),
+      api.sources.lichessTactics.topThemes(),
+    ])
+      .then(([s, d, t]) => {
+        setStats(s)
+        setDistribution(d)
+        setTopThemes(t)
+      })
+      .catch(() => toast.error('Failed to load dashboard', { description: 'Could not fetch Lichess Tactics data.' }))
+      .finally(() => setLoading(false))
+  }, [user])
 
   if (!user) return null
 
@@ -20,7 +44,13 @@ export function LichessTacticsDashboardPage(): React.ReactElement | null {
 
       <h1 className="text-base font-semibold">Lichess Tactics</h1>
 
-      <p className="text-sm text-muted-foreground">Loading dashboard…</p>
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : stats && distribution && topThemes ? (
+        <LichessTacticsDashboard stats={stats} distribution={distribution} topThemes={topThemes} />
+      ) : (
+        <p className="text-sm text-muted-foreground">No data available.</p>
+      )}
     </div>
   )
 }

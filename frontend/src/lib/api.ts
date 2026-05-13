@@ -582,6 +582,14 @@ export type LichessTacticsStats = {
   withThemesPct: number
 }
 
+export type LichessTacticsRatingDistribution = {
+  buckets: { min: number; max: number; count: number }[]
+}
+
+export type LichessTacticsTopThemes = {
+  themes: { name: string; displayName: string; description: string; count: number }[]
+}
+
 export const api = {
   auth: {
     me: (): Promise<AuthUser> => request('/auth/me'),
@@ -736,6 +744,10 @@ export const api = {
     lichessTactics: {
       stats: (): Promise<LichessTacticsStats> =>
         request('/sources/lichess-tactics/stats'),
+      ratingDistribution: (): Promise<LichessTacticsRatingDistribution> =>
+        request('/sources/lichess-tactics/rating-distribution'),
+      topThemes: (): Promise<LichessTacticsTopThemes> =>
+        request('/sources/lichess-tactics/top-themes'),
     },
   },
   attempts: {
