@@ -22,13 +22,21 @@ type StatCardProps = {
   label: string
   value: string
   secondary?: string
+  tag?: string
 }
 
-function StatCard({ label, value, secondary }: StatCardProps): React.ReactElement {
+function StatCard({ label, value, secondary, tag }: StatCardProps): React.ReactElement {
   return (
     <div className="flex flex-col gap-0.5 rounded-md border p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-lg font-semibold tabular-nums">{value}</p>
+      <div className="flex items-baseline gap-2">
+        <p className="text-lg font-semibold tabular-nums">{value}</p>
+        {tag && (
+          <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+            {tag}
+          </span>
+        )}
+      </div>
       {secondary && <p className="text-xs text-muted-foreground">{secondary}</p>}
     </div>
   )
@@ -62,7 +70,7 @@ export function LichessTacticsDashboard({ stats, distribution, topThemes }: Prop
         <StatCard
           label="With openings"
           value={formatNumber(stats.withOpeningsCount)}
-          secondary={stats.totalCount > 0 ? `${stats.withOpeningsPct}%` : undefined}
+          tag={stats.totalCount > 0 ? `${stats.withOpeningsPct}%` : undefined}
         />
       </div>
 

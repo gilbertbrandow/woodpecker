@@ -165,7 +165,6 @@ export function LichessTacticsItemsSection(): React.ReactElement {
             onChange={(e) => setRatingMin(e.target.value)}
             className="h-8 w-28 text-xs"
           />
-          <span className="text-xs text-muted-foreground">–</span>
           <Input
             type="number"
             placeholder="Max rating"
@@ -222,7 +221,7 @@ export function LichessTacticsItemsSection(): React.ReactElement {
               className="h-8 w-44 text-xs"
             />
             {openingDropdownOpen && filteredResults.length > 0 && (
-              <ul className="absolute z-10 mt-1 max-h-52 w-72 overflow-y-auto rounded-md border bg-popover shadow-md">
+              <ul className="absolute z-50 mt-1 max-h-52 w-72 overflow-y-auto rounded-md border bg-background shadow-md">
                 {filteredResults.map((o) => (
                   <li key={o.name}>
                     <button
