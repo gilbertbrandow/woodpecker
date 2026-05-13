@@ -53,3 +53,9 @@ Native PowerShell/CMD/Git Bash development is not the recommended path for now.
 ## Deployment
 
 See [DEPLOYMENT.md](deploy/DEPLOYMENT.md) for release and deployment instructions.
+
+Production/operator helper commands live in `deploy/Makefile` and can be run from the repo root with:
+
+```bash
+make -C deploy <target>
+```
