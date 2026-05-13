@@ -15,6 +15,8 @@ import { TrainingListPage } from './pages/TrainingListPage'
 import { TrainingPage } from './pages/TrainingPage'
 import { TrainingNewPage } from './pages/TrainingNewPage'
 import { AboutPage } from './pages/AboutPage'
+import { SourcesListPage } from './pages/SourcesListPage'
+import { LichessTacticsDashboardPage } from './pages/LichessTacticsDashboardPage'
 import { RunPage } from './pages/RunPage'
 import { RunResolverPage } from './pages/RunResolverPage'
 import { TrainingItemResolverPage } from './pages/TrainingItemResolverPage'
@@ -149,6 +151,18 @@ const aboutRoute = createRoute({
   component: AboutPage,
 })
 
+const sourcesListRoute = createRoute({
+  getParentRoute: () => appShellRoute,
+  path: '/sources',
+  component: SourcesListPage,
+})
+
+const lichessTacticsDashboardRoute = createRoute({
+  getParentRoute: () => appShellRoute,
+  path: '/sources/lichess-tactics',
+  component: LichessTacticsDashboardPage,
+})
+
 const runRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/runs/$runId',
@@ -203,6 +217,8 @@ const routeTree = rootRoute.addChildren([
       trainingRoute,
       aboutRoute,
       runRoute,
+      sourcesListRoute,
+      lichessTacticsDashboardRoute,
     ]),
     solveFlowRoute.addChildren([
       runSolveRoute,
