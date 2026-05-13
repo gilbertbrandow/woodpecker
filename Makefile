@@ -1,5 +1,8 @@
-LOCAL_COMPOSE = sudo docker compose -f docker-compose.yml -f docker-compose-local.yml
-PROD_COMPOSE  = sudo docker compose -f docker-compose.yml -f docker-compose-prod.yml
+DOCKER ?= docker
+COMPOSE = $(DOCKER) compose
+LOCAL_COMPOSE = $(COMPOSE) -f docker-compose.yml -f docker-compose-local.yml
+PROD_COMPOSE  = $(COMPOSE) -f docker-compose.yml -f docker-compose-prod.yml
+SEED_DEV_LIMIT ?= 1000
 
 up:
 	$(LOCAL_COMPOSE) up
@@ -42,6 +45,11 @@ migrate-history:
 
 migrate-rollback:
 	$(LOCAL_COMPOSE) exec backend flask --app app db downgrade $(rev)
+
+seed-dev:
+	$(MAKE) -C pipeline shared-openings-import
+	$(MAKE) -C pipeline lichess-tactics-themes-import
+	$(MAKE) -C pipeline lichess-tactics-import ARGS="--limit $(SEED_DEV_LIMIT)"
 
 test-frontend:
 	cd frontend && npm run test:run
@@ -94,4 +102,4 @@ lichess-tactics-validate-ec2:
 lichess-tactics-relink-openings-ec2:
 	DATABASE_URL=$(PROD_DB_URL) $(MAKE) -C pipeline lichess-tactics-relink-openings
 
-.PHONY: up up-build down logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade migrate-current migrate-history migrate-rollback test-frontend test-backend test-backend-integration test-integration test test-frontend-docker test-backend-docker test-docker db-shell-ec2 db-expose-ec2 db-tunnel-ec2 db-unexpose-ec2 lichess-tactics-validate-ec2 lichess-tactics-relink-openings-ec2
+.PHONY: up up-build down logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade migrate-current migrate-history migrate-rollback seed-dev test-frontend test-backend test-backend-integration test-integration test test-frontend-docker test-backend-docker test-docker db-shell-ec2 db-expose-ec2 db-tunnel-ec2 db-unexpose-ec2 lichess-tactics-validate-ec2 lichess-tactics-relink-openings-ec2
