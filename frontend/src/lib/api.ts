@@ -574,6 +574,14 @@ export type TrainingItemRunReference = {
   hasAttempts: boolean
 }
 
+export type LichessTacticsStats = {
+  totalCount: number
+  withOpeningsCount: number
+  withOpeningsPct: number
+  withThemesCount: number
+  withThemesPct: number
+}
+
 export const api = {
   auth: {
     me: (): Promise<AuthUser> => request('/auth/me'),
@@ -723,6 +731,12 @@ export const api = {
       request<{ runs: LeaderboardRun[] }>(
         `/leaderboard${scheduleId !== undefined ? `?scheduleId=${scheduleId}` : ''}`,
       ).then((r) => r.runs),
+  },
+  sources: {
+    lichessTactics: {
+      stats: (): Promise<LichessTacticsStats> =>
+        request('/sources/lichess-tactics/stats'),
+    },
   },
   attempts: {
     complete: (
