@@ -14,11 +14,10 @@ export function SourcesListPage(): React.ReactElement | null {
       <div className="flex flex-col gap-4 rounded-lg border bg-card p-6">
         <div className="flex flex-col gap-1">
           <h2 className="text-base font-semibold">Lichess Tactics</h2>
-          <p className="text-xs text-muted-foreground">Tactical puzzles</p>
         </div>
 
         <p className="text-sm text-muted-foreground">
-          Tactical puzzles imported from the Lichess puzzle database — one of the largest collections
+          Tactical puzzles imported from the Lichess puzzle database, one of the largest collections
           of chess puzzles in the world. Browse stats, rating distributions, themes, and example tactics.
         </p>
 

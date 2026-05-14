@@ -62,7 +62,7 @@ export function LichessTacticsDashboard({ metadata }: Props): React.ReactElement
       ? Math.round((metadata.tacticsWithOpeningsCount / metadata.totalTacticsAfterRun) * 1000) / 10
       : 0
 
-  const themeBars = metadata.themes.map((t) => ({
+  const themeBars = (metadata.themes ?? []).map((t) => ({
     ...t,
     shortLabel:
       t.displayName.length > THEME_BAR_LABEL_MAX_CHARS
