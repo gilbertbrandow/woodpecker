@@ -1,7 +1,9 @@
 DOCKER ?= docker
 COMPOSE = $(DOCKER) compose
 LOCAL_COMPOSE = $(COMPOSE) -f docker-compose.yml -f docker-compose-local.yml
+TEST_COMPOSE  = $(COMPOSE) -f docker-compose.yml -f docker-compose-local.yml -f docker-compose-test.yml
 SEED_DEV_LIMIT ?= 1000
+
 
 up:
 	$(LOCAL_COMPOSE) up
@@ -50,27 +52,29 @@ seed-dev:
 	$(MAKE) -C pipeline lichess-tactics-themes-import
 	$(MAKE) -C pipeline lichess-tactics-import ARGS="--limit $(SEED_DEV_LIMIT)"
 
-test-frontend:
-	cd frontend && . $${NVM_DIR:-$$HOME/.nvm}/nvm.sh && nvm install --no-progress && npm install && npm run test:run
 
-test-backend:
-	cd backend && .venv/bin/pytest -m "not integration"
+setup:
+	$(MAKE) -C backend setup
+	$(MAKE) -C frontend setup
 
-test-backend-integration:
-	cd backend && .venv/bin/pytest -m integration
+lint:
+	$(MAKE) -C backend lint
+	$(MAKE) -C frontend lint
 
-test: test-frontend test-backend
+test:
+	$(LOCAL_COMPOSE) build --quiet backend frontend
+	$(LOCAL_COMPOSE) run --rm backend pytest -m "not integration"
+	$(LOCAL_COMPOSE) run --rm frontend sh -c "npm install && npm run test:run"
 
-test-integration: test-backend-integration
+test-integration:
+	$(TEST_COMPOSE) build --quiet backend
+	$(TEST_COMPOSE) run --rm backend sh -c "flask --app app db upgrade && pytest -m integration"
+	$(TEST_COMPOSE) down -v
 
-test-frontend-docker:
-	$(LOCAL_COMPOSE) run --rm frontend npm run test:run
+test-all:
+	$(TEST_COMPOSE) build --quiet backend frontend
+	$(TEST_COMPOSE) run --rm backend sh -c "flask --app app db upgrade && pytest"
+	$(TEST_COMPOSE) run --rm frontend sh -c "npm install && npm run test:run"
+	$(TEST_COMPOSE) down -v
 
-test-backend-docker:
-	$(LOCAL_COMPOSE) run --rm backend pytest
-
-test-docker:
-	$(MAKE) test-frontend-docker
-	$(MAKE) test-backend-docker
-
-.PHONY: up up-build down logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade migrate-current migrate-history migrate-rollback seed-dev test-frontend test-backend test-backend-integration test-integration test test-frontend-docker test-backend-docker test-docker
+.PHONY: up up-build down logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade migrate-current migrate-history migrate-rollback seed-dev setup lint test test-integration test-all
