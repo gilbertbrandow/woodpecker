@@ -202,6 +202,11 @@ def get_latest_source_run_metadata() -> dict | None:
 
     Each metadata row captures only the tactics imported in that specific run.
     This function merges all rows to produce a complete picture of the source.
+
+    Aggregation is safe because Lichess tactics imports are append-only and idempotent:
+    existing tactics are skipped, so each tactic belongs to exactly one run.
+    Summing per-run counts therefore equals the global total without double-counting.
+    If a future source import is not append-only, this aggregation strategy must be revisited.
     """
     rows = list(
         db.session.execute(

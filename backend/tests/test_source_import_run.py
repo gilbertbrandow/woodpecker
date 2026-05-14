@@ -195,6 +195,70 @@ class TestGetLatestSourceRunMetadata:
         assert result is not None
         assert result["latestSourceImportRunId"] == newer.id
 
+    def test_aggregates_counts_across_multiple_runs(self, db_session) -> None:
+        from app.models.source_import_run import LichessTacticsSourceRunMetadata
+        from app.services.lichess_tactics_source import get_latest_source_run_metadata
+
+        run1 = _make_source_run(db_session, finished_at=datetime(2025, 1, 1, tzinfo=timezone.utc))
+        meta1 = LichessTacticsSourceRunMetadata(
+            source_import_run_id=run1.id,
+            imported_count=900,
+            total_tactics_after_run=900,
+            tactics_with_themes_count=800,
+            tactics_with_openings_count=700,
+            min_rating=600,
+            max_rating=2800,
+            average_rating=1500,
+            rating_bucket_counts_json={"1500": 100, "1550": 200},
+            theme_counts_json={"mateIn1": 500, "fork": 200},
+            opening_counts_json={"Sicilian_Defense": 300},
+            generated_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+        )
+        db_session.add(meta1)
+
+        # A re-import run that found nothing new (all tactics already existed).
+        run2 = _make_source_run(db_session, finished_at=datetime(2025, 6, 1, tzinfo=timezone.utc))
+        meta2 = LichessTacticsSourceRunMetadata(
+            source_import_run_id=run2.id,
+            imported_count=0,
+            total_tactics_after_run=900,
+            tactics_with_themes_count=0,
+            tactics_with_openings_count=0,
+            min_rating=0,
+            max_rating=0,
+            average_rating=None,
+            rating_bucket_counts_json={},
+            theme_counts_json={},
+            opening_counts_json={},
+            generated_at=datetime(2025, 6, 1, tzinfo=timezone.utc),
+        )
+        db_session.add(meta2)
+        db_session.commit()
+
+        result = get_latest_source_run_metadata()
+        assert result is not None
+
+        # Counts must be summed across both runs.
+        assert result["importedCount"] == 900
+        assert result["tacticsWithThemesCount"] == 800
+        assert result["tacticsWithOpeningsCount"] == 700
+
+        # The zero-import run must not contaminate min/max/average.
+        assert result["minRating"] == 600
+        assert result["maxRating"] == 2800
+        assert result["averageRating"] == 1500
+
+        # JSONB dicts must be merged.
+        assert result["ratingBucketCounts"] == {"1500": 100, "1550": 200}
+        assert result["themeCounts"] == {"mateIn1": 500, "fork": 200}
+        assert result["openingCounts"] == {"Sicilian_Defense": 300}
+
+        # latestSourceImportRunId must point to the most recent run.
+        assert result["latestSourceImportRunId"] == run2.id
+
+        # totalTacticsAfterRun comes from the most recent run's snapshot.
+        assert result["totalTacticsAfterRun"] == 900
+
     def test_returned_dict_has_all_required_keys(self, db_session) -> None:
         from app.services.lichess_tactics_source import get_latest_source_run_metadata
 

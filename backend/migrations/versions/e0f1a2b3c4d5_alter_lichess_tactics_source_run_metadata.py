@@ -50,14 +50,17 @@ def upgrade() -> None:
 
             UPDATE lichess_tactics_source_run_metadata
             SET
-                opening_counts_json = (
-                    SELECT json_object_agg(o.name, cnt)::jsonb
-                    FROM (
-                        SELECT o2.name, COUNT(*) AS cnt
-                        FROM lichess_tactic_openings lto
-                        JOIN openings o2 ON o2.id = lto.opening_id
-                        GROUP BY o2.name
-                    ) o
+                opening_counts_json = COALESCE(
+                    (
+                        SELECT json_object_agg(o.name, cnt)::jsonb
+                        FROM (
+                            SELECT o2.name, COUNT(*) AS cnt
+                            FROM lichess_tactic_openings lto
+                            JOIN openings o2 ON o2.id = lto.opening_id
+                            GROUP BY o2.name
+                        ) o
+                    ),
+                    '{}'::jsonb
                 ),
                 average_rating = (
                     SELECT AVG(rating)::int FROM lichess_tactics
