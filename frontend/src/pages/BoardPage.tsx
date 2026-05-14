@@ -105,6 +105,11 @@ export function BoardPage(): React.ReactElement | null {
     return result
   }, [ctrl.overview.data])
 
+  const currentPuzzleAttempts = React.useMemo(
+    () => ctrl.session.attemptHistory.filter((item) => item.runTrainingItemId === runTrainingItemId),
+    [ctrl.session.attemptHistory, runTrainingItemId],
+  )
+
   React.useEffect(() => {
     const data = ctrl.overview.data
     if (!data) return
@@ -186,9 +191,23 @@ export function BoardPage(): React.ReactElement | null {
 
   const [selectedPly, setSelectedPly] = React.useState<PlySelection | null>(null)
 
+  const lastOverviewTimerTextRef = React.useRef(ZERO_TIMER)
+  const lastOverviewMetTargetTimeRef = React.useRef<boolean | null>(null)
+  const lastSelectedAttemptRef = React.useRef<OverviewAttemptView | null>(null)
+
   React.useEffect(() => {
     setSelectedPly(null)
   }, [ctrl.board.boardKey])
+
+  React.useEffect(() => {
+    setSelectedAttemptId(null)
+  }, [runTrainingItemId])
+
+  React.useEffect(() => {
+    lastOverviewTimerTextRef.current = ZERO_TIMER
+    lastOverviewMetTargetTimeRef.current = null
+    lastSelectedAttemptRef.current = null
+  }, [runTrainingItemId, ZERO_TIMER])
 
   const focusPgnDisplay = React.useMemo(() => {
     if (ctrl.mode !== 'focus' && ctrl.mode !== 'failed') return null
@@ -252,7 +271,11 @@ export function BoardPage(): React.ReactElement | null {
           }
         }
       }
-      if (selectedAttempt?.board !== null && selectedAttempt?.board !== undefined) {
+      if (
+        selectedAttempt?.board !== null &&
+        selectedAttempt?.board !== undefined &&
+        selectedAttempt.status !== 'failed'
+      ) {
         return {
           ...base,
           fen: selectedAttempt.board.terminalFen ?? ctrl.board.fen,
@@ -305,10 +328,6 @@ export function BoardPage(): React.ReactElement | null {
     (focusPgnDisplay !== null &&
       selectedPly.line === 'main' &&
       selectedPly.index === focusPgnDisplay.mainline.length - 1)
-
-  const lastOverviewTimerTextRef = React.useRef(ZERO_TIMER)
-  const lastOverviewMetTargetTimeRef = React.useRef<boolean | null>(null)
-  const lastSelectedAttemptRef = React.useRef<OverviewAttemptView | null>(null)
 
   if ((!ctrl.overview.data && !ctrl.solvingView) || ctrl.mode === 'loading') {
     return (
@@ -690,6 +709,7 @@ export function BoardPage(): React.ReactElement | null {
           trainingProgress={overviewData.progress.trainingProgress}
         />
         <OverviewAttemptHistoryTable
+          key={runTrainingItemId}
           rows={historyRows}
           selectedAttemptId={selectedAttemptId}
           onSelectAttempt={handleSelectAttemptForTable}
@@ -798,6 +818,7 @@ export function BoardPage(): React.ReactElement | null {
       )}
       {ctrl.mode === 'overview' && overviewData !== null && (
         <OverviewSidebarRight
+          key={runTrainingItemId}
           historyRows={historyRows}
           selectedAttemptId={selectedAttemptId}
           onSelectAttempt={handleSelectAttemptForTable}
@@ -815,7 +836,8 @@ export function BoardPage(): React.ReactElement | null {
     <BoardCenterColumn
       board={displayBoard}
       actions={ctrl.actions}
-      attemptHistory={ctrl.session.attemptHistory}
+      attemptHistory={currentPuzzleAttempts}
+      stripMaxVisible={8}
       runId={runIdStr}
       activeAttemptId={ctrl.mode === 'overview' ? selectedAttemptId : undefined}
       stripInteractive={ctrl.mode === 'overview'}
