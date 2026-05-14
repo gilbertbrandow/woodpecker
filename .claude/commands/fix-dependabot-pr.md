@@ -50,9 +50,13 @@ Decide which category applies:
 
 Symptoms: `npm ci` fails with `Missing: <package>@<version> from lock file` or similar.
 
-This should be rare — the `dependabot-lockfile.yml` workflow regenerates the lockfile automatically. If it still happens, the workflow may not have run yet or failed itself.
+This should not happen — the `dependabot-lockfile.yml` workflow automatically runs `npm install` and commits the updated lockfile on every push to a `dependabot/npm_and_yarn/**` branch. If you see this error, the lockfile workflow itself likely failed or hasn't run yet. Check its status:
 
-Fix: see **Fix A** below.
+```bash
+gh run list --branch <HEAD_REF> --workflow dependabot-lockfile.yml --limit 5
+```
+
+If the workflow failed, fetch its logs and address the root cause there. Do not manually regenerate the lockfile unless the workflow is broken.
 
 ### B — Type errors or test failures
 
@@ -73,33 +77,6 @@ Treat like B — investigate the specific error before acting.
 Symptoms: The failure is in a job unrelated to what dependabot changed (e.g., a backend test failing on a frontend-only PR).
 
 Note this to the user. The PR itself may be fine — the failing check might be a pre-existing flake or unrelated regression. Do not close the PR. Explain and stop.
-
----
-
-## Fix A — Lockfile drift
-
-Check out the branch locally:
-
-```bash
-git fetch origin <HEAD_REF>
-git checkout <HEAD_REF>
-```
-
-Regenerate the lockfile:
-
-```bash
-cd frontend && npm install
-```
-
-Commit and push:
-
-```bash
-git add frontend/package-lock.json
-git commit -m "chore: regenerate package-lock.json for dependabot branch"
-git push
-```
-
-Tell the user CI should now pass and they can re-run the failed jobs if needed.
 
 ---
 
