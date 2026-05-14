@@ -8,6 +8,12 @@ from app.models.lichess_tactic import (
     lichess_tactic_theme_links,
 )
 from app.models.lichess_tactic_theme import LichessTacticTheme
+from app.models.source_import_run import (
+    LichessTacticsSourceRunMetadata,
+    SourceImportRun,
+    SourceImportSource,
+    SourceImportStatus,
+)
 from app.models.opening import Opening
 
 
@@ -189,3 +195,68 @@ def get_top_themes() -> list[dict]:
         }
         for r in rows
     ]
+
+
+def get_latest_source_run_metadata() -> dict | None:
+    """Aggregate precomputed metadata across all succeeded Lichess tactics import runs.
+
+    Each metadata row captures only the tactics imported in that specific run.
+    This function merges all rows to produce a complete picture of the source.
+    """
+    rows = list(
+        db.session.execute(
+            select(LichessTacticsSourceRunMetadata)
+            .join(
+                SourceImportRun,
+                SourceImportRun.id == LichessTacticsSourceRunMetadata.source_import_run_id,
+            )
+            .where(
+                SourceImportRun.source == SourceImportSource.LICHESS_TACTICS,
+                SourceImportRun.status == SourceImportStatus.SUCCEEDED,
+            )
+            .order_by(SourceImportRun.finished_at.desc())
+        ).scalars()
+    )
+
+    if not rows:
+        return None
+
+    latest = rows[0]
+
+    imported_count = sum(r.imported_count for r in rows)
+    tactics_with_themes = sum(r.tactics_with_themes_count for r in rows)
+    tactics_with_openings = sum(r.tactics_with_openings_count for r in rows)
+
+    non_empty = [r for r in rows if r.imported_count > 0]
+    min_rating = min((r.min_rating for r in non_empty), default=0)
+    max_rating = max((r.max_rating for r in non_empty), default=0)
+
+    weighted_sum = sum(r.average_rating * r.imported_count for r in non_empty if r.average_rating is not None)
+    weighted_denom = sum(r.imported_count for r in non_empty if r.average_rating is not None)
+    average_rating = int(weighted_sum / weighted_denom) if weighted_denom > 0 else None
+
+    rating_bucket_counts: dict[str, int] = {}
+    theme_counts: dict[str, int] = {}
+    opening_counts: dict[str, int] = {}
+    for r in rows:
+        for k, v in (r.rating_bucket_counts_json or {}).items():
+            rating_bucket_counts[k] = rating_bucket_counts.get(k, 0) + int(v)
+        for k, v in (r.theme_counts_json or {}).items():
+            theme_counts[k] = theme_counts.get(k, 0) + int(v)
+        for k, v in (r.opening_counts_json or {}).items():
+            opening_counts[k] = opening_counts.get(k, 0) + int(v)
+
+    return {
+        "latestSourceImportRunId": latest.source_import_run_id,
+        "importedCount": imported_count,
+        "totalTacticsAfterRun": latest.total_tactics_after_run,
+        "tacticsWithThemesCount": tactics_with_themes,
+        "tacticsWithOpeningsCount": tactics_with_openings,
+        "minRating": min_rating,
+        "maxRating": max_rating,
+        "averageRating": average_rating,
+        "ratingBucketCounts": rating_bucket_counts,
+        "themeCounts": theme_counts,
+        "openingCounts": opening_counts,
+        "generatedAt": latest.generated_at.isoformat(),
+    }
