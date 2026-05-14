@@ -121,6 +121,20 @@ export function computeFinalFen(fen: string, solutionMoves: string[]): string {
   return chess.fen()
 }
 
+type AttemptBoardView = { terminalFen: string | null; lastMove: [string, string] | null } | null
+
+export function resolveOverviewBoardPosition(
+  attempts: ReadonlyArray<{ status: string; board: AttemptBoardView }>,
+  solutionMoves: string[],
+  initialFen: string,
+): { fen: string; lastMove: [string, string] | undefined } {
+  const solvedAttempt = [...attempts].reverse().find((a) => a.status === 'solved') ?? null
+  return {
+    fen: solvedAttempt?.board?.terminalFen ?? computeFinalFen(initialFen, solutionMoves),
+    lastMove: solvedAttempt?.board?.lastMove ?? undefined,
+  }
+}
+
 export function formatTimeRemaining(ms: number): string {
   if (ms <= 0) return 'Overdue'
   const hours = ms / 3_600_000

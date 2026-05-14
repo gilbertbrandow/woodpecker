@@ -62,4 +62,20 @@ describe('SessionAttemptStrip', () => {
     renderWithProvider(<SessionAttemptStrip items={items} runId="1" maxVisible={10} />)
     expect(screen.getAllByRole('link')).toHaveLength(10)
   })
+
+  it('renders dots for attempts across multiple runTrainingItemIds without filtering', () => {
+    // Regression guard: the strip must render ALL items it receives regardless of runTrainingItemId.
+    // If someone adds a per-puzzle filter before passing items, this test fails.
+    const items = [
+      makeItem({ attemptId: 1, runTrainingItemId: 10, puzzlePosition: 1, status: 'solved', finishedAt: Date.now() }),
+      makeItem({ attemptId: 2, runTrainingItemId: 11, puzzlePosition: 2, status: 'failed', finishedAt: Date.now() }),
+      makeItem({ attemptId: 3, runTrainingItemId: 12, puzzlePosition: 3, status: 'ongoing' }),
+    ]
+    renderWithProvider(<SessionAttemptStrip items={items} runId="1" />)
+    // solved + failed are interactive links; ongoing is a non-interactive span — 3 dots total
+    expect(screen.getAllByRole('link')).toHaveLength(2)
+    expect(screen.getAllByRole('img', { hidden: true })).toHaveLength(1)
+    // All three dots carry an aria-label regardless of element type
+    expect(screen.getAllByLabelText(/Attempt for puzzle/)).toHaveLength(3)
+  })
 })
