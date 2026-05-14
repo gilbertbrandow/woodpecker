@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { Chess } from 'chess.js'
-import { buildPgnDisplay, resultsInCheckmate } from '../boardPage.helpers'
+import { buildPgnDisplay, computeFinalFen, resolveOverviewBoardPosition, resultsInCheckmate } from '../boardPage.helpers'
 
 describe('resultsInCheckmate', () => {
   it('returns true when the move results in checkmate', () => {
@@ -86,5 +86,68 @@ describe('buildPgnDisplay', () => {
     const result = buildPgnDisplay(FEN, [WRONG_MOVE], SOLUTION, 'failed', [CORRECT_RETRY_MOVE], false)
     expect(result.variation).not.toBeNull()
     expect(result.variation![0].uci).toBe(CORRECT_RETRY_MOVE)
+  })
+})
+
+// Reuse the same 4-ply position from the buildPgnDisplay suite above.
+const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+const SOLUTION_MOVES = ['e2e4', 'd7d5', 'e4d5', 'd8d5']
+
+describe('computeFinalFen', () => {
+  it('returns the initial FEN unchanged when solution is empty', () => {
+    expect(computeFinalFen(INITIAL_FEN, [])).toBe(INITIAL_FEN)
+  })
+
+  it('returns the correct terminal FEN after applying all solution moves', () => {
+    const terminal = computeFinalFen(INITIAL_FEN, SOLUTION_MOVES)
+    // Verify by replaying manually with chess.js
+    const chess = new Chess(INITIAL_FEN)
+    chess.move({ from: 'e2', to: 'e4' })
+    chess.move({ from: 'd7', to: 'd5' })
+    chess.move({ from: 'e4', to: 'd5' })
+    chess.move({ from: 'd8', to: 'd5' })
+    expect(terminal).toBe(chess.fen())
+  })
+})
+
+describe('resolveOverviewBoardPosition', () => {
+  const TERMINAL_FEN_A = 'r1bqkbnr/ppp1pppp/8/3Q4/8/8/PPPP1PPP/RNB1KBNR w KQkq - 0 3'
+  const TERMINAL_FEN_B = 'r1bqkb1r/ppp1pppp/5n2/3Q4/8/8/PPPP1PPP/RNB1KBNR w KQkq - 2 4'
+
+  it('falls back to computeFinalFen when all attempts are failed', () => {
+    const attempts = [
+      { status: 'failed', board: { terminalFen: 'some-wrong-fen', lastMove: ['e2', 'e4'] as [string, string] } },
+      { status: 'failed', board: { terminalFen: 'another-wrong-fen', lastMove: null } },
+    ]
+    const { fen } = resolveOverviewBoardPosition(attempts, SOLUTION_MOVES, INITIAL_FEN)
+    expect(fen).toBe(computeFinalFen(INITIAL_FEN, SOLUTION_MOVES))
+  })
+
+  it('uses the solved attempt\'s terminalFen', () => {
+    const attempts = [
+      { status: 'failed', board: { terminalFen: 'wrong-fen', lastMove: null } },
+      { status: 'solved', board: { terminalFen: TERMINAL_FEN_A, lastMove: ['d8', 'd5'] as [string, string] } },
+    ]
+    const { fen, lastMove } = resolveOverviewBoardPosition(attempts, SOLUTION_MOVES, INITIAL_FEN)
+    expect(fen).toBe(TERMINAL_FEN_A)
+    expect(lastMove).toEqual(['d8', 'd5'])
+  })
+
+  it('uses the LAST solved attempt when multiple solved attempts exist', () => {
+    const attempts = [
+      { status: 'solved', board: { terminalFen: TERMINAL_FEN_A, lastMove: null } },
+      { status: 'failed', board: { terminalFen: 'wrong-fen', lastMove: null } },
+      { status: 'solved', board: { terminalFen: TERMINAL_FEN_B, lastMove: ['e4', 'd5'] as [string, string] } },
+    ]
+    const { fen } = resolveOverviewBoardPosition(attempts, SOLUTION_MOVES, INITIAL_FEN)
+    expect(fen).toBe(TERMINAL_FEN_B)
+  })
+
+  it('falls back to computeFinalFen when the solved attempt has a null terminalFen', () => {
+    const attempts = [
+      { status: 'solved', board: { terminalFen: null, lastMove: null } },
+    ]
+    const { fen } = resolveOverviewBoardPosition(attempts, SOLUTION_MOVES, INITIAL_FEN)
+    expect(fen).toBe(computeFinalFen(INITIAL_FEN, SOLUTION_MOVES))
   })
 })

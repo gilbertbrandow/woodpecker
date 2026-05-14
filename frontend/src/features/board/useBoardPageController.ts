@@ -13,7 +13,7 @@ import {
   applyUci,
   resultsInCheckmate,
   playerColor,
-  computeFinalFen,
+  resolveOverviewBoardPosition,
   HEADER_H,
   FOOTER_H,
   H_PAD_MD,
@@ -318,12 +318,11 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
   const applyOverviewDisplayState = useCallback((data: RunTrainingItemOverview): void => {
     const solutionMoves = data.trainingItem.solution
-    const solvedAttempt = [...data.attempts].reverse().find((a) => a.status === 'solved') ?? null
-    const boardFen =
-      solvedAttempt?.board?.terminalFen ??
-      computeFinalFen(data.trainingItem.fen, solutionMoves)
-    const boardLastMove: [string, string] | undefined =
-      solvedAttempt?.board?.lastMove ?? undefined
+    const { fen: boardFen, lastMove: boardLastMove } = resolveOverviewBoardPosition(
+      data.attempts,
+      solutionMoves,
+      data.trainingItem.fen,
+    )
 
     chessRef.current = new Chess(data.trainingItem.fen)
     solutionMovesRef.current = solutionMoves
