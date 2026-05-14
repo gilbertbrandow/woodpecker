@@ -1,4 +1,4 @@
-NVM = ([ -f "$${NVM_DIR:-$$HOME/.nvm}/nvm.sh" ] && . "$${NVM_DIR:-$$HOME/.nvm}/nvm.sh" && nvm install --no-progress || true)
+NVM = [ -f "$${NVM_DIR:-$$HOME/.nvm}/nvm.sh" ] && . "$${NVM_DIR:-$$HOME/.nvm}/nvm.sh" && nvm install --no-progress || true
 
 setup:
 	$(NVM) && npm install
