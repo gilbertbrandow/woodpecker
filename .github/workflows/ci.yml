@@ -25,13 +25,9 @@ jobs:
           .venv/bin/pip install --upgrade pip
           .venv/bin/pip install -r requirements.txt
 
-      - name: ruff
+      - name: lint
         working-directory: backend
-        run: .venv/bin/ruff check app/ migrations/
-
-      - name: mypy
-        working-directory: backend
-        run: .venv/bin/mypy app/ migrations/
+        run: make lint
 
   backend-test:
     name: Backend tests
@@ -71,12 +67,12 @@ jobs:
           DATABASE_URL: postgresql://woodpecker:woodpecker@localhost:5432/woodpecker_test
         run: .venv/bin/flask --app app db upgrade
 
-      - name: pytest
+      - name: test
         working-directory: backend
         env:
           SECRET_KEY: ci-test-secret
           DATABASE_URL: postgresql://woodpecker:woodpecker@localhost:5432/woodpecker_test
-        run: .venv/bin/pytest -v
+        run: make test-integration
 
   frontend-lint:
     name: Frontend lint
@@ -94,9 +90,9 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: tsc
+      - name: lint
         working-directory: frontend
-        run: npm run typecheck
+        run: make lint
 
   frontend-test:
     name: Frontend tests
@@ -114,9 +110,9 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: vitest
+      - name: test
         working-directory: frontend
-        run: npm run test:run
+        run: make test
 
   build-backend:
     name: Build backend image
