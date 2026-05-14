@@ -2,7 +2,7 @@ DOCKER ?= docker
 COMPOSE = $(DOCKER) compose
 LOCAL_COMPOSE = $(COMPOSE) -f docker-compose.yml -f docker-compose-local.yml
 TEST_COMPOSE  = $(COMPOSE) --project-name woodpecker-test -f docker-compose.yml -f docker-compose-test.yml
-SEED_DEV_LIMIT ?= 1000
+SEED_DEV_LIMIT ?= 10000
 
 
 up:
