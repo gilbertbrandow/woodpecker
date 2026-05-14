@@ -1,14 +1,19 @@
+---
+name: prepare-issue
+description: Prepare to work on a GitHub issue by creating a branch, reading issue context and comments, inspecting relevant code, asking clarifying questions, and stopping before implementation.
+---
+
 # Prepare Issue
 
 Prepare to work on a GitHub issue without implementing it yet.
 
-The goal of this command is to create a clean branch, understand the issue deeply, inspect the relevant code, ask useful clarifying questions, and then stop. The output of this command is shared understanding, not code.
+The goal of this skill is to create a clean branch, understand the issue deeply, inspect the relevant code, ask useful clarifying questions, and then stop. The output of this skill is shared understanding, not code.
 
 ## Arguments
 
-`$ARGUMENTS` is required and must be a GitHub issue number.
+The argument is required and must be a GitHub issue number.
 
-If `$ARGUMENTS` is empty, ask the user for an issue number and stop.
+If no issue number is provided, ask the user for an issue number and stop.
 
 ---
 
@@ -201,9 +206,9 @@ Stop and wait for further instructions.
 
 ## Guardrails
 
-Do not implement code during this command.
+Do not implement code during this skill.
 
-Do not commit code during this command.
+Do not commit code during this skill.
 
 Do not push code changes other than creating/checking out the preparation branch.
 
@@ -217,4 +222,4 @@ Do not edit issue descriptions unless explicitly instructed.
 
 Do not mark work complete.
 
-The only GitHub write action this command should normally perform is commenting on the issue with the prepared branch name.
+The only GitHub write action this skill should normally perform is commenting on the issue with the prepared branch name.

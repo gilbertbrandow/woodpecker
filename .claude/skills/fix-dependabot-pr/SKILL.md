@@ -1,16 +1,21 @@
+---
+name: fix-dependabot-pr
+description: Diagnose and fix a failing Dependabot pull request, including lockfile drift, breaking API changes, unrelated failures, and too-breaking upgrades.
+---
+
 # Fix Dependabot PR
 
 Diagnose and fix a failing dependabot pull request. Handles lockfile drift, breaking API changes, and dependencies that are too breaking to upgrade now.
 
 ## Arguments
 
-`$ARGUMENTS` is an optional PR number. If empty, list failing dependabot PRs and ask the user which one to work on.
+The argument is an optional PR number. If empty, list failing dependabot PRs and ask the user which one to work on.
 
 ---
 
 ## Step 1 — Identify the PR
 
-If `$ARGUMENTS` is empty:
+If no PR number was provided:
 
 - Run `gh pr list --author app/dependabot --state open --json number,title,headRefName,statusCheckRollup` to list open dependabot PRs.
 - Filter to PRs where at least one required status check has failed (look for `FAILURE` or `ERROR` in `statusCheckRollup`).
