@@ -1,0 +1,8 @@
+services:
+  db:
+    environment:
+      POSTGRES_DB: woodpecker_test
+
+  backend:
+    environment:
+      DATABASE_URL: postgresql://woodpecker:woodpecker@db:5432/woodpecker_test
