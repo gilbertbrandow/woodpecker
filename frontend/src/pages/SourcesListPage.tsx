@@ -70,8 +70,6 @@ export function SourcesListPage(): React.ReactElement | null {
               Creative Commons licence
               <ExternalLink className="h-3 w-3" />
             </a>
-            . We are grateful to everyone who contributes to Lichess — the players, the
-            developers, and the donors who keep it running.
           </p>
         </div>
 
