@@ -146,6 +146,11 @@ export function BoardPage(): React.ReactElement | null {
     return Math.round(selectedAttempt.timeSpentMs / 100)
   }, [selectedAttempt])
 
+  const selectedAccuracyDelta = selectedAttempt?.impact?.accuracyDeltaPct ?? null
+  const selectedSolveTimeDelta = selectedAttempt?.impact?.averageSolveTimeDeltaMs ?? null
+  const selectedRunProgressDelta = selectedAttempt?.impact?.runProgressDeltaPct ?? null
+  const selectedTrainingProgressDelta = selectedAttempt?.impact?.trainingProgressDeltaPct ?? null
+
   const overviewMetTargetTime = React.useMemo((): boolean | null => {
     const tenths = ctrl.overview.data?.timer.targetSolveTenths ?? null
     if (selectedAttempt === null || selectedAttempt.timeSpentMs === null) return null
@@ -690,8 +695,8 @@ export function BoardPage(): React.ReactElement | null {
       <div className="flex flex-col gap-5">
         <OverviewStatsSection
           runIndex={overviewData.stats.runIndex}
-          accuracy={overviewData.stats.accuracy}
-          averageSolveTime={overviewData.stats.averageSolveTime}
+          accuracy={{ ...overviewData.stats.accuracy, deltaPct: selectedAccuracyDelta }}
+          averageSolveTime={{ ...overviewData.stats.averageSolveTime, deltaMs: selectedSolveTimeDelta }}
         />
         {overviewData.runPace.chartData !== null && (
           <RunPaceCard
@@ -700,8 +705,12 @@ export function BoardPage(): React.ReactElement | null {
           />
         )}
         <ProgressCard
-          runProgress={overviewData.progress.runProgress}
-          trainingProgress={overviewData.progress.trainingProgress}
+          runProgress={{ ...overviewData.progress.runProgress, delta: selectedRunProgressDelta }}
+          trainingProgress={
+            overviewData.progress.trainingProgress !== null
+              ? { ...overviewData.progress.trainingProgress, delta: selectedTrainingProgressDelta }
+              : null
+          }
         />
         <OverviewAttemptHistoryTable
           key={runTrainingItemId}
@@ -728,10 +737,14 @@ export function BoardPage(): React.ReactElement | null {
         runIndex={overviewData.stats.runIndex}
         paceChart={overviewData.runPace.chartData}
         isRunActive={overviewData.runPace.isRunActive}
-        accuracy={overviewData.stats.accuracy}
-        averageSolveTime={overviewData.stats.averageSolveTime}
-        runProgress={overviewData.progress.runProgress}
-        trainingProgress={overviewData.progress.trainingProgress}
+        accuracy={{ ...overviewData.stats.accuracy, deltaPct: selectedAccuracyDelta }}
+        averageSolveTime={{ ...overviewData.stats.averageSolveTime, deltaMs: selectedSolveTimeDelta }}
+        runProgress={{ ...overviewData.progress.runProgress, delta: selectedRunProgressDelta }}
+        trainingProgress={
+          overviewData.progress.trainingProgress !== null
+            ? { ...overviewData.progress.trainingProgress, delta: selectedTrainingProgressDelta }
+            : null
+        }
         breadcrumbs={
           <BoardBreadcrumbs
             runIndex={overviewData.runTrainingItem.runIndex}
