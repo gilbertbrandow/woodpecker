@@ -77,8 +77,6 @@ Starting issue preparation on branch:
 ```text
 <BRANCH_NAME>
 ```
-
-I will read the issue/comments, inspect the relevant code, and come back with clarifying questions before implementation.
 ```
 
 Do not open a pull request yet.
