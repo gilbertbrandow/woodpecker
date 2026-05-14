@@ -105,11 +105,6 @@ export function BoardPage(): React.ReactElement | null {
     return result
   }, [ctrl.overview.data])
 
-  const currentPuzzleAttempts = React.useMemo(
-    () => ctrl.session.attemptHistory.filter((item) => item.runTrainingItemId === runTrainingItemId),
-    [ctrl.session.attemptHistory, runTrainingItemId],
-  )
-
   React.useEffect(() => {
     const data = ctrl.overview.data
     if (!data) return
@@ -836,7 +831,7 @@ export function BoardPage(): React.ReactElement | null {
     <BoardCenterColumn
       board={displayBoard}
       actions={ctrl.actions}
-      attemptHistory={currentPuzzleAttempts}
+      attemptHistory={ctrl.session.attemptHistory}
       stripMaxVisible={8}
       runId={runIdStr}
       activeAttemptId={ctrl.mode === 'overview' ? selectedAttemptId : undefined}
