@@ -1,0 +1,64 @@
+import * as React from 'react'
+import { useRef } from 'react'
+import { Link } from '@tanstack/react-router'
+import { ChevronRight } from 'lucide-react'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs'
+
+type Props = {
+  breadcrumbParentLabel: string
+  breadcrumbParentTo: string
+  title: string
+  summary: string
+  aboutContent: React.ReactNode
+  exploreContent: React.ReactNode
+  onExploreTabOpen: () => void
+}
+
+export function SourceDetailShell({
+  breadcrumbParentLabel,
+  breadcrumbParentTo,
+  title,
+  summary,
+  aboutContent,
+  exploreContent,
+  onExploreTabOpen,
+}: Props): React.ReactElement {
+  const exploreOpenedRef = useRef(false)
+
+  const handleTabChange = (value: string): void => {
+    if (value === 'explore' && !exploreOpenedRef.current) {
+      exploreOpenedRef.current = true
+      onExploreTabOpen()
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <nav className="flex items-center gap-1 text-sm text-muted-foreground">
+        <Link to={breadcrumbParentTo} className="hover:text-foreground">
+          {breadcrumbParentLabel}
+        </Link>
+        <ChevronRight className="h-3.5 w-3.5" />
+        <span className="text-foreground">{title}</span>
+      </nav>
+
+      <div className="flex flex-col gap-1">
+        <h1 className="text-base font-semibold">{title}</h1>
+        <p className="text-sm text-muted-foreground">{summary}</p>
+      </div>
+
+      <Tabs defaultValue="about" onValueChange={handleTabChange}>
+        <TabsList>
+          <TabsTrigger value="about">About</TabsTrigger>
+          <TabsTrigger value="explore">Explore</TabsTrigger>
+        </TabsList>
+        <TabsContent value="about" className="mt-4">
+          {aboutContent}
+        </TabsContent>
+        <TabsContent value="explore" className="mt-4">
+          {exploreContent}
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}

@@ -65,85 +65,36 @@ def _make_tactic(session, puzzle_id: str, rating: int = 1500, source_run=None): 
     return tactic
 
 
+def _make_metadata_row(session, run, *, theme_counts_json=None, rating_bucket_counts_json=None):  # type: ignore[misc]
+    from app.models.source_import_run import LichessTacticsSourceRunMetadata
+
+    row = LichessTacticsSourceRunMetadata(
+        source_import_run_id=run.id,
+        imported_count=100,
+        total_tactics_after_run=100,
+        tactics_with_themes_count=80,
+        tactics_with_openings_count=60,
+        min_rating=400,
+        max_rating=2800,
+        average_rating=1500,
+        rating_bucket_counts_json=rating_bucket_counts_json or {"1500": 100},
+        theme_counts_json=theme_counts_json or {"fork": 40, "pin": 30},
+        opening_counts_json={"Sicilian_Defense": 20},
+        generated_at=datetime.now(timezone.utc),
+    )
+    session.add(row)
+    session.flush()
+    return row
+
+
 # ── Auth protection ────────────────────────────────────────────────────────────
 
 class TestSourcesAuthProtection:
-    def test_stats_requires_login(self, client: FlaskClient) -> None:
-        assert client.get("/sources/lichess-tactics/stats").status_code == 401
-
-    def test_rating_distribution_requires_login(self, client: FlaskClient) -> None:
-        assert client.get("/sources/lichess-tactics/rating-distribution").status_code == 401
-
-    def test_top_themes_requires_login(self, client: FlaskClient) -> None:
-        assert client.get("/sources/lichess-tactics/top-themes").status_code == 401
-
     def test_items_requires_login(self, client: FlaskClient) -> None:
         assert client.get("/sources/lichess-tactics/items").status_code == 401
 
-
-# ── Stats ──────────────────────────────────────────────────────────────────────
-
-@pytest.mark.integration
-class TestLichessTacticsStats:
-    def test_empty_database_returns_zero_counts(self, client: FlaskClient, db_session) -> None:
-        _login(client, _make_user(db_session).id)
-
-        body = client.get("/sources/lichess-tactics/stats").get_json()
-
-        assert body["totalCount"] == 0
-        assert body["withOpeningsCount"] == 0
-        assert body["withOpeningsPct"] == 0.0
-
-    def test_returns_correct_total_count(self, client: FlaskClient, db_session) -> None:
-        _login(client, _make_user(db_session).id)
-        run = _make_source_run(db_session)
-        _make_tactic(db_session, "st001", 1400, source_run=run)
-        _make_tactic(db_session, "st002", 1600, source_run=run)
-
-        body = client.get("/sources/lichess-tactics/stats").get_json()
-
-        assert body["totalCount"] == 2
-
-    def test_response_contains_required_keys(self, client: FlaskClient, db_session) -> None:
-        _login(client, _make_user(db_session).id)
-
-        body = client.get("/sources/lichess-tactics/stats").get_json()
-
-        assert {"totalCount", "withOpeningsCount", "withOpeningsPct"}.issubset(body.keys())
-
-
-# ── Rating distribution ────────────────────────────────────────────────────────
-
-@pytest.mark.integration
-class TestLichessTacticsRatingDistribution:
-    def test_empty_database_returns_empty_buckets(self, client: FlaskClient, db_session) -> None:
-        _login(client, _make_user(db_session).id)
-
-        body = client.get("/sources/lichess-tactics/rating-distribution").get_json()
-
-        assert body == {"buckets": []}
-
-    def test_tactics_appear_in_correct_bucket(self, client: FlaskClient, db_session) -> None:
-        _login(client, _make_user(db_session).id)
-        run = _make_source_run(db_session)
-        _make_tactic(db_session, "rd001", 1500, source_run=run)
-        _make_tactic(db_session, "rd002", 1510, source_run=run)
-
-        buckets = client.get("/sources/lichess-tactics/rating-distribution").get_json()["buckets"]
-
-        total = sum(b["count"] for b in buckets)
-        assert total == 2
-
-    def test_buckets_have_correct_shape(self, client: FlaskClient, db_session) -> None:
-        _login(client, _make_user(db_session).id)
-        _make_tactic(db_session, "rd003", 1500)
-
-        buckets = client.get("/sources/lichess-tactics/rating-distribution").get_json()["buckets"]
-
-        assert len(buckets) >= 1
-        for b in buckets:
-            assert "min" in b and "max" in b and "count" in b
-            assert b["max"] - b["min"] == 50
+    def test_source_run_metadata_requires_login(self, client: FlaskClient) -> None:
+        assert client.get("/sources/lichess-tactics/source-run-metadata").status_code == 401
 
 
 # ── Items list ─────────────────────────────────────────────────────────────────
@@ -201,3 +152,94 @@ class TestLichessTacticsItems:
         puzzle = client.get("/sources/lichess-tactics/items").get_json()["puzzles"][0]
 
         assert {"puzzleId", "rating", "popularity", "nbPlays", "gameUrl", "themes", "openings"}.issubset(puzzle.keys())
+
+
+# ── Source run metadata ────────────────────────────────────────────────────────
+
+@pytest.mark.integration
+class TestLichessTacticsSourceRunMetadata:
+    def test_returns_null_when_no_succeeded_runs(self, client: FlaskClient, db_session) -> None:
+        _login(client, _make_user(db_session).id)
+
+        body = client.get("/sources/lichess-tactics/source-run-metadata").get_json()
+
+        assert body == {"metadata": None}
+
+    def test_returns_metadata_shape_with_succeeded_run(self, client: FlaskClient, db_session) -> None:
+        _login(client, _make_user(db_session).id)
+        run = _make_source_run(db_session)
+        _make_metadata_row(db_session, run)
+
+        metadata = client.get("/sources/lichess-tactics/source-run-metadata").get_json()["metadata"]
+
+        assert metadata is not None
+        for key in (
+            "latestSourceImportRunId", "importedCount", "totalTacticsAfterRun",
+            "tacticsWithThemesCount", "tacticsWithOpeningsCount",
+            "minRating", "maxRating", "ratingBucketCounts", "themes", "generatedAt",
+        ):
+            assert key in metadata, f"missing key: {key}"
+
+    def test_themes_enriched_with_display_name(self, client: FlaskClient, db_session) -> None:
+        from app.models.lichess_tactic_theme import LichessTacticTheme
+
+        _login(client, _make_user(db_session).id)
+        run = _make_source_run(db_session)
+
+        theme = LichessTacticTheme(
+            name="test_theme_enrichment_unique",
+            display_name="Test Theme",
+            description="A test tactical motif.",
+        )
+        db_session.add(theme)
+        db_session.flush()
+
+        _make_metadata_row(db_session, run, theme_counts_json={"test_theme_enrichment_unique": 50})
+
+        metadata = client.get("/sources/lichess-tactics/source-run-metadata").get_json()["metadata"]
+
+        themes = metadata["themes"]
+        assert len(themes) == 1
+        assert themes[0]["name"] == "test_theme_enrichment_unique"
+        assert themes[0]["displayName"] == "Test Theme"
+        assert themes[0]["description"] == "A test tactical motif."
+        assert themes[0]["count"] == 50
+
+    def test_themes_sorted_by_count_descending(self, client: FlaskClient, db_session) -> None:
+        _login(client, _make_user(db_session).id)
+        run = _make_source_run(db_session)
+        _make_metadata_row(db_session, run, theme_counts_json={"pin": 10, "fork": 50, "skewer": 30})
+
+        themes = client.get("/sources/lichess-tactics/source-run-metadata").get_json()["metadata"]["themes"]
+
+        counts = [t["count"] for t in themes]
+        assert counts == sorted(counts, reverse=True)
+
+    def test_themes_capped_at_top_limit(self, client: FlaskClient, db_session) -> None:
+        _login(client, _make_user(db_session).id)
+        run = _make_source_run(db_session)
+        # 30 themes — more than TOP_THEMES_LIMIT (25)
+        theme_counts = {f"theme_{i:02d}": i + 1 for i in range(30)}
+        _make_metadata_row(db_session, run, theme_counts_json=theme_counts)
+
+        themes = client.get("/sources/lichess-tactics/source-run-metadata").get_json()["metadata"]["themes"]
+
+        assert len(themes) == 25
+
+    def test_returns_null_for_failed_run(self, client: FlaskClient, db_session) -> None:
+        from app.models.source_import_run import SourceImportRun, SourceImportSource, SourceImportOperation, SourceImportStatus
+
+        _login(client, _make_user(db_session).id)
+        failed_run = SourceImportRun(
+            source=SourceImportSource.LICHESS_TACTICS,
+            operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
+            status=SourceImportStatus.FAILED,
+            started_at=datetime.now(timezone.utc),
+            finished_at=datetime.now(timezone.utc),
+        )
+        db_session.add(failed_run)
+        db_session.flush()
+
+        body = client.get("/sources/lichess-tactics/source-run-metadata").get_json()
+
+        assert body == {"metadata": None}

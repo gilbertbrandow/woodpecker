@@ -1,4 +1,4 @@
-from sqlalchemy import func, select, exists, text
+from sqlalchemy import func, select, exists
 from sqlalchemy.orm import selectinload
 
 from app.extensions import db
@@ -16,78 +16,8 @@ from app.models.source_import_run import (
 )
 from app.models.opening import Opening
 
-
-def get_stats() -> dict:
-    total: int = db.session.execute(
-        select(func.count()).select_from(LichessTactic)
-    ).scalar_one()
-
-    if total == 0:
-        return {
-            "totalCount": 0,
-            "withOpeningsCount": 0,
-            "withOpeningsPct": 0.0,
-            "withThemesCount": 0,
-            "withThemesPct": 0.0,
-        }
-
-    with_openings: int = db.session.execute(
-        select(func.count()).select_from(LichessTactic).where(
-            exists(
-                select(lichess_tactic_openings.c.lichess_tactic_id).where(
-                    lichess_tactic_openings.c.lichess_tactic_id == LichessTactic.id
-                )
-            )
-        )
-    ).scalar_one()
-
-    with_themes: int = db.session.execute(
-        select(func.count()).select_from(LichessTactic).where(
-            exists(
-                select(lichess_tactic_theme_links.c.lichess_tactic_id).where(
-                    lichess_tactic_theme_links.c.lichess_tactic_id == LichessTactic.id
-                )
-            )
-        )
-    ).scalar_one()
-
-    return {
-        "totalCount": total,
-        "withOpeningsCount": with_openings,
-        "withOpeningsPct": round(with_openings / total * 100, 1),
-        "withThemesCount": with_themes,
-        "withThemesPct": round(with_themes / total * 100, 1),
-    }
-
-
-RATING_BUCKET_SIZE = 50
-
-
-def get_rating_distribution() -> list[dict]:
-    rows = db.session.execute(
-        select(
-            (func.floor(LichessTactic.rating / RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE).label("bucket_min"),
-            func.count().label("cnt"),
-        )
-        .select_from(LichessTactic)
-        .group_by(text("bucket_min"))
-        .order_by(text("bucket_min"))
-    ).all()
-
-    if not rows:
-        return []
-
-    start = int(rows[0].bucket_min)
-    end = int(rows[-1].bucket_min) + RATING_BUCKET_SIZE
-    bucket_map = {int(r.bucket_min): int(r.cnt) for r in rows}
-
-    return [
-        {"min": b, "max": b + RATING_BUCKET_SIZE, "count": bucket_map.get(b, 0)}
-        for b in range(start, end, RATING_BUCKET_SIZE)
-    ]
-
-
 ITEMS_PAGE_SIZE = 20
+TOP_THEMES_LIMIT = 25
 
 
 def _serialize_tactic(t: LichessTactic) -> dict:
@@ -168,35 +98,6 @@ def list_items(
     }
 
 
-TOP_THEMES_LIMIT = 25
-
-
-def get_top_themes() -> list[dict]:
-    rows = db.session.execute(
-        select(
-            LichessTacticTheme.name,
-            LichessTacticTheme.display_name,
-            LichessTacticTheme.description,
-            func.count().label("cnt"),
-        )
-        .select_from(lichess_tactic_theme_links)
-        .join(LichessTacticTheme, LichessTacticTheme.id == lichess_tactic_theme_links.c.lichess_tactic_theme_id)
-        .group_by(LichessTacticTheme.id)
-        .order_by(text("cnt DESC"))
-        .limit(TOP_THEMES_LIMIT)
-    ).all()
-
-    return [
-        {
-            "name": r.name,
-            "displayName": r.display_name,
-            "description": r.description,
-            "count": int(r.cnt),
-        }
-        for r in rows
-    ]
-
-
 def get_latest_source_run_metadata() -> dict | None:
     """Aggregate precomputed metadata across all succeeded Lichess tactics import runs.
 
@@ -251,6 +152,27 @@ def get_latest_source_run_metadata() -> dict | None:
         for k, v in (r.opening_counts_json or {}).items():
             opening_counts[k] = opening_counts.get(k, 0) + int(v)
 
+    # Sort by count descending and take the top N before enriching — keeps the DB lookup bounded.
+    top_theme_name_counts = sorted(theme_counts.items(), key=lambda x: x[1], reverse=True)[:TOP_THEMES_LIMIT]
+
+    top_names = [name for name, _ in top_theme_name_counts]
+    theme_rows = list(
+        db.session.execute(
+            select(LichessTacticTheme).where(LichessTacticTheme.name.in_(top_names))
+        ).scalars()
+    ) if top_names else []
+    theme_meta = {r.name: (r.display_name, r.description) for r in theme_rows}
+
+    themes = [
+        {
+            "name": name,
+            "displayName": theme_meta.get(name, (name, ""))[0] or name,
+            "description": theme_meta.get(name, ("", ""))[1] or "",
+            "count": count,
+        }
+        for name, count in top_theme_name_counts
+    ]
+
     return {
         "latestSourceImportRunId": latest.source_import_run_id,
         "importedCount": imported_count,
@@ -261,7 +183,7 @@ def get_latest_source_run_metadata() -> dict | None:
         "maxRating": max_rating,
         "averageRating": average_rating,
         "ratingBucketCounts": rating_bucket_counts,
-        "themeCounts": theme_counts,
+        "themes": themes,
         "openingCounts": opening_counts,
         "generatedAt": latest.generated_at.isoformat(),
     }

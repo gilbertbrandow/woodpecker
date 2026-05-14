@@ -1,6 +1,6 @@
 DOCKER ?= docker
 COMPOSE = $(DOCKER) compose
-PROD_DB_URL ?= postgresql://woodpecker:woodpecker@localhost:5433/woodpecker
+PROD_DB_URL ?= postgresql://woodpecker:SECRET@localhost:5433/woodpecker
 
 # EC2 / production database helpers.
 # Run from the repo root with `make -C deploy <target>` or from inside deploy/.
