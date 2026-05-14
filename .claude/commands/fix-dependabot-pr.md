@@ -124,8 +124,8 @@ Apply the minimal fix required to make CI pass. Do not refactor unrelated code.
 
 After making changes, run the appropriate checks locally if possible:
 
-- Frontend: `cd frontend && npm run typecheck && npm run test:run`
-- Backend: `cd backend && .venv/bin/mypy app/ && .venv/bin/pytest -v`
+- Frontend: `cd frontend && make lint && make test`
+- Backend: `cd backend && make lint && make test`
 
 Commit any fixes with a clear message:
 

@@ -4,10 +4,8 @@
 
 | Tool | Required for | Install |
 | --- | --- | --- |
-| Docker + Docker Compose | Running the app, backend tests | [docs.docker.com](https://docs.docker.com/get-docker/) |
-| nvm | Running frontend tests (`make test-frontend`) | `curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh \| bash` |
-
-`make test-frontend` sources nvm automatically and installs the Node version specified in `frontend/.nvmrc` (Node 26). nvm itself must be installed on the machine first.
+| Docker + Docker Compose | Running the app, running tests | [docs.docker.com](https://docs.docker.com/get-docker/) |
+| nvm | `make lint` and `make setup` (frontend) | `curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh \| bash` |
 
 ## Local development
 
@@ -26,6 +24,15 @@ On subsequent starts, `make up` is enough (no rebuild needed).
 
 ```bash
 make seed-dev SEED_DEV_LIMIT=5000
+```
+
+## Testing
+
+```bash
+make lint              # ruff + mypy + tsc
+make test              # unit tests in Docker
+make test-integration  # integration tests in Docker (isolated DB, auto teardown)
+make test-all          # full suite
 ```
 
 ## Importing puzzle data
@@ -54,8 +61,6 @@ Recommended setup:
 3. Enable Docker Desktop integration for the Ubuntu WSL distro.
 4. Clone this repository inside the WSL filesystem, not under `C:\` or `/mnt/c/...`.
 5. Run the normal local development commands from the WSL terminal.
-
-Native PowerShell/CMD/Git Bash development is not the recommended path for now.
 
 ## Deployment
 

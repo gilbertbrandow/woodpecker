@@ -107,16 +107,16 @@ make up              # start postgres + backend + frontend
 make migrate-upgrade # run all migrations
 make shell-backend   # bash shell inside the backend container
 
-# Without Docker (needs a running postgres with woodpecker_test db)
-cd backend
-python -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/ruff check app/ migrations/
-.venv/bin/mypy app/ migrations/
-.venv/bin/pytest -v                        # unit tests only
-.venv/bin/pytest -m integration -v        # integration tests (needs DB)
-```
+# Host-based (one-time: cd backend && make setup)
+cd backend && make lint             # ruff + mypy
+cd backend && make test             # unit tests, no DB needed
+cd backend && make test-integration # all tests, needs Postgres running
 
-Test markers: `integration` tests require a live PostgreSQL `woodpecker_test` database.
+# Docker-based (no local deps needed)
+make test              # unit tests
+make test-integration  # integration tests (isolated DB, auto teardown)
+make test-all          # full suite
+```
 
 ### Migrations
 
@@ -161,12 +161,11 @@ frontend/src/
 ### Running and testing
 
 ```bash
-cd frontend
-npm ci
-npm run typecheck   # tsc --noEmit
-npm run test:run    # vitest run (single pass)
-npm test            # vitest watch
-npm run dev         # Vite dev server on :5173
+cd frontend && make setup  # one-time: install node_modules (requires nvm)
+cd frontend && make lint   # tsc --noEmit
+cd frontend && make test   # vitest run (single pass)
+npm test                   # vitest watch — run from frontend/, no Makefile target
+npm run dev                # Vite dev server on :5173 — run from frontend/
 ```
 
 ---
