@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Github, BookOpen } from 'lucide-react'
+import { ExternalLink, BookOpen } from 'lucide-react'
 
 const GITHUB_URL = 'https://github.com/gilbertbrandow/woodpecker'
 const BOOK_URL = 'https://www.amazon.se/-/en/Axel-Smith/dp/1784830542'
@@ -20,7 +20,7 @@ export function Footer({ className = '' }: FooterProps): React.ReactElement {
           rel="noopener noreferrer"
           className="flex items-center gap-1.5 transition-colors hover:text-foreground"
         >
-          <Github className="h-3.5 w-3.5" />
+          <ExternalLink className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">GitHub</span>
         </a>
         <div className="flex items-center gap-4">
