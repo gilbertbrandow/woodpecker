@@ -72,18 +72,6 @@ scp /tmp/nginx-ssl.conf ubuntu@54.216.71.166:/opt/woodpecker/deploy/nginx/defaul
 ssh ubuntu@54.216.71.166 "cd /opt/woodpecker && docker compose -f docker-compose.yml -f docker-compose-prod.yml restart nginx"
 ```
 
-## Data
-
-**Puzzles** are imported once manually (re-running is safe — duplicates are skipped):
-
-```bash
-make puzzle-seed-ec2 EC2_HOST=54.216.71.166 file=~/path/to/lichess.csv.zst args="--min-rating 1200 --max-rating 2400 --limit 200000"
-```
-
-**Themes and openings** are seeded automatically by `flask db upgrade`.
-
-**Postgres data** lives in the `pgdata` Docker volume on the EBS root disk. Backed up daily to S3 — see Backups section below.
-
 ## Backups
 
 A systemd timer (`woodpecker-backup.timer`) fires daily at 02:00 UTC. It runs `/opt/woodpecker/scripts/backup-db.sh` as the `ubuntu` user, which streams `pg_dump` from the `db` container through gzip and uploads to S3 under `YYYY/MM/woodpecker_TIMESTAMP.sql.gz`. Backups are kept for 30 days via an S3 lifecycle rule.
@@ -163,11 +151,3 @@ docker compose -f docker-compose.yml -f docker-compose-prod.yml exec -T backend 
 ```
 
 Version tags are in the GHCR package history and the GitHub Releases page.
-
-## Known quirks
-
-- **`POSTGRES_PASSWORD` must be URL-safe** (letters, numbers, `-`, `_` only) — it is embedded directly in `DATABASE_URL` by Docker Compose.
-- **Do not install `python3-certbot-nginx`** — it pulls in system nginx which starts on port 80 and conflicts with the Docker nginx container. Use bare `certbot` with `--webroot`.
-- **Docker must come from Docker's official apt repo**, not Ubuntu's default — `docker-compose-plugin` is unavailable in Ubuntu's packages. The Terraform `user_data` handles this on fresh instances.
-- **`options-ssl-nginx.conf` and `ssl-dhparams.pem` do not exist** in this setup — they are only created by certbot's nginx plugin. The nginx SSL config uses inline cipher settings instead.
-- **nginx config is managed manually.** Changing `deploy/nginx/https.conf` in the repo does not update the running server — scp it and restart nginx (see TLS section).
