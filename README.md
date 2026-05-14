@@ -25,6 +25,18 @@ On subsequent starts, `make up` is enough (no rebuild needed).
 
 `make seed-dev` imports shared opening data, Lichess tactic themes, and a bounded set of Lichess tactics for local development. The default tactic import limit is 1000.
 
+### Windows
+
+Windows development is supported through WSL2.
+
+Recommended setup:
+
+1. Install WSL2 with Ubuntu.
+2. Install Docker Desktop.
+3. Enable Docker Desktop integration for the Ubuntu WSL distro.
+4. Clone this repository inside the WSL filesystem, not under `C:\` or `/mnt/c/...`.
+5. Run the normal local development commands from the WSL terminal.
+
 ## Testing
 
 ```bash
@@ -48,18 +60,6 @@ make -C pipeline lichess-tactics-validate
 ```
 
 Each step downloads its source data automatically on first run.
-
-## Windows development
-
-Windows development is supported through WSL2.
-
-Recommended setup:
-
-1. Install WSL2 with Ubuntu.
-2. Install Docker Desktop.
-3. Enable Docker Desktop integration for the Ubuntu WSL distro.
-4. Clone this repository inside the WSL filesystem, not under `C:\` or `/mnt/c/...`.
-5. Run the normal local development commands from the WSL terminal.
 
 ## Deployment
 
