@@ -5,7 +5,7 @@ The pipeline is a standalone Python + Click CLI that imports data into the share
 ## Two top-level commands
 
 | Command | Purpose |
-|---|---|
+| --- | --- |
 | `openings` | Import chess opening reference data (ECO codes, names, parent hierarchy) from TSV files |
 | `lichess-tactics` | Import Lichess puzzle data: themes taxonomy, then tactics themselves |
 
@@ -13,7 +13,7 @@ The pipeline is a standalone Python + Click CLI that imports data into the share
 
 Each command group has its own Docker image built from a shared base:
 
-```
+```txt
 base.Dockerfile          → woodpecker-pipeline-base (Python + shared deps)
 openings/Dockerfile      → woodpecker-pipeline-openings
 sources/lichess_tactics/Dockerfile → woodpecker-pipeline-lichess-tactics
