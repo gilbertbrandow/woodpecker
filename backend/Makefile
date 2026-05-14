@@ -11,6 +11,9 @@ test:
 	.venv/bin/pytest -m "not integration"
 
 test-integration:
+	.venv/bin/pytest -m integration
+
+test-all:
 	.venv/bin/pytest
 
-.PHONY: setup lint test test-integration
+.PHONY: setup lint test test-integration test-all
