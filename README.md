@@ -1,13 +1,16 @@
 # woodpecker
 
-## Local development prerequisites
+## Local development
+
+### Prerequisites
 
 | Tool | Required for | Install |
 | --- | --- | --- |
-| Docker + Docker Compose | Running the app, running tests | [docs.docker.com](https://docs.docker.com/get-docker/) |
-| nvm | `make lint` and `make setup` (frontend) | `curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh \| bash` |
+| Docker + Docker Compose | Running the app locally; Docker-based tests | [docs.docker.com](https://docs.docker.com/get-docker/) |
+| nvm | Native frontend setup/tests (`make test-frontend`, `make -C frontend setup/test`) | `curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh \| bash` |
+| Python 3.12 | Native backend setup/tests (`make -C backend setup/test`) | [python.org](https://www.python.org/downloads/) or system package manager |
 
-## Local development
+### Getting started
 
 ```bash
 cp .env.example .env
@@ -20,11 +23,7 @@ Open [http://localhost:5173](http://localhost:5173) and sign in with your Liches
 
 On subsequent starts, `make up` is enough (no rebuild needed).
 
-`make seed-dev` imports shared opening data, Lichess tactic themes, and a bounded set of Lichess tactics for local development. The default tactic import limit is 1000. Override it with:
-
-```bash
-make seed-dev SEED_DEV_LIMIT=5000
-```
+`make seed-dev` imports shared opening data, Lichess tactic themes, and a bounded set of Lichess tactics for local development. The default tactic import limit is 1000.
 
 ## Testing
 
