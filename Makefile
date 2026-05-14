@@ -1,7 +1,7 @@
 DOCKER ?= docker
 COMPOSE = $(DOCKER) compose
 LOCAL_COMPOSE = $(COMPOSE) -f docker-compose.yml -f docker-compose-local.yml
-TEST_COMPOSE  = $(COMPOSE) -f docker-compose.yml -f docker-compose-local.yml -f docker-compose-test.yml
+TEST_COMPOSE  = $(COMPOSE) --project-name woodpecker-test -f docker-compose.yml -f docker-compose-test.yml
 SEED_DEV_LIMIT ?= 1000
 
 
@@ -52,7 +52,6 @@ seed-dev:
 	$(MAKE) -C pipeline lichess-tactics-themes-import
 	$(MAKE) -C pipeline lichess-tactics-import ARGS="--limit $(SEED_DEV_LIMIT)"
 
-
 setup:
 	$(MAKE) -C backend setup
 	$(MAKE) -C frontend setup
@@ -72,9 +71,9 @@ test-integration:
 	$(TEST_COMPOSE) down -v
 
 test-all:
-	$(TEST_COMPOSE) build --quiet backend frontend
+	$(TEST_COMPOSE) build --quiet backend
 	$(TEST_COMPOSE) run --rm backend sh -c "flask --app app db upgrade && pytest"
-	$(TEST_COMPOSE) run --rm frontend sh -c "npm install && npm run test:run"
+	$(MAKE) -C frontend test
 	$(TEST_COMPOSE) down -v
 
 .PHONY: up up-build down logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade migrate-current migrate-history migrate-rollback seed-dev setup lint test test-integration test-all
