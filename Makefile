@@ -44,7 +44,7 @@ migrate-rollback:
 	$(LOCAL_COMPOSE) exec backend flask --app app db downgrade $(rev)
 
 test-frontend:
-	cd frontend && npm run test:run
+	cd frontend && . $${NVM_DIR:-$$HOME/.nvm}/nvm.sh && nvm install --no-progress && npm install && npm run test:run
 
 test-backend:
 	cd backend && .venv/bin/pytest -m "not integration"
