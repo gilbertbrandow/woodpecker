@@ -13,7 +13,7 @@ import {
   applyUci,
   resultsInCheckmate,
   playerColor,
-  computeFinalFen,
+  resolveOverviewBoardPosition,
   HEADER_H,
   FOOTER_H,
   H_PAD_MD,
@@ -318,12 +318,11 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
   const applyOverviewDisplayState = useCallback((data: RunTrainingItemOverview): void => {
     const solutionMoves = data.trainingItem.solution
-    const selectedAttemptEntry = data.attempts.find((a) => a.id === data.selectedAttemptId) ?? null
-    const boardFen =
-      selectedAttemptEntry?.board?.terminalFen ??
-      computeFinalFen(data.trainingItem.fen, solutionMoves)
-    const boardLastMove: [string, string] | undefined =
-      selectedAttemptEntry?.board?.lastMove ?? undefined
+    const { fen: boardFen, lastMove: boardLastMove } = resolveOverviewBoardPosition(
+      data.attempts,
+      solutionMoves,
+      data.trainingItem.fen,
+    )
 
     chessRef.current = new Chess(data.trainingItem.fen)
     solutionMovesRef.current = solutionMoves
@@ -353,15 +352,17 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     loadRequestIdRef.current += 1
     const requestId = loadRequestIdRef.current
 
+    // Apply cached board state immediately (avoids flicker), but always
+    // fetch the full overview from the API so PGN and other fields are fresh.
+    let appliedCachedBoard = false
     if (skipNextLoadRef.current) {
       const cached = cachedOverviewPuzzleRef.current
-      if (cached !== null) {
-        skipNextLoadRef.current = false
-        cachedOverviewPuzzleRef.current = null
-        applyOverviewDisplayState(cached)
-        return
-      }
       skipNextLoadRef.current = false
+      cachedOverviewPuzzleRef.current = null
+      if (cached !== null) {
+        applyOverviewDisplayState(cached)
+        appliedCachedBoard = true
+      }
     }
 
     if (
@@ -380,7 +381,9 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
           if (requestId !== loadRequestIdRef.current) return
 
           setOverview(overviewData)
-          applyOverviewDisplayState(overviewData)
+          if (!appliedCachedBoard) {
+            applyOverviewDisplayState(overviewData)
+          }
           return
         }
 
@@ -422,15 +425,19 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     navigateToOverview,
   ])
 
+  // Redirect to the in-progress attempt route when arriving at the overview URL
+  // while an attempt is active. Uses the ref (set synchronously in conclude())
+  // rather than state to avoid a race where the overview URL is replaced right
+  // after conclude() navigates here but before setCurrentAttemptId(null) flushes.
   useEffect(() => {
     if (routeKind !== 'overview') return
-    if (currentAttemptId === null) return
+    if (currentAttemptIdRef.current === null) return
     void navigate({
       to: '/app/runs/$runId/training-items/$runTrainingItemId/attempts/$attemptId',
-      params: { runId: runIdStr, runTrainingItemId: runTrainingItemIdStr, attemptId: String(currentAttemptId) },
+      params: { runId: runIdStr, runTrainingItemId: runTrainingItemIdStr, attemptId: String(currentAttemptIdRef.current) },
       replace: true,
     })
-  }, [routeKind, currentAttemptId, navigate, runIdStr, runTrainingItemIdStr])
+  }, [routeKind, navigate, runIdStr, runTrainingItemIdStr])
 
   useEffect(() => {
     if (mode !== 'focus' || !isAttemptReady) return

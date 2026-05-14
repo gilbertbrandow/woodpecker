@@ -7,6 +7,7 @@ from typing import IO, Any
 import click
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from app.models.lichess_tactic import LichessTactic, lichess_tactic_openings
@@ -47,7 +48,7 @@ def relink_openings(session: Session, file: Path, batch_size: int = 500) -> None
     def flush() -> int:
         if not batch:
             return 0
-        result = session.execute(
+        result: CursorResult[Any] = session.execute(  # type: ignore[assignment]
             pg_insert(lichess_tactic_openings).values(batch).on_conflict_do_nothing()
         )
         session.commit()

@@ -1,8 +1,15 @@
 # woodpecker
 
-## Local development
+## Local development prerequisites
 
-Prerequisites: Docker + Docker Compose
+| Tool | Required for | Install |
+| --- | --- | --- |
+| Docker + Docker Compose | Running the app, backend tests | [docs.docker.com](https://docs.docker.com/get-docker/) |
+| nvm | Running frontend tests (`make test-frontend`) | `curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh \| bash` |
+
+`make test-frontend` sources nvm automatically and installs the Node version specified in `frontend/.nvmrc` (Node 26). nvm itself must be installed on the machine first.
+
+## Local development
 
 ```bash
 cp .env.example .env

@@ -51,7 +51,7 @@ seed-dev:
 	$(MAKE) -C pipeline lichess-tactics-import ARGS="--limit $(SEED_DEV_LIMIT)"
 
 test-frontend:
-	cd frontend && npm run test:run
+	cd frontend && . $${NVM_DIR:-$$HOME/.nvm}/nvm.sh && nvm install --no-progress && npm install && npm run test:run
 
 test-backend:
 	cd backend && .venv/bin/pytest -m "not integration"

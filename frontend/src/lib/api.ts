@@ -574,6 +574,22 @@ export type TrainingItemRunReference = {
   hasAttempts: boolean
 }
 
+export type LichessTacticsStats = {
+  totalCount: number
+  withOpeningsCount: number
+  withOpeningsPct: number
+  withThemesCount: number
+  withThemesPct: number
+}
+
+export type LichessTacticsRatingDistribution = {
+  buckets: { min: number; max: number; count: number }[]
+}
+
+export type LichessTacticsTopThemes = {
+  themes: { name: string; displayName: string; description: string; count: number }[]
+}
+
 export const api = {
   auth: {
     me: (): Promise<AuthUser> => request('/auth/me'),
@@ -723,6 +739,32 @@ export const api = {
       request<{ runs: LeaderboardRun[] }>(
         `/leaderboard${scheduleId !== undefined ? `?scheduleId=${scheduleId}` : ''}`,
       ).then((r) => r.runs),
+  },
+  sources: {
+    lichessTactics: {
+      stats: (): Promise<LichessTacticsStats> =>
+        request('/sources/lichess-tactics/stats'),
+      ratingDistribution: (): Promise<LichessTacticsRatingDistribution> =>
+        request('/sources/lichess-tactics/rating-distribution'),
+      topThemes: (): Promise<LichessTacticsTopThemes> =>
+        request('/sources/lichess-tactics/top-themes'),
+      items: (params: {
+        page?: number
+        ratingMin?: number
+        ratingMax?: number
+        theme?: string
+        openings?: string[]
+      }): Promise<LichessTacticPage> => {
+        const p = new URLSearchParams()
+        if (params.page !== undefined) p.set('page', String(params.page))
+        if (params.ratingMin !== undefined) p.set('ratingMin', String(params.ratingMin))
+        if (params.ratingMax !== undefined) p.set('ratingMax', String(params.ratingMax))
+        if (params.theme) p.set('theme', params.theme)
+        if (params.openings?.length) p.set('openings', params.openings.join(','))
+        const qs = p.toString()
+        return request(`/sources/lichess-tactics/items${qs ? `?${qs}` : ''}`)
+      },
+    },
   },
   attempts: {
     complete: (

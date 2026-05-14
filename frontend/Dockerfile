@@ -1,9 +1,12 @@
-FROM node:26-alpine AS deps
+# Docker cannot read frontend/.nvmrc in FROM before the build context is copied.
+# Keep this default in sync with frontend/.nvmrc; CI verifies they match.
+ARG NODE_VERSION=26
+FROM node:${NODE_VERSION}-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-FROM node:26-alpine AS dev
+FROM node:${NODE_VERSION}-alpine AS dev
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -15,7 +18,7 @@ FROM deps AS build
 COPY . .
 RUN npm run build
 
-FROM nginx:1.29-alpine AS prod
+FROM nginx:1.31-alpine AS prod
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80

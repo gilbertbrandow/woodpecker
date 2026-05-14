@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useSidebar } from './ui/sidebar'
-import { ChevronsUpDown, LayoutDashboard, Library, CalendarDays, Puzzle, CircleHelp, Settings, LogOut, Play } from 'lucide-react'
+import { ChevronsUpDown, LayoutDashboard, Library, Database, CalendarDays, Puzzle, CircleHelp, Settings, LogOut, Play } from 'lucide-react'
 import { toast } from 'sonner'
 import woodpeckerLogo from '../assets/woodpecker.svg'
 import { useAuth } from '../context/auth'
@@ -40,6 +40,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', to: '/app', icon: LayoutDashboard },
+  { label: 'Sources', to: '/app/sources', icon: Database },
   { label: 'Subsets', to: '/app/subsets', icon: Library },
   { label: 'Schedules', to: '/app/schedules', icon: CalendarDays },
   { label: 'Training', to: '/app/training', icon: Puzzle },
@@ -96,7 +97,7 @@ export function AppSidebar({ activeRun }: { activeRun: ActiveRun | null }): Reac
       <SidebarSeparator />
       <SidebarContent>
         <SidebarGroup>
-          <SidebarMenu className="gap-2">
+          <SidebarMenu className="gap-1">
           {isMobile && activeRun !== null && (
             <SidebarMenuItem>
               <SidebarMenuButton

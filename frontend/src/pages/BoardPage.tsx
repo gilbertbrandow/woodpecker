@@ -146,6 +146,11 @@ export function BoardPage(): React.ReactElement | null {
     return Math.round(selectedAttempt.timeSpentMs / 100)
   }, [selectedAttempt])
 
+  const selectedAccuracyDelta = selectedAttempt?.impact?.accuracyDeltaPct ?? null
+  const selectedSolveTimeDelta = selectedAttempt?.impact?.averageSolveTimeDeltaMs ?? null
+  const selectedRunProgressDelta = selectedAttempt?.impact?.runProgressDeltaPct ?? null
+  const selectedTrainingProgressDelta = selectedAttempt?.impact?.trainingProgressDeltaPct ?? null
+
   const overviewMetTargetTime = React.useMemo((): boolean | null => {
     const tenths = ctrl.overview.data?.timer.targetSolveTenths ?? null
     if (selectedAttempt === null || selectedAttempt.timeSpentMs === null) return null
@@ -186,9 +191,23 @@ export function BoardPage(): React.ReactElement | null {
 
   const [selectedPly, setSelectedPly] = React.useState<PlySelection | null>(null)
 
+  const lastOverviewTimerTextRef = React.useRef(ZERO_TIMER)
+  const lastOverviewMetTargetTimeRef = React.useRef<boolean | null>(null)
+  const lastSelectedAttemptRef = React.useRef<OverviewAttemptView | null>(null)
+
   React.useEffect(() => {
     setSelectedPly(null)
   }, [ctrl.board.boardKey])
+
+  React.useEffect(() => {
+    setSelectedAttemptId(null)
+  }, [runTrainingItemId])
+
+  React.useEffect(() => {
+    lastOverviewTimerTextRef.current = ZERO_TIMER
+    lastOverviewMetTargetTimeRef.current = null
+    lastSelectedAttemptRef.current = null
+  }, [runTrainingItemId, ZERO_TIMER])
 
   const focusPgnDisplay = React.useMemo(() => {
     if (ctrl.mode !== 'focus' && ctrl.mode !== 'failed') return null
@@ -252,7 +271,11 @@ export function BoardPage(): React.ReactElement | null {
           }
         }
       }
-      if (selectedAttempt?.board !== null && selectedAttempt?.board !== undefined) {
+      if (
+        selectedAttempt?.board !== null &&
+        selectedAttempt?.board !== undefined &&
+        selectedAttempt.status !== 'failed'
+      ) {
         return {
           ...base,
           fen: selectedAttempt.board.terminalFen ?? ctrl.board.fen,
@@ -305,10 +328,6 @@ export function BoardPage(): React.ReactElement | null {
     (focusPgnDisplay !== null &&
       selectedPly.line === 'main' &&
       selectedPly.index === focusPgnDisplay.mainline.length - 1)
-
-  const lastOverviewTimerTextRef = React.useRef(ZERO_TIMER)
-  const lastOverviewMetTargetTimeRef = React.useRef<boolean | null>(null)
-  const lastSelectedAttemptRef = React.useRef<OverviewAttemptView | null>(null)
 
   if ((!ctrl.overview.data && !ctrl.solvingView) || ctrl.mode === 'loading') {
     return (
@@ -676,8 +695,8 @@ export function BoardPage(): React.ReactElement | null {
       <div className="flex flex-col gap-5">
         <OverviewStatsSection
           runIndex={overviewData.stats.runIndex}
-          accuracy={overviewData.stats.accuracy}
-          averageSolveTime={overviewData.stats.averageSolveTime}
+          accuracy={{ ...overviewData.stats.accuracy, deltaPct: selectedAccuracyDelta }}
+          averageSolveTime={{ ...overviewData.stats.averageSolveTime, deltaMs: selectedSolveTimeDelta }}
         />
         {overviewData.runPace.chartData !== null && (
           <RunPaceCard
@@ -686,10 +705,15 @@ export function BoardPage(): React.ReactElement | null {
           />
         )}
         <ProgressCard
-          runProgress={overviewData.progress.runProgress}
-          trainingProgress={overviewData.progress.trainingProgress}
+          runProgress={{ ...overviewData.progress.runProgress, delta: selectedRunProgressDelta }}
+          trainingProgress={
+            overviewData.progress.trainingProgress !== null
+              ? { ...overviewData.progress.trainingProgress, delta: selectedTrainingProgressDelta }
+              : null
+          }
         />
         <OverviewAttemptHistoryTable
+          key={runTrainingItemId}
           rows={historyRows}
           selectedAttemptId={selectedAttemptId}
           onSelectAttempt={handleSelectAttemptForTable}
@@ -713,10 +737,14 @@ export function BoardPage(): React.ReactElement | null {
         runIndex={overviewData.stats.runIndex}
         paceChart={overviewData.runPace.chartData}
         isRunActive={overviewData.runPace.isRunActive}
-        accuracy={overviewData.stats.accuracy}
-        averageSolveTime={overviewData.stats.averageSolveTime}
-        runProgress={overviewData.progress.runProgress}
-        trainingProgress={overviewData.progress.trainingProgress}
+        accuracy={{ ...overviewData.stats.accuracy, deltaPct: selectedAccuracyDelta }}
+        averageSolveTime={{ ...overviewData.stats.averageSolveTime, deltaMs: selectedSolveTimeDelta }}
+        runProgress={{ ...overviewData.progress.runProgress, delta: selectedRunProgressDelta }}
+        trainingProgress={
+          overviewData.progress.trainingProgress !== null
+            ? { ...overviewData.progress.trainingProgress, delta: selectedTrainingProgressDelta }
+            : null
+        }
         breadcrumbs={
           <BoardBreadcrumbs
             runIndex={overviewData.runTrainingItem.runIndex}
@@ -798,6 +826,7 @@ export function BoardPage(): React.ReactElement | null {
       )}
       {ctrl.mode === 'overview' && overviewData !== null && (
         <OverviewSidebarRight
+          key={runTrainingItemId}
           historyRows={historyRows}
           selectedAttemptId={selectedAttemptId}
           onSelectAttempt={handleSelectAttemptForTable}
@@ -816,6 +845,7 @@ export function BoardPage(): React.ReactElement | null {
       board={displayBoard}
       actions={ctrl.actions}
       attemptHistory={ctrl.session.attemptHistory}
+      stripMaxVisible={8}
       runId={runIdStr}
       activeAttemptId={ctrl.mode === 'overview' ? selectedAttemptId : undefined}
       stripInteractive={ctrl.mode === 'overview'}
