@@ -34,3 +34,9 @@ def lichess_tactics_items() -> Response:
     openings_param = request.args.get("openings", None, type=str)
     opening_names = [o.strip() for o in openings_param.split(",") if o.strip()] if openings_param else []
     return jsonify(svc.list_items(page, rating_min, rating_max, theme, opening_names))
+
+
+@sources_bp.get("/lichess-tactics/source-run-metadata")
+@login_required
+def lichess_tactics_source_run_metadata() -> Response:
+    return jsonify({"metadata": svc.get_latest_source_run_metadata()})
