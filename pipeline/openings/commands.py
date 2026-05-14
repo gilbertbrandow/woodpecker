@@ -1,8 +1,8 @@
 import click
 
 from db import Session
-from shared.openings.downloader import ensure_opening_files
-from shared.openings.importer import import_openings
+from openings.downloader import ensure_opening_files
+from openings.importer import import_openings
 
 
 @click.group()

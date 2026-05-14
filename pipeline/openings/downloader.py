@@ -4,7 +4,7 @@ import yaml
 
 from downloader import ensure_file
 
-DATA_DIR = Path(__file__).parents[2] / "data"
+DATA_DIR = Path(__file__).parents[1] / "data"
 
 
 def ensure_opening_files() -> list[Path]:

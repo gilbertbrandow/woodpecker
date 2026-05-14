@@ -1,13 +1,20 @@
+from datetime import datetime, timezone
 from pathlib import Path
 
 import click
 
 from db import Session
 from sources.lichess_tactics.downloader import ensure_theme_file, ensure_tactics_file
-from sources.lichess_tactics.opening_relinker import relink_openings as _relink_openings
 from sources.lichess_tactics.theme_importer import import_themes
 from sources.lichess_tactics.tactic_importer import import_tactics
 from sources.lichess_tactics.validators import validate_links as _validate_links
+from app.models.source_import_run import (
+    SourceImportRun,
+    SourceImportSource,
+    SourceImportOperation,
+    SourceImportStatus,
+    LichessTacticsSourceRunMetadata,
+)
 
 
 @click.group("lichess-tactics")
@@ -63,20 +70,63 @@ def tactics_import(
     """Import Lichess tactics with theme and opening links (idempotent)."""
     file = Path(file_path) if file_path else ensure_tactics_file()
     with Session() as session:
-        import_tactics(session, file, limit, min_rating, max_rating, batch_size)
+        run = SourceImportRun(
+            source=SourceImportSource.LICHESS_TACTICS,
+            operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
+            status=SourceImportStatus.RUNNING,
+            started_at=datetime.now(timezone.utc),
+            parameters_json={
+                "limit": limit,
+                "min_rating": min_rating,
+                "max_rating": max_rating,
+                "batch_size": batch_size,
+                "file": str(file),
+            },
+        )
+        session.add(run)
+        # Commit the RUNNING row before import so the FK on training_items resolves
+        # from the very first batch commit inside import_tactics.
+        session.commit()
+        run_id = run.id
 
+        try:
+            stats = import_tactics(
+                session, file, run_id, limit, min_rating, max_rating, batch_size
+            )
 
-@tactics.command("relink-openings")
-@click.option("--file", "file_path", default=None, type=click.Path(exists=True), help="Path to lichess_db_puzzle.csv or .csv.zst (downloaded automatically if omitted)")
-@click.option("--batch-size", type=int, default=500, show_default=True, help="DB insert batch size")
-def tactics_relink_openings(file_path: str | None, batch_size: int) -> None:
-    """Add any missing opening links to existing tactics (safe to run on production).
+            meta = LichessTacticsSourceRunMetadata(
+                source_import_run_id=run_id,
+                imported_count=stats["imported_count"],
+                total_tactics_after_run=stats["total_tactics_after_run"],
+                tactics_with_themes_count=stats["tactics_with_themes_count"],
+                tactics_with_openings_count=stats["tactics_with_openings_count"],
+                min_rating=stats["min_rating"],
+                max_rating=stats["max_rating"],
+                average_rating=stats["average_rating"],
+                rating_bucket_counts_json=stats["rating_bucket_counts"],
+                theme_counts_json=stats["theme_counts"],
+                opening_counts_json=stats["opening_counts"],
+                generated_at=datetime.now(timezone.utc),
+            )
+            session.add(meta)
 
-    Run 'validate-links' before and after to measure the improvement.
-    """
-    file = Path(file_path) if file_path else ensure_tactics_file()
-    with Session() as session:
-        _relink_openings(session, file, batch_size)
+            run.status = SourceImportStatus.SUCCEEDED
+            run.finished_at = datetime.now(timezone.utc)
+            run.summary_json = {
+                "imported_count": stats["imported_count"],
+                "total_rows_seen": stats["total_rows_seen"],
+                "skipped_existing_count": stats["skipped_existing_count"],
+                "total_tactics_after_run": stats["total_tactics_after_run"],
+            }
+            session.commit()
+
+        except Exception as e:
+            session.rollback()
+            run.status = SourceImportStatus.FAILED
+            run.finished_at = datetime.now(timezone.utc)
+            run.error_message = str(e)[:2000]
+            session.commit()
+            raise
 
 
 @lichess_tactics.command("validate-links")
