@@ -171,7 +171,7 @@ class TestGetLatestSourceRunMetadata:
         assert result["maxRating"] == 2800
         assert result["averageRating"] == 1500
         assert "ratingBucketCounts" in result
-        assert "themeCounts" in result
+        assert "themes" in result
         assert "openingCounts" in result
         assert "generatedAt" in result
 
@@ -250,7 +250,8 @@ class TestGetLatestSourceRunMetadata:
 
         # JSONB dicts must be merged.
         assert result["ratingBucketCounts"] == {"1500": 100, "1550": 200}
-        assert result["themeCounts"] == {"mateIn1": 500, "fork": 200}
+        theme_count_map = {t["name"]: t["count"] for t in result["themes"]}
+        assert theme_count_map == {"mateIn1": 500, "fork": 200}
         assert result["openingCounts"] == {"Sicilian_Defense": 300}
 
         # latestSourceImportRunId must point to the most recent run.
@@ -272,7 +273,7 @@ class TestGetLatestSourceRunMetadata:
             "latestSourceImportRunId", "importedCount", "totalTacticsAfterRun",
             "tacticsWithThemesCount", "tacticsWithOpeningsCount",
             "minRating", "maxRating", "averageRating",
-            "ratingBucketCounts", "themeCounts", "openingCounts", "generatedAt",
+            "ratingBucketCounts", "themes", "openingCounts", "generatedAt",
         }
         assert expected_keys.issubset(result.keys())
 
@@ -303,7 +304,7 @@ class TestSourceRunMetadataRoute:
         assert body["metadata"]["latestSourceImportRunId"] == run.id
         assert body["metadata"]["importedCount"] == 900
         assert isinstance(body["metadata"]["ratingBucketCounts"], dict)
-        assert isinstance(body["metadata"]["themeCounts"], dict)
+        assert isinstance(body["metadata"]["themes"], list)
         assert isinstance(body["metadata"]["openingCounts"], dict)
 
     def test_does_not_return_metadata_for_failed_run(self, client: FlaskClient, db_session) -> None:
