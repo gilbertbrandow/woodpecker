@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useEffect, useState } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import { AreaChart, Area, XAxis, YAxis, BarChart, Bar, Cell } from 'recharts'
 import {
   ChartContainer,
@@ -8,11 +8,7 @@ import {
   type ChartConfig,
 } from '../ui/chart'
 import { formatNumber } from '../../lib/utils'
-import type {
-  LichessTacticsStats,
-  LichessTacticsRatingDistribution,
-  LichessTacticsTopThemes,
-} from '../../lib/api'
+import type { LichessTacticsSourceRunMetadata } from '../../lib/api'
 
 const THEME_BAR_LABEL_MAX_CHARS = 8
 const CHART_COLOR = 'hsl(var(--chart-1))'
@@ -43,16 +39,30 @@ function StatCard({ label, value, secondary, tag }: StatCardProps): React.ReactE
 }
 
 type Props = {
-  stats: LichessTacticsStats
-  distribution: LichessTacticsRatingDistribution
-  topThemes: LichessTacticsTopThemes
+  metadata: LichessTacticsSourceRunMetadata
 }
 
-export function LichessTacticsDashboard({ stats, distribution, topThemes }: Props): React.ReactElement {
+export function LichessTacticsDashboard({ metadata }: Props): React.ReactElement {
   const [chartsReady, setChartsReady] = useState(false)
   useEffect(() => { setChartsReady(true) }, [])
 
-  const themeBars = topThemes.themes.map((t) => ({
+  const ratingBuckets = useMemo(() => {
+    const entries = Object.entries(metadata.ratingBucketCounts)
+      .map(([k, count]) => ({ min: Number(k), count }))
+      .sort((a, b) => a.min - b.min)
+    return entries.map((b, i) => ({
+      min: b.min,
+      max: entries[i + 1]?.min ?? b.min + 50,
+      count: b.count,
+    }))
+  }, [metadata.ratingBucketCounts])
+
+  const withOpeningsPct =
+    metadata.totalTacticsAfterRun > 0
+      ? Math.round((metadata.tacticsWithOpeningsCount / metadata.totalTacticsAfterRun) * 1000) / 10
+      : 0
+
+  const themeBars = metadata.themes.map((t) => ({
     ...t,
     shortLabel:
       t.displayName.length > THEME_BAR_LABEL_MAX_CHARS
@@ -65,12 +75,12 @@ export function LichessTacticsDashboard({ stats, distribution, topThemes }: Prop
       <div className="grid grid-cols-2 gap-4">
         <StatCard
           label="Total tactics"
-          value={formatNumber(stats.totalCount)}
+          value={formatNumber(metadata.totalTacticsAfterRun)}
         />
         <StatCard
           label="With openings"
-          value={formatNumber(stats.withOpeningsCount)}
-          tag={stats.totalCount > 0 ? `${stats.withOpeningsPct}%` : undefined}
+          value={formatNumber(metadata.tacticsWithOpeningsCount)}
+          tag={metadata.totalTacticsAfterRun > 0 ? `${withOpeningsPct}%` : undefined}
         />
       </div>
 
@@ -82,12 +92,12 @@ export function LichessTacticsDashboard({ stats, distribution, topThemes }: Prop
               How imported tactics are spread across rating ranges
             </p>
           </div>
-          {distribution.buckets.length === 0 ? (
+          {ratingBuckets.length === 0 ? (
             <p className="text-sm text-muted-foreground">No rating data available.</p>
           ) : (
             <ChartContainer config={CHART_CONFIG} className="h-56 min-w-0 w-full">
               <AreaChart
-                data={distribution.buckets}
+                data={ratingBuckets}
                 margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
               >
                 <defs>

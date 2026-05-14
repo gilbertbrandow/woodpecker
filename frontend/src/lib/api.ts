@@ -574,20 +574,26 @@ export type TrainingItemRunReference = {
   hasAttempts: boolean
 }
 
-export type LichessTacticsStats = {
-  totalCount: number
-  withOpeningsCount: number
-  withOpeningsPct: number
-  withThemesCount: number
-  withThemesPct: number
+export type LichessTacticsThemeDetail = {
+  name: string
+  displayName: string
+  description: string
+  count: number
 }
 
-export type LichessTacticsRatingDistribution = {
-  buckets: { min: number; max: number; count: number }[]
-}
-
-export type LichessTacticsTopThemes = {
-  themes: { name: string; displayName: string; description: string; count: number }[]
+export type LichessTacticsSourceRunMetadata = {
+  latestSourceImportRunId: number
+  importedCount: number
+  totalTacticsAfterRun: number
+  tacticsWithThemesCount: number
+  tacticsWithOpeningsCount: number
+  minRating: number
+  maxRating: number
+  averageRating: number | null
+  ratingBucketCounts: Record<string, number>
+  themes: LichessTacticsThemeDetail[]
+  openingCounts: Record<string, number>
+  generatedAt: string
 }
 
 export const api = {
@@ -742,12 +748,8 @@ export const api = {
   },
   sources: {
     lichessTactics: {
-      stats: (): Promise<LichessTacticsStats> =>
-        request('/sources/lichess-tactics/stats'),
-      ratingDistribution: (): Promise<LichessTacticsRatingDistribution> =>
-        request('/sources/lichess-tactics/rating-distribution'),
-      topThemes: (): Promise<LichessTacticsTopThemes> =>
-        request('/sources/lichess-tactics/top-themes'),
+      sourceRunMetadata: (): Promise<{ metadata: LichessTacticsSourceRunMetadata | null }> =>
+        request('/sources/lichess-tactics/source-run-metadata'),
       items: (params: {
         page?: number
         ratingMin?: number

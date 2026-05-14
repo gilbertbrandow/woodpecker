@@ -16,7 +16,7 @@ import { TrainingPage } from './pages/TrainingPage'
 import { TrainingNewPage } from './pages/TrainingNewPage'
 import { AboutPage } from './pages/AboutPage'
 import { SourcesListPage } from './pages/SourcesListPage'
-import { LichessTacticsDashboardPage } from './pages/LichessTacticsDashboardPage'
+import { LichessTacticsSourcePage } from './pages/LichessTacticsSourcePage'
 import { RunPage } from './pages/RunPage'
 import { RunResolverPage } from './pages/RunResolverPage'
 import { TrainingItemResolverPage } from './pages/TrainingItemResolverPage'
@@ -160,7 +160,7 @@ const sourcesListRoute = createRoute({
 const lichessTacticsDashboardRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/sources/lichess-tactics',
-  component: LichessTacticsDashboardPage,
+  component: LichessTacticsSourcePage,
 })
 
 const runRoute = createRoute({
