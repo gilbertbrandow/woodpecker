@@ -2,7 +2,7 @@ DOCKER ?= docker
 COMPOSE = $(DOCKER) compose
 LOCAL_COMPOSE = $(COMPOSE) -f docker-compose.yml -f docker-compose-local.yml
 TEST_COMPOSE  = $(COMPOSE) --project-name woodpecker-test -f docker-compose.yml -f docker-compose-test.yml
-SEED_DEV_LIMIT ?= 1000
+SEED_DEV_LIMIT ?= 10000
 
 
 up:
@@ -48,7 +48,7 @@ migrate-rollback:
 	$(LOCAL_COMPOSE) exec backend flask --app app db downgrade $(rev)
 
 seed-dev:
-	$(MAKE) -C pipeline shared-openings-import
+	$(MAKE) -C pipeline openings-import
 	$(MAKE) -C pipeline lichess-tactics-themes-import
 	$(MAKE) -C pipeline lichess-tactics-import ARGS="--limit $(SEED_DEV_LIMIT)"
 

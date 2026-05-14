@@ -8,7 +8,7 @@ from urllib.parse import urlsplit, urlunsplit
 import click
 import sqlalchemy as sa
 import zstandard
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text as sa_text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
@@ -124,7 +124,7 @@ def _check_prerequisites(session: Session) -> None:
     theme_count = session.scalar(select(func.count()).select_from(LichessTacticTheme))
     if not opening_count:
         raise SystemExit(
-            "ERROR: openings table is empty. Run 'shared openings import' first."
+            "ERROR: openings table is empty. Run 'openings import' first."
         )
     if not theme_count:
         raise SystemExit(
@@ -135,11 +135,12 @@ def _check_prerequisites(session: Session) -> None:
 def import_tactics(
     session: Session,
     file: Path,
+    source_import_run_id: int,
     limit: int | None = None,
     min_rating: int = 0,
     max_rating: int = 9999,
     batch_size: int = 500,
-) -> None:
+) -> dict[str, Any]:
     _check_prerequisites(session)
 
     start = time.monotonic()
@@ -178,11 +179,11 @@ def import_tactics(
                 CursorResult[Any],
                 session.execute(
                     sa.text(
-                        "INSERT INTO training_items (source_type) "
-                        "SELECT 'LICHESS_TACTIC' FROM generate_series(1, :n) "
+                        "INSERT INTO training_items (source_type, source_import_run_id) "
+                        "SELECT 'LICHESS_TACTIC', :run_id FROM generate_series(1, :n) "
                         "RETURNING id"
                     ),
-                    {"n": len(new_tactics)},
+                    {"n": len(new_tactics), "run_id": source_import_run_id},
                 ),
             )
             new_ids = [row.id for row in ti_result]
@@ -295,3 +296,99 @@ def import_tactics(
             f"Note: {len(unknown_openings)} opening tag(s) could not be resolved (no exact or fuzzy match): "
             + ", ".join(sorted(unknown_openings))
         )
+
+    # Global snapshot: total tactics in DB after this run completes.
+    total_after = session.scalar(select(func.count()).select_from(LichessTactic)) or 0
+
+    # All remaining stats are scoped to this run only via source_import_run_id.
+    run_scalars = session.execute(
+        sa_text("""
+            SELECT
+                COUNT(lt.id)          AS imported_count,
+                MIN(lt.rating)        AS min_rating,
+                MAX(lt.rating)        AS max_rating,
+                AVG(lt.rating)::int   AS average_rating
+            FROM lichess_tactics lt
+            JOIN training_items ti ON ti.id = lt.training_item_id
+            WHERE ti.source_import_run_id = :run_id
+        """),
+        {"run_id": source_import_run_id},
+    ).one()
+
+    with_themes_count = session.scalar(
+        sa_text("""
+            SELECT COUNT(DISTINCT lt.id)
+            FROM lichess_tactics lt
+            JOIN training_items ti ON ti.id = lt.training_item_id
+            JOIN lichess_tactic_theme_links ltt ON ltt.lichess_tactic_id = lt.id
+            WHERE ti.source_import_run_id = :run_id
+        """),
+        {"run_id": source_import_run_id},
+    ) or 0
+
+    with_openings_count = session.scalar(
+        sa_text("""
+            SELECT COUNT(DISTINCT lt.id)
+            FROM lichess_tactics lt
+            JOIN training_items ti ON ti.id = lt.training_item_id
+            JOIN lichess_tactic_openings lto ON lto.lichess_tactic_id = lt.id
+            WHERE ti.source_import_run_id = :run_id
+        """),
+        {"run_id": source_import_run_id},
+    ) or 0
+
+    bucket_rows = session.execute(
+        sa_text("""
+            SELECT (FLOOR(lt.rating / 50) * 50)::int AS bucket, COUNT(*) AS cnt
+            FROM lichess_tactics lt
+            JOIN training_items ti ON ti.id = lt.training_item_id
+            WHERE ti.source_import_run_id = :run_id
+            GROUP BY bucket
+            ORDER BY bucket
+        """),
+        {"run_id": source_import_run_id},
+    ).all()
+    rating_bucket_counts = {str(r.bucket): int(r.cnt) for r in bucket_rows}
+
+    theme_rows = session.execute(
+        sa_text("""
+            SELECT th.name, COUNT(*) AS cnt
+            FROM lichess_tactic_theme_links ltt
+            JOIN lichess_tactic_themes th ON th.id = ltt.lichess_tactic_theme_id
+            JOIN lichess_tactics lt ON lt.id = ltt.lichess_tactic_id
+            JOIN training_items ti ON ti.id = lt.training_item_id
+            WHERE ti.source_import_run_id = :run_id
+            GROUP BY th.name
+        """),
+        {"run_id": source_import_run_id},
+    ).all()
+    theme_counts = {r.name: int(r.cnt) for r in theme_rows}
+
+    opening_rows = session.execute(
+        sa_text("""
+            SELECT o.name, COUNT(*) AS cnt
+            FROM lichess_tactic_openings lto
+            JOIN openings o ON o.id = lto.opening_id
+            JOIN lichess_tactics lt ON lt.id = lto.lichess_tactic_id
+            JOIN training_items ti ON ti.id = lt.training_item_id
+            WHERE ti.source_import_run_id = :run_id
+            GROUP BY o.name
+        """),
+        {"run_id": source_import_run_id},
+    ).all()
+    opening_counts = {r.name: int(r.cnt) for r in opening_rows}
+
+    return {
+        "total_rows_seen": rows_read,
+        "imported_count": int(run_scalars.imported_count or 0),
+        "skipped_existing_count": rows_skipped,
+        "total_tactics_after_run": total_after,
+        "tactics_with_themes_count": int(with_themes_count),
+        "tactics_with_openings_count": int(with_openings_count),
+        "min_rating": int(run_scalars.min_rating or 0),
+        "max_rating": int(run_scalars.max_rating or 0),
+        "average_rating": int(run_scalars.average_rating) if run_scalars.average_rating is not None else None,
+        "rating_bucket_counts": rating_bucket_counts,
+        "theme_counts": theme_counts,
+        "opening_counts": opening_counts,
+    }

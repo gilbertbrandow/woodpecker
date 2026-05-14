@@ -8,7 +8,8 @@ from flask.testing import FlaskClient
 
 _TRUNCATE_TABLES = (
     "training_attempts, run_training_items, runs, trainings, "
-    "schedules, subset_training_items, subsets, users, lichess_tactics, training_items"
+    "schedules, subset_training_items, subsets, users, lichess_tactics, training_items, "
+    "lichess_tactics_source_run_metadata, source_import_runs"
 )
 
 
@@ -52,6 +53,7 @@ def db_session(app: Flask, _db_schema: None):  # type: ignore[misc]
 
 def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
     from app.models.user import User
+    from app.models.source_import_run import SourceImportRun, SourceImportSource, SourceImportOperation, SourceImportStatus
     from app.models.training_item import TrainingItem, TrainingItemSource
     from app.models.lichess_tactic import LichessTactic
     from app.models.subset import Subset, SubsetTrainingItem
@@ -64,7 +66,20 @@ def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
     PUZZLE_SOLUTION = "e8d8 a1a8"
     CHECKMATE_ALT = "h7h8"
 
-    training_item = TrainingItem(source_type=TrainingItemSource.LICHESS_TACTIC)
+    source_run = SourceImportRun(
+        source=SourceImportSource.LICHESS_TACTICS,
+        operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
+        status=SourceImportStatus.SUCCEEDED,
+        started_at=datetime.now(timezone.utc),
+        finished_at=datetime.now(timezone.utc),
+    )
+    session.add(source_run)
+    session.flush()
+
+    training_item = TrainingItem(
+        source_type=TrainingItemSource.LICHESS_TACTIC,
+        source_import_run_id=source_run.id,
+    )
     session.add(training_item)
     session.flush()
 

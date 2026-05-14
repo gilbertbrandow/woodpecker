@@ -20,11 +20,32 @@ def _login(client: FlaskClient, user_id: int) -> None:
         sess["user_id"] = user_id
 
 
-def _make_tactic(session, puzzle_id: str, rating: int = 1500):  # type: ignore[misc]
+def _make_source_run(session):  # type: ignore[misc]
+    from app.models.source_import_run import SourceImportRun, SourceImportSource, SourceImportOperation, SourceImportStatus
+
+    run = SourceImportRun(
+        source=SourceImportSource.LICHESS_TACTICS,
+        operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
+        status=SourceImportStatus.SUCCEEDED,
+        started_at=datetime.now(timezone.utc),
+        finished_at=datetime.now(timezone.utc),
+    )
+    session.add(run)
+    session.flush()
+    return run
+
+
+def _make_tactic(session, puzzle_id: str, rating: int = 1500, source_run=None):  # type: ignore[misc]
     from app.models.training_item import TrainingItem, TrainingItemSource
     from app.models.lichess_tactic import LichessTactic
 
-    item = TrainingItem(source_type=TrainingItemSource.LICHESS_TACTIC)
+    if source_run is None:
+        source_run = _make_source_run(session)
+
+    item = TrainingItem(
+        source_type=TrainingItemSource.LICHESS_TACTIC,
+        source_import_run_id=source_run.id,
+    )
     session.add(item)
     session.flush()
 
@@ -75,8 +96,9 @@ class TestLichessTacticsStats:
 
     def test_returns_correct_total_count(self, client: FlaskClient, db_session) -> None:
         _login(client, _make_user(db_session).id)
-        _make_tactic(db_session, "st001", 1400)
-        _make_tactic(db_session, "st002", 1600)
+        run = _make_source_run(db_session)
+        _make_tactic(db_session, "st001", 1400, source_run=run)
+        _make_tactic(db_session, "st002", 1600, source_run=run)
 
         body = client.get("/sources/lichess-tactics/stats").get_json()
 
@@ -103,8 +125,9 @@ class TestLichessTacticsRatingDistribution:
 
     def test_tactics_appear_in_correct_bucket(self, client: FlaskClient, db_session) -> None:
         _login(client, _make_user(db_session).id)
-        _make_tactic(db_session, "rd001", 1500)
-        _make_tactic(db_session, "rd002", 1510)
+        run = _make_source_run(db_session)
+        _make_tactic(db_session, "rd001", 1500, source_run=run)
+        _make_tactic(db_session, "rd002", 1510, source_run=run)
 
         buckets = client.get("/sources/lichess-tactics/rating-distribution").get_json()["buckets"]
 
@@ -129,8 +152,9 @@ class TestLichessTacticsRatingDistribution:
 class TestLichessTacticsItems:
     def test_returns_all_tactics(self, client: FlaskClient, db_session) -> None:
         _login(client, _make_user(db_session).id)
-        _make_tactic(db_session, "it001", 1300)
-        _make_tactic(db_session, "it002", 1700)
+        run = _make_source_run(db_session)
+        _make_tactic(db_session, "it001", 1300, source_run=run)
+        _make_tactic(db_session, "it002", 1700, source_run=run)
 
         body = client.get("/sources/lichess-tactics/items").get_json()
 
@@ -140,8 +164,9 @@ class TestLichessTacticsItems:
 
     def test_rating_min_filter(self, client: FlaskClient, db_session) -> None:
         _login(client, _make_user(db_session).id)
-        _make_tactic(db_session, "it003", 1000)
-        _make_tactic(db_session, "it004", 2000)
+        run = _make_source_run(db_session)
+        _make_tactic(db_session, "it003", 1000, source_run=run)
+        _make_tactic(db_session, "it004", 2000, source_run=run)
 
         body = client.get("/sources/lichess-tactics/items?ratingMin=1500").get_json()
 
@@ -150,8 +175,9 @@ class TestLichessTacticsItems:
 
     def test_rating_max_filter(self, client: FlaskClient, db_session) -> None:
         _login(client, _make_user(db_session).id)
-        _make_tactic(db_session, "it005", 1000)
-        _make_tactic(db_session, "it006", 2000)
+        run = _make_source_run(db_session)
+        _make_tactic(db_session, "it005", 1000, source_run=run)
+        _make_tactic(db_session, "it006", 2000, source_run=run)
 
         body = client.get("/sources/lichess-tactics/items?ratingMax=1500").get_json()
 

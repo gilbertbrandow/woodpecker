@@ -1,15 +1,14 @@
 import enum
-from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum
+from sqlalchemy import Enum, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
 
 from app.extensions import Base
 
 if TYPE_CHECKING:
     from app.models.lichess_tactic import LichessTactic
+    from app.models.source_import_run import SourceImportRun
 
 
 class TrainingItemSource(enum.Enum):
@@ -25,10 +24,13 @@ class TrainingItem(Base):
     source_type: Mapped[TrainingItemSource] = mapped_column(
         Enum(TrainingItemSource, name="training_item_source"), nullable=False
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+    source_import_run_id: Mapped[int | None] = mapped_column(
+        ForeignKey("source_import_runs.id"), nullable=True
     )
 
     lichess_tactic: Mapped["LichessTactic"] = relationship(
         "LichessTactic", back_populates="training_item", uselist=False
+    )
+    source_import_run: Mapped["SourceImportRun | None"] = relationship(
+        "SourceImportRun", back_populates="training_items"
     )
