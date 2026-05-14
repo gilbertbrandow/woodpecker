@@ -144,8 +144,8 @@ jobs:
       - name: Build base image
         run: docker build -f pipeline/base.Dockerfile -t woodpecker-pipeline-base .
 
-      - name: Build shared image
-        run: docker build -f pipeline/shared/Dockerfile -t woodpecker-pipeline-shared .
+      - name: Build openings image
+        run: docker build -f pipeline/openings/Dockerfile -t woodpecker-pipeline-openings .
 
       - name: Build lichess-tactics image
         run: docker build -f pipeline/sources/lichess_tactics/Dockerfile -t woodpecker-pipeline-lichess-tactics .
