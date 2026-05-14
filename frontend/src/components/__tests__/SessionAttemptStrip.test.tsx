@@ -72,9 +72,10 @@ describe('SessionAttemptStrip', () => {
       makeItem({ attemptId: 3, runTrainingItemId: 12, puzzlePosition: 3, status: 'ongoing' }),
     ]
     renderWithProvider(<SessionAttemptStrip items={items} runId="1" />)
-    // solved + failed are interactive links; ongoing is non-interactive
+    // solved + failed are interactive links; ongoing is a non-interactive span — 3 dots total
     expect(screen.getAllByRole('link')).toHaveLength(2)
-    // All three dots are present in the DOM (links + the non-interactive span)
-    expect(screen.getAllByRole('img', { hidden: true })).toHaveLength(3)
+    expect(screen.getAllByRole('img', { hidden: true })).toHaveLength(1)
+    // All three dots carry an aria-label regardless of element type
+    expect(screen.getAllByLabelText(/Attempt for puzzle/)).toHaveLength(3)
   })
 })
