@@ -1,0 +1,8 @@
+services:
+  backend:
+    build:
+      target: dev
+    environment:
+      SECRET_KEY: ci-test-secret
+      LICHESS_CLIENT_ID: test
+      LICHESS_REDIRECT_URI: http://localhost/callback

@@ -1,5 +1,9 @@
-LOCAL_COMPOSE = sudo docker compose -f docker-compose.yml -f docker-compose-local.yml
-PROD_COMPOSE  = sudo docker compose -f docker-compose.yml -f docker-compose-prod.yml
+DOCKER ?= docker
+COMPOSE = $(DOCKER) compose
+LOCAL_COMPOSE = $(COMPOSE) -f docker-compose.yml -f docker-compose-local.yml
+TEST_COMPOSE  = $(COMPOSE) --project-name woodpecker-test -f docker-compose.yml -f docker-compose-test.yml
+SEED_DEV_LIMIT ?= 1000
+
 
 up:
 	$(LOCAL_COMPOSE) up
@@ -43,55 +47,33 @@ migrate-history:
 migrate-rollback:
 	$(LOCAL_COMPOSE) exec backend flask --app app db downgrade $(rev)
 
-test-frontend:
-	cd frontend && . $${NVM_DIR:-$$HOME/.nvm}/nvm.sh && nvm install --no-progress && npm install && npm run test:run
+seed-dev:
+	$(MAKE) -C pipeline shared-openings-import
+	$(MAKE) -C pipeline lichess-tactics-themes-import
+	$(MAKE) -C pipeline lichess-tactics-import ARGS="--limit $(SEED_DEV_LIMIT)"
 
-test-backend:
-	cd backend && .venv/bin/pytest -m "not integration"
+setup:
+	$(MAKE) -C backend setup
+	$(MAKE) -C frontend setup
 
-test-backend-integration:
-	cd backend && .venv/bin/pytest -m integration
+lint:
+	$(MAKE) -C backend lint
+	$(MAKE) -C frontend lint
 
-test: test-frontend test-backend
+test:
+	$(LOCAL_COMPOSE) build --quiet backend frontend
+	$(LOCAL_COMPOSE) run --rm backend pytest -m "not integration"
+	$(LOCAL_COMPOSE) run --rm frontend sh -c "npm install && npm run test:run"
 
-test-integration: test-backend-integration
+test-integration:
+	$(TEST_COMPOSE) build --quiet backend
+	$(TEST_COMPOSE) run --rm backend sh -c "flask --app app db upgrade && pytest -m integration"
+	$(TEST_COMPOSE) down -v
 
-test-frontend-docker:
-	$(LOCAL_COMPOSE) run --rm frontend npm run test:run
+test-all:
+	$(TEST_COMPOSE) build --quiet backend
+	$(TEST_COMPOSE) run --rm backend sh -c "flask --app app db upgrade && pytest"
+	$(MAKE) -C frontend test
+	$(TEST_COMPOSE) down -v
 
-test-backend-docker:
-	$(LOCAL_COMPOSE) run --rm backend pytest
-
-test-docker:
-	$(MAKE) test-frontend-docker
-	$(MAKE) test-backend-docker
-
-db-shell-ec2:
-	ssh -t ubuntu@$(EC2_HOST) "cd /opt/woodpecker && docker compose -f docker-compose.yml -f docker-compose-prod.yml exec db psql -U woodpecker woodpecker"
-
-db-expose-ec2:
-	ssh ubuntu@$(EC2_HOST) "cd /opt/woodpecker && docker compose -f docker-compose.yml -f docker-compose-prod.yml -f docker-compose-db-tunnel.yml up -d --no-deps db"
-	@echo "DB port now bound to 127.0.0.1:5432 on EC2. Run 'make db-tunnel-ec2' in a new terminal."
-
-db-tunnel-ec2:
-	@echo "Forwarding localhost:5433 → EC2 db. Ctrl-C to close."
-	ssh -N -L 5433:localhost:5432 ubuntu@$(EC2_HOST)
-
-db-unexpose-ec2:
-	ssh ubuntu@$(EC2_HOST) "cd /opt/woodpecker && docker compose -f docker-compose.yml -f docker-compose-prod.yml up -d db"
-
-# Pipeline commands against production DB.
-# Prerequisites: open the SSH tunnel first in a separate terminal:
-#   make db-expose-ec2   (one-off, binds the port on EC2)
-#   make db-tunnel-ec2   (keeps running — forwards localhost:5433 → EC2 db)
-# Then set PROD_DB_URL to the production connection string, e.g.:
-#   PROD_DB_URL="postgresql://woodpecker:SECRET@localhost:5433/woodpecker"
-PROD_DB_URL ?= postgresql://woodpecker:woodpecker@localhost:5433/woodpecker
-
-lichess-tactics-validate-ec2:
-	DATABASE_URL=$(PROD_DB_URL) $(MAKE) -C pipeline lichess-tactics-validate
-
-lichess-tactics-relink-openings-ec2:
-	DATABASE_URL=$(PROD_DB_URL) $(MAKE) -C pipeline lichess-tactics-relink-openings
-
-.PHONY: up up-build down logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade migrate-current migrate-history migrate-rollback test-frontend test-backend test-backend-integration test-integration test test-frontend-docker test-backend-docker test-docker db-shell-ec2 db-expose-ec2 db-tunnel-ec2 db-unexpose-ec2 lichess-tactics-validate-ec2 lichess-tactics-relink-openings-ec2
+.PHONY: up up-build down logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade migrate-current migrate-history migrate-rollback seed-dev setup lint test test-integration test-all
