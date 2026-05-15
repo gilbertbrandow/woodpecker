@@ -56,7 +56,7 @@ def _get_max_users() -> int:
         return 0
 
 
-def decide_access(lichess_username: str, active_count: int, max_users: int, in_whitelist: bool) -> str:
+def decide_access(active_count: int, max_users: int, in_whitelist: bool) -> str:
     """Pure function: returns 'onboarding' or 'waitlisted' for a new (non-existing) user."""
     if in_whitelist or (max_users > 0 and active_count < max_users):
         return "onboarding"
@@ -68,7 +68,8 @@ def get_or_create_user(access_token: str) -> dict[str, object]:
     client = berserk.Client(session=lichess_session)
     account = client.account.get()
     lichess_username: str = account["username"].lower()
-    avatar_url: str | None = account.get("avatar")
+    raw_avatar = account.get("avatar")
+    avatar_url: str | None = str(raw_avatar) if raw_avatar is not None else None
 
     existing = db.session.execute(
         db.select(User).filter_by(lichess_username=lichess_username)
@@ -82,7 +83,7 @@ def get_or_create_user(access_token: str) -> dict[str, object]:
     max_users = _get_max_users()
     active_count = db.session.scalar(sa.select(sa.func.count()).select_from(User)) or 0
 
-    status = decide_access(lichess_username, active_count, max_users, in_whitelist)
+    status = decide_access(active_count, max_users, in_whitelist)
 
     if status == "onboarding":
         return {

@@ -51,15 +51,19 @@ def callback() -> WerkzeugResponse:
 
     status = result["status"]
     if status == "active":
-        auth_session.set_active(int(result["user_id"]))  # type: ignore[arg-type]
+        user_id = result["user_id"]
+        assert isinstance(user_id, int)
+        auth_session.set_active(user_id)
     elif status == "onboarding":
-        auth_session.set_onboarding(
-            str(result["lichess_username"]),
-            result.get("avatar_url"),  # type: ignore[arg-type]
-        )
+        username = result["lichess_username"]
+        avatar = result.get("avatar_url")
+        assert isinstance(username, str)
+        assert avatar is None or isinstance(avatar, str)
+        auth_session.set_onboarding(username, avatar)
     elif status == "waitlisted":
-        auth_session.set_waitlisted(str(result["lichess_username"]))
-
+        username = result["lichess_username"]
+        assert isinstance(username, str)
+        auth_session.set_waitlisted(username)
     return redirect(APP_ORIGIN)
 
 
