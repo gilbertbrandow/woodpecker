@@ -47,8 +47,16 @@ See `CONTEXT.md` for the domain glossary. See `pipeline/AGENTS.md` for pipeline-
 
 - Backend: pytest. New service functions need tests. Integration tests that require a live DB must be marked `@pytest.mark.integration`.
 - Frontend: Vitest + `@testing-library/react`. Test files go in `src/test/` or a local `__tests__/` folder.
-- Run backend tests: `cd backend && .venv/bin/pytest -m "not integration"`
-- Run frontend tests: **requires Node 20+**. Activate with `nvm use 20` before running `cd frontend && npm run test:run`. The system default Node (18) is too old for Vitest and will fail silently or with version errors.
+
+**Full suite (matches CI, use for final verification):**
+- `make test` — unit tests for both backend and frontend inside Docker.
+- `make test-integration` — integration tests against a throwaway test DB.
+- `make test-all` — everything.
+
+**Faster inner loop (use during development):**
+- `cd backend && make test` — backend unit tests only, using the local `.venv`.
+- `cd backend && make test-integration` — backend integration tests (requires a running local DB).
+- `cd frontend && make test` — frontend tests; the frontend Makefile handles Node version via `nvm` automatically.
 
 ### Commands
 
