@@ -1,7 +1,17 @@
+"""All user-input validators for the Woodpecker API.
+
+Each function accepts a raw string, returns the cleaned/validated value,
+or raises ValueError with a user-readable message.
+"""
 import re
 
 _DISPLAY_NAME_RE = re.compile(r'^[\w\s\-]+$', re.UNICODE)
 _EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+
+AVATAR_PIECES = {"bk", "bq", "br", "bb", "bn"}
+AVATAR_COLORS = {"navy", "sky", "forest", "sage", "amber", "straw", "crimson", "rust"}
+BOARD_THEMES = {"blue", "blue2", "brown", "green", "green-plastic", "maple", "wood", "wood4"}
+PIECE_SETS = {"alpha", "anarcandy", "companion", "maestro", "merida"}
 
 
 def validate_email(value: str) -> str:
@@ -22,3 +32,37 @@ def validate_display_name(value: str) -> str:
     if not _DISPLAY_NAME_RE.match(stripped):
         raise ValueError("Display name may only contain letters, digits, spaces, underscores, and hyphens.")
     return stripped
+
+
+def validate_avatar_url(value: str) -> str | None:
+    if not value:
+        return None
+    if value.startswith("https://"):
+        if len(value) > 512:
+            raise ValueError("Avatar URL must be 512 characters or fewer.")
+        return value
+    if value.startswith("default:"):
+        parts = value.split(":")
+        if len(parts) not in (3, 4):
+            raise ValueError("Invalid default avatar format.")
+        piece = parts[1]
+        color = parts[2]
+        style = parts[3] if len(parts) == 4 else "alpha"
+        if piece not in AVATAR_PIECES or color not in AVATAR_COLORS:
+            raise ValueError("Invalid default avatar piece or color.")
+        if style not in PIECE_SETS:
+            raise ValueError("Invalid default avatar style.")
+        return value
+    raise ValueError("Avatar URL must start with https:// or be a valid default avatar.")
+
+
+def validate_board_theme(value: str) -> str:
+    if value not in BOARD_THEMES:
+        raise ValueError(f"Invalid board theme: {value!r}.")
+    return value
+
+
+def validate_piece_set(value: str) -> str:
+    if value not in PIECE_SETS:
+        raise ValueError(f"Invalid piece set: {value!r}.")
+    return value
