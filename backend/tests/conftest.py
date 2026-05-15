@@ -118,7 +118,8 @@ def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
     session.flush()
 
     schedule_config: dict[str, object] = {
-        "runs": [{"target_hours": 168}],
+        "runs": [{"target_hours": 168, "break_after_hours": 0}],
+        "puzzle_order": "fixed",
         "failed_repetition": {"mode": "queue", "max_repeats": 1},
     }
     schedule = Schedule(

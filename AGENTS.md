@@ -48,7 +48,7 @@ See `CONTEXT.md` for the domain glossary. See `pipeline/AGENTS.md` for pipeline-
 - Backend: pytest. New service functions need tests. Integration tests that require a live DB must be marked `@pytest.mark.integration`.
 - Frontend: Vitest + `@testing-library/react`. Test files go in `src/test/` or a local `__tests__/` folder.
 - Run backend tests: `cd backend && .venv/bin/pytest -m "not integration"`
-- Run frontend tests: `cd frontend && npm run test:run`
+- Run frontend tests: **requires Node 20+**. Activate with `nvm use 20` before running `cd frontend && npm run test:run`. The system default Node (18) is too old for Vitest and will fail silently or with version errors.
 
 ### Commands
 
@@ -68,6 +68,34 @@ Use `make` targets at the repo root — run `make` or inspect the `Makefile` for
 - No editing of existing Alembic migration files.
 - No committing `.env`, secrets, or local paths.
 - Do not move pipeline/ingestion logic back into the Flask backend.
+
+## Workflows
+
+### Making a schema migration
+
+1. Edit the ORM model(s) in `backend/app/models/`.
+2. Run `make migrate msg="short description"` to auto-generate the migration in `backend/migrations/versions/`.
+3. Review the generated file — confirm the `upgrade()` and `downgrade()` functions match what you intended.
+4. Run `make migrate-upgrade` to apply it locally.
+5. Commit both the model change and the migration file together.
+
+Rules:
+
+- Never hand-edit an existing migration file. Generate a new one to fix mistakes.
+- Bulk inserts inside migrations must use `sa.text()` with named params and a list of dicts — not the ORM layer.
+- The migration must be safe for a fresh DB (no assumptions about existing data) unless the PR description explicitly states otherwise.
+
+### Working with AI on a new feature
+
+Use the skill chain in `.claude/skills/`:
+
+1. **`/grill-with-docs`** — interview yourself about the feature until terms, constraints, and edge cases are sharp. Updates `CONTEXT.md` inline.
+2. **`/to-prd`** — produce a concise PRD from the grilled requirements.
+3. **`/triage`** — break the PRD into a labelled GitHub Issue ready for implementation.
+4. Implement (agent or human).
+5. **`/handoff`** — summarise what changed for the next context window or reviewer.
+
+For architecture questions use **`/improve-codebase-architecture`**. For PR review use **`/ultrareview`**.
 
 ## Agent skills
 

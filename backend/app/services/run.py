@@ -15,7 +15,6 @@ from app.services.attempt_state import (
     attempt_type_fields,
     derive_attempt_outcome,
     derive_position_status,
-    is_puzzle_terminal,
     qualifying_attempt_id,
 )
 from app.services.chess_board import compute_attempt_board, compute_attempt_pgn
@@ -24,7 +23,6 @@ from app.services.solve_contract import SolveContract
 from app.services.training_item_content import (
     LichessTacticMetadata,
     SourceMetadata,
-    TrainingItemPayload,
     get_content,
     get_content_batch,
 )

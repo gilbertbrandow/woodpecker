@@ -1,5 +1,3 @@
-from typing import cast
-
 import chess
 
 from app.models.run import TrainingAttempt
