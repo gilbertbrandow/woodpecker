@@ -34,7 +34,7 @@ const PIECE_CHESS_NOTATION: Record<string, string> = {
 export function SettingsPage(): React.ReactElement | null {
   const { user, loading, updateUser } = useAuth()
   const navigate = useNavigate()
-  const [nickname, setNickname] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [saving, setSaving] = useState(false)
   const [selectedPiece, setSelectedPiece] = useState<AvatarPiece>(AVATAR_PIECES[0])
@@ -52,7 +52,7 @@ export function SettingsPage(): React.ReactElement | null {
 
   useEffect(() => {
     if (user) {
-      setNickname(user.nickname ?? '')
+      setDisplayName(user.displayName)
       const avatarVal = parseAvatarValue(user.avatarUrl)
       const defaults = resolveAvatarDefaults(user.username)
       setSelectedPiece(avatarVal.type === 'default' ? avatarVal.piece : defaults.piece)
@@ -65,10 +65,10 @@ export function SettingsPage(): React.ReactElement | null {
 
   const avatarValue = parseAvatarValue(user.avatarUrl)
 
-  const saveNickname = async (): Promise<void> => {
+  const saveDisplayName = async (): Promise<void> => {
     setSaving(true)
     try {
-      const updated = await api.settings.update({ nickname })
+      const updated = await api.settings.update({ displayName })
       updateUser(updated)
       toast('Profile updated', { description: 'Your display name has been saved.' })
     } catch {
@@ -162,20 +162,19 @@ export function SettingsPage(): React.ReactElement | null {
           Lichess account: <span className="text-foreground">{user.username}</span>
         </p>
         <div className="flex flex-col gap-2">
-          <label htmlFor="nickname" className="text-xs text-muted-foreground">
+          <label htmlFor="display-name" className="text-xs text-muted-foreground">
             Display name
           </label>
           <div className="flex gap-2">
             <input
-              id="nickname"
+              id="display-name"
               type="text"
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
-              placeholder={user.username}
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
               maxLength={32}
               className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />
-            <Button size="sm" onClick={() => void saveNickname()} disabled={saving}>
+            <Button size="sm" onClick={() => void saveDisplayName()} disabled={saving}>
               Save
             </Button>
           </div>

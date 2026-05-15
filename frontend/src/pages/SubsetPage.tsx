@@ -171,10 +171,10 @@ function SectionTrigger({
 
 function UsedBySchedules({
   subsetId,
-  currentUsername,
+  currentUserId,
 }: {
   subsetId: number;
-  currentUsername: string;
+  currentUserId: number;
 }): React.ReactElement {
   const [open, setOpen] = useState(true);
   const [schedules, setSchedules] = useState<ScheduleSummary[]>([]);
@@ -230,7 +230,7 @@ function UsedBySchedules({
           ) : (
             <SchedulesTable
               schedules={schedules}
-              currentUsername={currentUsername}
+              currentUserId={currentUserId}
               deletingId={deletingId}
               onDelete={handleDelete}
             />
@@ -439,7 +439,7 @@ export function SubsetPage(): React.ReactElement | null {
   }
 
   const locked = subset.status === "locked";
-  const isOwn = subset.ownedBy.username === user.username;
+  const isOwn = subset.ownedBy.id === user.id;
   const isBusy = isSaving || isFilling;
   const puzzleCount = subset.puzzleCount;
   const isFull = total >= puzzleCount;
@@ -726,7 +726,7 @@ export function SubsetPage(): React.ReactElement | null {
                 No data yet — fill the subset first.
               </p>
             )}
-            <UsedBySchedules subsetId={id} currentUsername={user.username} />
+            <UsedBySchedules subsetId={id} currentUserId={user.id} />
           </div>
         </TabsContent>
       </Tabs>

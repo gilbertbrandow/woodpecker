@@ -259,7 +259,7 @@ export function SchedulePage(): React.ReactElement | null {
   }
 
   const locked = schedule.status === "locked";
-  const isOwn = schedule.createdBy.username === user.username;
+  const isOwn = schedule.createdBy.id === user.id;
   const showActions = isOwn && !locked;
 
   const totalHours = runs.reduce(
@@ -483,7 +483,7 @@ export function SchedulePage(): React.ReactElement | null {
               })
             }
           >
-            <UserAvatar username={subset.ownedBy.username} avatarUrl={subset.ownedBy.avatarUrl} />
+            <UserAvatar displayName={subset.ownedBy.displayName} avatarUrl={subset.ownedBy.avatarUrl} />
             <span className="min-w-0 flex-1 truncate font-medium">{subset.name}</span>
             <StatusBadge status={subset.status} />
             <span className="shrink-0 whitespace-nowrap text-sm tabular-nums text-muted-foreground">
@@ -533,7 +533,7 @@ export function SchedulePage(): React.ReactElement | null {
                 })
               }
             >
-              <UserAvatar username={user.username} avatarUrl={user.avatarUrl} className="h-7 w-7" />
+              <UserAvatar displayName={user.displayName} avatarUrl={user.avatarUrl} className="h-7 w-7" />
               <ProgressBar
                 value={myTraining.totalPuzzles > 0 ? Math.round((myTraining.completedPuzzles / myTraining.totalPuzzles) * 100) : 0}
                 tooltipLabel={`${myTraining.completedPuzzles} / ${myTraining.totalPuzzles} puzzles`}

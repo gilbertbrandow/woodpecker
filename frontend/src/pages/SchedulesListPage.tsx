@@ -57,7 +57,7 @@ export function SchedulesListPage(): React.ReactElement | null {
       ) : (
         <SchedulesTable
           schedules={schedules}
-          currentUsername={user.username}
+          currentUserId={user.id}
           deletingId={deletingId}
           onDelete={(s) => void handleDelete(s)}
         />

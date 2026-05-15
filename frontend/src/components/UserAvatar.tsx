@@ -5,14 +5,12 @@ import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip'
 
 type UserAvatarProps = {
-  username: string
-  displayName?: string
+  displayName: string
   avatarUrl: string | null
   className?: string
 }
 
 export function UserAvatar({
-  username,
   displayName,
   avatarUrl,
   className = 'h-6 w-6',
@@ -21,14 +19,14 @@ export function UserAvatar({
   const avatar =
     av.type === 'custom' ? (
       <Avatar className={`${className} shrink-0`}>
-        <AvatarImage src={av.url} alt={username} />
+        <AvatarImage src={av.url} alt={displayName} />
         <AvatarFallback>
-          <DefaultAvatar username={username} className={className} />
+          <DefaultAvatar username={displayName} className={className} />
         </AvatarFallback>
       </Avatar>
     ) : (
       <DefaultAvatar
-        username={username}
+        username={displayName}
         piece={av.type === 'default' ? av.piece : undefined}
         color={av.type === 'default' ? av.color : undefined}
         style={av.type === 'default' ? av.style : undefined}
@@ -46,7 +44,7 @@ export function UserAvatar({
           {avatar}
         </span>
       </TooltipTrigger>
-      <TooltipContent>{displayName ?? username}</TooltipContent>
+      <TooltipContent>{displayName}</TooltipContent>
     </Tooltip>
   )
 }

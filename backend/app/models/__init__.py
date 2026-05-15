@@ -1,3 +1,4 @@
+from app.models.user import User, WaitlistEntry, WhitelistEntry
 from app.models.source_import_run import (
     SourceImportRun,
     SourceImportSource,
@@ -15,6 +16,9 @@ from app.models.training import Training
 from app.models.run import Run, RunTrainingItem, TrainingAttempt
 
 __all__ = [
+    "User",
+    "WaitlistEntry",
+    "WhitelistEntry",
     "SourceImportRun",
     "SourceImportSource",
     "SourceImportOperation",

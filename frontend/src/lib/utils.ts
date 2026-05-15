@@ -7,7 +7,7 @@ export function cn(...inputs: ClassValue[]): string {
 }
 
 export function displayName(user: AuthUser): string {
-  return user.nickname ?? user.username
+  return user.displayName
 }
 
 export function formatNumber(n: number): string {

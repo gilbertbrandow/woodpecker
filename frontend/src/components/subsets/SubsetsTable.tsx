@@ -21,7 +21,7 @@ import type { Subset } from '../../lib/api'
 
 type SubsetsTableProps = {
   subsets: Subset[]
-  currentUsername: string
+  currentUserId: number
   deletingId: number | null
   onDelete: (subset: Subset) => void
 }
@@ -36,7 +36,7 @@ function formatDate(iso: string): string {
 
 export function SubsetsTable({
   subsets,
-  currentUsername,
+  currentUserId,
   deletingId,
   onDelete,
 }: SubsetsTableProps): React.ReactElement {
@@ -53,7 +53,7 @@ export function SubsetsTable({
 
   const ownerOptions = useMemo(
     () =>
-      Array.from(new Set(subsets.map((s) => s.ownedBy.username)))
+      Array.from(new Set(subsets.map((s) => s.ownedBy.displayName)))
         .sort()
         .map((v) => ({ label: v, value: v })),
     [subsets],
@@ -69,12 +69,12 @@ export function SubsetsTable({
   const columns: ColumnDef<Subset>[] = [
     {
       id: 'creator',
-      accessorFn: (row) => row.ownedBy.username,
+      accessorFn: (row) => row.ownedBy.displayName,
       header: 'Creator',
       enableSorting: false,
       cell: ({ row }) => (
         <UserAvatar
-          username={row.original.ownedBy.username}
+          displayName={row.original.ownedBy.displayName}
           avatarUrl={row.original.ownedBy.avatarUrl}
         />
       ),
@@ -116,7 +116,7 @@ export function SubsetsTable({
       header: '',
       enableSorting: false,
       cell: ({ row }) => {
-        const isOwn = row.original.ownedBy.username === currentUsername
+        const isOwn = row.original.ownedBy.id === currentUserId
         if (!isOwn) return null
         return (
           <AlertDialog>

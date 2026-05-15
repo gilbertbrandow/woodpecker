@@ -50,11 +50,11 @@ export function TrainingTable({
   const columns: ColumnDef<AllTrainingSummary>[] = [
     {
       id: 'user',
-      accessorFn: (row) => row.user.username,
+      accessorFn: (row) => row.user.displayName,
       header: 'User',
       enableSorting: false,
       cell: ({ row }) => (
-        <UserAvatar username={row.original.user.username} avatarUrl={row.original.user.avatarUrl} />
+        <UserAvatar displayName={row.original.user.displayName} avatarUrl={row.original.user.avatarUrl} />
       ),
     },
     {

@@ -50,7 +50,7 @@ def _make_metadata(session, run):  # type: ignore[misc]
 def _make_user(session):  # type: ignore[misc]
     from app.models.user import User
 
-    user = User(lichess_username="sir_meta_test", created_at=datetime.now(timezone.utc))
+    user = User(lichess_username="sir_meta_test", display_name="sir_meta_test", created_at=datetime.now(timezone.utc))
     session.add(user)
     session.flush()
     return user
