@@ -67,7 +67,7 @@ export function AppSidebar({ activeRun }: { activeRun: ActiveRun | null }): Reac
       <Avatar className="h-8 w-8 rounded-lg">
         <AvatarImage src={avatarValue.url} alt={`${user?.displayName}'s avatar`} />
         <AvatarFallback className="rounded-lg">
-          <DefaultAvatar username={user?.username ?? ''} className="h-8 w-8" />
+          <DefaultAvatar username={user?.displayName ?? ''} className="h-8 w-8" />
         </AvatarFallback>
       </Avatar>
     ) : (

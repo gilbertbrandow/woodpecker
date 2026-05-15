@@ -29,7 +29,7 @@ def build_lichess_auth_url(challenge: str, redirect_uri: str) -> str:
         "response_type": "code",
         "client_id": LICHESS_CLIENT_ID,
         "redirect_uri": redirect_uri,
-        "scope": "preference:read email:read",
+        "scope": "preference:read",
         "code_challenge_method": "S256",
         "code_challenge": challenge,
     })
