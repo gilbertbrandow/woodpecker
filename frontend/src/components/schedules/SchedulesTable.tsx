@@ -22,7 +22,7 @@ import { formatDuration } from './DurationInput'
 
 type SchedulesTableProps = {
   schedules: ScheduleSummary[]
-  currentUsername: string
+  currentUserId: number
   deletingId: number | null
   onDelete: (schedule: ScheduleSummary) => void
 }
@@ -37,7 +37,7 @@ function formatDate(iso: string): string {
 
 export function SchedulesTable({
   schedules,
-  currentUsername,
+  currentUserId,
   deletingId,
   onDelete,
 }: SchedulesTableProps): React.ReactElement {
@@ -54,7 +54,7 @@ export function SchedulesTable({
 
   const creatorOptions = useMemo(
     () =>
-      Array.from(new Set(schedules.map((s) => s.createdBy.username)))
+      Array.from(new Set(schedules.map((s) => s.createdBy.displayName)))
         .sort()
         .map((v) => ({ label: v, value: v })),
     [schedules],
@@ -70,12 +70,12 @@ export function SchedulesTable({
   const columns: ColumnDef<ScheduleSummary>[] = [
     {
       id: 'creator',
-      accessorFn: (row) => row.createdBy.username,
+      accessorFn: (row) => row.createdBy.displayName,
       header: 'Creator',
       enableSorting: false,
       cell: ({ row }) => (
         <UserAvatar
-          username={row.original.createdBy.username}
+          displayName={row.original.createdBy.displayName}
           avatarUrl={row.original.createdBy.avatarUrl}
         />
       ),
@@ -143,7 +143,7 @@ export function SchedulesTable({
       header: '',
       enableSorting: false,
       cell: ({ row }) => {
-        const isOwn = row.original.createdBy.username === currentUsername
+        const isOwn = row.original.createdBy.id === currentUserId
         if (!isOwn) return null
         return (
           <AlertDialog>

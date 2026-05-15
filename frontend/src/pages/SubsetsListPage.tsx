@@ -57,7 +57,7 @@ export function SubsetsListPage(): React.ReactElement | null {
       ) : (
         <SubsetsTable
           subsets={subsets}
-          currentUsername={user.username}
+          currentUserId={user.id}
           deletingId={deletingId}
           onDelete={(s) => void handleDelete(s)}
         />

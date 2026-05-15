@@ -35,7 +35,7 @@ export function ScheduleNewPage(): React.ReactElement | null {
     api.subsets
       .list()
       .then((all) => {
-        const locked = all.filter((s) => s.status === 'locked' && s.ownedBy.username === user.username)
+        const locked = all.filter((s) => s.status === 'locked' && s.ownedBy.id === user.id)
         setSubsets(locked)
       })
       .catch(() => toast.error('Failed to load subsets', { description: 'Could not fetch subsets.' }))

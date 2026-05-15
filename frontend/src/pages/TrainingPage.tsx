@@ -368,7 +368,7 @@ export function TrainingPage(): React.ReactElement | null {
 
   const { schedule } = training
   const runDefs = schedule.runs
-  const isOwner = training.ownerUsername === user.username
+  const isOwner = training.ownerId === user.id
   const canManageRuns = isOwner && (training.status === 'draft' || training.status === 'in_progress')
   const completedRunCount = runs.filter((r) => r.status === 'completed').length
   const hasActiveRun = runs.some((r) => r.status === 'active')
@@ -403,7 +403,7 @@ export function TrainingPage(): React.ReactElement | null {
             </Badge>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
-            <UserAvatar username={training.ownerUsername} displayName={training.ownerDisplayName} avatarUrl={training.ownerAvatarUrl} className="h-4 w-4" />
+            <UserAvatar displayName={training.ownerDisplayName} avatarUrl={training.ownerAvatarUrl} className="h-4 w-4" />
             <span>{training.ownerDisplayName}</span>
             <span className="text-muted-foreground/40">·</span>
             <span>Started {formatStartedAt(training.startedAt)}</span>
@@ -444,7 +444,7 @@ export function TrainingPage(): React.ReactElement | null {
           }
         >
           <UserAvatar
-            username={schedule.createdBy.username}
+            displayName={schedule.createdBy.displayName}
             avatarUrl={schedule.createdBy.avatarUrl}
           />
           <span className="min-w-0 flex-1 truncate font-medium">{schedule.name}</span>

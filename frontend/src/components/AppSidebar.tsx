@@ -65,7 +65,7 @@ export function AppSidebar({ activeRun }: { activeRun: ActiveRun | null }): Reac
   const avatarEl = avatarValue ? (
     avatarValue.type === 'custom' ? (
       <Avatar className="h-8 w-8 rounded-lg">
-        <AvatarImage src={avatarValue.url} alt={`${user?.username}'s avatar`} />
+        <AvatarImage src={avatarValue.url} alt={`${user?.displayName}'s avatar`} />
         <AvatarFallback className="rounded-lg">
           <DefaultAvatar username={user?.username ?? ''} className="h-8 w-8" />
         </AvatarFallback>

@@ -31,14 +31,14 @@ export function UserMenu(): React.ReactElement | null {
   const avatarEl =
     avatarValue.type === 'custom' ? (
       <Avatar className="h-8 w-8">
-        <AvatarImage src={avatarValue.url} alt={`${user.username}'s avatar`} />
+        <AvatarImage src={avatarValue.url} alt={`${user.displayName}'s avatar`} />
         <AvatarFallback>
-          <DefaultAvatar username={user.username} className="h-8 w-8" />
+          <DefaultAvatar username={user.displayName} className="h-8 w-8" />
         </AvatarFallback>
       </Avatar>
     ) : (
       <DefaultAvatar
-        username={user.username}
+        username={user.displayName}
         piece={avatarValue.type === 'default' ? avatarValue.piece : undefined}
         color={avatarValue.type === 'default' ? avatarValue.color : undefined}
         style={avatarValue.type === 'default' ? avatarValue.style : undefined}

@@ -105,7 +105,7 @@ export function TrainingNewPage(): React.ReactElement | null {
                   onClick={() => enrollingId === null && void handleEnroll(schedule)}
                 >
                   <TableCell>
-                    <UserAvatar username={schedule.createdBy.username} avatarUrl={schedule.createdBy.avatarUrl} />
+                    <UserAvatar displayName={schedule.createdBy.displayName} avatarUrl={schedule.createdBy.avatarUrl} />
                   </TableCell>
                   <TableCell className="font-medium">{schedule.name}</TableCell>
                   <TableCell className="hidden sm:table-cell text-muted-foreground">
