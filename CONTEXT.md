@@ -87,7 +87,24 @@ _Avoid_: source data, puzzle metadata, display metadata
 > **Dev:** "Can a Run span multiple Subsets?"
 > **Domain expert:** "No. A Run belongs to a Training, which belongs to a Schedule, which is tied to exactly one Subset. To train across multiple puzzle sets, the user composes a Subset from multiple Sources."
 
+**Display Name**:
+The sole public identity of an active user. Required (non-null) for all active users. Chosen during onboarding, prefilled with the user's Lichess username. Validated on all writes: 2–32 characters, letters/numbers/spaces/underscores/hyphens only. Lichess username is never shown publicly; Display Name is used everywhere another user is represented.
+_Avoid_: nickname (prior code term, renamed), username (when referring to public display)
+
+**User Cap**:
+The configured maximum number of active users, controlled by the `MAX_USERS` environment variable. Defaults to 0 (fully closed). Existing users are never blocked by the cap. Whitelisted users bypass it.
+_Avoid_: limit, max users, participant cap
+
+**Whitelist**:
+A set of Lichess usernames (stored lowercase) that are permitted to sign up regardless of the User Cap. Managed by operators via a deploy command (`make -C deploy whitelist-add`), not through an admin UI.
+_Avoid_: allowed list, bypass list
+
+**Waitlist**:
+A separate table of Lichess users who authenticated but could not create an account because the User Cap was reached and they are not Whitelisted. Not part of the main users table. Waitlisted users may optionally provide an email address for future outreach. Insertion is idempotent by Lichess username.
+_Avoid_: pending users, blocked users, queue
+
 ## Flagged ambiguities
 
 - "puzzle" appears in the UI, old docs, and issue history — resolved: use **TrainingItem** for the stored record; "puzzle" is acceptable only in user-facing UI copy.
 - "cycle" is used loosely in the Woodpecker Method description — resolved: use **Run** for the software concept.
+- "nickname" was the prior code-level field name for user display identity — resolved: renamed to `display_name` everywhere (DB column, model, API, frontend) as part of issue #10.
