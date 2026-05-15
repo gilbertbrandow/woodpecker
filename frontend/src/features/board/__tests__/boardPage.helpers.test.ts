@@ -27,7 +27,7 @@ describe('buildPgnDisplay', () => {
   //   opponent (white): e4xd5
   //   player  (black): Qxd5
   const FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-  const SOLUTION = 'e2e4 d7d5 e4d5 d8d5'
+  const SOLUTION: (string | string[])[] = ['e2e4', 'd7d5', 'e4d5', 'd8d5']
   const FIRST_PLY = 'e2e4'
   const PLAYER_MOVE_1 = 'd7d5'
   const PLAYER_MOVE_2 = 'd8d5'
@@ -91,7 +91,7 @@ describe('buildPgnDisplay', () => {
 
 // Reuse the same 4-ply position from the buildPgnDisplay suite above.
 const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-const SOLUTION_MOVES = ['e2e4', 'd7d5', 'e4d5', 'd8d5']
+const SOLUTION_MOVES: (string | string[])[] = ['e2e4', 'd7d5', 'e4d5', 'd8d5']
 
 describe('computeFinalFen', () => {
   it('returns the initial FEN unchanged when solution is empty', () => {

@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from app.services.run import _pace_chart_data
+from app.services.schedule_config import RunDefinition, ScheduleConfig
 
 MS_PER_HOUR = 3_600_000
 MS_PER_DAY = 24 * MS_PER_HOUR
@@ -18,10 +19,10 @@ def _make_run(run_index: int = 0) -> object:
     return SimpleNamespace(run_index=run_index, started_at=START)
 
 
-def _make_config(target_hours: float, run_index: int = 0) -> dict[str, object]:
-    runs: list[object] = [None] * (run_index + 1)
-    runs[run_index] = {"target_hours": target_hours}
-    return {"runs": runs}
+def _make_schedule_cfg(target_hours: int, run_index: int = 0) -> ScheduleConfig:
+    runs = [RunDefinition(target_hours=1, break_after_hours=0)] * run_index
+    runs.append(RunDefinition(target_hours=target_hours, break_after_hours=0))
+    return ScheduleConfig(runs=runs, puzzle_order="random", total_queue=1)
 
 
 def _make_puzzles(solved_offsets_ms: list[int]) -> list[SimpleNamespace]:
@@ -39,13 +40,13 @@ def _make_puzzles(solved_offsets_ms: list[int]) -> list[SimpleNamespace]:
 
 def _call(
     run_index: int,
-    target_hours: float,
+    target_hours: int,
     solved_offsets_ms: list[int],
     now_offset_ms: int,
     total_puzzles: int | None = None,
 ) -> dict[str, object] | None:
     run = _make_run(run_index)
-    config = _make_config(target_hours, run_index)
+    schedule_cfg = _make_schedule_cfg(target_hours, run_index)
     n = total_puzzles if total_puzzles is not None else len(solved_offsets_ms)
     puzzles = _make_puzzles(solved_offsets_ms)
     extra_empty = n - len(solved_offsets_ms)
@@ -56,46 +57,32 @@ def _call(
     with patch("app.services.run.datetime") as mock_dt:
         mock_dt.now.return_value = now_dt
         mock_dt.fromtimestamp = datetime.fromtimestamp
-        result = _pace_chart_data(run, puzzles, config, total_queue=1)  # type: ignore[arg-type]
+        result = _pace_chart_data(run, puzzles, schedule_cfg)  # type: ignore[arg-type]
     return result
 
 
 class TestReturnNone:
-    def test_missing_runs_key(self) -> None:
-        run = _make_run()
-        assert _pace_chart_data(run, [], {}, 1) is None  # type: ignore[arg-type]
-
     def test_run_index_out_of_bounds(self) -> None:
         run = _make_run(run_index=5)
-        config = _make_config(168.0, run_index=0)
-        assert _pace_chart_data(run, [], config, 1) is None  # type: ignore[arg-type]
-
-    def test_zero_target_hours(self) -> None:
-        run = _make_run()
-        config = _make_config(0.0)
-        assert _pace_chart_data(run, [], config, 1) is None  # type: ignore[arg-type]
-
-    def test_negative_target_hours(self) -> None:
-        run = _make_run()
-        config = _make_config(-10.0)
-        assert _pace_chart_data(run, [], config, 1) is None  # type: ignore[arg-type]
+        schedule_cfg = _make_schedule_cfg(168, run_index=0)
+        assert _pace_chart_data(run, [], schedule_cfg) is None  # type: ignore[arg-type]
 
 
 class TestLabelTicks:
     def test_7_day_run_produces_8_ticks(self) -> None:
-        result = _call(0, target_hours=168.0, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=100)
+        result = _call(0, target_hours=168, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=100)
         assert result is not None
         assert len(result["labelTicks"]) == 8  # type: ignore[arg-type]
 
     def test_label_ticks_start_at_start_ms(self) -> None:
-        result = _call(0, target_hours=168.0, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=10)
+        result = _call(0, target_hours=168, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=10)
         assert result is not None
         ticks = result["labelTicks"]
         assert isinstance(ticks, list)
         assert ticks[0] == START_MS
 
     def test_label_ticks_end_at_deadline(self) -> None:
-        result = _call(0, target_hours=168.0, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=10)
+        result = _call(0, target_hours=168, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=10)
         assert result is not None
         deadline_ms = START_MS + int(168.0 * MS_PER_HOUR)
         ticks = result["labelTicks"]
@@ -103,35 +90,35 @@ class TestLabelTicks:
         assert ticks[-1] == deadline_ms
 
     def test_1_day_run_produces_7_ticks(self) -> None:
-        result = _call(0, target_hours=24.0, solved_offsets_ms=[], now_offset_ms=MS_PER_HOUR, total_puzzles=10)
+        result = _call(0, target_hours=24, solved_offsets_ms=[], now_offset_ms=MS_PER_HOUR, total_puzzles=10)
         assert result is not None
         ticks = result["labelTicks"]
         assert isinstance(ticks, list)
         assert len(ticks) == 7
 
     def test_48_hour_run_produces_3_ticks(self) -> None:
-        result = _call(0, target_hours=48.0, solved_offsets_ms=[], now_offset_ms=MS_PER_HOUR, total_puzzles=10)
+        result = _call(0, target_hours=48, solved_offsets_ms=[], now_offset_ms=MS_PER_HOUR, total_puzzles=10)
         assert result is not None
         ticks = result["labelTicks"]
         assert isinstance(ticks, list)
         assert len(ticks) == 3
 
     def test_1_day_run_uses_4h_intervals(self) -> None:
-        result = _call(0, target_hours=24.0, solved_offsets_ms=[], now_offset_ms=MS_PER_HOUR, total_puzzles=10)
+        result = _call(0, target_hours=24, solved_offsets_ms=[], now_offset_ms=MS_PER_HOUR, total_puzzles=10)
         assert result is not None
         ticks = result["labelTicks"]
         assert isinstance(ticks, list)
         assert ticks[1] - ticks[0] == 4 * MS_PER_HOUR
 
     def test_48_hour_run_uses_24h_intervals(self) -> None:
-        result = _call(0, target_hours=48.0, solved_offsets_ms=[], now_offset_ms=MS_PER_HOUR, total_puzzles=10)
+        result = _call(0, target_hours=48, solved_offsets_ms=[], now_offset_ms=MS_PER_HOUR, total_puzzles=10)
         assert result is not None
         ticks = result["labelTicks"]
         assert isinstance(ticks, list)
         assert ticks[1] - ticks[0] == 24 * MS_PER_HOUR
 
     def test_sub_day_run_uses_hourly_ticks(self) -> None:
-        result = _call(0, target_hours=6.0, solved_offsets_ms=[], now_offset_ms=MS_PER_HOUR, total_puzzles=10)
+        result = _call(0, target_hours=6, solved_offsets_ms=[], now_offset_ms=MS_PER_HOUR, total_puzzles=10)
         assert result is not None
         ticks = result["labelTicks"]
         assert isinstance(ticks, list)
@@ -140,31 +127,31 @@ class TestLabelTicks:
 
 class TestRequiredFields:
     def test_required_keys_present(self) -> None:
-        result = _call(0, target_hours=168.0, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=10)
+        result = _call(0, target_hours=168, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=10)
         assert result is not None
         for key in ("startMs", "deadlineMs", "totalItems", "labelTicks", "domainStartMs", "series", "status", "itemDelta", "timeRemainingMs"):
             assert key in result, f"Missing key: {key}"
 
     def test_start_and_deadline_ms(self) -> None:
-        result = _call(0, target_hours=168.0, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=10)
+        result = _call(0, target_hours=168, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=10)
         assert result is not None
         assert result["startMs"] == START_MS
         assert result["deadlineMs"] == START_MS + int(168.0 * MS_PER_HOUR)
 
     def test_total_puzzles_matches_input(self) -> None:
-        result = _call(0, target_hours=168.0, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=42)
+        result = _call(0, target_hours=168, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=42)
         assert result is not None
         assert result["totalItems"] == 42
 
 
 class TestPaceStatus:
     def test_on_pace_when_no_puzzles_just_started(self) -> None:
-        result = _call(0, target_hours=168.0, solved_offsets_ms=[], now_offset_ms=0, total_puzzles=100)
+        result = _call(0, target_hours=168, solved_offsets_ms=[], now_offset_ms=0, total_puzzles=100)
         assert result is not None
         assert result["status"] == "on_pace"
 
     def test_behind_when_no_puzzles_solved_after_day_1(self) -> None:
-        result = _call(0, target_hours=168.0, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=100)
+        result = _call(0, target_hours=168, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=100)
         assert result is not None
         assert result["status"] == "behind"
 
@@ -172,7 +159,7 @@ class TestPaceStatus:
         total = 14
         half_day = MS_PER_DAY // 2
         offsets = [i * 1000 for i in range(total)]
-        result = _call(0, target_hours=168.0, solved_offsets_ms=offsets, now_offset_ms=half_day, total_puzzles=total)
+        result = _call(0, target_hours=168, solved_offsets_ms=offsets, now_offset_ms=half_day, total_puzzles=total)
         assert result is not None
         assert result["status"] == "ahead"
 
@@ -181,13 +168,13 @@ class TestPaceStatus:
         half_day = MS_PER_DAY // 2
         expected_at_half_day = round((half_day / (168 * MS_PER_HOUR)) * total)
         offsets = [i * 1000 for i in range(expected_at_half_day + 1)]
-        result = _call(0, target_hours=168.0, solved_offsets_ms=offsets, now_offset_ms=half_day, total_puzzles=total)
+        result = _call(0, target_hours=168, solved_offsets_ms=offsets, now_offset_ms=half_day, total_puzzles=total)
         assert result is not None
         assert result["status"] == "on_pace"
 
     def test_time_remaining_ms_is_negative_when_overdue(self) -> None:
         overdue_offset = int(168.0 * MS_PER_HOUR) + MS_PER_DAY
-        result = _call(0, target_hours=168.0, solved_offsets_ms=[], now_offset_ms=overdue_offset, total_puzzles=10)
+        result = _call(0, target_hours=168, solved_offsets_ms=[], now_offset_ms=overdue_offset, total_puzzles=10)
         assert result is not None
         time_remaining = result["timeRemainingMs"]
         assert isinstance(time_remaining, int)
@@ -196,7 +183,7 @@ class TestPaceStatus:
 
 class TestSeries:
     def test_series_contains_start_tick(self) -> None:
-        result = _call(0, target_hours=168.0, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=10)
+        result = _call(0, target_hours=168, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=10)
         assert result is not None
         series = result["series"]
         assert isinstance(series, list)
@@ -204,7 +191,7 @@ class TestSeries:
         assert START_MS in time_values
 
     def test_target_at_start_is_zero(self) -> None:
-        result = _call(0, target_hours=168.0, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=10)
+        result = _call(0, target_hours=168, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=10)
         assert result is not None
         series = result["series"]
         assert isinstance(series, list)
@@ -214,7 +201,7 @@ class TestSeries:
     def test_target_at_deadline_equals_total_puzzles(self) -> None:
         total = 10
         deadline_ms = START_MS + int(168.0 * MS_PER_HOUR)
-        result = _call(0, target_hours=168.0, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=total)
+        result = _call(0, target_hours=168, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=total)
         assert result is not None
         series = result["series"]
         assert isinstance(series, list)
@@ -225,7 +212,7 @@ class TestSeries:
     def test_actual_at_now_reflects_solved_count(self) -> None:
         now_offset = MS_PER_DAY
         solved_offsets = [MS_PER_HOUR * i for i in range(1, 5)]
-        result = _call(0, target_hours=168.0, solved_offsets_ms=solved_offsets, now_offset_ms=now_offset, total_puzzles=20)
+        result = _call(0, target_hours=168, solved_offsets_ms=solved_offsets, now_offset_ms=now_offset, total_puzzles=20)
         assert result is not None
         series = result["series"]
         assert isinstance(series, list)
@@ -235,7 +222,7 @@ class TestSeries:
         assert now_tick["actual"] == 4
 
     def test_actual_is_none_for_future_ticks(self) -> None:
-        result = _call(0, target_hours=168.0, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=10)
+        result = _call(0, target_hours=168, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=10)
         assert result is not None
         series = result["series"]
         assert isinstance(series, list)
@@ -246,7 +233,7 @@ class TestSeries:
             assert tick["actual"] is None
 
     def test_projection_is_none_for_past_ticks(self) -> None:
-        result = _call(0, target_hours=168.0, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=10)
+        result = _call(0, target_hours=168, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=10)
         assert result is not None
         series = result["series"]
         assert isinstance(series, list)
@@ -257,7 +244,7 @@ class TestSeries:
             assert tick["projection"] is None
 
     def test_domain_start_is_before_start_ms(self) -> None:
-        result = _call(0, target_hours=168.0, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=10)
+        result = _call(0, target_hours=168, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=10)
         assert result is not None
         domain_start = result["domainStartMs"]
         assert isinstance(domain_start, int)

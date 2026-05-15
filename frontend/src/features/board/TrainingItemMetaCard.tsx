@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Badge } from '../../components/ui/badge'
 import { cn } from '../../lib/utils'
-import type { LichessTacticTheme } from '../../lib/api'
+import type { LichessTacticSourceMetadata, SourceMetadata } from '../../lib/api'
 import type { PlySelection } from './boardPage.helpers'
 
 type DisplayMoveMin = {
@@ -127,10 +127,62 @@ function computePrevPly(
   return selected.index > 0 ? { line: 'main', index: selected.index - 1 } : null
 }
 
+function LichessTacticSection({
+  source,
+  focusMode,
+}: {
+  source: LichessTacticSourceMetadata
+  focusMode: boolean
+}): React.ReactElement {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-baseline gap-4">
+        <div>
+          <span className="text-xs text-muted-foreground">Puzzle </span>
+          <a
+            href={`https://lichess.org/training/${source.displayId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-mono text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+          >
+            #{source.displayId}
+          </a>
+        </div>
+        {!focusMode && (
+          <span className="tabular-nums text-sm">
+            <span className="text-xs text-muted-foreground">Rating </span>
+            {source.rating}
+          </span>
+        )}
+      </div>
+      {!focusMode && source.themes.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {source.themes.map((t) => (
+            <Badge key={t.name} variant="outline" className="text-xs font-normal">
+              {t.displayName}
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SourceSection({
+  source,
+  focusMode,
+}: {
+  source: SourceMetadata
+  focusMode: boolean
+}): React.ReactElement | null {
+  if (source.sourceType === 'LICHESS_TACTIC') {
+    return <LichessTacticSection source={source} focusMode={focusMode} />
+  }
+  return null
+}
+
 type TrainingItemMetaCardProps = {
-  displayId: string
-  rating: number
-  themes: LichessTacticTheme[]
+  source: SourceMetadata
   pgnDisplay: TrainingItemMetaPgnDisplayMin | null
   focusMode?: boolean
   selectedPly?: PlySelection | null
@@ -138,9 +190,7 @@ type TrainingItemMetaCardProps = {
 }
 
 export function TrainingItemMetaCard({
-  displayId,
-  rating,
-  themes,
+  source,
   pgnDisplay,
   focusMode = false,
   selectedPly,
@@ -165,37 +215,7 @@ export function TrainingItemMetaCard({
 
   return (
     <div className="flex flex-col gap-3 rounded-md border border-border px-3 py-3">
-      <div className="flex flex-col gap-2">
-        <div className="flex items-baseline gap-4">
-          <div>
-            <span className="text-xs text-muted-foreground">Puzzle </span>
-            <a
-              href={`https://lichess.org/training/${displayId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-mono text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-            >
-              #{displayId}
-            </a>
-          </div>
-          {!focusMode && (
-            <span className="tabular-nums text-sm">
-              <span className="text-xs text-muted-foreground">Rating </span>
-              {rating}
-            </span>
-          )}
-        </div>
-        {!focusMode && themes.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {themes.map((t) => (
-              <Badge key={t.name} variant="outline" className="text-xs font-normal">
-                {t.displayName}
-              </Badge>
-            ))}
-          </div>
-        )}
-      </div>
-
+      <SourceSection source={source} focusMode={focusMode} />
       {pgnDisplay !== null && pgnDisplay.mainline.length > 0 && (
         <div className={cn('text-sm leading-relaxed', 'border-t border-border pt-2')}>
           <MoveSequence moves={pgnDisplay.mainline} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />

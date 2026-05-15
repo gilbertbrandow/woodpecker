@@ -1,5 +1,5 @@
 import { Chess } from 'chess.js'
-import type { DisplayMove, PositionStatus, TrainingItemMetaPgnDisplay } from '../../lib/api'
+import type { DisplayMove, PositionStatus, TrainingItemMetaPgnDisplay, OverviewAttemptView } from '../../lib/api'
 
 export type Mode = 'loading' | 'focus' | 'failed' | 'overview'
 export type Orientation = 'white' | 'black'
@@ -9,6 +9,24 @@ export type MoveFeedbackState = {
   lastMoveResult: MoveFeedbackResult | null
   lastMoveSquare: string | null
   isShowingMoveFeedback: boolean
+}
+
+export type BoardState = {
+  boardKey: number
+  boardSize: number
+  fen: string
+  orientation: Orientation
+  dests: Map<string, string[]>
+  lastMove: [string, string] | undefined
+  hintSquare: string | null
+  pendingPromotion: PendingPromotion | null
+  moveFeedback: {
+    result: MoveFeedbackResult | null
+    square: string | null
+    visible: boolean
+  }
+  turnToMove: Orientation
+  kingPieceUrl: string
 }
 
 export const HEADER_H = 56
@@ -115,9 +133,13 @@ export function positionStatusLabel(status: PositionStatus): string {
   }
 }
 
-export function computeFinalFen(fen: string, solutionMoves: string[]): string {
+export function resolveStep(step: string | string[]): string {
+  return Array.isArray(step) ? step[0] : step
+}
+
+export function computeFinalFen(fen: string, plies: (string | string[])[]): string {
   const chess = new Chess(fen)
-  for (const uci of solutionMoves) applyUci(chess, uci)
+  for (const ply of plies) applyUci(chess, resolveStep(ply))
   return chess.fen()
 }
 
@@ -125,12 +147,12 @@ type AttemptBoardView = { terminalFen: string | null; lastMove: [string, string]
 
 export function resolveOverviewBoardPosition(
   attempts: ReadonlyArray<{ status: string; board: AttemptBoardView }>,
-  solutionMoves: string[],
+  plies: (string | string[])[],
   initialFen: string,
 ): { fen: string; lastMove: [string, string] | undefined } {
   const solvedAttempt = [...attempts].reverse().find((a) => a.status === 'solved') ?? null
   return {
-    fen: solvedAttempt?.board?.terminalFen ?? computeFinalFen(initialFen, solutionMoves),
+    fen: solvedAttempt?.board?.terminalFen ?? computeFinalFen(initialFen, plies),
     lastMove: solvedAttempt?.board?.lastMove ?? undefined,
   }
 }
@@ -185,12 +207,12 @@ function applyUciDisplay(
 export function buildPgnDisplay(
   baseFen: string,
   attemptMoves: string[],
-  solutionMovesStr: string,
+  plies: (string | string[])[],
   attemptStatus: 'solved' | 'failed' | 'in_progress',
   retryPlies: string[] = [],
   autoVariation: boolean = true,
 ): TrainingItemMetaPgnDisplay {
-  const solutionMoves = solutionMovesStr.split(' ').filter(Boolean)
+  const solutionMoves = plies.map(resolveStep)
   if (solutionMoves.length === 0) return { mainline: [], variation: null }
 
   if (attemptStatus === 'in_progress') {
@@ -282,4 +304,69 @@ export function buildPgnDisplay(
   }
 
   return { mainline, variation: variation.length > 0 ? variation : null }
+}
+
+export function resolveDisplayBoard(
+  board: BoardState,
+  mode: Mode,
+  selectedPly: PlySelection | null,
+  focusPgnDisplay: TrainingItemMetaPgnDisplay | null,
+  selectedAttempt: OverviewAttemptView | null,
+  overviewPgnDisplay: TrainingItemMetaPgnDisplay | null,
+): BoardState {
+  if (mode === 'overview') {
+    const base: BoardState = { ...board, dests: new Map() }
+    if (selectedPly !== null && overviewPgnDisplay !== null) {
+      const plyList =
+        selectedPly.line === 'main'
+          ? overviewPgnDisplay.mainline
+          : (overviewPgnDisplay.variation ?? [])
+      const ply = plyList[selectedPly.index]
+      if (ply) {
+        const feedbackResult: MoveFeedbackResult | null =
+          ply.moveStatus === 'correct' ? 'correct' : ply.moveStatus === 'wrong' ? 'wrong' : null
+        return {
+          ...base,
+          fen: ply.fen,
+          lastMove: [ply.from, ply.to],
+          moveFeedback: { result: feedbackResult, square: feedbackResult !== null ? ply.to : null, visible: feedbackResult !== null },
+        }
+      }
+    }
+    if (
+      selectedAttempt?.board !== null &&
+      selectedAttempt?.board !== undefined &&
+      selectedAttempt.status !== 'failed'
+    ) {
+      return {
+        ...base,
+        fen: selectedAttempt.board.terminalFen ?? board.fen,
+        lastMove: selectedAttempt.board.lastMove ?? undefined,
+        moveFeedback: {
+          result: selectedAttempt.board.result,
+          square: selectedAttempt.board.result !== null ? (selectedAttempt.board.lastMove?.[1] ?? null) : null,
+          visible: selectedAttempt.board.result !== null,
+        },
+      }
+    }
+    return base
+  }
+
+  if (selectedPly === null || focusPgnDisplay === null) return board
+  const isAtHeadPly =
+    selectedPly.line === 'main' && selectedPly.index === focusPgnDisplay.mainline.length - 1
+  if (isAtHeadPly) return board
+  const plyList =
+    selectedPly.line === 'main' ? focusPgnDisplay.mainline : (focusPgnDisplay.variation ?? [])
+  const ply = plyList[selectedPly.index]
+  if (!ply) return board
+  const feedbackResult: MoveFeedbackResult | null =
+    ply.moveStatus === 'correct' ? 'correct' : ply.moveStatus === 'wrong' ? 'wrong' : null
+  return {
+    ...board,
+    fen: ply.fen,
+    lastMove: [ply.from, ply.to],
+    dests: new Map(),
+    moveFeedback: { result: feedbackResult, square: feedbackResult !== null ? ply.to : null, visible: feedbackResult !== null },
+  }
 }

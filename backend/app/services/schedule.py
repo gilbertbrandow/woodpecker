@@ -6,10 +6,8 @@ import sqlalchemy as sa
 from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.subset import Subset
-
-MAX_RUNS = 20
-MAX_REPEATS = 5
-VALID_PUZZLE_ORDERS = frozenset({"random", "fixed", "rating_asc", "rating_desc"})
+from app.models.user import User
+from app.services.schedule_config import ScheduleConfig
 
 DEFAULT_CONFIG: dict[str, object] = {
     "runs": [
@@ -24,61 +22,22 @@ DEFAULT_CONFIG: dict[str, object] = {
 }
 
 
-def _validate_config(config: dict[str, object]) -> None:
-    runs_raw = config.get("runs")
-    if not isinstance(runs_raw, list):
-        raise ValueError("config.runs must be a list.")
-    if not runs_raw:
-        raise ValueError("config.runs must have at least one entry.")
-    if len(runs_raw) > MAX_RUNS:
-        raise ValueError(f"config.runs must have at most {MAX_RUNS} entries.")
-    for i, run_item in enumerate(runs_raw):
-        if not isinstance(run_item, dict):
-            raise ValueError(f"config.runs[{i}] must be an object.")
-        run = cast(dict[str, object], run_item)
-        target_hours = run.get("target_hours")
-        break_after = run.get("break_after_hours")
-        if not isinstance(target_hours, int) or target_hours < 1:
-            raise ValueError(f"config.runs[{i}].target_hours must be a positive integer.")
-        if not isinstance(break_after, int) or break_after < 0:
-            raise ValueError(f"config.runs[{i}].break_after_hours must be a non-negative integer.")
-
-    order_raw = config.get("puzzle_order")
-    if order_raw not in VALID_PUZZLE_ORDERS:
-        raise ValueError(
-            f"config.puzzle_order must be one of: {', '.join(sorted(VALID_PUZZLE_ORDERS))}."
-        )
-
-    rep_raw = config.get("failed_repetition")
-    if not isinstance(rep_raw, dict):
-        raise ValueError("config.failed_repetition must be an object.")
-    rep = cast(dict[str, object], rep_raw)
-    mode = rep.get("mode")
-    if mode not in ("none", "queue"):
-        raise ValueError("config.failed_repetition.mode must be 'none' or 'queue'.")
-    if mode == "queue":
-        max_repeats = rep.get("max_repeats")
-        if not isinstance(max_repeats, int) or not (1 <= max_repeats <= MAX_REPEATS):
-            raise ValueError(
-                f"config.failed_repetition.max_repeats must be an integer between 1 and {MAX_REPEATS}."
-            )
-
-
-def compute_total_hours(config: dict[str, object]) -> int:
-    runs_raw = config.get("runs")
-    if not isinstance(runs_raw, list):
-        return 0
-    total = 0
-    for run_item in runs_raw:
-        if not isinstance(run_item, dict):
-            continue
-        run = cast(dict[str, object], run_item)
-        target = run.get("target_hours")
-        break_after = run.get("break_after_hours")
-        total += (target if isinstance(target, int) else 0) + (
-            break_after if isinstance(break_after, int) else 0
-        )
-    return total
+def schedule_to_dict(schedule: Schedule, creator: User) -> dict[str, object]:
+    total_hours: int = 0
+    if isinstance(schedule.config, dict):
+        total_hours = ScheduleConfig.from_dict(schedule.config).total_hours
+    return {
+        "id": schedule.id,
+        "name": schedule.name,
+        "description": schedule.description,
+        "subsetId": schedule.subset_id,
+        "status": schedule.status,
+        "config": schedule.config,
+        "totalHours": total_hours,
+        "createdBy": {"username": creator.lichess_username, "avatarUrl": creator.avatar_url},
+        "createdAt": schedule.created_at.isoformat(),
+        "lockedAt": schedule.locked_at.isoformat() if schedule.locked_at else None,
+    }
 
 
 def _get_owned_schedule(schedule_id: int, user_id: int) -> Schedule:
@@ -143,9 +102,8 @@ def update_schedule(
         if config_raw is not None:
             if not isinstance(config_raw, dict):
                 raise ValueError("config must be an object.")
-            config_dict = cast(dict[str, object], config_raw)
-            _validate_config(config_dict)
-            schedule.config = config_dict
+            ScheduleConfig.from_dict(cast(dict[str, object], config_raw))
+            schedule.config = cast(dict[str, object], config_raw)
         else:
             schedule.config = None
 
@@ -159,9 +117,7 @@ def lock_schedule(schedule_id: int, user_id: int) -> Schedule:
         raise ValueError("Already locked.")
     if schedule.config is None:
         raise ValueError("Cannot lock a schedule without a config.")
-    runs_raw = schedule.config.get("runs")
-    if not isinstance(runs_raw, list) or not runs_raw:
-        raise ValueError("Cannot lock a schedule with no runs defined.")
+    ScheduleConfig.from_dict(schedule.config)
     schedule.locked_at = datetime.now(timezone.utc)
     db.session.commit()
     return schedule
@@ -188,33 +144,22 @@ def get_schedule_insights(schedule_id: int, user_id: int) -> list[dict[str, obje
         if subset.locked_puzzle_count is not None
         else subset.puzzle_count
     )
-    if not puzzle_count or not schedule.config:
+    if not puzzle_count or not isinstance(schedule.config, dict):
         return []
 
-    runs_raw = schedule.config.get("runs")
-    if not isinstance(runs_raw, list) or not runs_raw:
-        return []
-
+    schedule_cfg = ScheduleConfig.from_dict(schedule.config)
     result: list[dict[str, object]] = []
     current = date.today()
 
-    for run_item in runs_raw:
-        if not isinstance(run_item, dict):
-            continue
-        run = cast(dict[str, object], run_item)
-        target_hours_raw = run.get("target_hours")
-        break_hours_raw = run.get("break_after_hours")
-        if not isinstance(target_hours_raw, int) or not isinstance(break_hours_raw, int):
-            continue
-
-        run_days = max(1, round(target_hours_raw / 24))
+    for run_def in schedule_cfg.runs:
+        run_days = max(1, round(run_def.target_hours / 24))
         puzzles_per_day = round(puzzle_count / run_days, 1)
 
         for _ in range(run_days):
             result.append({"date": current.isoformat(), "puzzlesPerDay": puzzles_per_day})
             current += timedelta(days=1)
 
-        break_days = round(break_hours_raw / 24)
+        break_days = round(run_def.break_after_hours / 24)
         for _ in range(break_days):
             result.append({"date": current.isoformat(), "puzzlesPerDay": 0})
             current += timedelta(days=1)
@@ -245,12 +190,15 @@ def list_schedules(user_id: int, subset_id: int | None = None) -> list[dict[str,
 
     result: list[dict[str, object]] = []
     for row in rows:
-        config: dict[str, object] = row.config if isinstance(row.config, dict) else {}
-        runs_raw = config.get("runs")
-        run_count = len(runs_raw) if isinstance(runs_raw, list) else 0
-        total_hours = compute_total_hours(config)
-        order_raw = config.get("puzzle_order")
-        puzzle_order = order_raw if isinstance(order_raw, str) else None
+        if isinstance(row.config, dict):
+            schedule_cfg = ScheduleConfig.from_dict(row.config)
+            run_count = len(schedule_cfg.runs)
+            total_hours = schedule_cfg.total_hours
+            puzzle_order: str | None = schedule_cfg.puzzle_order
+        else:
+            run_count = 0
+            total_hours = 0
+            puzzle_order = None
         result.append({
             "id": row.id,
             "name": row.name,

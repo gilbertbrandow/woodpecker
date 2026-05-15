@@ -2,29 +2,10 @@ from flask import Blueprint, jsonify, request, session, Response
 
 from app.decorators import login_required
 from app.extensions import db
-from app.models.subset import Subset
 from app.models.user import User
 from app.services import subset as subset_svc
 
 subsets_bp = Blueprint("subsets", __name__, url_prefix="/subsets")
-
-
-def _subset_to_dict(subset: Subset, owner: User | None = None) -> dict[str, object]:
-    d: dict[str, object] = {
-        "id": subset.id,
-        "name": subset.name,
-        "status": subset_svc.subset_status(subset),
-        "puzzleCount": subset.locked_puzzle_count if subset.locked_puzzle_count is not None else subset.puzzle_count,
-        "config": subset.config,
-        "createdAt": subset.created_at.isoformat(),
-        "lockedAt": subset.locked_at.isoformat() if subset.locked_at else None,
-    }
-    if owner is not None:
-        d["ownedBy"] = {
-            "username": owner.lichess_username,
-            "avatarUrl": owner.avatar_url,
-        }
-    return d
 
 
 @subsets_bp.post("")
@@ -41,14 +22,14 @@ def create_subset() -> tuple[Response, int]:
         subset = subset_svc.create_subset(session["user_id"], name, puzzle_count_raw)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    return jsonify(_subset_to_dict(subset)), 201
+    return jsonify(subset_svc.subset_to_dict(subset)), 201
 
 
 @subsets_bp.get("")
 @login_required
 def list_subsets() -> Response:
     rows = subset_svc.list_subsets(session["user_id"])
-    return jsonify([_subset_to_dict(s, owner) for s, owner in rows])
+    return jsonify([subset_svc.subset_to_dict(s, owner) for s, owner in rows])
 
 
 @subsets_bp.get("/<int:subset_id>")
@@ -60,7 +41,7 @@ def get_subset(subset_id: int) -> tuple[Response, int] | Response:
         return jsonify({"error": str(e)}), 404
     except PermissionError as e:
         return jsonify({"error": str(e)}), 403
-    return jsonify(_subset_to_dict(subset, owner))
+    return jsonify(subset_svc.subset_to_dict(subset, owner))
 
 
 @subsets_bp.delete("/<int:subset_id>")
@@ -100,7 +81,7 @@ def save_config(subset_id: int) -> tuple[Response, int] | Response:
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     owner = db.session.get(User, session["user_id"])
-    return jsonify(_subset_to_dict(subset, owner))
+    return jsonify(subset_svc.subset_to_dict(subset, owner))
 
 
 @subsets_bp.post("/<int:subset_id>/fill")
@@ -196,4 +177,4 @@ def lock_subset(subset_id: int) -> tuple[Response, int] | Response:
         status_code = 409 if "Already locked" in str(e) else 400
         return jsonify({"error": str(e)}), status_code
     owner = db.session.get(User, session["user_id"])
-    return jsonify(_subset_to_dict(subset, owner))
+    return jsonify(subset_svc.subset_to_dict(subset, owner))

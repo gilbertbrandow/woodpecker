@@ -17,23 +17,6 @@ def _load_creator(schedule: Schedule) -> User:
     return creator
 
 
-def _schedule_to_dict(schedule: Schedule, creator: User) -> dict[str, object]:
-    config = schedule.config
-    total_hours = schedule_svc.compute_total_hours(config) if config else 0
-    return {
-        "id": schedule.id,
-        "name": schedule.name,
-        "description": schedule.description,
-        "subsetId": schedule.subset_id,
-        "status": schedule.status,
-        "config": config,
-        "totalHours": total_hours,
-        "createdBy": {"username": creator.lichess_username, "avatarUrl": creator.avatar_url},
-        "createdAt": schedule.created_at.isoformat(),
-        "lockedAt": schedule.locked_at.isoformat() if schedule.locked_at else None,
-    }
-
-
 @schedules_bp.post("")
 @login_required
 def create_schedule() -> tuple[Response, int]:
@@ -50,7 +33,7 @@ def create_schedule() -> tuple[Response, int]:
         return jsonify({"error": str(e)}), 404
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    return jsonify(_schedule_to_dict(schedule, _load_creator(schedule))), 201
+    return jsonify(schedule_svc.schedule_to_dict(schedule, _load_creator(schedule))), 201
 
 
 @schedules_bp.get("")
@@ -71,7 +54,7 @@ def get_schedule(schedule_id: int) -> tuple[Response, int] | Response:
         return jsonify({"error": str(e)}), 404
     except PermissionError as e:
         return jsonify({"error": str(e)}), 403
-    return jsonify(_schedule_to_dict(schedule, _load_creator(schedule)))
+    return jsonify(schedule_svc.schedule_to_dict(schedule, _load_creator(schedule)))
 
 
 @schedules_bp.patch("/<int:schedule_id>")
@@ -86,7 +69,7 @@ def update_schedule(schedule_id: int) -> tuple[Response, int] | Response:
         return jsonify({"error": str(e)}), 403
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    return jsonify(_schedule_to_dict(schedule, _load_creator(schedule)))
+    return jsonify(schedule_svc.schedule_to_dict(schedule, _load_creator(schedule)))
 
 
 @schedules_bp.delete("/<int:schedule_id>")
@@ -178,4 +161,4 @@ def lock_schedule(schedule_id: int) -> tuple[Response, int] | Response:
     except ValueError as e:
         status_code = 409 if "Already locked" in str(e) else 400
         return jsonify({"error": str(e)}), status_code
-    return jsonify(_schedule_to_dict(schedule, _load_creator(schedule)))
+    return jsonify(schedule_svc.schedule_to_dict(schedule, _load_creator(schedule)))

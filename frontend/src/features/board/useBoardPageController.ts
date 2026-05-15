@@ -11,6 +11,7 @@ import type { SessionAttemptHistoryItem } from '../../context/solveSession'
 import {
   computeDests,
   applyUci,
+  resolveStep,
   resultsInCheckmate,
   playerColor,
   resolveOverviewBoardPosition,
@@ -29,27 +30,9 @@ import {
   INITIAL_OPPONENT_MOVE_DELAY_MS,
   OPPONENT_MOVE_ANIM_MS,
 } from './boardPage.helpers'
-import type { Mode, Orientation, PendingPromotion, MoveFeedbackResult, MoveFeedbackState } from './boardPage.helpers'
+import type { Mode, Orientation, PendingPromotion, MoveFeedbackResult, MoveFeedbackState, BoardState } from './boardPage.helpers'
 
-export type { Mode, Orientation, PendingPromotion, MoveFeedbackResult }
-
-export type BoardState = {
-  boardKey: number
-  boardSize: number
-  fen: string
-  orientation: Orientation
-  dests: Map<string, string[]>
-  lastMove: [string, string] | undefined
-  hintSquare: string | null
-  pendingPromotion: PendingPromotion | null
-  moveFeedback: {
-    result: MoveFeedbackResult | null
-    square: string | null
-    visible: boolean
-  }
-  turnToMove: Orientation
-  kingPieceUrl: string
-}
+export type { Mode, Orientation, PendingPromotion, MoveFeedbackResult, BoardState }
 
 export type TimerState = {
   elapsedTenths: number
@@ -113,7 +96,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const movesPlayedRef = useRef<string[]>([])
   const allPliesRef = useRef<string[]>([])
   const failedRetryPliesRef = useRef<string[]>([])
-  const solutionMovesRef = useRef<string[]>([])
+  const solutionMovesRef = useRef<(string | string[])[]>([])
   const currentAttemptIdRef = useRef<number | null>(null)
   const currentRunTrainingItemIdRef = useRef<number>(runTrainingItemId)
   const displayFenRef = useRef('')
@@ -295,7 +278,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     primeTimeoutRef.current = setTimeout(() => {
       const ch = chessRef.current
       if (!ch) return
-      const firstMove = solutionMovesRef.current[0]
+      const firstMove = resolveStep(solutionMovesRef.current[0] ?? '')
       applyUci(ch, firstMove)
       allPliesRef.current = [firstMove]
       setAllPliesPlayed([firstMove])
@@ -590,7 +573,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       return
     }
 
-    const opponentUci = solutionMoves[moveIndexRef.current]
+    const opponentUci = resolveStep(solutionMoves[moveIndexRef.current] ?? '')
     scheduleTimeout(() => {
       hideMoveFeedbackBadge()
       applyOpponentMove(opponentUci)
@@ -650,7 +633,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     const moveIndex = moveIndexRef.current
 
     if (isPromotion) {
-      const expectedBase = solutionMoves[moveIndex]?.slice(0, 4)
+      const currentStep = solutionMoves[moveIndex]
+      const expectedBase = resolveStep(currentStep ?? '').slice(0, 4)
       const promotionPieces = ['q', 'r', 'b', 'n'] as const
       const squareLeadsToCheckmate = promotionPieces.some((p) => resultsInCheckmate(chess, orig, dest, p))
       if (orig + dest !== expectedBase && !squareLeadsToCheckmate) {
@@ -665,7 +649,11 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     }
 
     const uci = orig + dest
-    if (uci === solutionMoves[moveIndex] || resultsInCheckmate(chess, orig, dest)) {
+    const currentStep = solutionMoves[moveIndex]
+    const isCorrect = Array.isArray(currentStep)
+      ? currentStep.includes(uci)
+      : uci === currentStep
+    if (isCorrect || resultsInCheckmate(chess, orig, dest)) {
       resolveCorrectMove(orig, dest, uci)
     } else {
       resolveWrongMove(orig, dest)
@@ -682,7 +670,11 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
     const uci = pending.orig + pending.dest + piece
     const chess = chessRef.current
-    if (uci === solutionMovesRef.current[moveIndexRef.current] || (chess !== null && resultsInCheckmate(chess, pending.orig, pending.dest, piece))) {
+    const currentStep = solutionMovesRef.current[moveIndexRef.current]
+    const isCorrect = Array.isArray(currentStep)
+      ? currentStep.includes(uci)
+      : uci === currentStep
+    if (isCorrect || (chess !== null && resultsInCheckmate(chess, pending.orig, pending.dest, piece))) {
       resolveCorrectMove(pending.orig, pending.dest, uci)
     } else {
       resolveWrongMove(pending.orig, pending.dest, piece)
@@ -700,7 +692,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const handleShowHint = useCallback((): void => {
     const next = solutionMovesRef.current[moveIndexRef.current]
     if (!next) return
-    setHintSquare(next.slice(0, 2))
+    setHintSquare(resolveStep(next).slice(0, 2))
   }, [])
 
   const handleShowSolution = useCallback((): void => {
@@ -710,7 +702,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     const moveIndex = moveIndexRef.current
     if (!chess || moveIndex >= solutionMoves.length) return
 
-    const uci = solutionMoves[moveIndex]
+    const uci = resolveStep(solutionMoves[moveIndex] ?? '')
     inputBlockedRef.current = true
     setInputBlocked(true)
     applyUci(chess, uci)
@@ -730,7 +722,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       return
     }
 
-    const opponentUci = solutionMoves[moveIndexRef.current]
+    const opponentUci = resolveStep(solutionMoves[moveIndexRef.current] ?? '')
     scheduleTimeout(() => {
       applyOpponentMove(opponentUci)
       inputBlockedRef.current = false

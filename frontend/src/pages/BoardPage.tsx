@@ -1,10 +1,9 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useAuth } from '../context/auth'
-import { Clock, CheckCircle2, XCircle, RotateCcw, ExternalLink, SkipForward } from 'lucide-react'
+import { Clock, CheckCircle2, XCircle } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
-import { Button, buttonVariants } from '../components/ui/button'
-import { cn } from '../lib/utils'
+import { Button } from '../components/ui/button'
 import { useBoardPageController } from '../features/board/useBoardPageController'
 import { BoardPageShell } from '../features/board/BoardPageShell'
 import { BoardBreadcrumbs } from '../features/board/BoardBreadcrumbs'
@@ -20,11 +19,11 @@ import { ProgressCard } from '../features/board/ProgressCard'
 import { RunPaceCard } from '../features/board/RunPaceCard'
 import { RunCompleteOverlay } from '../features/board/RunCompleteOverlay'
 import { OverviewAttemptHistoryTable } from '../features/board/OverviewAttemptHistoryTable'
-import type { OverviewAttemptHistoryRow } from '../features/board/OverviewAttemptHistoryTable'
-import { buildPgnDisplay, formatTimer, formatTargetSolveTime } from '../features/board/boardPage.helpers'
-import type { PlySelection } from '../features/board/boardPage.helpers'
+import { MobileActionsBar } from '../features/board/MobileActionsBar'
+import { useOverviewAttemptSelection } from '../features/board/useOverviewAttemptSelection'
+import { usePgnNavigation } from '../features/board/usePgnNavigation'
+import { resolveDisplayBoard, formatTimer, formatTargetSolveTime } from '../features/board/boardPage.helpers'
 import type { BoardState } from '../features/board/useBoardPageController'
-import type { OverviewAttemptView } from '../lib/api'
 
 function parsePositiveInt(value: unknown): number | null {
   if (typeof value === 'number') {
@@ -44,9 +43,7 @@ export function BoardPage(): React.ReactElement | null {
 
   const params = useParams({ strict: false })
   const search = useSearch({ strict: false })
-  const location = useLocation({
-    select: (loc) => loc.pathname,
-  })
+  const location = useLocation({ select: (loc) => loc.pathname })
   const navigate = useNavigate()
 
   const runIdStr = typeof params.runId === 'string' ? params.runId : ''
@@ -69,15 +66,12 @@ export function BoardPage(): React.ReactElement | null {
     routeKind,
   })
 
-  const [selectedAttemptId, setSelectedAttemptId] = React.useState<number | null>(null)
-  const [showOverlay, setShowOverlay] = React.useState(false)
-
   const isOverviewPath = React.useMemo(
     () => /^\/app\/runs\/\d+\/training-items\/\d+\/overview$/.test(location),
     [location],
   )
 
-  const setOverviewAttemptInUrl = React.useCallback(
+  const setAttemptInUrl = React.useCallback(
     (aId: number | null, replace: boolean): void => {
       if (!isOverviewPath) return
       void navigate({
@@ -90,87 +84,13 @@ export function BoardPage(): React.ReactElement | null {
     [isOverviewPath, navigate, runIdStr, runTrainingItemIdStr],
   )
 
-  const allAttempts = React.useMemo((): OverviewAttemptView[] => {
-    const data = ctrl.overview.data
-    if (!data) return []
-    const result: OverviewAttemptView[] = []
-    for (const attempt of data.attempts) {
-      if (attempt.status !== 'in_progress') result.push(attempt)
-    }
-    for (const samePuzzle of data.sameTrainingItemAcrossRuns) {
-      for (const attempt of samePuzzle.attempts) {
-        if (attempt.status !== 'in_progress') result.push(attempt)
-      }
-    }
-    return result
-  }, [ctrl.overview.data])
-
-  React.useEffect(() => {
-    const data = ctrl.overview.data
-    if (!data) return
-    if (data.runTrainingItem.id !== Number(runTrainingItemIdStr)) return
-    const allIds = new Set(allAttempts.map((a) => a.id))
-    const validRequested =
-      requestedOverviewAttemptId !== null && allIds.has(requestedOverviewAttemptId)
-        ? requestedOverviewAttemptId
-        : null
-    const nextId = validRequested ?? data.selectedAttemptId
-    setSelectedAttemptId(nextId)
-    if (validRequested !== null && nextId !== null && nextId !== requestedOverviewAttemptId) {
-      setOverviewAttemptInUrl(nextId, true)
-    }
-  }, [ctrl.overview.data, allAttempts, requestedOverviewAttemptId, setOverviewAttemptInUrl, runTrainingItemIdStr])
-
-  React.useEffect(() => {
-    if (ctrl.overview.data !== null && ctrl.runJustCompleted) {
-      setShowOverlay(true)
-    }
-  }, [ctrl.overview.data, ctrl.runJustCompleted])
-
-  const handleSelectAttempt = React.useCallback(
-    (aId: number): void => {
-      if (aId === selectedAttemptId) return
-      setSelectedAttemptId(aId)
-      setOverviewAttemptInUrl(aId, false)
-    },
-    [selectedAttemptId, setOverviewAttemptInUrl],
-  )
-
-  const selectedAttempt = React.useMemo(
-    () => allAttempts.find((a) => a.id === selectedAttemptId) ?? null,
-    [allAttempts, selectedAttemptId],
-  )
-
-  const frozenTimerTenths = React.useMemo((): number => {
-    if (selectedAttempt === null || selectedAttempt.timeSpentMs === null) return 0
-    return Math.round(selectedAttempt.timeSpentMs / 100)
-  }, [selectedAttempt])
-
-  const selectedAccuracyDelta = selectedAttempt?.impact?.accuracyDeltaPct ?? null
-  const selectedSolveTimeDelta = selectedAttempt?.impact?.averageSolveTimeDeltaMs ?? null
-  const selectedRunProgressDelta = selectedAttempt?.impact?.runProgressDeltaPct ?? null
-  const selectedTrainingProgressDelta = selectedAttempt?.impact?.trainingProgressDeltaPct ?? null
-
-  const overviewMetTargetTime = React.useMemo((): boolean | null => {
-    const tenths = ctrl.overview.data?.timer.targetSolveTenths ?? null
-    if (selectedAttempt === null || selectedAttempt.timeSpentMs === null) return null
-    if (tenths === null || tenths <= 0) return null
-    return Math.round(selectedAttempt.timeSpentMs / 100) <= tenths
-  }, [selectedAttempt, ctrl.overview.data])
-
-  const historyRows = React.useMemo((): OverviewAttemptHistoryRow[] => {
-    return allAttempts.map((attempt) => ({
-      attemptId: attempt.id,
-      runId: attempt.runId,
-      runLabel: `Run ${attempt.runIndex + 1}`,
-      runOrder: attempt.runIndex,
-      runTrainingItemId: attempt.runTrainingItemId,
-      tryNumber: attempt.tryNumber,
-      countsTowardsTraining: attempt.countsTowardsTraining,
-      result: attempt.status as 'solved' | 'failed',
-      timeSpentMs: attempt.timeSpentMs,
-    }))
-  }, [allAttempts])
+  const { selectedAttemptId, selectedAttempt, allAttempts, historyRows, handleSelectAttempt } =
+    useOverviewAttemptSelection({
+      overviewData: ctrl.overview.data,
+      runTrainingItemId,
+      requestedAttemptId: requestedOverviewAttemptId,
+      onUrlAttemptChange: setAttemptInUrl,
+    })
 
   const handleSelectAttemptForTable = React.useCallback(
     (aId: number): void => {
@@ -189,145 +109,46 @@ export function BoardPage(): React.ReactElement | null {
     [historyRows, runIdStr, handleSelectAttempt, navigate],
   )
 
-  const [selectedPly, setSelectedPly] = React.useState<PlySelection | null>(null)
+  const { pgnDisplay, selectedPly, setSelectedPly, isAtHead } = usePgnNavigation({
+    mode: ctrl.mode,
+    solvingView: ctrl.solvingView,
+    session: ctrl.session,
+    selectedAttempt,
+    boardKey: ctrl.board.boardKey,
+  })
+
+  const [showOverlay, setShowOverlay] = React.useState(false)
+
+  React.useEffect(() => {
+    if (ctrl.overview.data !== null && ctrl.runJustCompleted) {
+      setShowOverlay(true)
+    }
+  }, [ctrl.overview.data, ctrl.runJustCompleted])
+
+  const overviewPgnDisplay = ctrl.mode === 'overview' ? (selectedAttempt?.pgnDisplay ?? null) : null
+
+  const displayBoard = React.useMemo(
+    (): BoardState =>
+      resolveDisplayBoard(
+        ctrl.board,
+        ctrl.mode,
+        selectedPly,
+        ctrl.mode !== 'overview' ? pgnDisplay : null,
+        selectedAttempt,
+        overviewPgnDisplay,
+      ),
+    [ctrl.board, ctrl.mode, selectedPly, pgnDisplay, selectedAttempt, overviewPgnDisplay],
+  )
 
   const lastOverviewTimerTextRef = React.useRef(ZERO_TIMER)
   const lastOverviewMetTargetTimeRef = React.useRef<boolean | null>(null)
-  const lastSelectedAttemptRef = React.useRef<OverviewAttemptView | null>(null)
-
-  React.useEffect(() => {
-    setSelectedPly(null)
-  }, [ctrl.board.boardKey])
-
-  React.useEffect(() => {
-    setSelectedAttemptId(null)
-  }, [runTrainingItemId])
+  const lastSelectedAttemptRef = React.useRef<(typeof allAttempts)[number] | null>(null)
 
   React.useEffect(() => {
     lastOverviewTimerTextRef.current = ZERO_TIMER
     lastOverviewMetTargetTimeRef.current = null
     lastSelectedAttemptRef.current = null
   }, [runTrainingItemId, ZERO_TIMER])
-
-  const focusPgnDisplay = React.useMemo(() => {
-    if (ctrl.mode !== 'focus' && ctrl.mode !== 'failed') return null
-    if (ctrl.solvingView === null) return null
-    const moves =
-      ctrl.mode === 'focus' && ctrl.session.liveFocusStatus === 'in_progress'
-        ? ctrl.session.allPliesPlayed
-        : ctrl.session.movesPlayed
-    return buildPgnDisplay(
-      ctrl.solvingView.trainingItem.fen,
-      moves,
-      ctrl.solvingView.trainingItem.solution.join(' '),
-      ctrl.mode === 'failed' ? 'failed' : ctrl.session.liveFocusStatus,
-      ctrl.mode === 'failed' ? ctrl.session.failedRetryPlies : undefined,
-      false,
-    )
-  }, [ctrl.mode, ctrl.solvingView, ctrl.session])
-
-  const overviewPgnDisplay = ctrl.mode === 'overview' ? (selectedAttempt?.pgnDisplay ?? null) : null
-  const pgnDisplay = ctrl.mode === 'overview' ? overviewPgnDisplay : focusPgnDisplay
-
-  React.useEffect(() => {
-    if (ctrl.mode !== 'overview') return
-    if (overviewPgnDisplay === null || overviewPgnDisplay.mainline.length === 0) {
-      setSelectedPly(null)
-      return
-    }
-    const lastMove = overviewPgnDisplay.mainline[overviewPgnDisplay.mainline.length - 1]
-    if (lastMove.moveStatus === 'wrong') {
-      if (overviewPgnDisplay.variation && overviewPgnDisplay.variation.length > 0) {
-        setSelectedPly({ line: 'variation', index: overviewPgnDisplay.variation.length - 1 })
-      } else {
-        setSelectedPly(null)
-      }
-      return
-    }
-    setSelectedPly({ line: 'main', index: overviewPgnDisplay.mainline.length - 1 })
-  }, [overviewPgnDisplay, ctrl.mode])
-
-  const displayBoard = React.useMemo((): BoardState => {
-    if (ctrl.mode === 'overview') {
-      const base: BoardState = { ...ctrl.board, dests: new Map() }
-      if (selectedPly !== null && overviewPgnDisplay !== null) {
-        const plyList =
-          selectedPly.line === 'main'
-            ? overviewPgnDisplay.mainline
-            : (overviewPgnDisplay.variation ?? [])
-        const ply = plyList[selectedPly.index]
-        if (ply) {
-          const feedbackResult: 'correct' | 'wrong' | null =
-            ply.moveStatus === 'correct' ? 'correct' : ply.moveStatus === 'wrong' ? 'wrong' : null
-          return {
-            ...base,
-            fen: ply.fen,
-            lastMove: [ply.from, ply.to],
-            moveFeedback: {
-              result: feedbackResult,
-              square: feedbackResult !== null ? ply.to : null,
-              visible: feedbackResult !== null,
-            },
-          }
-        }
-      }
-      if (
-        selectedAttempt?.board !== null &&
-        selectedAttempt?.board !== undefined &&
-        selectedAttempt.status !== 'failed'
-      ) {
-        return {
-          ...base,
-          fen: selectedAttempt.board.terminalFen ?? ctrl.board.fen,
-          lastMove: selectedAttempt.board.lastMove ?? undefined,
-          moveFeedback: {
-            result: selectedAttempt.board.result,
-            square:
-              selectedAttempt.board.result !== null
-                ? (selectedAttempt.board.lastMove?.[1] ?? null)
-                : null,
-            visible: selectedAttempt.board.result !== null,
-          },
-        }
-      }
-      return base
-    }
-
-    if (selectedPly === null || focusPgnDisplay === null) return ctrl.board
-    const isAtHeadPly =
-      selectedPly.line === 'main' && selectedPly.index === focusPgnDisplay.mainline.length - 1
-    if (isAtHeadPly) return ctrl.board
-    const plyList =
-      selectedPly.line === 'main' ? focusPgnDisplay.mainline : (focusPgnDisplay.variation ?? [])
-    const ply = plyList[selectedPly.index]
-    if (!ply) return ctrl.board
-    const feedbackResult: 'correct' | 'wrong' | null =
-      ply.moveStatus === 'correct' ? 'correct' : ply.moveStatus === 'wrong' ? 'wrong' : null
-    return {
-      ...ctrl.board,
-      fen: ply.fen,
-      lastMove: [ply.from, ply.to],
-      dests: new Map(),
-      moveFeedback: {
-        result: feedbackResult,
-        square: feedbackResult !== null ? ply.to : null,
-        visible: feedbackResult !== null,
-      },
-    }
-  }, [
-    ctrl.board,
-    ctrl.mode,
-    selectedPly,
-    focusPgnDisplay,
-    selectedAttempt,
-    overviewPgnDisplay,
-  ])
-
-  const isAtHead =
-    selectedPly === null ||
-    (focusPgnDisplay !== null &&
-      selectedPly.line === 'main' &&
-      selectedPly.index === focusPgnDisplay.mainline.length - 1)
 
   if ((!ctrl.overview.data && !ctrl.solvingView) || ctrl.mode === 'loading') {
     return (
@@ -339,12 +160,22 @@ export function BoardPage(): React.ReactElement | null {
 
   const overviewData = ctrl.overview.data
 
+  const frozenTimerTenths =
+    selectedAttempt === null || selectedAttempt.timeSpentMs === null
+      ? 0
+      : Math.round(selectedAttempt.timeSpentMs / 100)
+
+  const overviewMetTargetTime = (() => {
+    const tenths = overviewData?.timer.targetSolveTenths ?? null
+    if (selectedAttempt === null || selectedAttempt.timeSpentMs === null) return null
+    if (tenths === null || tenths <= 0) return null
+    return Math.round(selectedAttempt.timeSpentMs / 100) <= tenths
+  })()
+
   const currentOverviewTimerText = formatTimer(frozenTimerTenths, showTenths)
   if (currentOverviewTimerText !== ZERO_TIMER) lastOverviewTimerTextRef.current = currentOverviewTimerText
   const displayedOverviewTimerText =
-    currentOverviewTimerText !== ZERO_TIMER
-      ? currentOverviewTimerText
-      : lastOverviewTimerTextRef.current
+    currentOverviewTimerText !== ZERO_TIMER ? currentOverviewTimerText : lastOverviewTimerTextRef.current
   if (overviewMetTargetTime !== null) lastOverviewMetTargetTimeRef.current = overviewMetTargetTime
   const displayedOverviewMetTargetTime = overviewMetTargetTime ?? lastOverviewMetTargetTimeRef.current
   if (selectedAttempt !== null) lastSelectedAttemptRef.current = selectedAttempt
@@ -363,6 +194,11 @@ export function BoardPage(): React.ReactElement | null {
   const timerTargetSolveTenths = ctrl.mode === 'focus' ? ctrl.timer.targetSolveTenths : null
 
   const isSolvedAttempt = displayedAttempt?.status === 'solved'
+
+  const selectedAccuracyDelta = selectedAttempt?.impact?.accuracyDeltaPct ?? null
+  const selectedSolveTimeDelta = selectedAttempt?.impact?.averageSolveTimeDeltaMs ?? null
+  const selectedRunProgressDelta = selectedAttempt?.impact?.runProgressDeltaPct ?? null
+  const selectedTrainingProgressDelta = selectedAttempt?.impact?.trainingProgressDeltaPct ?? null
 
   const timerRightSlot =
     ctrl.mode === 'focus' ? undefined : ctrl.mode === 'failed' ? (
@@ -413,9 +249,7 @@ export function BoardPage(): React.ReactElement | null {
               </span>
             </TooltipTrigger>
             <TooltipContent>
-              {displayedOverviewMetTargetTime
-                ? 'Completed within target time'
-                : 'Target time missed'}
+              {displayedOverviewMetTargetTime ? 'Completed within target time' : 'Target time missed'}
             </TooltipContent>
           </Tooltip>
         )}
@@ -443,44 +277,23 @@ export function BoardPage(): React.ReactElement | null {
       </>
     )
 
-  const displayId =
+  const sourceForMetaCard =
     ctrl.mode === 'overview' && overviewData !== null
-      ? overviewData.trainingItem.displayId
-      : (ctrl.solvingView?.trainingItem.displayId ?? '')
-  const rating =
-    ctrl.mode === 'overview' && overviewData !== null
-      ? overviewData.trainingItem.rating
-      : (ctrl.solvingView?.trainingItem.rating ?? 0)
-  const themes =
-    ctrl.mode === 'overview' && overviewData !== null
-      ? overviewData.trainingItem.themes
-      : (ctrl.solvingView?.trainingItem.themes ?? [])
+      ? overviewData.trainingItem.source
+      : (ctrl.solvingView?.trainingItem.source ?? null)
 
   const timerBar =
     ctrl.mode === 'focus' && ctrl.session.allPliesPlayed.length > 0
       ? (() => {
           const { elapsedTenths, targetSolveTenths } = ctrl.timer
-          if (
-            targetSolveTenths === null ||
-            targetSolveTenths <= 0 ||
-            elapsedTenths >= targetSolveTenths
-          )
-            return null
-          const leftPct = Math.max(
-            0,
-            Math.min(100, ((targetSolveTenths - elapsedTenths) / targetSolveTenths) * 100),
-          )
+          if (targetSolveTenths === null || targetSolveTenths <= 0 || elapsedTenths >= targetSolveTenths) return null
+          const leftPct = Math.max(0, Math.min(100, ((targetSolveTenths - elapsedTenths) / targetSolveTenths) * 100))
           const hue =
-            leftPct >= 60
-              ? 60 + ((leftPct - 60) / 40) * 60
-              : leftPct >= 20
-                ? ((leftPct - 20) / 40) * 60
-                : 0
-          const targetText = formatTargetSolveTime(targetSolveTenths)
+            leftPct >= 60 ? 60 + ((leftPct - 60) / 40) * 60 : leftPct >= 20 ? ((leftPct - 20) / 40) * 60 : 0
           return {
             leftPct,
             color: `hsl(${hue} 55% 48%)`,
-            tooltipText: `Target solve time: ${targetText}. This bar shows how much of that time is remaining.`,
+            tooltipText: `Target solve time: ${formatTargetSolveTime(targetSolveTenths)}. This bar shows how much of that time is remaining.`,
           }
         })()
       : null
@@ -538,156 +351,37 @@ export function BoardPage(): React.ReactElement | null {
 
   const mobileExtras =
     ctrl.mode === 'focus' ? (
-      <div className="mt-3 flex items-center justify-between">
-        <span className="tabular-nums text-sm font-medium">{timerText}</span>
-        <MoveStatusCard
-          lastMoveResult={displayBoard.moveFeedback.result}
-          turnToMove={ctrl.board.turnToMove}
-          kingPieceUrl={ctrl.board.kingPieceUrl}
-          compact={true}
-        />
-      </div>
+      <MobileActionsBar
+        mode="focus"
+        timerText={timerText}
+        lastMoveResult={displayBoard.moveFeedback.result}
+        turnToMove={ctrl.board.turnToMove}
+        kingPieceUrl={ctrl.board.kingPieceUrl}
+      />
     ) : ctrl.mode === 'failed' ? (
-      <div className="mt-3 flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <span className="tabular-nums text-sm font-medium">{timerText}</span>
-          {failedMetTargetTime !== null && (
-            <span
-              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
-                failedMetTargetTime
-                  ? 'border-green-600/20 bg-green-500/15 text-green-700 dark:text-green-400'
-                  : 'border-amber-600/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
-              }`}
-            >
-              <Clock className="h-3 w-3" />
-              {failedMetTargetTime ? 'Time met' : 'Time missed'}
-            </span>
-          )}
-          <span className="inline-flex items-center gap-1 rounded-full border border-red-600/20 bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
-            <XCircle className="h-3 w-3" />
-            Failed
-          </span>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="flex-1"
-            onClick={ctrl.actions.handleShowHint}
-            disabled={ctrl.inputBlocked}
-          >
-            Hint
-          </Button>
-          <Button
-            variant="outline"
-            className="flex-1"
-            onClick={ctrl.actions.handleShowSolution}
-            disabled={ctrl.inputBlocked}
-          >
-            Solution
-          </Button>
-        </div>
-      </div>
+      <MobileActionsBar
+        mode="failed"
+        timerText={timerText}
+        failedMetTargetTime={failedMetTargetTime}
+        inputBlocked={ctrl.inputBlocked}
+        onHint={ctrl.actions.handleShowHint}
+        onSolution={ctrl.actions.handleShowSolution}
+        lastMoveResult={displayBoard.moveFeedback.result}
+        turnToMove={ctrl.board.turnToMove}
+        kingPieceUrl={ctrl.board.kingPieceUrl}
+      />
     ) : overviewData !== null ? (
-      <div className="mt-3 flex flex-col gap-2 pb-3">
-        <div className="flex items-center gap-2">
-          <span className="tabular-nums text-sm font-medium">{displayedOverviewTimerText}</span>
-          {displayedOverviewMetTargetTime !== null && (
-            <Tooltip delayDuration={100}>
-              <TooltipTrigger asChild>
-                <span
-                  className={`inline-flex cursor-default items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
-                    displayedOverviewMetTargetTime
-                      ? 'border-green-600/20 bg-green-500/15 text-green-700 dark:text-green-400'
-                      : 'border-amber-600/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
-                  }`}
-                >
-                  <Clock className="h-3 w-3" />
-                  Time
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>
-                {displayedOverviewMetTargetTime
-                  ? 'Completed within target time'
-                  : 'Target time missed'}
-              </TooltipContent>
-            </Tooltip>
-          )}
-          {displayedAttempt !== null && (
-            <Tooltip delayDuration={100}>
-              <TooltipTrigger asChild>
-                <span
-                  className={`inline-flex cursor-default items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
-                    isSolvedAttempt
-                      ? 'border-green-600/20 bg-green-500/15 text-green-700 dark:text-green-400'
-                      : 'border-red-600/20 bg-red-500/15 text-red-700 dark:text-red-400'
-                  }`}
-                >
-                  {isSolvedAttempt ? (
-                    <CheckCircle2 className="h-3 w-3" />
-                  ) : (
-                    <XCircle className="h-3 w-3" />
-                  )}
-                  {isSolvedAttempt ? 'Solved' : 'Failed'}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{isSolvedAttempt ? 'Correctly solved' : 'Not solved'}</TooltipContent>
-            </Tooltip>
-          )}
-          <div className="ml-auto flex items-center gap-1">
-            <Tooltip delayDuration={100}>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  disabled={ctrl.isLoadingNextPuzzle}
-                  onClick={() => void ctrl.actions.handleRetake()}
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  <span className="sr-only">Retake</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Retake</TooltipContent>
-            </Tooltip>
-            <Tooltip delayDuration={100}>
-              <TooltipTrigger asChild>
-                <a
-                  href={overviewData.actions.analyze.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'h-8 w-8')}
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  <span className="sr-only">Analyze</span>
-                </a>
-              </TooltipTrigger>
-              <TooltipContent>Analyze</TooltipContent>
-            </Tooltip>
-          </div>
-        </div>
-        <Tooltip delayDuration={100}>
-          <TooltipTrigger asChild>
-            <span className="w-full">
-              <Button
-                className="w-full bg-foreground text-background hover:bg-foreground/90"
-                disabled={
-                  overviewData.actions.nextTrainingItem.disabledReason !== null ||
-                  ctrl.isLoadingNextPuzzle
-                }
-                onClick={() => void ctrl.actions.handleNextPuzzle()}
-              >
-                <SkipForward className="mr-2 h-4 w-4" />
-                Next puzzle
-              </Button>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>
-            {overviewData.actions.nextTrainingItem.disabledReason !== null
-              ? overviewData.actions.nextTrainingItem.disabledReason
-              : null}
-          </TooltipContent>
-        </Tooltip>
-      </div>
+      <MobileActionsBar
+        mode="overview"
+        timerText={displayedOverviewTimerText}
+        metTargetTime={displayedOverviewMetTargetTime}
+        displayedAttempt={displayedAttempt}
+        analyzeUrl={overviewData.actions.analyze.url}
+        nextDisabledReason={overviewData.actions.nextTrainingItem.disabledReason}
+        isLoadingNextPuzzle={ctrl.isLoadingNextPuzzle}
+        onRetake={() => void ctrl.actions.handleRetake()}
+        onNextPuzzle={() => void ctrl.actions.handleNextPuzzle()}
+      />
     ) : null
 
   const mobileDrawerContent =
@@ -720,9 +414,7 @@ export function BoardPage(): React.ReactElement | null {
         />
         {overviewPgnDisplay !== null && (
           <TrainingItemMetaCard
-            displayId={overviewData.trainingItem.displayId}
-            rating={overviewData.trainingItem.rating}
-            themes={overviewData.trainingItem.themes}
+            source={overviewData.trainingItem.source}
             pgnDisplay={overviewPgnDisplay}
             selectedPly={ctrl.mode === 'overview' ? selectedPly : null}
             onPlyClick={ctrl.mode === 'overview' ? setSelectedPly : undefined}
@@ -781,15 +473,15 @@ export function BoardPage(): React.ReactElement | null {
         targetSolveTenths={timerTargetSolveTenths}
         rightSlot={timerRightSlot}
       />
-      <TrainingItemMetaCard
-        displayId={displayId}
-        rating={rating}
-        themes={themes}
-        pgnDisplay={pgnDisplay}
-        focusMode={ctrl.mode !== 'overview'}
-        selectedPly={ctrl.mode === 'overview' ? selectedPly : null}
-        onPlyClick={ctrl.mode === 'overview' ? setSelectedPly : undefined}
-      />
+      {sourceForMetaCard !== null && (
+        <TrainingItemMetaCard
+          source={sourceForMetaCard}
+          pgnDisplay={pgnDisplay}
+          focusMode={ctrl.mode !== 'overview'}
+          selectedPly={ctrl.mode === 'overview' ? selectedPly : null}
+          onPlyClick={ctrl.mode === 'overview' ? setSelectedPly : undefined}
+        />
+      )}
       {ctrl.mode === 'focus' && (
         <div className="mt-auto">
           <MoveStatusCard

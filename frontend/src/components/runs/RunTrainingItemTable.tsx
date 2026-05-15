@@ -118,10 +118,17 @@ export function RunTrainingItemTable({ trainingItems, runIdStr, isActive }: RunT
       ),
     },
     {
-      accessorKey: 'rating',
+      id: 'rating',
       header: ({ column }) => <SortHeader column={column} label="Rating" />,
       meta: { className: 'min-w-24' } satisfies ColMeta,
-      cell: ({ row }) => <span className="tabular-nums">{row.original.rating}</span>,
+      accessorFn: (row) =>
+        row.source.sourceType === 'LICHESS_TACTIC' ? row.source.rating : null,
+      cell: ({ row }) => {
+        const src = row.original.source
+        return src.sourceType === 'LICHESS_TACTIC'
+          ? <span className="tabular-nums">{src.rating}</span>
+          : <span className="text-muted-foreground">—</span>
+      },
     },
     {
       accessorKey: 'positionStatus',
@@ -156,17 +163,20 @@ export function RunTrainingItemTable({ trainingItems, runIdStr, isActive }: RunT
       meta: { className: 'sticky right-0 bg-background w-28' } satisfies ColMeta,
       cell: ({ row }) => {
         const item = row.original
+        const lichessSrc = item.source.sourceType === 'LICHESS_TACTIC' ? item.source : null
         return (
           <div className="flex items-center gap-0.5">
-            <ActionButton
-              tooltip="Open puzzle on Lichess"
-              onClick={(e) => {
-                e.stopPropagation()
-                window.open(`https://lichess.org/training/${item.displayId}`, '_blank', 'noopener,noreferrer')
-              }}
-            >
-              <ExternalLink className="h-4 w-4" />
-            </ActionButton>
+            {lichessSrc !== null && (
+              <ActionButton
+                tooltip="Open puzzle on Lichess"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  window.open(`https://lichess.org/training/${lichessSrc.displayId}`, '_blank', 'noopener,noreferrer')
+                }}
+              >
+                <ExternalLink className="h-4 w-4" />
+              </ActionButton>
+            )}
             <ActionButton
               tooltip={isActive ? 'Solve this puzzle' : 'Run is not active'}
               disabled={!isActive}

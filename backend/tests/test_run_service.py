@@ -1,6 +1,6 @@
 import pytest
 from app.models.run import TrainingAttempt
-from app.services.run import _attempt_type_fields, _total_queue_attempts
+from app.services.attempt_state import attempt_type_fields
 
 
 def _make_attempt(try_number: int, status: str) -> TrainingAttempt:
@@ -10,23 +10,8 @@ def _make_attempt(try_number: int, status: str) -> TrainingAttempt:
     return a
 
 
-
-@pytest.mark.parametrize(
-    "config, expected",
-    [
-        ({}, 1),
-        ({"failed_repetition": {"mode": "single"}}, 1),
-        ({"failed_repetition": {"mode": "queue", "max_repeats": 0}}, 1),
-        ({"failed_repetition": {"mode": "queue", "max_repeats": 2}}, 3),
-        ({"failed_repetition": "not_a_dict"}, 1),
-    ],
-)
-def test_total_queue_attempts(config: dict[str, object], expected: int) -> None:
-    assert _total_queue_attempts(config) == expected
-
-
 def test_attempt_type_fields_first_attempt_scored() -> None:
-    result = _attempt_type_fields([], 1, 1)
+    result = attempt_type_fields([], 1, 1)
     assert result["attemptType"] == "scored"
     assert result["countsTowardsTraining"] is True
     assert result["countsTowardsProgress"] is True
@@ -36,13 +21,13 @@ def test_attempt_type_fields_first_attempt_scored() -> None:
 
 def test_attempt_type_fields_second_attempt_scored() -> None:
     prior_failed = _make_attempt(1, "failed")
-    result = _attempt_type_fields([prior_failed], 2, 2)
+    result = attempt_type_fields([prior_failed], 2, 2)
     assert result["attemptType"] == "scored"
     assert result["countsTowardsTraining"] is True
 
 
 def test_attempt_type_fields_beyond_queue() -> None:
-    result = _attempt_type_fields([], 3, 2)
+    result = attempt_type_fields([], 3, 2)
     assert result["attemptType"] == "practice"
     assert result["countsTowardsTraining"] is False
     assert result["countsTowardsProgress"] is False
@@ -52,6 +37,6 @@ def test_attempt_type_fields_beyond_queue() -> None:
 
 def test_attempt_type_fields_already_solved() -> None:
     prior_solved = _make_attempt(1, "solved")
-    result = _attempt_type_fields([prior_solved], 2, 2)
+    result = attempt_type_fields([prior_solved], 2, 2)
     assert result["attemptType"] == "practice"
     assert result["countsTowardsTraining"] is False

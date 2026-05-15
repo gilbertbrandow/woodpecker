@@ -11,7 +11,7 @@ type OverviewSidebarRightProps = {
   selectedAttemptId: number | null
   onSelectAttempt: (attemptId: number) => void
   nextPuzzleDisabledReason: string | null
-  analyzeUrl: string
+  analyzeUrl: string | null
 }
 
 export function OverviewSidebarRight({
