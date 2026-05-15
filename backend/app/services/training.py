@@ -34,7 +34,9 @@ def training_full_dict(training: Training) -> dict[str, object]:
     if owner is None:
         raise LookupError("Training owner not found.")
 
-    schedule_cfg = ScheduleConfig.from_dict(schedule.config if isinstance(schedule.config, dict) else {})
+    if not isinstance(schedule.config, dict):
+        raise LookupError("Schedule has no config.")
+    schedule_cfg = ScheduleConfig.from_dict(schedule.config)
     run_count = len(schedule_cfg.runs)
     puzzle_order = schedule_cfg.puzzle_order
     total_hours = schedule_cfg.total_hours
