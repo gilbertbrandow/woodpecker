@@ -1,35 +1,52 @@
-DOCKER ?= docker
-COMPOSE = $(DOCKER) compose
-PROD_DB_URL ?= postgresql://woodpecker:SECRET@localhost:5433/woodpecker
+DOCKER  ?= docker
+COMPOSE  = $(DOCKER) compose
 
-# EC2 / production database helpers.
-# Run from the repo root with `make -C deploy <target>` or from inside deploy/.
-#
-# Typical production DB tunnel flow:
-#   make -C deploy db-expose-ec2 EC2_HOST=<host>
-#   make -C deploy db-tunnel-ec2 EC2_HOST=<host>
-#
-# In a separate terminal, run pipeline commands against the tunnel:
-#   make -C deploy lichess-tactics-validate PROD_DB_URL="postgresql://woodpecker:SECRET@localhost:5433/woodpecker"
+DEPLOY_DIR  := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
+SCRIPTS_DIR := $(DEPLOY_DIR)/scripts
+
+-include $(DEPLOY_DIR)/../.env
+
+PROD_DB_URL = postgresql://woodpecker:$(PROD_DB_PASSWORD)@localhost:5433/woodpecker
+
+# ── Tunnel ─────────────────────────────────────────────────────────────────────
+
+db-tunnel-start:
+	@$(SCRIPTS_DIR)/db-tunnel-prod.sh start
+
+db-tunnel-stop:
+	@$(SCRIPTS_DIR)/db-tunnel-prod.sh stop
+
+# ── DB access ──────────────────────────────────────────────────────────────────
+
+db-shell:
+	@PGPASSWORD=$(PROD_DB_PASSWORD) psql -h localhost -p 5433 -U woodpecker woodpecker
 
 db-shell-ec2:
 	ssh -t ubuntu@$(EC2_HOST) "cd /opt/woodpecker && docker compose -f docker-compose.yml -f docker-compose-prod.yml exec db psql -U woodpecker woodpecker"
 
-db-expose-ec2:
-	ssh ubuntu@$(EC2_HOST) "cd /opt/woodpecker && docker compose -f docker-compose.yml -f docker-compose-prod.yml -f docker-compose-db-tunnel.yml up -d --no-deps db"
-	@echo "DB port now bound to 127.0.0.1:5432 on EC2. Run 'make -C deploy db-tunnel-ec2' in a new terminal."
+db-query:
+	@PGPASSWORD=$(PROD_DB_PASSWORD) psql -h localhost -p 5433 -U woodpecker woodpecker -c "$(SQL)"
 
-db-tunnel-ec2:
-	@echo "Forwarding localhost:5433 → EC2 db. Ctrl-C to close."
-	ssh -N -L 5433:localhost:5432 ubuntu@$(EC2_HOST)
+# ── Pipeline (prod) ────────────────────────────────────────────────────────────
 
-db-unexpose-ec2:
-	ssh ubuntu@$(EC2_HOST) "cd /opt/woodpecker && docker compose -f docker-compose.yml -f docker-compose-prod.yml up -d db"
+_confirm-prod-mutation:
+	@printf "[PRODUCTION] WARNING: This will mutate production data.\nType 'yes' to continue: "; \
+	read confirm; \
+	[ "$$confirm" = "yes" ] || { echo "Aborted."; exit 1; }
 
-lichess-tactics-validate:
+prod-lichess-tactics-validate:
 	DATABASE_URL=$(PROD_DB_URL) $(MAKE) -C ../pipeline lichess-tactics-validate
 
-lichess-tactics-relink-openings:
-	DATABASE_URL=$(PROD_DB_URL) $(MAKE) -C ../pipeline lichess-tactics-relink-openings
+prod-lichess-tactics-import: _confirm-prod-mutation
+	DATABASE_URL=$(PROD_DB_URL) $(MAKE) -C ../pipeline lichess-tactics-import ARGS="$(ARGS)"
 
-.PHONY: db-shell-ec2 db-expose-ec2 db-tunnel-ec2 db-unexpose-ec2 lichess-tactics-validate lichess-tactics-relink-openings
+prod-lichess-tactics-themes-import: _confirm-prod-mutation
+	DATABASE_URL=$(PROD_DB_URL) $(MAKE) -C ../pipeline lichess-tactics-themes-import
+
+prod-openings-import: _confirm-prod-mutation
+	DATABASE_URL=$(PROD_DB_URL) $(MAKE) -C ../pipeline openings-import
+
+.PHONY: db-tunnel-start db-tunnel-stop db-shell db-shell-ec2 db-query \
+        _confirm-prod-mutation \
+        prod-lichess-tactics-validate prod-lichess-tactics-import \
+        prod-lichess-tactics-themes-import prod-openings-import
