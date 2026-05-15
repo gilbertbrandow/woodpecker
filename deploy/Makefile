@@ -35,16 +35,16 @@ _confirm-prod-mutation:
 	[ "$$confirm" = "yes" ] || { echo "Aborted."; exit 1; }
 
 prod-lichess-tactics-validate:
-	DATABASE_URL=$(PROD_DB_URL) $(MAKE) -C ../pipeline lichess-tactics-validate
+	@DATABASE_URL=$(PROD_DB_URL) $(MAKE) -s -C ../pipeline lichess-tactics-validate
 
 prod-lichess-tactics-import: _confirm-prod-mutation
-	DATABASE_URL=$(PROD_DB_URL) $(MAKE) -C ../pipeline lichess-tactics-import ARGS="$(ARGS)"
+	@DATABASE_URL=$(PROD_DB_URL) $(MAKE) -s -C ../pipeline lichess-tactics-import ARGS="$(ARGS)"
 
 prod-lichess-tactics-themes-import: _confirm-prod-mutation
-	DATABASE_URL=$(PROD_DB_URL) $(MAKE) -C ../pipeline lichess-tactics-themes-import
+	@DATABASE_URL=$(PROD_DB_URL) $(MAKE) -s -C ../pipeline lichess-tactics-themes-import
 
 prod-openings-import: _confirm-prod-mutation
-	DATABASE_URL=$(PROD_DB_URL) $(MAKE) -C ../pipeline openings-import
+	@DATABASE_URL=$(PROD_DB_URL) $(MAKE) -s -C ../pipeline openings-import
 
 .PHONY: db-tunnel-start db-tunnel-stop db-shell db-shell-ec2 db-query \
         _confirm-prod-mutation \
