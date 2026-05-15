@@ -1,0 +1,160 @@
+import chess
+
+
+def compute_attempt_board(
+    fen: str,
+    solution: str,
+    status: str,
+    moves: list[str],
+) -> dict[str, object] | None:
+    if status == "in_progress":
+        return None
+
+    solution_plies = solution.split()
+    board = chess.Board(fen)
+
+    if status == "solved":
+        try:
+            board.push_uci(solution_plies[0])
+            player_idx = 0
+            opponent_idx = 2
+            for uci in moves:
+                board.push_uci(uci)
+                is_last_user = player_idx + 1 >= len(moves)
+                if not is_last_user and opponent_idx < len(solution_plies):
+                    board.push_uci(solution_plies[opponent_idx])
+                    opponent_idx += 2
+                player_idx += 1
+        except Exception:
+            pass
+        last_uci = moves[-1] if moves else None
+        last_move: list[str] | None = [last_uci[:2], last_uci[2:4]] if last_uci else None
+        return {
+            "terminalFen": board.fen(),
+            "lastMove": last_move,
+            "result": "correct",
+        }
+
+    try:
+        board.push_uci(solution_plies[0])
+        player_positions = list(range(1, len(solution_plies), 2))
+        for i, uci in enumerate(moves):
+            if i >= len(player_positions):
+                break
+            expected = solution_plies[player_positions[i]]
+            board.push_uci(uci)
+            if uci != expected and not board.is_checkmate():
+                last_move = [uci[:2], uci[2:4]]
+                return {
+                    "terminalFen": board.fen(),
+                    "lastMove": last_move,
+                    "result": "wrong",
+                }
+            if i + 1 < len(moves) and player_positions[i] + 1 < len(solution_plies):
+                board.push_uci(solution_plies[player_positions[i] + 1])
+    except Exception:
+        pass
+
+    return {"terminalFen": None, "lastMove": None, "result": None}
+
+
+def compute_attempt_pgn(
+    fen: str,
+    solution: str,
+    status: str,
+    moves: list[str],
+) -> dict[str, object] | None:
+    if status == "in_progress":
+        return None
+
+    solution_plies = solution.split()
+
+    def _make_display_move(
+        board: chess.Board,
+        uci: str,
+        move_status: str | None,
+    ) -> dict[str, object] | None:
+        is_white = board.turn == chess.WHITE
+        move_number = board.fullmove_number
+        try:
+            move = chess.Move.from_uci(uci)
+            san = board.san(move)
+            board.push(move)
+            return {
+                "san": san,
+                "uci": uci,
+                "fen": board.fen(),
+                "from": uci[:2],
+                "to": uci[2:4],
+                "moveNumber": move_number,
+                "isWhite": is_white,
+                "moveStatus": move_status,
+            }
+        except Exception:
+            return None
+
+    mainline: list[dict[str, object]] = []
+    variation: list[dict[str, object]] | None = None
+
+    board = chess.Board(fen)
+    try:
+        opp_move = _make_display_move(board, solution_plies[0], "opponent")
+        if opp_move:
+            mainline.append(opp_move)
+    except Exception:
+        return {"mainline": mainline, "variation": None}
+
+    player_positions = list(range(1, len(solution_plies), 2))
+
+    if status == "solved":
+        for i, uci in enumerate(moves):
+            is_last = i == len(moves) - 1
+            dm = _make_display_move(board, uci, "correct")
+            if not dm:
+                break
+            mainline.append(dm)
+            if not is_last:
+                opp_idx = player_positions[i] + 1 if i < len(player_positions) else None
+                if opp_idx is not None and opp_idx < len(solution_plies):
+                    opp = _make_display_move(board, solution_plies[opp_idx], "opponent")
+                    if opp:
+                        mainline.append(opp)
+        return {"mainline": mainline, "variation": None}
+
+    for i, uci in enumerate(moves):
+        if i >= len(player_positions):
+            break
+        expected = solution_plies[player_positions[i]]
+        is_wrong = uci != expected
+        dm = _make_display_move(board, uci, "wrong" if is_wrong else "correct")
+        if not dm:
+            break
+        mainline.append(dm)
+        if is_wrong and not board.is_checkmate():
+            var_board = chess.Board(fen)
+            try:
+                var_board.push_uci(solution_plies[0])
+                for j in range(i):
+                    var_board.push_uci(moves[j])
+                    if player_positions[j] + 1 < len(solution_plies):
+                        var_board.push_uci(solution_plies[player_positions[j] + 1])
+            except Exception:
+                break
+            variation = []
+            var_idx = player_positions[i]
+            for k in range(var_idx, len(solution_plies)):
+                vdm = _make_display_move(
+                    var_board,
+                    solution_plies[k],
+                    "correct" if k % 2 == 1 else "opponent",
+                )
+                if not vdm:
+                    break
+                variation.append(vdm)
+            break
+        if i + 1 < len(moves) and player_positions[i] + 1 < len(solution_plies):
+            opp = _make_display_move(board, solution_plies[player_positions[i] + 1], "opponent")
+            if opp:
+                mainline.append(opp)
+
+    return {"mainline": mainline, "variation": variation}

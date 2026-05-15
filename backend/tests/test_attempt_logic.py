@@ -1,6 +1,6 @@
 import chess as python_chess
 from app.models.run import TrainingAttempt
-from app.services.run import _derive_attempt_outcome, _derive_position_status
+from app.services.attempt_state import derive_attempt_outcome, derive_position_status
 
 STANDARD_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 TWO_PLY_SOLUTION = "e2e4 d7d5"
@@ -15,22 +15,22 @@ def _make_attempt(try_number: int, status: str) -> TrainingAttempt:
 
 
 def test_outcome_solved_single_move() -> None:
-    result = _derive_attempt_outcome(STANDARD_FEN, TWO_PLY_SOLUTION, ["d7d5"])
+    result = derive_attempt_outcome(STANDARD_FEN, TWO_PLY_SOLUTION, ["d7d5"])
     assert result == "solved"
 
 
 def test_outcome_solved_multi_move() -> None:
-    result = _derive_attempt_outcome(STANDARD_FEN, FOUR_PLY_SOLUTION, ["d7d5", "d8d5"])
+    result = derive_attempt_outcome(STANDARD_FEN, FOUR_PLY_SOLUTION, ["d7d5", "d8d5"])
     assert result == "solved"
 
 
 def test_outcome_failed_wrong_move() -> None:
-    result = _derive_attempt_outcome(STANDARD_FEN, TWO_PLY_SOLUTION, ["d7d6"])
+    result = derive_attempt_outcome(STANDARD_FEN, TWO_PLY_SOLUTION, ["d7d6"])
     assert result == "failed"
 
 
 def test_outcome_failed_empty_moves() -> None:
-    result = _derive_attempt_outcome(STANDARD_FEN, TWO_PLY_SOLUTION, [])
+    result = derive_attempt_outcome(STANDARD_FEN, TWO_PLY_SOLUTION, [])
     assert result == "failed"
 
 
@@ -43,39 +43,39 @@ def test_outcome_solved_by_checkmate() -> None:
         b = board_after_opp.copy()
         b.push_uci(mate_uci)
         assert b.is_checkmate(), f"{mate_uci} should be checkmate"
-        result = _derive_attempt_outcome(fen, "e8d8 a7a8", [mate_uci])
+        result = derive_attempt_outcome(fen, "e8d8 a7a8", [mate_uci])
         assert result == "solved"
 
 
 def test_outcome_failed_not_all_moves() -> None:
-    result = _derive_attempt_outcome(STANDARD_FEN, FOUR_PLY_SOLUTION, ["d7d5"])
+    result = derive_attempt_outcome(STANDARD_FEN, FOUR_PLY_SOLUTION, ["d7d5"])
     assert result == "failed"
 
 
 def test_status_not_started() -> None:
-    assert _derive_position_status([], 1) == "not_started"
+    assert derive_position_status([], 1) == "not_started"
 
 
 def test_status_in_progress() -> None:
-    assert _derive_position_status([_make_attempt(1, "in_progress")], 1) == "in_progress"
+    assert derive_position_status([_make_attempt(1, "in_progress")], 1) == "in_progress"
 
 
 def test_status_solved_first_try() -> None:
-    assert _derive_position_status([_make_attempt(1, "solved")], 1) == "solved"
+    assert derive_position_status([_make_attempt(1, "solved")], 1) == "solved"
 
 
 def test_status_solved_with_retries() -> None:
     attempts = [_make_attempt(1, "failed"), _make_attempt(2, "solved")]
-    assert _derive_position_status(attempts, 2) == "solved_with_retries"
+    assert derive_position_status(attempts, 2) == "solved_with_retries"
 
 
 def test_status_failed_queue_exhausted() -> None:
     attempts = [_make_attempt(1, "failed"), _make_attempt(2, "failed")]
-    assert _derive_position_status(attempts, 2) == "failed"
+    assert derive_position_status(attempts, 2) == "failed"
 
 
 def test_status_in_progress_when_queue_not_exhausted() -> None:
-    assert _derive_position_status([_make_attempt(1, "failed")], 2) == "in_progress"
+    assert derive_position_status([_make_attempt(1, "failed")], 2) == "in_progress"
 
 
 def test_status_solved_ignores_practice_attempts() -> None:
@@ -85,4 +85,4 @@ def test_status_solved_ignores_practice_attempts() -> None:
         _make_attempt(2, "failed"),
         _make_attempt(3, "failed"),
     ]
-    assert _derive_position_status(attempts, 2) == "solved"
+    assert derive_position_status(attempts, 2) == "solved"
