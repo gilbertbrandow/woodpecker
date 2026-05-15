@@ -19,6 +19,7 @@ from app.services.attempt_state import (
     qualifying_attempt_id,
 )
 from app.services.chess_board import compute_attempt_board, compute_attempt_pgn
+from app.services.schedule_config import ScheduleConfig
 from app.services.training_item_content import TrainingItemContent, get_content, get_content_batch
 
 
@@ -50,15 +51,16 @@ def _get_owned_attempt(
     return attempt, run_puzzle, run
 
 
-def _get_schedule_config(run: Run) -> tuple[Schedule, dict[str, object]]:
+def _get_schedule_config(run: Run) -> tuple[Schedule, ScheduleConfig]:
     training = db.session.get(Training, run.training_id)
     if training is None:
         raise LookupError("Training not found.")
     schedule = db.session.get(Schedule, training.schedule_id)
     if schedule is None:
         raise LookupError("Schedule not found.")
-    config: dict[str, object] = schedule.config if isinstance(schedule.config, dict) else {}
-    return schedule, config
+    if not isinstance(schedule.config, dict):
+        raise LookupError("Schedule has no config.")
+    return schedule, ScheduleConfig.from_dict(schedule.config)
 
 
 def _format_break_duration(hours: int) -> str | None:
@@ -72,16 +74,6 @@ def _format_break_duration(hours: int) -> str | None:
     weeks = days // 7
     return f"{weeks} week{'s' if weeks != 1 else ''}"
 
-
-def _total_queue_attempts(config: dict[str, object]) -> int:
-    rep_raw = config.get("failed_repetition")
-    if not isinstance(rep_raw, dict):
-        return 1
-    rep = cast(dict[str, object], rep_raw)
-    if rep.get("mode") != "queue":
-        return 1
-    max_repeats = rep.get("max_repeats")
-    return 1 + (max_repeats if isinstance(max_repeats, int) else 0)
 
 
 
@@ -177,7 +169,7 @@ def _run_puzzle_attempt_view_dict(run_puzzle: RunTrainingItem) -> dict[str, obje
     if run is None:
         raise LookupError("Run not found.")
     _, config = _get_schedule_config(run)
-    total_queue = _total_queue_attempts(config)
+    total_queue = config.total_queue
 
     sorted_attempts = sorted(run_puzzle.attempts, key=lambda a: a.try_number)
     in_progress_attempt = next((a for a in sorted_attempts if a.status == "in_progress"), None)
@@ -252,7 +244,7 @@ def _run_puzzle_full_dict(run_puzzle: RunTrainingItem) -> dict[str, object]:
     if run is None:
         raise LookupError("Run not found.")
     schedule, config = _get_schedule_config(run)
-    total_queue = _total_queue_attempts(config)
+    total_queue = config.total_queue
 
     total_puzzles = db.session.scalar(
         sa.select(sa.func.count()).where(RunTrainingItem.run_id == run_puzzle.run_id)
@@ -369,19 +361,12 @@ def _tick_interval_ms(target_hours: float) -> int:
 def _pace_chart_data(
     run: Run,
     run_puzzles: list[RunTrainingItem],
-    config: dict[str, object],
-    total_queue: int,
+    schedule_cfg: ScheduleConfig,
 ) -> dict[str, object] | None:
-    runs_raw = config.get("runs")
-    if not isinstance(runs_raw, list) or run.run_index >= len(runs_raw):
+    if run.run_index >= len(schedule_cfg.runs):
         return None
-    run_def = runs_raw[run.run_index]
-    if not isinstance(run_def, dict):
-        return None
-    target_hours_raw = run_def.get("target_hours")
-    if not isinstance(target_hours_raw, (int, float)) or target_hours_raw <= 0:
-        return None
-    target_hours = float(target_hours_raw)
+    target_hours = float(schedule_cfg.runs[run.run_index].target_hours)
+    total_queue = schedule_cfg.total_queue
 
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     start_ms = int(run.started_at.timestamp() * 1000)
@@ -488,7 +473,7 @@ def get_active_run_summary(user_id: int) -> dict[str, object] | None:
 
 def run_dict(run: Run) -> dict[str, object]:
     _, config = _get_schedule_config(run)
-    total_queue = _total_queue_attempts(config)
+    total_queue = config.total_queue
 
     run_puzzles = list(
         db.session.scalars(sa.select(RunTrainingItem).where(RunTrainingItem.run_id == run.id)).all()
@@ -516,7 +501,7 @@ def run_dict(run: Run) -> dict[str, object]:
         "currentRunTrainingItemId": _current_run_puzzle_id(run.id, total_queue),
         "targetAccuracy": run.target_accuracy,
         "targetSolveSeconds": run.target_solve_seconds,
-        "paceChart": _pace_chart_data(run, run_puzzles, config, total_queue),
+        "paceChart": _pace_chart_data(run, run_puzzles, config),
     }
 
 
@@ -542,11 +527,11 @@ def start_run(training_id: int, user_id: int, expected_run_index: int | None = N
     schedule = db.session.get(Schedule, training.schedule_id)
     if schedule is None:
         raise LookupError("Schedule not found.")
-    config: dict[str, object] = schedule.config if isinstance(schedule.config, dict) else {}
-    runs_raw = config.get("runs")
-    run_count = len(runs_raw) if isinstance(runs_raw, list) else 0
-    puzzle_order_raw = config.get("puzzle_order")
-    puzzle_order = puzzle_order_raw if isinstance(puzzle_order_raw, str) else "sequential"
+    if not isinstance(schedule.config, dict):
+        raise LookupError("Schedule has no config.")
+    schedule_cfg = ScheduleConfig.from_dict(schedule.config)
+    run_count = len(schedule_cfg.runs)
+    puzzle_order = schedule_cfg.puzzle_order
 
     run_index = db.session.scalar(
         sa.select(sa.func.count()).where(
@@ -618,7 +603,7 @@ def continue_run(run_id: int, user_id: int) -> dict[str, object]:
         raise ValueError("Run is not active.")
 
     _, config = _get_schedule_config(run)
-    total_queue = _total_queue_attempts(config)
+    total_queue = config.total_queue
 
     existing_attempt = db.session.scalar(
         sa.select(TrainingAttempt)
@@ -655,7 +640,7 @@ def continue_run(run_id: int, user_id: int) -> dict[str, object]:
 def list_run_puzzles(run_id: int) -> dict[str, object]:
     run = _get_run(run_id)
     _, config = _get_schedule_config(run)
-    total_queue = _total_queue_attempts(config)
+    total_queue = config.total_queue
 
     rows = db.session.execute(
         sa.text("""
@@ -983,12 +968,10 @@ def _compute_progress_card(
     if schedule is not None:
         subset = db.session.get(Subset, schedule.subset_id)
 
-    if subset is None or schedule is None:
+    if subset is None or schedule is None or not isinstance(schedule.config, dict):
         return {"runProgress": run_progress_row, "trainingProgress": None}
 
-    config: dict[str, object] = schedule.config if isinstance(schedule.config, dict) else {}
-    runs_raw = config.get("runs")
-    run_count = len(runs_raw) if isinstance(runs_raw, list) else 0
+    run_count = len(ScheduleConfig.from_dict(schedule.config).runs)
     puzzle_count = (
         subset.locked_puzzle_count
         if subset.locked_puzzle_count is not None
@@ -1119,20 +1102,15 @@ def _build_run_puzzle_overview(
     content = get_content(run_puzzle.training_item_id)
 
     _, config = _get_schedule_config(run)
-    total_queue = _total_queue_attempts(config)
+    total_queue = config.total_queue
 
     training = db.session.get(Training, training_id)
     schedule = db.session.get(Schedule, training.schedule_id) if training else None
     schedule_name: str | None = schedule.name if schedule is not None else None
 
-    runs_raw = config.get("runs")
-    runs_list: list[object] = runs_raw if isinstance(runs_raw, list) else []
-    total_runs = len(runs_list)
+    total_runs = len(config.runs)
     is_training_complete = total_runs > 0 and run.run_index == total_runs - 1
-    run_entry = runs_list[run.run_index] if run.run_index < total_runs else {}
-    run_entry_dict = cast(dict[str, object], run_entry) if isinstance(run_entry, dict) else {}
-    break_hours_raw = run_entry_dict.get("break_after_hours")
-    break_hours = break_hours_raw if isinstance(break_hours_raw, int) else 0
+    break_hours = config.runs[run.run_index].break_after_hours if run.run_index < total_runs else 0
     break_duration = _format_break_duration(break_hours)
 
     all_run_puzzles = list(
@@ -1221,7 +1199,7 @@ def _build_run_puzzle_overview(
             run_puzzle, training_id, total_queue
         ),
         "runPace": {
-            "chartData": _pace_chart_data(run, all_run_puzzles, config, total_queue),
+            "chartData": _pace_chart_data(run, all_run_puzzles, config),
             "isRunActive": run.completed_at is None and run.aborted_at is None,
         },
         "stats": {
@@ -1300,7 +1278,7 @@ def complete_attempt(
         raise ValueError("Attempt is already completed.")
 
     _, config = _get_schedule_config(run)
-    total_queue = _total_queue_attempts(config)
+    total_queue = config.total_queue
     is_queue_attempt = attempt.try_number <= total_queue
 
     content = get_content(run_puzzle.training_item_id)
@@ -1328,12 +1306,8 @@ def complete_attempt(
             training = db.session.get(Training, run.training_id)
             if training is not None:
                 schedule = db.session.get(Schedule, training.schedule_id)
-                if schedule is not None:
-                    schedule_config: dict[str, object] = (
-                        schedule.config if isinstance(schedule.config, dict) else {}
-                    )
-                    runs_list = schedule_config.get("runs")
-                    run_count = len(runs_list) if isinstance(runs_list, list) else 0
+                if schedule is not None and isinstance(schedule.config, dict):
+                    run_count = len(ScheduleConfig.from_dict(schedule.config).runs)
                     if run.run_index == run_count - 1:
                         training.completed_at = now
 
@@ -1361,7 +1335,7 @@ def get_training_item_history(run_id: int, training_item_id: int, user_id: int) 
     content = get_content(training_item_id)
 
     _, config = _get_schedule_config(run)
-    total_queue = _total_queue_attempts(config)
+    total_queue = config.total_queue
 
     run_training_items = list(
         db.session.scalars(

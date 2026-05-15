@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from typing import cast
 
 import sqlalchemy as sa
 
@@ -9,23 +8,7 @@ from app.models.schedule import Schedule
 from app.models.training import Training
 from app.models.subset import Subset
 from app.models.user import User
-
-
-def _compute_total_hours(config: dict[str, object]) -> int:
-    runs_raw = config.get("runs")
-    if not isinstance(runs_raw, list):
-        return 0
-    total = 0
-    for run_item in runs_raw:
-        if not isinstance(run_item, dict):
-            continue
-        run = cast(dict[str, object], run_item)
-        target = run.get("target_hours")
-        break_after = run.get("break_after_hours")
-        total += (target if isinstance(target, int) else 0) + (
-            break_after if isinstance(break_after, int) else 0
-        )
-    return total
+from app.services.schedule_config import ScheduleConfig
 
 
 def _get_owned_training(training_id: int, user_id: int) -> Training:
@@ -51,12 +34,10 @@ def training_full_dict(training: Training) -> dict[str, object]:
     if owner is None:
         raise LookupError("Training owner not found.")
 
-    config = schedule.config if isinstance(schedule.config, dict) else {}
-    runs_raw = config.get("runs")
-    run_count = len(runs_raw) if isinstance(runs_raw, list) else 0
-    order_raw = config.get("puzzle_order")
-    puzzle_order = order_raw if isinstance(order_raw, str) else None
-    total_hours = _compute_total_hours(config)
+    schedule_cfg = ScheduleConfig.from_dict(schedule.config if isinstance(schedule.config, dict) else {})
+    run_count = len(schedule_cfg.runs)
+    puzzle_order = schedule_cfg.puzzle_order
+    total_hours = schedule_cfg.total_hours
 
     puzzle_count = (
         subset.locked_puzzle_count
@@ -97,7 +78,7 @@ def training_full_dict(training: Training) -> dict[str, object]:
             "status": schedule.status,
             "totalHours": total_hours,
             "runCount": run_count,
-            "runs": runs_raw if isinstance(runs_raw, list) else [],
+            "runs": [{"target_hours": r.target_hours, "break_after_hours": r.break_after_hours} for r in schedule_cfg.runs],
             "puzzleOrder": puzzle_order,
             "createdBy": {
                 "username": creator.lichess_username,
@@ -221,9 +202,7 @@ def list_my_trainings(user_id: int) -> list[dict[str, object]]:
 
     result: list[dict[str, object]] = []
     for row in rows:
-        config: dict[str, object] = row.config if isinstance(row.config, dict) else {}
-        runs_raw = config.get("runs")
-        total_runs = len(runs_raw) if isinstance(runs_raw, list) else 0
+        total_runs = len(ScheduleConfig.from_dict(row.config).runs) if isinstance(row.config, dict) else 0
         result.append({
             "id": row.id,
             "scheduleId": row.schedule_id,
@@ -322,9 +301,7 @@ def list_all_trainings(schedule_id: int | None = None) -> list[dict[str, object]
 
     result: list[dict[str, object]] = []
     for row in rows:
-        config: dict[str, object] = row.config if isinstance(row.config, dict) else {}
-        runs_raw = config.get("runs")
-        total_runs = len(runs_raw) if isinstance(runs_raw, list) else 0
+        total_runs = len(ScheduleConfig.from_dict(row.config).runs) if isinstance(row.config, dict) else 0
         result.append({
             "id": row.id,
             "scheduleId": row.schedule_id,

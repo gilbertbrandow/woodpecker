@@ -1,7 +1,6 @@
 import pytest
 from app.models.run import TrainingAttempt
 from app.services.attempt_state import attempt_type_fields
-from app.services.run import _total_queue_attempts
 
 
 def _make_attempt(try_number: int, status: str) -> TrainingAttempt:
@@ -9,21 +8,6 @@ def _make_attempt(try_number: int, status: str) -> TrainingAttempt:
     a.try_number = try_number
     a.status = status
     return a
-
-
-
-@pytest.mark.parametrize(
-    "config, expected",
-    [
-        ({}, 1),
-        ({"failed_repetition": {"mode": "single"}}, 1),
-        ({"failed_repetition": {"mode": "queue", "max_repeats": 0}}, 1),
-        ({"failed_repetition": {"mode": "queue", "max_repeats": 2}}, 3),
-        ({"failed_repetition": "not_a_dict"}, 1),
-    ],
-)
-def test_total_queue_attempts(config: dict[str, object], expected: int) -> None:
-    assert _total_queue_attempts(config) == expected
 
 
 def test_attempt_type_fields_first_attempt_scored() -> None:
