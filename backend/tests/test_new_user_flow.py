@@ -10,6 +10,29 @@ from flask.testing import FlaskClient
 
 from app.models.user import User, WaitlistEntry, WhitelistEntry
 from app.services.validation import validate_display_name
+from app.services.auth_service import decide_access
+
+
+# ── Access decision (pure, no DB) ─────────────────────────────────────────────
+
+class TestDecideAccess:
+    def test_below_cap_gets_onboarding(self) -> None:
+        assert decide_access("user", active_count=4, max_users=5, in_whitelist=False) == "onboarding"
+
+    def test_at_cap_gets_waitlisted(self) -> None:
+        assert decide_access("user", active_count=5, max_users=5, in_whitelist=False) == "waitlisted"
+
+    def test_over_cap_gets_waitlisted(self) -> None:
+        assert decide_access("user", active_count=10, max_users=5, in_whitelist=False) == "waitlisted"
+
+    def test_zero_max_users_waitlists_everyone(self) -> None:
+        assert decide_access("user", active_count=0, max_users=0, in_whitelist=False) == "waitlisted"
+
+    def test_whitelisted_bypasses_full_cap(self) -> None:
+        assert decide_access("vip", active_count=5, max_users=5, in_whitelist=True) == "onboarding"
+
+    def test_whitelisted_bypasses_zero_cap(self) -> None:
+        assert decide_access("vip", active_count=0, max_users=0, in_whitelist=True) == "onboarding"
 
 
 # ── Display name validation ───────────────────────────────────────────────────
