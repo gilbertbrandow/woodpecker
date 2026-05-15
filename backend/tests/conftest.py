@@ -9,7 +9,7 @@ from flask.testing import FlaskClient
 _TRUNCATE_TABLES = (
     "training_attempts, run_training_items, runs, trainings, "
     "schedules, subset_training_items, subsets, users, lichess_tactics, training_items, "
-    "lichess_tactics_source_run_metadata, source_import_runs"
+    "lichess_tactics_source_run_metadata, source_import_runs, waitlist, whitelist"
 )
 
 
@@ -99,6 +99,7 @@ def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
 
     user = User(
         lichess_username=f"testuser_{tactic.id}",
+        display_name=f"testuser_{tactic.id}",
         created_at=datetime.now(timezone.utc),
     )
     session.add(user)

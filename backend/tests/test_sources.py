@@ -9,7 +9,7 @@ from flask.testing import FlaskClient
 def _make_user(session):  # type: ignore[misc]
     from app.models.user import User
 
-    user = User(lichess_username="sources_test_user", created_at=datetime.now(timezone.utc))
+    user = User(lichess_username="sources_test_user", display_name="sources_test_user", created_at=datetime.now(timezone.utc))
     session.add(user)
     session.flush()
     return user

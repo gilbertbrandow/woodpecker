@@ -69,8 +69,8 @@ def training_full_dict(training: Training) -> dict[str, object]:
         "startedAt": training.started_at.isoformat(),
         "completedAt": training.completed_at.isoformat() if training.completed_at else None,
         "abortedAt": training.aborted_at.isoformat() if training.aborted_at else None,
-        "ownerUsername": owner.lichess_username,
-        "ownerDisplayName": owner.nickname or owner.lichess_username,
+        "ownerId": owner.id,
+        "ownerDisplayName": owner.display_name,
         "ownerAvatarUrl": owner.avatar_url,
         "runTargets": run_targets,
         "schedule": {
@@ -83,7 +83,7 @@ def training_full_dict(training: Training) -> dict[str, object]:
             "runs": [{"target_hours": r.target_hours, "break_after_hours": r.break_after_hours} for r in schedule_cfg.runs],
             "puzzleOrder": puzzle_order,
             "createdBy": {
-                "username": creator.lichess_username,
+                "displayName": creator.display_name,
                 "avatarUrl": creator.avatar_url,
             },
             "subset": {
@@ -265,7 +265,7 @@ def list_all_trainings(schedule_id: int | None = None) -> list[dict[str, object]
             SELECT t.id, t.schedule_id,
                    t.started_at, t.completed_at, t.aborted_at,
                    s.name AS schedule_name, s.subset_id, s.config,
-                   u.lichess_username, u.avatar_url,
+                   u.display_name, u.avatar_url,
                    CASE
                      WHEN t.aborted_at IS NOT NULL THEN 'aborted'
                      WHEN t.completed_at IS NOT NULL THEN 'completed'
@@ -317,7 +317,7 @@ def list_all_trainings(schedule_id: int | None = None) -> list[dict[str, object]
             "completedAt": row.completed_at.isoformat() if row.completed_at else None,
             "abortedAt": row.aborted_at.isoformat() if row.aborted_at else None,
             "user": {
-                "username": row.lichess_username,
+                "displayName": row.display_name,
                 "avatarUrl": row.avatar_url,
             },
         })
@@ -355,7 +355,7 @@ def get_schedule_participants(
 
     rows = db.session.execute(
         sa.text("""
-            SELECT t.id, t.started_at, u.lichess_username, u.avatar_url
+            SELECT t.id, t.started_at, u.display_name, u.avatar_url
             FROM trainings t
             JOIN users u ON u.id = t.user_id
             WHERE t.schedule_id = :sid
@@ -367,7 +367,7 @@ def get_schedule_participants(
     participants: list[dict[str, object]] = [
         {
             "id": row.id,
-            "username": row.lichess_username,
+            "displayName": row.display_name,
             "avatarUrl": row.avatar_url,
             "startedAt": row.started_at.isoformat(),
         }

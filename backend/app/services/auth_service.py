@@ -76,7 +76,7 @@ def get_or_create_user(access_token: str) -> dict[str, object]:
     max_users = _get_max_users()
     active_count = db.session.scalar(sa.select(sa.func.count()).select_from(User)) or 0
 
-    if in_whitelist or max_users == 0 or active_count < max_users:
+    if in_whitelist or (max_users > 0 and active_count < max_users):
         return {
             "status": "onboarding",
             "lichess_username": lichess_username,

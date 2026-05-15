@@ -1,5 +1,6 @@
 from app.extensions import db
 from app.models.user import User
+from app.services.validation import validate_display_name
 
 AVATAR_PIECES = {"bk", "bq", "br", "bb", "bn"}
 AVATAR_COLORS = {
@@ -17,15 +18,6 @@ PIECE_SETS = {
 
 DEFAULT_BOARD_THEME = "blue"
 DEFAULT_PIECE_SET = "alpha"
-
-
-def _validate_nickname(value: str) -> str | None:
-    stripped = value.strip()
-    if not stripped:
-        return None
-    if len(stripped) > 32:
-        raise ValueError("Nickname must be 32 characters or fewer.")
-    return stripped
 
 
 def _validate_avatar_url(value: str) -> str | None:
@@ -64,7 +56,7 @@ def _validate_piece_set(value: str) -> str:
 
 def update_user_settings(
     user_id: int,
-    nickname: str | None,
+    display_name: str | None,
     avatar_url: str | None,
     board_theme: str | None,
     piece_theme: str | None,
@@ -74,8 +66,8 @@ def update_user_settings(
     if not user:
         raise ValueError("User not found.")
 
-    if nickname is not None:
-        user.nickname = _validate_nickname(nickname)
+    if display_name is not None:
+        user.display_name = validate_display_name(display_name)
     if avatar_url is not None:
         user.avatar_url = _validate_avatar_url(avatar_url)
     if board_theme is not None:
