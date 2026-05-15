@@ -25,6 +25,7 @@ services:
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:5173}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-0}
       FLASK_ENV: ${FLASK_ENV:-production}
+      MAX_USERS: ${MAX_USERS:-0}
     depends_on:
       db:
         condition: service_healthy
