@@ -12,6 +12,7 @@ from app.routes.themes import themes_bp
 from app.routes.openings import openings_bp
 from app.routes.leaderboard import leaderboard_bp
 from app.routes.sources import sources_bp
+from app.cli import register_commands
 
 
 def create_app() -> Flask:
@@ -38,5 +39,7 @@ def create_app() -> Flask:
     app.register_blueprint(openings_bp)
     app.register_blueprint(leaderboard_bp)
     app.register_blueprint(sources_bp)
+
+    register_commands(app)
 
     return app
