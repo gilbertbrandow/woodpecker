@@ -49,11 +49,13 @@ See `CONTEXT.md` for the domain glossary. See `pipeline/AGENTS.md` for pipeline-
 - Frontend: Vitest + `@testing-library/react`. Test files go in `src/test/` or a local `__tests__/` folder.
 
 **Full suite (matches CI, use for final verification):**
+
 - `make test` — unit tests for both backend and frontend inside Docker.
 - `make test-integration` — integration tests against a throwaway test DB.
 - `make test-all` — everything.
 
 **Faster inner loop (use during development):**
+
 - `cd backend && make test` — backend unit tests only, using the local `.venv`.
 - `cd backend && make test-integration` — backend integration tests (requires a running local DB).
 - `cd frontend && make test` — frontend tests; the frontend Makefile handles Node version via `nvm` automatically.
