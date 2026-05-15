@@ -159,7 +159,7 @@ make -C deploy db-tunnel-stop
 make -C deploy db-shell-ec2
 ```
 
-GUI tools (Beekeeper, TablePlus, etc.): run `db-tunnel-start`, connect to `localhost:5433` with user `woodpecker` and the password from `.env.local`.
+GUI tools (Beekeeper, TablePlus, etc.): run `db-tunnel-start`, connect to `localhost:5433` with user `woodpecker` and the password from `~/.woodpecker-prod-env`.
 
 ## Rollback
 

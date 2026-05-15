@@ -12,8 +12,8 @@ load_env() {
     fi
     # shellcheck source=/dev/null
     source "$ENV_FILE"
-    : "${EC2_HOST:?EC2_HOST must be set in deploy/.env.local}"
-    : "${PROD_DB_PASSWORD:?PROD_DB_PASSWORD must be set in deploy/.env.local}"
+    : "${EC2_HOST:?EC2_HOST must be set in ~/.woodpecker-prod-env}"
+    : "${PROD_DB_PASSWORD:?PROD_DB_PASSWORD must be set in ~/.woodpecker-prod-env}"
 }
 
 start() {
