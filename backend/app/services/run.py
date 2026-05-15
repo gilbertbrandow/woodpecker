@@ -20,7 +20,14 @@ from app.services.attempt_state import (
 )
 from app.services.chess_board import compute_attempt_board, compute_attempt_pgn
 from app.services.schedule_config import ScheduleConfig
-from app.services.training_item_content import TrainingItemContent, get_content, get_content_batch
+from app.services.solve_contract import SolveContract
+from app.services.training_item_content import (
+    LichessTacticMetadata,
+    SourceMetadata,
+    TrainingItemPayload,
+    get_content,
+    get_content_batch,
+)
 
 
 def _get_run(run_id: int) -> Run:
@@ -164,7 +171,7 @@ def _session_attempt_strip_item(
 
 
 def _run_puzzle_attempt_view_dict(run_puzzle: RunTrainingItem) -> dict[str, object]:
-    content = get_content(run_puzzle.training_item_id)
+    payload = get_content(run_puzzle.training_item_id)
     run = db.session.get(Run, run_puzzle.run_id)
     if run is None:
         raise LookupError("Run not found.")
@@ -211,12 +218,9 @@ def _run_puzzle_attempt_view_dict(run_puzzle: RunTrainingItem) -> dict[str, obje
             "scheduleName": schedule_name,
         },
         "trainingItem": {
-            "displayId": content.display_id,
-            "fen": content.fen,
-            "solution": content.moves.split(),
-            "rating": content.rating,
-            "themes": content.themes,
-            "gameUrl": content.game_url,
+            "fen": payload.contract.fen,
+            "solution": payload.contract.plies,
+            "source": payload.metadata.to_api_dict(),
         },
         "attempt": {
             "id": in_progress_attempt.id,
@@ -239,7 +243,7 @@ def _run_puzzle_attempt_view_dict(run_puzzle: RunTrainingItem) -> dict[str, obje
 
 
 def _run_puzzle_full_dict(run_puzzle: RunTrainingItem) -> dict[str, object]:
-    content = get_content(run_puzzle.training_item_id)
+    payload = get_content(run_puzzle.training_item_id)
     run = db.session.get(Run, run_puzzle.run_id)
     if run is None:
         raise LookupError("Run not found.")
@@ -269,11 +273,9 @@ def _run_puzzle_full_dict(run_puzzle: RunTrainingItem) -> dict[str, object]:
         "runTrainingItemId": run_puzzle.id,
         "position": run_puzzle.position,
         "positionStatus": derive_position_status(sorted_attempts, total_queue),
-        "displayId": content.display_id,
-        "fen": content.fen,
-        "solution": content.moves,
-        "rating": content.rating,
-        "gameUrl": content.game_url,
+        "source": payload.metadata.to_api_dict(),
+        "fen": payload.contract.fen,
+        "solution": payload.contract.plies,
         "maxTriesPerItem": total_queue,
         "currentTryNumber": current_try_number,
         "currentAttemptId": current_attempt_id,
@@ -281,7 +283,6 @@ def _run_puzzle_full_dict(run_puzzle: RunTrainingItem) -> dict[str, object]:
         "totalItems": total_puzzles,
         "scheduleName": schedule.name,
         "runIndex": run.run_index,
-        "themes": content.themes,
         **attempt_type_data,
     }
 
@@ -666,7 +667,7 @@ def list_run_puzzles(run_id: int) -> dict[str, object]:
     ).all()
 
     training_item_ids = [row.training_item_id for row in rows]
-    contents = get_content_batch(training_item_ids)
+    payloads = get_content_batch(training_item_ids)
 
     rp_ids = [row.run_training_item_id for row in rows]
     attempts_by_puzzle: dict[int, list[TrainingAttempt]] = {rp_id: [] for rp_id in rp_ids}
@@ -679,8 +680,7 @@ def list_run_puzzles(run_id: int) -> dict[str, object]:
         {
             "runTrainingItemId": row.run_training_item_id,
             "position": row.position,
-            "displayId": contents[row.training_item_id].display_id,
-            "rating": contents[row.training_item_id].rating,
+            "source": payloads[row.training_item_id].metadata.to_api_dict(),
             "positionStatus": derive_position_status(
                 attempts_by_puzzle[row.run_training_item_id], total_queue
             ),
@@ -840,8 +840,7 @@ def _overview_attempt_view(
     run_puzzle: RunTrainingItem,
     qualifying_attempt_id: int | None,
     total_queue: int,
-    puzzle_fen: str,
-    puzzle_solution: str,
+    contract: SolveContract,
     run_puzzles: list[RunTrainingItem],
     training_id: int,
 ) -> dict[str, object]:
@@ -852,6 +851,7 @@ def _overview_attempt_view(
         attempt, qualifying_attempt_id, run_puzzles, total_queue, training_id
     )
 
+    attempt_moves = attempt.moves if isinstance(attempt.moves, list) else []
     return {
         "id": attempt.id,
         "runId": run.id,
@@ -862,21 +862,15 @@ def _overview_attempt_view(
         "startedAt": attempt.started_at.isoformat(),
         "completedAt": attempt.completed_at.isoformat() if attempt.completed_at else None,
         "timeSpentMs": attempt.time_spent_ms,
-        "moves": attempt.moves if isinstance(attempt.moves, list) else [],
+        "moves": attempt_moves,
         "attemptType": type_data["attemptType"],
         "isQualifying": attempt.id == qualifying_attempt_id,
         "countsTowardsTraining": type_data["countsTowardsTraining"],
         "countsTowardsProgress": type_data["countsTowardsProgress"],
         "countsTowardsAccuracy": type_data["countsTowardsAccuracy"],
         "countsTowardsAverageTime": type_data["countsTowardsAverageTime"],
-        "board": compute_attempt_board(
-            puzzle_fen, puzzle_solution, attempt.status,
-            attempt.moves if isinstance(attempt.moves, list) else [],
-        ),
-        "pgnDisplay": compute_attempt_pgn(
-            puzzle_fen, puzzle_solution, attempt.status,
-            attempt.moves if isinstance(attempt.moves, list) else [],
-        ),
+        "board": compute_attempt_board(contract, attempt.status, attempt_moves),
+        "pgnDisplay": compute_attempt_pgn(contract, attempt.status, attempt_moves),
         "impact": impact,
     }
 
@@ -903,7 +897,7 @@ def _same_puzzle_run_overview_items(
         other_run = db.session.get(Run, rp.run_id)
         if other_run is None:
             continue
-        rp_content = get_content(rp.training_item_id)
+        rp_payload = get_content(rp.training_item_id)
 
         sorted_attempts = sorted(rp.attempts, key=lambda a: a.try_number)
         q_id = qualifying_attempt_id(sorted_attempts, total_queue)
@@ -917,7 +911,7 @@ def _same_puzzle_run_overview_items(
         attempt_views = [
             _overview_attempt_view(
                 a, other_run, rp, q_id, total_queue,
-                rp_content.fen, rp_content.moves,
+                rp_payload.contract,
                 other_run_puzzles_for_run, training_id,
             )
             for a in sorted_attempts
@@ -1015,7 +1009,7 @@ def _compute_progress_card(
     return {"runProgress": run_progress_row, "trainingProgress": training_progress_row}
 
 
-def _compute_overview_actions(run: Run, content: TrainingItemContent) -> dict[str, object]:
+def _compute_overview_actions(run: Run, metadata: SourceMetadata) -> dict[str, object]:
     next_enabled = run.completed_at is None and run.aborted_at is None
     disabled_reason: str | None = None
     if run.completed_at is not None:
@@ -1023,10 +1017,14 @@ def _compute_overview_actions(run: Run, content: TrainingItemContent) -> dict[st
     elif run.aborted_at is not None:
         disabled_reason = "Run aborted"
 
+    analyze_url: str | None = (
+        metadata.game_url if isinstance(metadata, LichessTacticMetadata) else None
+    )
+
     return {
         "runStatus": run.status,
         "retake": {"enabled": True},
-        "analyze": {"enabled": True, "url": content.game_url},
+        "analyze": {"enabled": analyze_url is not None, "url": analyze_url},
         "nextTrainingItem": {"enabled": next_enabled, "disabledReason": disabled_reason},
     }
 
@@ -1099,7 +1097,7 @@ def _build_run_puzzle_overview(
     run_just_completed: bool = False,
     completing_attempt_id: int | None = None,
 ) -> dict[str, object]:
-    content = get_content(run_puzzle.training_item_id)
+    payload = get_content(run_puzzle.training_item_id)
 
     _, config = _get_schedule_config(run)
     total_queue = config.total_queue
@@ -1146,7 +1144,7 @@ def _build_run_puzzle_overview(
     for a in sorted_attempts:
         view = _overview_attempt_view(
             a, run, run_puzzle, q_attempt_id, total_queue,
-            content.fen, content.moves, all_run_puzzles, training_id,
+            payload.contract, all_run_puzzles, training_id,
         )
         if a.id == q_attempt_id:
             impact = cast(dict[str, object], view["impact"])
@@ -1186,12 +1184,9 @@ def _build_run_puzzle_overview(
             "scheduleName": schedule_name,
         },
         "trainingItem": {
-            "displayId": content.display_id,
-            "fen": content.fen,
-            "solution": content.moves.split(),
-            "rating": content.rating,
-            "themes": content.themes,
-            "gameUrl": content.game_url,
+            "fen": payload.contract.fen,
+            "solution": payload.contract.plies,
+            "source": payload.metadata.to_api_dict(),
         },
         "selectedAttemptId": resolved_selected_id,
         "attempts": attempt_views,
@@ -1210,7 +1205,7 @@ def _build_run_puzzle_overview(
         "progress": _compute_progress_card(
             run, all_run_puzzles, total_queue, run_progress_delta_pct, training_id
         ),
-        "actions": _compute_overview_actions(run, content),
+        "actions": _compute_overview_actions(run, payload.metadata),
         "timer": {
             "targetSolveTenths": target_solve_tenths,
         },
@@ -1281,9 +1276,9 @@ def complete_attempt(
     total_queue = config.total_queue
     is_queue_attempt = attempt.try_number <= total_queue
 
-    content = get_content(run_puzzle.training_item_id)
+    payload = get_content(run_puzzle.training_item_id)
 
-    outcome = derive_attempt_outcome(content.fen, content.moves, uci_moves)
+    outcome = derive_attempt_outcome(payload.contract, uci_moves)
 
     now = datetime.now(timezone.utc)
     attempt.status = outcome
@@ -1332,7 +1327,7 @@ def complete_attempt(
 
 def get_training_item_history(run_id: int, training_item_id: int, user_id: int) -> dict[str, object]:
     run = _get_owned_run(run_id, user_id)
-    content = get_content(training_item_id)
+    payload = get_content(training_item_id)
 
     _, config = _get_schedule_config(run)
     total_queue = config.total_queue
@@ -1364,8 +1359,8 @@ def get_training_item_history(run_id: int, training_item_id: int, user_id: int) 
         })
 
     return {
-        "displayId": content.display_id,
-        "solution": content.moves,
+        "source": payload.metadata.to_api_dict(),
+        "solution": payload.contract.plies,
         "maxTriesPerItem": total_queue,
         "positions": positions,
     }

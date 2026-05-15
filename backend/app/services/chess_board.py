@@ -1,28 +1,33 @@
 import chess
 
+from app.services.solve_contract import SolveContract
+
+
+def _resolve(ply: str | list[str]) -> str:
+    return ply if isinstance(ply, str) else ply[0]
+
 
 def compute_attempt_board(
-    fen: str,
-    solution: str,
+    contract: SolveContract,
     status: str,
     moves: list[str],
 ) -> dict[str, object] | None:
     if status == "in_progress":
         return None
 
-    solution_plies = solution.split()
-    board = chess.Board(fen)
+    plies = contract.plies
+    board = chess.Board(contract.fen)
 
     if status == "solved":
         try:
-            board.push_uci(solution_plies[0])
+            board.push_uci(_resolve(plies[0]))
             player_idx = 0
             opponent_idx = 2
             for uci in moves:
                 board.push_uci(uci)
                 is_last_user = player_idx + 1 >= len(moves)
-                if not is_last_user and opponent_idx < len(solution_plies):
-                    board.push_uci(solution_plies[opponent_idx])
+                if not is_last_user and opponent_idx < len(plies):
+                    board.push_uci(_resolve(plies[opponent_idx]))
                     opponent_idx += 2
                 player_idx += 1
         except Exception:
@@ -36,22 +41,25 @@ def compute_attempt_board(
         }
 
     try:
-        board.push_uci(solution_plies[0])
-        player_positions = list(range(1, len(solution_plies), 2))
+        board.push_uci(_resolve(plies[0]))
+        player_positions = list(range(1, len(plies), 2))
         for i, uci in enumerate(moves):
             if i >= len(player_positions):
                 break
-            expected = solution_plies[player_positions[i]]
+            expected = plies[player_positions[i]]
             board.push_uci(uci)
-            if uci != expected and not board.is_checkmate():
+            is_correct = (
+                uci in expected if isinstance(expected, list) else uci == expected
+            )
+            if not is_correct and not board.is_checkmate():
                 last_move = [uci[:2], uci[2:4]]
                 return {
                     "terminalFen": board.fen(),
                     "lastMove": last_move,
                     "result": "wrong",
                 }
-            if i + 1 < len(moves) and player_positions[i] + 1 < len(solution_plies):
-                board.push_uci(solution_plies[player_positions[i] + 1])
+            if i + 1 < len(moves) and player_positions[i] + 1 < len(plies):
+                board.push_uci(_resolve(plies[player_positions[i] + 1]))
     except Exception:
         pass
 
@@ -59,15 +67,14 @@ def compute_attempt_board(
 
 
 def compute_attempt_pgn(
-    fen: str,
-    solution: str,
+    contract: SolveContract,
     status: str,
     moves: list[str],
 ) -> dict[str, object] | None:
     if status == "in_progress":
         return None
 
-    solution_plies = solution.split()
+    plies = contract.plies
 
     def _make_display_move(
         board: chess.Board,
@@ -96,15 +103,15 @@ def compute_attempt_pgn(
     mainline: list[dict[str, object]] = []
     variation: list[dict[str, object]] | None = None
 
-    board = chess.Board(fen)
+    board = chess.Board(contract.fen)
     try:
-        opp_move = _make_display_move(board, solution_plies[0], "opponent")
+        opp_move = _make_display_move(board, _resolve(plies[0]), "opponent")
         if opp_move:
             mainline.append(opp_move)
     except Exception:
         return {"mainline": mainline, "variation": None}
 
-    player_positions = list(range(1, len(solution_plies), 2))
+    player_positions = list(range(1, len(plies), 2))
 
     if status == "solved":
         for i, uci in enumerate(moves):
@@ -115,8 +122,8 @@ def compute_attempt_pgn(
             mainline.append(dm)
             if not is_last:
                 opp_idx = player_positions[i] + 1 if i < len(player_positions) else None
-                if opp_idx is not None and opp_idx < len(solution_plies):
-                    opp = _make_display_move(board, solution_plies[opp_idx], "opponent")
+                if opp_idx is not None and opp_idx < len(plies):
+                    opp = _make_display_move(board, _resolve(plies[opp_idx]), "opponent")
                     if opp:
                         mainline.append(opp)
         return {"mainline": mainline, "variation": None}
@@ -124,36 +131,36 @@ def compute_attempt_pgn(
     for i, uci in enumerate(moves):
         if i >= len(player_positions):
             break
-        expected = solution_plies[player_positions[i]]
-        is_wrong = uci != expected
+        expected = plies[player_positions[i]]
+        is_wrong = (uci not in expected) if isinstance(expected, list) else (uci != expected)
         dm = _make_display_move(board, uci, "wrong" if is_wrong else "correct")
         if not dm:
             break
         mainline.append(dm)
         if is_wrong and not board.is_checkmate():
-            var_board = chess.Board(fen)
+            var_board = chess.Board(contract.fen)
             try:
-                var_board.push_uci(solution_plies[0])
+                var_board.push_uci(_resolve(plies[0]))
                 for j in range(i):
                     var_board.push_uci(moves[j])
-                    if player_positions[j] + 1 < len(solution_plies):
-                        var_board.push_uci(solution_plies[player_positions[j] + 1])
+                    if player_positions[j] + 1 < len(plies):
+                        var_board.push_uci(_resolve(plies[player_positions[j] + 1]))
             except Exception:
                 break
             variation = []
             var_idx = player_positions[i]
-            for k in range(var_idx, len(solution_plies)):
+            for k in range(var_idx, len(plies)):
                 vdm = _make_display_move(
                     var_board,
-                    solution_plies[k],
+                    _resolve(plies[k]),
                     "correct" if k % 2 == 1 else "opponent",
                 )
                 if not vdm:
                     break
                 variation.append(vdm)
             break
-        if i + 1 < len(moves) and player_positions[i] + 1 < len(solution_plies):
-            opp = _make_display_move(board, solution_plies[player_positions[i] + 1], "opponent")
+        if i + 1 < len(moves) and player_positions[i] + 1 < len(plies):
+            opp = _make_display_move(board, _resolve(plies[player_positions[i] + 1]), "opponent")
             if opp:
                 mainline.append(opp)
 

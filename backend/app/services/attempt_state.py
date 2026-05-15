@@ -3,6 +3,7 @@ from typing import cast
 import chess
 
 from app.models.run import TrainingAttempt
+from app.services.solve_contract import SolveContract
 
 
 def derive_position_status(attempts: list[TrainingAttempt], total_queue: int) -> str:
@@ -67,17 +68,18 @@ def qualifying_attempt_id(
     return None
 
 
-def derive_attempt_outcome(fen: str, solution: str, uci_moves: list[str]) -> str:
-    solution_plies = solution.split()
-    player_positions = list(range(1, len(solution_plies), 2))
+def derive_attempt_outcome(contract: SolveContract, uci_moves: list[str]) -> str:
+    plies = contract.plies
+    player_positions = list(range(1, len(plies), 2))
     required_player_count = len(player_positions)
 
-    if not solution_plies or required_player_count == 0:
+    if not plies or required_player_count == 0:
         return "failed"
 
-    board = chess.Board(fen)
+    board = chess.Board(contract.fen)
     try:
-        board.push_uci(solution_plies[0])
+        first = plies[0]
+        board.push_uci(first if isinstance(first, str) else first[0])
         for i, player_uci in enumerate(uci_moves):
             if i >= required_player_count:
                 return "failed"
@@ -85,11 +87,15 @@ def derive_attempt_outcome(fen: str, solution: str, uci_moves: list[str]) -> str
             if not board.is_legal(move):
                 return "failed"
             board.push(move)
-            expected_uci = solution_plies[player_positions[i]]
-            if player_uci != expected_uci and not board.is_checkmate():
+            expected = plies[player_positions[i]]
+            is_correct = (
+                player_uci in expected if isinstance(expected, list) else player_uci == expected
+            )
+            if not is_correct and not board.is_checkmate():
                 return "failed"
             if i < required_player_count - 1:
-                board.push_uci(solution_plies[player_positions[i] + 1])
+                next_opp = plies[player_positions[i] + 1]
+                board.push_uci(next_opp if isinstance(next_opp, str) else next_opp[0])
     except (chess.InvalidMoveError, chess.IllegalMoveError, ValueError, IndexError):
         return "failed"
 

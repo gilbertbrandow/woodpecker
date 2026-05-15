@@ -1,10 +1,12 @@
 import chess as python_chess
 from app.models.run import TrainingAttempt
 from app.services.attempt_state import derive_attempt_outcome, derive_position_status
+from app.services.solve_contract import SolveContract
 
 STANDARD_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-TWO_PLY_SOLUTION = "e2e4 d7d5"
-FOUR_PLY_SOLUTION = "e2e4 d7d5 e4d5 d8d5"
+TWO_PLY = SolveContract(fen=STANDARD_FEN, plies=["e2e4", "d7d5"])
+FOUR_PLY = SolveContract(fen=STANDARD_FEN, plies=["e2e4", "d7d5", "e4d5", "d8d5"])
+SET_MATCH = SolveContract(fen=STANDARD_FEN, plies=["e2e4", ["d7d5", "d7d6", "e7e5"]])
 
 
 def _make_attempt(try_number: int, status: str) -> TrainingAttempt:
@@ -15,41 +17,47 @@ def _make_attempt(try_number: int, status: str) -> TrainingAttempt:
 
 
 def test_outcome_solved_single_move() -> None:
-    result = derive_attempt_outcome(STANDARD_FEN, TWO_PLY_SOLUTION, ["d7d5"])
-    assert result == "solved"
+    assert derive_attempt_outcome(TWO_PLY, ["d7d5"]) == "solved"
 
 
 def test_outcome_solved_multi_move() -> None:
-    result = derive_attempt_outcome(STANDARD_FEN, FOUR_PLY_SOLUTION, ["d7d5", "d8d5"])
-    assert result == "solved"
+    assert derive_attempt_outcome(FOUR_PLY, ["d7d5", "d8d5"]) == "solved"
 
 
 def test_outcome_failed_wrong_move() -> None:
-    result = derive_attempt_outcome(STANDARD_FEN, TWO_PLY_SOLUTION, ["d7d6"])
-    assert result == "failed"
+    assert derive_attempt_outcome(TWO_PLY, ["d7d6"]) == "failed"
 
 
 def test_outcome_failed_empty_moves() -> None:
-    result = derive_attempt_outcome(STANDARD_FEN, TWO_PLY_SOLUTION, [])
-    assert result == "failed"
+    assert derive_attempt_outcome(TWO_PLY, []) == "failed"
 
 
 def test_outcome_solved_by_checkmate() -> None:
     fen = "4k3/Q6R/8/8/3K4/8/8/8 b - - 0 1"
-
     board_after_opp = python_chess.Board(fen)
     board_after_opp.push_uci("e8d8")
     for mate_uci in ("a7a8", "a7b8", "a7d7", "h7h8"):
         b = board_after_opp.copy()
         b.push_uci(mate_uci)
         assert b.is_checkmate(), f"{mate_uci} should be checkmate"
-        result = derive_attempt_outcome(fen, "e8d8 a7a8", [mate_uci])
-        assert result == "solved"
+        contract = SolveContract(fen=fen, plies=["e8d8", "a7a8"])
+        assert derive_attempt_outcome(contract, [mate_uci]) == "solved"
 
 
 def test_outcome_failed_not_all_moves() -> None:
-    result = derive_attempt_outcome(STANDARD_FEN, FOUR_PLY_SOLUTION, ["d7d5"])
-    assert result == "failed"
+    assert derive_attempt_outcome(FOUR_PLY, ["d7d5"]) == "failed"
+
+
+def test_outcome_solved_set_match_first_accepted() -> None:
+    assert derive_attempt_outcome(SET_MATCH, ["d7d5"]) == "solved"
+
+
+def test_outcome_solved_set_match_other_accepted() -> None:
+    assert derive_attempt_outcome(SET_MATCH, ["e7e5"]) == "solved"
+
+
+def test_outcome_failed_set_match_rejected_move() -> None:
+    assert derive_attempt_outcome(SET_MATCH, ["g8f6"]) == "failed"
 
 
 def test_status_not_started() -> None:
@@ -79,7 +87,6 @@ def test_status_in_progress_when_queue_not_exhausted() -> None:
 
 
 def test_status_solved_ignores_practice_attempts() -> None:
-    # try_number=1 is solved (within queue=2) → "solved", even though later attempts exist
     attempts = [
         _make_attempt(1, "solved"),
         _make_attempt(2, "failed"),
