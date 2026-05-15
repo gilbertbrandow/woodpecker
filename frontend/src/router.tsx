@@ -3,6 +3,8 @@ import type { AuthContextValue } from './context/auth'
 import { Layout } from './components/Layout'
 import { AppShell } from './components/AppShell'
 import { LoginPage } from './pages/LoginPage'
+import { OnboardingPage } from './pages/OnboardingPage'
+import { WaitlistPage } from './pages/WaitlistPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { SubsetsListPage } from './pages/SubsetsListPage'
@@ -56,20 +58,44 @@ const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   beforeLoad: ({ context }) => {
-    if (!context.auth.loading && context.auth.user) {
-      throw redirect({ to: '/app' })
-    }
+    if (context.auth.loading) return
+    if (context.auth.user) throw redirect({ to: '/app' })
+    if (context.auth.onboarding) throw redirect({ to: '/onboarding' })
+    if (context.auth.waitlisted) throw redirect({ to: '/waitlist' })
   },
   component: LoginPage,
+})
+
+const onboardingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/onboarding',
+  beforeLoad: ({ context }) => {
+    if (context.auth.loading) return
+    if (context.auth.user) throw redirect({ to: '/app' })
+    if (!context.auth.onboarding) throw redirect({ to: '/' })
+  },
+  component: OnboardingPage,
+})
+
+const waitlistRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/waitlist',
+  beforeLoad: ({ context }) => {
+    if (context.auth.loading) return
+    if (context.auth.user) throw redirect({ to: '/app' })
+    if (!context.auth.waitlisted) throw redirect({ to: '/' })
+  },
+  component: WaitlistPage,
 })
 
 const appRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/app',
   beforeLoad: ({ context }) => {
-    if (!context.auth.loading && !context.auth.user) {
-      throw redirect({ to: '/' })
-    }
+    if (context.auth.loading) return
+    if (context.auth.onboarding) throw redirect({ to: '/onboarding' })
+    if (context.auth.waitlisted) throw redirect({ to: '/waitlist' })
+    if (!context.auth.user) throw redirect({ to: '/' })
   },
 })
 
@@ -202,6 +228,8 @@ const runPuzzleOverviewRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
+  onboardingRoute,
+  waitlistRoute,
   appRoute.addChildren([
     appShellRoute.addChildren([
       dashboardRoute,

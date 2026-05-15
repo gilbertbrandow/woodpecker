@@ -31,17 +31,31 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export type AuthUser = {
+  status: 'active'
   id: number
   username: string
-  nickname: string | null
+  displayName: string
   avatarUrl: string | null
   boardTheme: string
   pieceTheme: string
   showTimerTenths: boolean
 }
 
+export type OnboardingState = {
+  status: 'onboarding'
+  lichessUsername: string
+  avatarUrl: string | null
+}
+
+export type WaitlistedState = {
+  status: 'waitlisted'
+  email: string | null
+}
+
+export type AuthState = AuthUser | OnboardingState | WaitlistedState
+
 export type SettingsPayload = {
-  nickname?: string
+  displayName?: string
   avatarUrl?: string
   boardTheme?: string
   pieceTheme?: string
@@ -56,7 +70,7 @@ export type Subset = {
   config: SubsetConfig | null
   createdAt: string
   lockedAt: string | null
-  ownedBy: { username: string; avatarUrl: string | null }
+  ownedBy: { id: number; displayName: string; avatarUrl: string | null }
 }
 
 export type SubsetConfig = {
@@ -167,7 +181,7 @@ export type ScheduleSummary = {
   name: string
   description: string | null
   status: 'draft' | 'locked'
-  createdBy: { username: string; avatarUrl: string | null }
+  createdBy: { id: number; displayName: string; avatarUrl: string | null }
   subsetId: number
   subsetName: string
   runCount: number
@@ -208,7 +222,7 @@ export type TrainingScheduleSummary = {
   runCount: number
   runs: { target_hours: number; break_after_hours: number }[]
   puzzleOrder: PuzzleOrder | null
-  createdBy: { username: string; avatarUrl: string | null }
+  createdBy: { displayName: string; avatarUrl: string | null }
   subset: { id: number; name: string; puzzleCount: number }
 }
 
@@ -219,7 +233,7 @@ export type Training = {
   startedAt: string
   completedAt: string | null
   abortedAt: string | null
-  ownerUsername: string
+  ownerId: number
   ownerDisplayName: string
   ownerAvatarUrl: string | null
   runTargets: RunTarget[]
@@ -241,12 +255,12 @@ export type MyTrainingSummary = {
 }
 
 export type AllTrainingSummary = MyTrainingSummary & {
-  user: { username: string; avatarUrl: string | null }
+  user: { displayName: string; avatarUrl: string | null }
 }
 
 export type ParticipantInfo = {
   id: number
-  username: string
+  displayName: string
   avatarUrl: string | null
   startedAt: string
 }
@@ -278,8 +292,7 @@ export type LeaderboardRun = {
   completedAt: string | null
   abortedAt: string | null
   status: RunStatus
-  username: string
-  nickname: string | null
+  displayName: string
   avatarUrl: string | null
   scheduleId: number
   scheduleName: string
@@ -379,7 +392,7 @@ export type Schedule = {
   status: 'draft' | 'locked'
   config: ScheduleConfig | null
   totalHours: number
-  createdBy: { username: string; avatarUrl: string | null }
+  createdBy: { id: number; displayName: string; avatarUrl: string | null }
   createdAt: string
   lockedAt: string | null
 }
@@ -606,15 +619,19 @@ export type LichessTacticsSourceRunMetadata = {
 
 export const api = {
   auth: {
-    me: (): Promise<AuthUser> => request('/auth/me'),
+    me: (): Promise<AuthState> => request('/auth/me'),
     logout: (): Promise<void> => request('/auth/logout', { method: 'POST' }),
+    completeOnboarding: (displayName: string): Promise<AuthUser> =>
+      request('/auth/onboarding', { method: 'POST', body: JSON.stringify({ displayName }) }),
+    updateWaitlistEmail: (email: string): Promise<WaitlistedState> =>
+      request('/auth/waitlist/email', { method: 'PATCH', body: JSON.stringify({ email }) }),
   },
   health: {
     check: (): Promise<{ status: string }> => request('/health'),
   },
   settings: {
     update: (payload: SettingsPayload): Promise<AuthUser> =>
-      request('/settings', { method: 'PATCH', body: JSON.stringify(payload) }),
+      request<AuthUser>('/settings', { method: 'PATCH', body: JSON.stringify(payload) }),
   },
   subsets: {
     list: (): Promise<Subset[]> => request('/subsets'),
