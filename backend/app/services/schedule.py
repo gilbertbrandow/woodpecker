@@ -34,7 +34,7 @@ def schedule_to_dict(schedule: Schedule, creator: User) -> dict[str, object]:
         "status": schedule.status,
         "config": schedule.config,
         "totalHours": total_hours,
-        "createdBy": {"username": creator.lichess_username, "avatarUrl": creator.avatar_url},
+        "createdBy": {"id": creator.id, "displayName": creator.display_name, "avatarUrl": creator.avatar_url},
         "createdAt": schedule.created_at.isoformat(),
         "lockedAt": schedule.locked_at.isoformat() if schedule.locked_at else None,
     }
@@ -176,7 +176,7 @@ def list_schedules(user_id: int, subset_id: int | None = None) -> list[dict[str,
         sa.text(f"""
             SELECT s.id, s.name, s.description, s.config,
                    s.created_at, s.locked_at, s.subset_id,
-                   u.lichess_username, u.avatar_url,
+                   u.id AS user_id, u.display_name, u.avatar_url,
                    sub.name AS subset_name
             FROM schedules s
             JOIN users u ON u.id = s.user_id
@@ -204,7 +204,7 @@ def list_schedules(user_id: int, subset_id: int | None = None) -> list[dict[str,
             "name": row.name,
             "description": row.description,
             "status": "locked" if row.locked_at is not None else "draft",
-            "createdBy": {"username": row.lichess_username, "avatarUrl": row.avatar_url},
+            "createdBy": {"id": int(row.user_id), "displayName": row.display_name, "avatarUrl": row.avatar_url},
             "subsetId": row.subset_id,
             "subsetName": row.subset_name,
             "runCount": run_count,

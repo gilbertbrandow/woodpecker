@@ -41,7 +41,8 @@ def subset_to_dict(subset: Subset, owner: User | None = None) -> dict[str, objec
     }
     if owner is not None:
         d["ownedBy"] = {
-            "username": owner.lichess_username,
+            "id": owner.id,
+            "displayName": owner.display_name,
             "avatarUrl": owner.avatar_url,
         }
     return d

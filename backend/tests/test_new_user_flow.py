@@ -106,12 +106,12 @@ class TestCapBehavior:
                 result = get_or_create_user("fake_token")
                 assert result["status"] == "waitlisted"
 
-    def test_zero_max_users_always_allows_onboarding(self, app: Flask, db_session) -> None:  # type: ignore[misc]
+    def test_zero_max_users_waitlists_everyone(self, app: Flask, db_session) -> None:  # type: ignore[misc]
         with patch.dict(os.environ, {"MAX_USERS": "0"}):
             with _patch_berserk(_make_lichess_mock("zeroucap")):
                 from app.services.auth_service import get_or_create_user
                 result = get_or_create_user("fake_token")
-                assert result["status"] == "onboarding"
+                assert result["status"] == "waitlisted"
 
 
 # ── Whitelist bypass ──────────────────────────────────────────────────────────
