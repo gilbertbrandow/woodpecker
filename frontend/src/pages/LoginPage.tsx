@@ -6,14 +6,15 @@ import { Button } from '../components/ui/button'
 import { LichessIcon } from '../components/LichessIcon'
 
 export function LoginPage(): React.ReactElement | null {
-  const { user, loading } = useAuth()
+  const { user, onboarding, waitlisted, loading } = useAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
-    if (!loading && user) {
-      void navigate({ to: '/app' })
-    }
-  }, [user, loading, navigate])
+    if (loading) return
+    if (user) void navigate({ to: '/app' })
+    else if (onboarding) void navigate({ to: '/onboarding' })
+    else if (waitlisted) void navigate({ to: '/waitlist' })
+  }, [user, onboarding, waitlisted, loading, navigate])
 
   if (loading) return null
 
