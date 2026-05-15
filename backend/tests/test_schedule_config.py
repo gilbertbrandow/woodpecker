@@ -2,7 +2,7 @@ import pytest
 
 from app.services.schedule_config import ScheduleConfig
 
-VALID = {
+VALID: dict[str, object] = {
     "runs": [{"target_hours": 24, "break_after_hours": 0}],
     "puzzle_order": "random",
     "failed_repetition": {"mode": "none"},

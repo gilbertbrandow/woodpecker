@@ -50,6 +50,7 @@ def test_pgn_solved_move_statuses() -> None:
     result = compute_attempt_pgn(TWO_PLY, "solved", ["d7d5"])
     assert result is not None
     mainline = result["mainline"]
+    assert isinstance(mainline, list)
     assert mainline[0]["moveStatus"] == "opponent"
     assert mainline[1]["moveStatus"] == "correct"
 
@@ -59,6 +60,7 @@ def test_pgn_failed_wrong_move_produces_variation() -> None:
     assert result is not None
     assert result["variation"] is not None
     mainline = result["mainline"]
+    assert isinstance(mainline, list)
     wrong_move = next((m for m in mainline if m["moveStatus"] == "wrong"), None)
     assert wrong_move is not None
 
@@ -68,5 +70,6 @@ def test_pgn_multi_move_solution_solved() -> None:
     assert result is not None
     assert result["variation"] is None
     mainline = result["mainline"]
+    assert isinstance(mainline, list)
     correct_moves = [m for m in mainline if m["moveStatus"] == "correct"]
     assert len(correct_moves) == 2
