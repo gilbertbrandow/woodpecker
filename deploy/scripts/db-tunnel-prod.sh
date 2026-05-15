@@ -2,13 +2,12 @@
 set -euo pipefail
 
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPO_DIR="$(cd "$DEPLOY_DIR/.." && pwd)"
-ENV_FILE="$REPO_DIR/.env"
+ENV_FILE="$HOME/.woodpecker-prod-env"
 PID_FILE="$DEPLOY_DIR/.db-tunnel.pid"
 
 load_env() {
     if [[ ! -f "$ENV_FILE" ]]; then
-        echo "Error: $ENV_FILE not found. Copy .env.example and fill in values." >&2
+        echo "Error: $ENV_FILE not found. Create it with EC2_HOST and PROD_DB_PASSWORD, then chmod 600 it." >&2
         exit 1
     fi
     # shellcheck source=/dev/null

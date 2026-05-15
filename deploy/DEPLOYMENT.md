@@ -132,7 +132,15 @@ rm /tmp/restore.sql.gz
 
 ## Database access
 
-Operator credentials (`EC2_HOST`, `PROD_DB_PASSWORD`) live in the root `.env` (gitignored). See `.env.example` for the keys to add.
+Operator credentials (`EC2_HOST`, `PROD_DB_PASSWORD`) live in `~/.woodpecker-prod-env` outside the repo (chmod 600, never committed). Create it manually:
+
+```bash
+cat > ~/.woodpecker-prod-env << 'EOF'
+EC2_HOST=your-ec2-host
+PROD_DB_PASSWORD=your-db-password
+EOF
+chmod 600 ~/.woodpecker-prod-env
+```
 
 ```bash
 # Open a background tunnel (localhost:5433 → production DB)

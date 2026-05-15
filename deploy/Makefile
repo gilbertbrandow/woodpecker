@@ -4,7 +4,7 @@ COMPOSE  = $(DOCKER) compose
 DEPLOY_DIR  := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 SCRIPTS_DIR := $(DEPLOY_DIR)/scripts
 
--include $(DEPLOY_DIR)/../.env
+-include $(HOME)/.woodpecker-prod-env
 
 PROD_DB_URL = postgresql://woodpecker:$(PROD_DB_PASSWORD)@localhost:5433/woodpecker
 
