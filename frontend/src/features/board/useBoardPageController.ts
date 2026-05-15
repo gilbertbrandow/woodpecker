@@ -30,27 +30,9 @@ import {
   INITIAL_OPPONENT_MOVE_DELAY_MS,
   OPPONENT_MOVE_ANIM_MS,
 } from './boardPage.helpers'
-import type { Mode, Orientation, PendingPromotion, MoveFeedbackResult, MoveFeedbackState } from './boardPage.helpers'
+import type { Mode, Orientation, PendingPromotion, MoveFeedbackResult, MoveFeedbackState, BoardState } from './boardPage.helpers'
 
-export type { Mode, Orientation, PendingPromotion, MoveFeedbackResult }
-
-export type BoardState = {
-  boardKey: number
-  boardSize: number
-  fen: string
-  orientation: Orientation
-  dests: Map<string, string[]>
-  lastMove: [string, string] | undefined
-  hintSquare: string | null
-  pendingPromotion: PendingPromotion | null
-  moveFeedback: {
-    result: MoveFeedbackResult | null
-    square: string | null
-    visible: boolean
-  }
-  turnToMove: Orientation
-  kingPieceUrl: string
-}
+export type { Mode, Orientation, PendingPromotion, MoveFeedbackResult, BoardState }
 
 export type TimerState = {
   elapsedTenths: number
