@@ -1,5 +1,4 @@
 import os
-import re
 
 from flask import Blueprint, redirect, session, request, jsonify, Response
 from werkzeug.wrappers import Response as WerkzeugResponse
@@ -14,7 +13,8 @@ from app.services.auth_service import (
     update_waitlist_email,
     get_waitlist_email,
 )
-from app.services.validation import validate_display_name
+from app.services.validation import validate_display_name, validate_email
+import app.auth_session as auth_session
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -22,8 +22,6 @@ APP_ORIGIN = os.environ.get("APP_ORIGIN", "http://localhost:5173")
 LICHESS_REDIRECT_URI = os.environ.get(
     "LICHESS_REDIRECT_URI", "http://localhost:5173/api/auth/callback"
 )
-
-_EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 
 
 @auth_bp.get("/login")
@@ -52,31 +50,35 @@ def callback() -> WerkzeugResponse:
 
     status = result["status"]
     if status == "active":
-        session["user_id"] = result["user_id"]
+        auth_session.set_active(int(result["user_id"]))  # type: ignore[arg-type]
     elif status == "onboarding":
-        session["pending_onboarding"] = {
-            "lichess_username": result["lichess_username"],
-            "avatar_url": result["avatar_url"],
-        }
+        auth_session.set_onboarding(
+            str(result["lichess_username"]),
+            result.get("avatar_url"),  # type: ignore[arg-type]
+        )
     elif status == "waitlisted":
-        session["waitlisted_lichess_username"] = result["lichess_username"]
+        auth_session.set_waitlisted(str(result["lichess_username"]))
 
     return redirect(APP_ORIGIN)
 
 
 @auth_bp.post("/logout")
 def logout() -> tuple[str, int]:
-    session.clear()
+    auth_session.clear()
     return "", 204
 
 
 @auth_bp.get("/me")
 def me() -> tuple[Response, int] | Response:
-    user_id = session.get("user_id")
-    if user_id:
-        user = db.session.get(User, user_id)
+    state = auth_session.read()
+
+    if state is None:
+        return jsonify({"error": "not authenticated"}), 401
+
+    if state["kind"] == "active":
+        user = db.session.get(User, state["user_id"])
         if not user:
-            session.clear()
+            auth_session.clear()
             return jsonify({"error": "not authenticated"}), 401
         return jsonify({
             "status": "active",
@@ -89,26 +91,21 @@ def me() -> tuple[Response, int] | Response:
             "showTimerTenths": user.show_timer_tenths,
         })
 
-    pending = session.get("pending_onboarding")
-    if pending:
+    if state["kind"] == "onboarding":
         return jsonify({
             "status": "onboarding",
-            "lichessUsername": pending["lichess_username"],
-            "avatarUrl": pending.get("avatar_url"),
+            "lichessUsername": state["lichess_username"],
+            "avatarUrl": state["avatar_url"],
         })
 
-    waitlisted = session.get("waitlisted_lichess_username")
-    if waitlisted:
-        email = get_waitlist_email(waitlisted)
-        return jsonify({"status": "waitlisted", "email": email})
-
-    return jsonify({"error": "not authenticated"}), 401
+    email = get_waitlist_email(state["lichess_username"])
+    return jsonify({"status": "waitlisted", "email": email})
 
 
 @auth_bp.post("/onboarding")
 def onboarding() -> tuple[Response, int] | Response:
-    pending = session.get("pending_onboarding")
-    if not pending:
+    state = auth_session.read()
+    if state is None or state["kind"] != "onboarding":
         return jsonify({"error": "no pending onboarding session"}), 401
 
     data: dict[str, object] = request.get_json(silent=True) or {}
@@ -121,13 +118,10 @@ def onboarding() -> tuple[Response, int] | Response:
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 
-    lichess_username: str = pending["lichess_username"]
-    avatar_url: str | None = pending.get("avatar_url")
-
-    user = create_user_from_onboarding(lichess_username, display_name, avatar_url)
-
-    session.pop("pending_onboarding", None)
-    session["user_id"] = user.id
+    user = create_user_from_onboarding(
+        state["lichess_username"], display_name, state["avatar_url"]
+    )
+    auth_session.set_active(user.id)
 
     return jsonify({
         "status": "active",
@@ -143,17 +137,22 @@ def onboarding() -> tuple[Response, int] | Response:
 
 @auth_bp.patch("/waitlist/email")
 def update_email() -> tuple[Response, int] | Response:
-    waitlisted = session.get("waitlisted_lichess_username")
-    if not waitlisted:
+    state = auth_session.read()
+    if state is None or state["kind"] != "waitlisted":
         return jsonify({"error": "not on waitlist"}), 401
 
     data: dict[str, object] = request.get_json(silent=True) or {}
-    email = data.get("email")
-    if not isinstance(email, str) or not _EMAIL_RE.match(email):
+    raw_email = data.get("email")
+    if not isinstance(raw_email, str):
         return jsonify({"error": "invalid email address"}), 400
 
     try:
-        entry = update_waitlist_email(waitlisted, email)
+        email = validate_email(raw_email)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    try:
+        entry = update_waitlist_email(state["lichess_username"], email)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
 

@@ -1,6 +1,14 @@
 import re
 
 _DISPLAY_NAME_RE = re.compile(r'^[\w\s\-]+$', re.UNICODE)
+_EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+
+
+def validate_email(value: str) -> str:
+    stripped = value.strip()
+    if not _EMAIL_RE.match(stripped):
+        raise ValueError("Invalid email address.")
+    return stripped
 
 
 def validate_display_name(value: str) -> str:
