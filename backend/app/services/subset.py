@@ -29,6 +29,24 @@ def subset_status(subset: Subset) -> str:
     return "filled" if count > 0 else "draft"
 
 
+def subset_to_dict(subset: Subset, owner: User | None = None) -> dict[str, object]:
+    d: dict[str, object] = {
+        "id": subset.id,
+        "name": subset.name,
+        "status": subset_status(subset),
+        "puzzleCount": subset.locked_puzzle_count if subset.locked_puzzle_count is not None else subset.puzzle_count,
+        "config": subset.config,
+        "createdAt": subset.created_at.isoformat(),
+        "lockedAt": subset.locked_at.isoformat() if subset.locked_at else None,
+    }
+    if owner is not None:
+        d["ownedBy"] = {
+            "username": owner.lichess_username,
+            "avatarUrl": owner.avatar_url,
+        }
+    return d
+
+
 def _parse_config(config: dict[str, object]) -> tuple[
     int, int, float | None, float | None, str, list[str], float
 ]:

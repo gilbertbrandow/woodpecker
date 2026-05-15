@@ -6,6 +6,7 @@ import sqlalchemy as sa
 from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.subset import Subset
+from app.models.user import User
 from app.services.schedule_config import ScheduleConfig
 
 DEFAULT_CONFIG: dict[str, object] = {
@@ -19,6 +20,24 @@ DEFAULT_CONFIG: dict[str, object] = {
     "puzzle_order": "random",
     "failed_repetition": {"mode": "none"},
 }
+
+
+def schedule_to_dict(schedule: Schedule, creator: User) -> dict[str, object]:
+    total_hours: int = 0
+    if isinstance(schedule.config, dict):
+        total_hours = ScheduleConfig.from_dict(schedule.config).total_hours
+    return {
+        "id": schedule.id,
+        "name": schedule.name,
+        "description": schedule.description,
+        "subsetId": schedule.subset_id,
+        "status": schedule.status,
+        "config": schedule.config,
+        "totalHours": total_hours,
+        "createdBy": {"username": creator.lichess_username, "avatarUrl": creator.avatar_url},
+        "createdAt": schedule.created_at.isoformat(),
+        "lockedAt": schedule.locked_at.isoformat() if schedule.locked_at else None,
+    }
 
 
 def _get_owned_schedule(schedule_id: int, user_id: int) -> Schedule:
