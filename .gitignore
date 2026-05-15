@@ -1,4 +1,8 @@
 docs/*
+!docs/agents/
+!docs/agents/**
+!docs/adr/
+!docs/adr/**
 .env
 .venv/
 node_modules/
