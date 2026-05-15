@@ -132,14 +132,34 @@ rm /tmp/restore.sql.gz
 
 ## Database access
 
+Operator credentials (`EC2_HOST`, `PROD_DB_PASSWORD`) live in `~/.woodpecker-prod-env` outside the repo (chmod 600, never committed). Create it manually:
+
 ```bash
-make db-shell-ec2 EC2_HOST=54.216.71.166      # psql shell on server
-make db-expose-ec2 EC2_HOST=54.216.71.166      # bind DB to 127.0.0.1:5432 on EC2
-make db-tunnel-ec2 EC2_HOST=54.216.71.166      # forward localhost:5433 → EC2 (blocks)
-make db-unexpose-ec2 EC2_HOST=54.216.71.166    # remove port binding
+cat > ~/.woodpecker-prod-env << 'EOF'
+EC2_HOST=your-ec2-host
+PROD_DB_PASSWORD=your-db-password
+EOF
+chmod 600 ~/.woodpecker-prod-env
 ```
 
-GUI tools: run `db-expose-ec2` + `db-tunnel-ec2`, connect to `localhost:5433`.
+```bash
+# Open a background tunnel (localhost:5433 → production DB)
+make -C deploy db-tunnel-start
+
+# Interactive psql
+make -C deploy db-shell
+
+# Single query (useful for scripting and LLM-driven inspection)
+make -C deploy db-query SQL="SELECT count(*) FROM training_items"
+
+# Close the tunnel and unexpose the DB port on EC2
+make -C deploy db-tunnel-stop
+
+# Direct psql shell on EC2 without a local tunnel
+make -C deploy db-shell-ec2
+```
+
+GUI tools (Beekeeper, TablePlus, etc.): run `db-tunnel-start`, connect to `localhost:5433` with user `woodpecker` and the password from `~/.woodpecker-prod-env`.
 
 ## Rollback
 
