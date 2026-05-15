@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { useAuth } from '../context/auth'
@@ -20,15 +20,22 @@ function validateDisplayName(value: string): string | null {
 }
 
 export function OnboardingPage(): React.ReactElement | null {
-  const { onboarding, updateUser, loading } = useAuth()
+  const { user, onboarding, waitlisted, updateUser, loading } = useAuth()
   const navigate = useNavigate()
   const [displayName, setDisplayName] = useState(onboarding?.lichessUsername ?? '')
   const [saving, setSaving] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
 
+  useEffect(() => {
+    if (loading) return
+    if (user) void navigate({ to: '/app' })
+    else if (waitlisted) void navigate({ to: '/waitlist' })
+    else if (!onboarding) void navigate({ to: '/' })
+  }, [user, onboarding, waitlisted, loading, navigate])
+
   if (loading || !onboarding) return null
 
-  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
+  const handleSubmit = async (e: React.SyntheticEvent): Promise<void> => {
     e.preventDefault()
     const error = validateDisplayName(displayName)
     if (error) {

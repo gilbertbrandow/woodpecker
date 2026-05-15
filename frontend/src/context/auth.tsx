@@ -51,6 +51,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const updateUser = (updated: AuthUser): void => {
     setUser(updated)
+    setOnboarding(null)
+    setWaitlisted(null)
   }
 
   const handleSetWaitlisted = (state: WaitlistedState): void => {

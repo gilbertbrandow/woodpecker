@@ -12,6 +12,7 @@ from app.services.auth_service import (
     create_user_from_onboarding,
     update_waitlist_email,
     get_waitlist_email,
+    is_access_approved,
 )
 from app.services.validation import validate_display_name, validate_email
 import app.auth_session as auth_session
@@ -94,7 +95,15 @@ def me() -> tuple[Response, int] | Response:
             "avatarUrl": state["avatar_url"],
         })
 
-    email = get_waitlist_email(state["lichess_username"])
+    lichess_username = state["lichess_username"]
+    if is_access_approved(lichess_username):
+        auth_session.set_onboarding(lichess_username, None)
+        return jsonify({
+            "status": "onboarding",
+            "lichessUsername": lichess_username,
+            "avatarUrl": None,
+        })
+    email = get_waitlist_email(lichess_username)
     return jsonify({"status": "waitlisted", "email": email})
 
 

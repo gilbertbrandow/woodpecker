@@ -137,6 +137,14 @@ def update_waitlist_email(lichess_username: str, email: str) -> WaitlistEntry:
     return entry
 
 
+def is_access_approved(lichess_username: str) -> bool:
+    """Return True if a waitlisted user now qualifies for onboarding."""
+    in_whitelist = whitelist_service.is_whitelisted(lichess_username)
+    max_users = _get_max_users()
+    active_count = db.session.scalar(sa.select(sa.func.count()).select_from(User)) or 0
+    return decide_access(active_count, max_users, in_whitelist) == "onboarding"
+
+
 def get_waitlist_email(lichess_username: str) -> str | None:
     entry = db.session.execute(
         db.select(WaitlistEntry).filter_by(lichess_username=lichess_username)
