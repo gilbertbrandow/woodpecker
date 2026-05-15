@@ -15,6 +15,7 @@ from app.services.auth_service import (
 )
 from app.services.validation import validate_display_name, validate_email
 import app.auth_session as auth_session
+from app.user_schema import user_to_dict
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -80,16 +81,7 @@ def me() -> tuple[Response, int] | Response:
         if not user:
             auth_session.clear()
             return jsonify({"error": "not authenticated"}), 401
-        return jsonify({
-            "status": "active",
-            "id": user.id,
-            "username": user.lichess_username,
-            "displayName": user.display_name,
-            "avatarUrl": user.avatar_url,
-            "boardTheme": user.board_theme,
-            "pieceTheme": user.piece_theme,
-            "showTimerTenths": user.show_timer_tenths,
-        })
+        return jsonify(user_to_dict(user))
 
     if state["kind"] == "onboarding":
         return jsonify({
@@ -123,16 +115,7 @@ def onboarding() -> tuple[Response, int] | Response:
     )
     auth_session.set_active(user.id)
 
-    return jsonify({
-        "status": "active",
-        "id": user.id,
-        "username": user.lichess_username,
-        "displayName": user.display_name,
-        "avatarUrl": user.avatar_url,
-        "boardTheme": user.board_theme,
-        "pieceTheme": user.piece_theme,
-        "showTimerTenths": user.show_timer_tenths,
-    })
+    return jsonify(user_to_dict(user))
 
 
 @auth_bp.patch("/waitlist/email")

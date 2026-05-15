@@ -1,22 +1,9 @@
 from flask import Blueprint, jsonify, request, session, Response
 from app.decorators import login_required
-from app.models.user import User
 from app.services.settings import update_user_settings
+from app.user_schema import user_to_dict
 
 settings_bp = Blueprint("settings", __name__, url_prefix="/settings")
-
-
-def _user_to_dict(user: User) -> dict[str, object]:
-    return {
-        "status": "active",
-        "id": user.id,
-        "username": user.lichess_username,
-        "displayName": user.display_name,
-        "avatarUrl": user.avatar_url,
-        "boardTheme": user.board_theme,
-        "pieceTheme": user.piece_theme,
-        "showTimerTenths": user.show_timer_tenths,
-    }
 
 
 @settings_bp.patch("")
@@ -43,4 +30,4 @@ def patch_settings() -> tuple[Response, int] | Response:
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 
-    return jsonify(_user_to_dict(user))
+    return jsonify(user_to_dict(user))
