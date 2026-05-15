@@ -9,7 +9,8 @@ import requests as http
 import sqlalchemy as sa
 
 from app.extensions import db
-from app.models.user import User, WaitlistEntry, WhitelistEntry
+from app.models.user import User, WaitlistEntry
+from app.services import whitelist_service
 
 LICHESS_CLIENT_ID = os.environ.get("LICHESS_CLIENT_ID", "woodpecker")
 LICHESS_OAUTH_URL = "https://lichess.org/oauth"
@@ -76,9 +77,7 @@ def get_or_create_user(access_token: str) -> dict[str, object]:
     if existing:
         return {"status": "active", "user_id": existing.id}
 
-    in_whitelist = db.session.execute(
-        db.select(WhitelistEntry).filter_by(lichess_username=lichess_username)
-    ).scalar_one_or_none() is not None
+    in_whitelist = whitelist_service.is_whitelisted(lichess_username)
 
     max_users = _get_max_users()
     active_count = db.session.scalar(sa.select(sa.func.count()).select_from(User)) or 0
