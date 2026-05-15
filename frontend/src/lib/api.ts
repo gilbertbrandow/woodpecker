@@ -76,6 +76,24 @@ export type SubsetConfig = {
 export type LichessTacticTheme = { name: string; displayName: string | null }
 export type LichessTacticOpening = { name: string; displayName: string; eco: string }
 
+export type LichessTacticSourceMetadata = {
+  sourceType: 'LICHESS_TACTIC'
+  displayId: string
+  rating: number
+  gameUrl: string
+  themes: LichessTacticTheme[]
+}
+
+export type PositionalSourceMetadata = {
+  sourceType: 'POSITIONAL'
+}
+
+export type DecoySourceMetadata = {
+  sourceType: 'DECOY'
+}
+
+export type SourceMetadata = LichessTacticSourceMetadata | PositionalSourceMetadata | DecoySourceMetadata
+
 export type LichessTactic = {
   puzzleId: string
   rating: number
@@ -292,11 +310,9 @@ export type RunTrainingItemFull = {
   runTrainingItemId: number
   position: number
   positionStatus: PositionStatus
-  displayId: string
+  source: SourceMetadata
   fen: string
-  solution: string
-  rating: number
-  gameUrl: string
+  solution: (string | string[])[]
   maxTriesPerItem: number
   currentTryNumber: number
   currentAttemptId: number | null
@@ -304,7 +320,6 @@ export type RunTrainingItemFull = {
   totalItems: number
   scheduleName: string
   runIndex: number
-  themes: LichessTacticTheme[]
 }
 
 export type PaceChartData = {
@@ -345,8 +360,7 @@ export type Run = {
 export type RunTrainingItemListItem = {
   runTrainingItemId: number
   position: number
-  displayId: string
-  rating: number
+  source: SourceMetadata
   positionStatus: PositionStatus
   tryCount: number
   timeMs: number | null
@@ -449,12 +463,9 @@ export type RunTrainingItemOverview = {
     scheduleName: string | null
   }
   trainingItem: {
-    displayId: string
     fen: string
-    solution: string[]
-    rating: number
-    themes: LichessTacticTheme[]
-    gameUrl: string
+    solution: (string | string[])[]
+    source: SourceMetadata
   }
   selectedAttemptId: number | null
   attempts: OverviewAttemptView[]
@@ -484,7 +495,7 @@ export type RunTrainingItemOverview = {
   actions: {
     runStatus: RunStatus
     retake: { enabled: boolean }
-    analyze: { enabled: boolean; url: string }
+    analyze: { enabled: boolean; url: string | null }
     nextTrainingItem: { enabled: boolean; disabledReason: string | null }
   }
   timer: {
@@ -529,12 +540,9 @@ export type RunTrainingItemAttemptView = {
     scheduleName: string | null
   }
   trainingItem: {
-    displayId: string
     fen: string
-    solution: string[]
-    rating: number
-    themes: LichessTacticTheme[]
-    gameUrl: string
+    solution: (string | string[])[]
+    source: SourceMetadata
   }
   attempt: {
     id: number

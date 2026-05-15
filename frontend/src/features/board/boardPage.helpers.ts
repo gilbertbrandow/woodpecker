@@ -115,9 +115,13 @@ export function positionStatusLabel(status: PositionStatus): string {
   }
 }
 
-export function computeFinalFen(fen: string, solutionMoves: string[]): string {
+export function resolveStep(step: string | string[]): string {
+  return Array.isArray(step) ? step[0] : step
+}
+
+export function computeFinalFen(fen: string, plies: (string | string[])[]): string {
   const chess = new Chess(fen)
-  for (const uci of solutionMoves) applyUci(chess, uci)
+  for (const ply of plies) applyUci(chess, resolveStep(ply))
   return chess.fen()
 }
 
@@ -125,12 +129,12 @@ type AttemptBoardView = { terminalFen: string | null; lastMove: [string, string]
 
 export function resolveOverviewBoardPosition(
   attempts: ReadonlyArray<{ status: string; board: AttemptBoardView }>,
-  solutionMoves: string[],
+  plies: (string | string[])[],
   initialFen: string,
 ): { fen: string; lastMove: [string, string] | undefined } {
   const solvedAttempt = [...attempts].reverse().find((a) => a.status === 'solved') ?? null
   return {
-    fen: solvedAttempt?.board?.terminalFen ?? computeFinalFen(initialFen, solutionMoves),
+    fen: solvedAttempt?.board?.terminalFen ?? computeFinalFen(initialFen, plies),
     lastMove: solvedAttempt?.board?.lastMove ?? undefined,
   }
 }
@@ -185,12 +189,12 @@ function applyUciDisplay(
 export function buildPgnDisplay(
   baseFen: string,
   attemptMoves: string[],
-  solutionMovesStr: string,
+  plies: (string | string[])[],
   attemptStatus: 'solved' | 'failed' | 'in_progress',
   retryPlies: string[] = [],
   autoVariation: boolean = true,
 ): TrainingItemMetaPgnDisplay {
-  const solutionMoves = solutionMovesStr.split(' ').filter(Boolean)
+  const solutionMoves = plies.map(resolveStep)
   if (solutionMoves.length === 0) return { mainline: [], variation: null }
 
   if (attemptStatus === 'in_progress') {

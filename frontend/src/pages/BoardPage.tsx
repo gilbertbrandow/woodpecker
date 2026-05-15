@@ -219,7 +219,7 @@ export function BoardPage(): React.ReactElement | null {
     return buildPgnDisplay(
       ctrl.solvingView.trainingItem.fen,
       moves,
-      ctrl.solvingView.trainingItem.solution.join(' '),
+      ctrl.solvingView.trainingItem.solution,
       ctrl.mode === 'failed' ? 'failed' : ctrl.session.liveFocusStatus,
       ctrl.mode === 'failed' ? ctrl.session.failedRetryPlies : undefined,
       false,
@@ -443,18 +443,10 @@ export function BoardPage(): React.ReactElement | null {
       </>
     )
 
-  const displayId =
+  const sourceForMetaCard =
     ctrl.mode === 'overview' && overviewData !== null
-      ? overviewData.trainingItem.displayId
-      : (ctrl.solvingView?.trainingItem.displayId ?? '')
-  const rating =
-    ctrl.mode === 'overview' && overviewData !== null
-      ? overviewData.trainingItem.rating
-      : (ctrl.solvingView?.trainingItem.rating ?? 0)
-  const themes =
-    ctrl.mode === 'overview' && overviewData !== null
-      ? overviewData.trainingItem.themes
-      : (ctrl.solvingView?.trainingItem.themes ?? [])
+      ? overviewData.trainingItem.source
+      : (ctrl.solvingView?.trainingItem.source ?? null)
 
   const timerBar =
     ctrl.mode === 'focus' && ctrl.session.allPliesPlayed.length > 0
@@ -649,20 +641,22 @@ export function BoardPage(): React.ReactElement | null {
               </TooltipTrigger>
               <TooltipContent>Retake</TooltipContent>
             </Tooltip>
-            <Tooltip delayDuration={100}>
-              <TooltipTrigger asChild>
-                <a
-                  href={overviewData.actions.analyze.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'h-8 w-8')}
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  <span className="sr-only">Analyze</span>
-                </a>
-              </TooltipTrigger>
-              <TooltipContent>Analyze</TooltipContent>
-            </Tooltip>
+            {overviewData.actions.analyze.url !== null && (
+              <Tooltip delayDuration={100}>
+                <TooltipTrigger asChild>
+                  <a
+                    href={overviewData.actions.analyze.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'h-8 w-8')}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    <span className="sr-only">Analyze</span>
+                  </a>
+                </TooltipTrigger>
+                <TooltipContent>Analyze</TooltipContent>
+              </Tooltip>
+            )}
           </div>
         </div>
         <Tooltip delayDuration={100}>
@@ -720,9 +714,7 @@ export function BoardPage(): React.ReactElement | null {
         />
         {overviewPgnDisplay !== null && (
           <TrainingItemMetaCard
-            displayId={overviewData.trainingItem.displayId}
-            rating={overviewData.trainingItem.rating}
-            themes={overviewData.trainingItem.themes}
+            source={overviewData.trainingItem.source}
             pgnDisplay={overviewPgnDisplay}
             selectedPly={ctrl.mode === 'overview' ? selectedPly : null}
             onPlyClick={ctrl.mode === 'overview' ? setSelectedPly : undefined}
@@ -781,15 +773,15 @@ export function BoardPage(): React.ReactElement | null {
         targetSolveTenths={timerTargetSolveTenths}
         rightSlot={timerRightSlot}
       />
-      <TrainingItemMetaCard
-        displayId={displayId}
-        rating={rating}
-        themes={themes}
-        pgnDisplay={pgnDisplay}
-        focusMode={ctrl.mode !== 'overview'}
-        selectedPly={ctrl.mode === 'overview' ? selectedPly : null}
-        onPlyClick={ctrl.mode === 'overview' ? setSelectedPly : undefined}
-      />
+      {sourceForMetaCard !== null && (
+        <TrainingItemMetaCard
+          source={sourceForMetaCard}
+          pgnDisplay={pgnDisplay}
+          focusMode={ctrl.mode !== 'overview'}
+          selectedPly={ctrl.mode === 'overview' ? selectedPly : null}
+          onPlyClick={ctrl.mode === 'overview' ? setSelectedPly : undefined}
+        />
+      )}
       {ctrl.mode === 'focus' && (
         <div className="mt-auto">
           <MoveStatusCard

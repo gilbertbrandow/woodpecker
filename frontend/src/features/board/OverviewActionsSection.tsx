@@ -7,7 +7,7 @@ import { cn } from '../../lib/utils'
 type OverviewActionsSectionProps = {
   nextPuzzleDisabledReason: string | null
   isLoadingNextPuzzle: boolean
-  gameUrl: string
+  gameUrl: string | null
   onNextPuzzle: () => void
   onRetake: () => void
 }
@@ -26,15 +26,17 @@ export function OverviewActionsSection({ nextPuzzleDisabledReason, isLoadingNext
           <RotateCcw className="mr-2 h-4 w-4" />
           Retake
         </Button>
-        <a
-          href={gameUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn(buttonVariants({ variant: 'outline' }), 'flex-1')}
-        >
-          <ExternalLink className="mr-2 h-4 w-4" />
-          Analyze
-        </a>
+        {gameUrl !== null && (
+          <a
+            href={gameUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(buttonVariants({ variant: 'outline' }), 'flex-1')}
+          >
+            <ExternalLink className="mr-2 h-4 w-4" />
+            Analyze
+          </a>
+        )}
       </div>
       <Tooltip delayDuration={100}>
         <TooltipTrigger asChild>
