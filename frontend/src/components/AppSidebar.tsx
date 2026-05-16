@@ -3,13 +3,13 @@ import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useSidebar } from './ui/sidebar'
 import { ChevronsUpDown, LayoutDashboard, Library, Database, CalendarDays, Puzzle, CircleHelp, Settings, LogOut, Play } from 'lucide-react'
 import { toast } from 'sonner'
-import woodpeckerLogo from '../assets/woodpecker.svg'
 import { useAuth } from '../context/auth'
 import { parseAvatarValue } from '../lib/avatar'
 import { displayName } from '../lib/utils'
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar'
 import { DefaultAvatar } from './DefaultAvatar'
 import { useIsMobile } from '../hooks/use-mobile'
+import { AppLogo } from './AppLogo'
 import type { ActiveRun } from '../lib/api'
 import {
   DropdownMenu,
@@ -24,12 +24,12 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-  SidebarSeparator,
 } from './ui/sidebar'
 
 type NavItem = {
@@ -38,14 +38,44 @@ type NavItem = {
   icon: React.ComponentType<{ className?: string }>
 }
 
-const NAV_ITEMS: NavItem[] = [
+const ACTIVITY_ITEMS: NavItem[] = [
   { label: 'Dashboard', to: '/app', icon: LayoutDashboard },
+  { label: 'Training', to: '/app/training', icon: Puzzle },
+]
+
+const SETUP_ITEMS: NavItem[] = [
   { label: 'Sources', to: '/app/sources', icon: Database },
   { label: 'Subsets', to: '/app/subsets', icon: Library },
   { label: 'Schedules', to: '/app/schedules', icon: CalendarDays },
-  { label: 'Training', to: '/app/training', icon: Puzzle },
-  { label: 'About', to: '/app/about', icon: CircleHelp },
 ]
+
+const GENERAL_ITEMS: NavItem[] = [
+  { label: 'Help', to: '/app/about', icon: CircleHelp },
+]
+
+function NavGroup({ items, pathname, onNavigate }: {
+  items: NavItem[]
+  pathname: string
+  onNavigate: () => void
+}): React.ReactElement {
+  return (
+    <SidebarMenu className="gap-1">
+      {items.map(({ label, to, icon: Icon }) => {
+        const isActive = to === '/app' ? pathname === '/app' : pathname.startsWith(to)
+        return (
+          <SidebarMenuItem key={to}>
+            <SidebarMenuButton asChild isActive={isActive} tooltip={label}>
+              <Link to={to} onClick={onNavigate}>
+                <Icon className="h-4 w-4" />
+                <span>{label}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        )
+      })}
+    </SidebarMenu>
+  )
+}
 
 export function AppSidebar({ activeRun }: { activeRun: ActiveRun | null }): React.ReactElement {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
@@ -59,6 +89,8 @@ export function AppSidebar({ activeRun }: { activeRun: ActiveRun | null }): Reac
     toast('Signed out', { description: 'See you next time.' })
     void navigate({ to: '/' })
   }
+
+  const closeMobile = (): void => setOpenMobile(false)
 
   const avatarValue = user ? parseAvatarValue(user.avatarUrl) : null
 
@@ -83,53 +115,58 @@ export function AppSidebar({ activeRun }: { activeRun: ActiveRun | null }): Reac
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <Link to="/app" className="flex items-center gap-2">
-          <div className="flex size-8 shrink-0 items-center justify-center">
-            <img src={woodpeckerLogo} alt="Woodpecker logo" className="h-6 w-6 translate-x-0.5 dark:invert" />
-          </div>
-          <div className="grid flex-1 text-left leading-none group-data-[collapsible=icon]:hidden">
-            <span className="truncate text-[13px] font-semibold text-foreground">Woodpecker</span>
-            <span className="truncate text-[10px] text-sidebar-foreground/60 mt-1">Chess trainer</span>
-          </div>
-        </Link>
+      <SidebarHeader className="h-14 justify-center px-4 py-0">
+        <AppLogo
+          iconClassName="h-5 w-5"
+          textClassName="text-sm group-data-[collapsible=icon]:hidden"
+        />
       </SidebarHeader>
-      <SidebarSeparator />
-      <SidebarContent>
+      <SidebarContent className="overflow-y-auto">
         <SidebarGroup>
+          <SidebarGroupLabel>Activity</SidebarGroupLabel>
           <SidebarMenu className="gap-1">
-          {isMobile && activeRun !== null && (
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                tooltip={`Continue — Run ${activeRun.runIndex + 1}`}
-                className="bg-foreground text-background hover:bg-foreground/90 hover:text-background"
-              >
-                <Link
-                  to="/app/runs/$runId/solve"
-                  params={{ runId: String(activeRun.runId) }}
-                  onClick={() => setOpenMobile(false)}
+            {isMobile && activeRun !== null && (
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={`Continue — Run ${activeRun.runIndex + 1}`}
+                  className="bg-foreground text-background hover:bg-foreground/90 hover:text-background"
                 >
-                  <Play className="h-4 w-4" />
-                  <span>Continue — Run {activeRun.runIndex + 1}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )}
-          {NAV_ITEMS.map(({ label, to, icon: Icon }) => {
-            const isActive = to === '/app' ? pathname === '/app' : pathname.startsWith(to)
-            return (
-              <SidebarMenuItem key={to}>
-                <SidebarMenuButton asChild isActive={isActive} tooltip={label}>
-                  <Link to={to} onClick={() => setOpenMobile(false)}>
-                    <Icon className="h-4 w-4" />
-                    <span>{label}</span>
+                  <Link
+                    to="/app/runs/$runId/solve"
+                    params={{ runId: String(activeRun.runId) }}
+                    onClick={closeMobile}
+                  >
+                    <Play className="h-4 w-4" />
+                    <span>Continue — Run {activeRun.runIndex + 1}</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-            )
-          })}
+            )}
+            {ACTIVITY_ITEMS.map(({ label, to, icon: Icon }) => {
+              const isActive = to === '/app' ? pathname === '/app' : pathname.startsWith(to)
+              return (
+                <SidebarMenuItem key={to}>
+                  <SidebarMenuButton asChild isActive={isActive} tooltip={label}>
+                    <Link to={to} onClick={closeMobile}>
+                      <Icon className="h-4 w-4" />
+                      <span>{label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )
+            })}
           </SidebarMenu>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Setup</SidebarGroupLabel>
+          <NavGroup items={SETUP_ITEMS} pathname={pathname} onNavigate={closeMobile} />
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>General</SidebarGroupLabel>
+          <NavGroup items={GENERAL_ITEMS} pathname={pathname} onNavigate={closeMobile} />
         </SidebarGroup>
       </SidebarContent>
       {user && (

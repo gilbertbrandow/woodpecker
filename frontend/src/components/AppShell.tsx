@@ -9,7 +9,7 @@ import { ThemeToggle } from './ThemeToggle'
 import { useAuth } from '../context/auth'
 import { Menu, Play } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
-import woodpeckerLogo from '../assets/woodpecker.svg'
+import { AppLogo } from './AppLogo'
 import { useActiveRun } from '../hooks/useActiveRun'
 import type { ActiveRun } from '../lib/api'
 import { buttonVariants } from './ui/button'
@@ -21,10 +21,7 @@ function AppShellHeader({ activeRun }: { activeRun: ActiveRun | null }): React.R
     <header className="flex h-12 shrink-0 items-center border-b border-border px-4">
       {/* Mobile: logo left, controls right */}
       <div className="flex w-full items-center justify-between sm:hidden">
-        <Link to="/app" className="flex items-center gap-2">
-          <img src={woodpeckerLogo} alt="Woodpecker logo" className="h-5 w-5 dark:invert" />
-          <span className="text-sm font-semibold">Woodpecker</span>
-        </Link>
+        <AppLogo iconClassName="h-5 w-5" textClassName="text-sm" />
         <div className="flex items-center gap-1">
           <ThemeToggle />
           <button
