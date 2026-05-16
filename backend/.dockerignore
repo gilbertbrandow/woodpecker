@@ -1,0 +1,22 @@
+# Virtual environment — dependencies are installed fresh via pip in the image
+.venv/
+
+# Python cache — regenerated automatically at runtime
+__pycache__/
+*.pyc
+*.pyo
+
+# Tool caches — not needed at runtime
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Tests — not needed at runtime
+tests/
+
+# Dev-only tooling — production scripts belong in app/cli.py as Flask CLI commands
+scripts/
+
+# Dev/build tooling — not needed at runtime
+Makefile
+pytest.ini
