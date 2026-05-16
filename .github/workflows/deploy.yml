@@ -72,7 +72,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "deploy/scripts/backup-db.sh,deploy/scripts/woodpecker-backup.service,deploy/scripts/woodpecker-backup.timer"
+          source: "deploy/scripts/backup-db.sh,deploy/scripts/verify-backup-upload.sh,deploy/scripts/woodpecker-backup.service,deploy/scripts/woodpecker-backup.timer"
           target: /opt/woodpecker/scripts/
           strip_components: 2
 
@@ -109,7 +109,7 @@ jobs:
             fi
 
             # Install / refresh systemd backup units
-            chmod +x /opt/woodpecker/scripts/backup-db.sh
+            chmod +x /opt/woodpecker/scripts/backup-db.sh /opt/woodpecker/scripts/verify-backup-upload.sh
             sudo cp /opt/woodpecker/scripts/woodpecker-backup.service /etc/systemd/system/
             sudo cp /opt/woodpecker/scripts/woodpecker-backup.timer   /etc/systemd/system/
             sudo systemctl daemon-reload
