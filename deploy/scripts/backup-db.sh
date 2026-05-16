@@ -29,4 +29,7 @@ aws s3 cp "${BACKUP_FILE}" "s3://${BACKUP_BUCKET}/${S3_KEY}" --region eu-west-1
 echo "[backup] Removing temp file"
 rm -f "${BACKUP_FILE}"
 
+echo "[backup] Verifying upload"
+"$(dirname "${BASH_SOURCE[0]}")/verify-backup-upload.sh" "${S3_KEY}"
+
 echo "[backup] Done"

@@ -83,6 +83,7 @@ The EC2 instance has an IAM instance profile that grants write access to the bac
 | Path | Purpose |
 | ---- | ------- |
 | `/opt/woodpecker/scripts/backup-db.sh` | Backup script (deployed by CI) |
+| `/opt/woodpecker/scripts/verify-backup-upload.sh` | Post-backup upload verification (called by backup-db.sh) |
 | `/etc/systemd/system/woodpecker-backup.service` | oneshot service unit |
 | `/etc/systemd/system/woodpecker-backup.timer` | daily timer unit |
 
@@ -110,7 +111,38 @@ sudo systemctl start woodpecker-backup.service
 journalctl -u woodpecker-backup.service -f
 ```
 
-### Restoring from backup
+### Validating a backup locally
+
+Run this from your local machine (requires AWS CLI access to the backup bucket and Docker).
+
+Add `BACKUP_BUCKET` and `AWS_REGION` to `~/.woodpecker-prod-env` if not already present:
+
+```bash
+echo 'BACKUP_BUCKET=your-bucket-name' >> ~/.woodpecker-prod-env
+echo 'AWS_REGION=eu-west-1' >> ~/.woodpecker-prod-env
+```
+
+Then validate the latest backup:
+
+```bash
+make -C deploy db-backup-validate-latest
+```
+
+Or validate a specific backup key:
+
+```bash
+make -C deploy db-backup-validate S3_KEY=YYYY/MM/woodpecker_TIMESTAMP.sql.gz
+```
+
+The script will download the backup, verify the gzip is readable, and restore it into an isolated `postgres:16` container on `localhost:5434`. It prints connection instructions on success. The container persists after validation so you can inspect the data manually. To clean up:
+
+```bash
+make -C deploy db-backup-validate-clean
+```
+
+This does **not** touch the production database or your normal local dev database.
+
+### Restoring from backup (production disaster recovery)
 
 ```bash
 ssh ubuntu@54.216.71.166
@@ -132,12 +164,14 @@ rm /tmp/restore.sql.gz
 
 ## Database access
 
-Operator credentials (`EC2_HOST`, `PROD_DB_PASSWORD`) live in `~/.woodpecker-prod-env` outside the repo (chmod 600, never committed). Create it manually:
+Operator credentials live in `~/.woodpecker-prod-env` outside the repo (chmod 600, never committed). Create it manually:
 
 ```bash
 cat > ~/.woodpecker-prod-env << 'EOF'
 EC2_HOST=your-ec2-host
 PROD_DB_PASSWORD=your-db-password
+BACKUP_BUCKET=your-backup-bucket-name
+AWS_REGION=eu-west-1
 EOF
 chmod 600 ~/.woodpecker-prod-env
 ```
