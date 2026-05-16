@@ -9,7 +9,7 @@ import { displayName } from '../lib/utils'
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar'
 import { DefaultAvatar } from './DefaultAvatar'
 import { useIsMobile } from '../hooks/use-mobile'
-import { AppLogo } from './AppLogo'
+import woodpeckerLogo from '../assets/woodpecker.svg'
 import type { ActiveRun } from '../lib/api'
 import {
   DropdownMenu,
@@ -50,7 +50,7 @@ const SETUP_ITEMS: NavItem[] = [
 ]
 
 const GENERAL_ITEMS: NavItem[] = [
-  { label: 'Help', to: '/app/about', icon: CircleHelp },
+  { label: 'Method', to: '/app/about', icon: CircleHelp },
 ]
 
 function NavGroup({ items, pathname, onNavigate }: {
@@ -115,14 +115,27 @@ export function AppSidebar({ activeRun }: { activeRun: ActiveRun | null }): Reac
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="h-14 justify-center px-4 py-0">
-        <AppLogo
-          iconClassName="h-5 w-5"
-          textClassName="text-sm group-data-[collapsible=icon]:hidden"
-        />
+      <SidebarHeader className="h-14 justify-center border-b border-transparent py-0">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              size="lg"
+              asChild
+              tooltip="Woodpecker"
+              className="hover:bg-transparent active:bg-transparent focus-visible:bg-transparent"
+            >
+              <Link to="/app">
+                <div className="flex size-8 shrink-0 items-center justify-center ">
+                  <img src={woodpeckerLogo} alt="" className="size-5 dark:invert -mr-1"/>
+                </div>
+                <span className="font-semibold text-sm text-foreground">Woodpecker</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent className="overflow-y-auto">
-        <SidebarGroup>
+      <SidebarContent className="overflow-y-auto group-data-[collapsible=icon]:gap-1">
+        <SidebarGroup className="group-data-[collapsible=icon]:py-0">
           <SidebarGroupLabel>Activity</SidebarGroupLabel>
           <SidebarMenu className="gap-1">
             {isMobile && activeRun !== null && (
@@ -159,12 +172,12 @@ export function AppSidebar({ activeRun }: { activeRun: ActiveRun | null }): Reac
           </SidebarMenu>
         </SidebarGroup>
 
-        <SidebarGroup>
+        <SidebarGroup className="group-data-[collapsible=icon]:py-0">
           <SidebarGroupLabel>Setup</SidebarGroupLabel>
           <NavGroup items={SETUP_ITEMS} pathname={pathname} onNavigate={closeMobile} />
         </SidebarGroup>
 
-        <SidebarGroup>
+        <SidebarGroup className="group-data-[collapsible=icon]:py-0">
           <SidebarGroupLabel>General</SidebarGroupLabel>
           <NavGroup items={GENERAL_ITEMS} pathname={pathname} onNavigate={closeMobile} />
         </SidebarGroup>

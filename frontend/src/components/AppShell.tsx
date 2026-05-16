@@ -18,7 +18,7 @@ import { cn } from '../lib/utils'
 function AppShellHeader({ activeRun }: { activeRun: ActiveRun | null }): React.ReactElement {
   const { toggleSidebar } = useSidebar()
   return (
-    <header className="flex h-12 shrink-0 items-center border-b border-border px-4">
+    <header className="flex h-14 shrink-0 items-center border-b border-border px-4">
       {/* Mobile: logo left, controls right */}
       <div className="flex w-full items-center justify-between sm:hidden">
         <AppLogo iconClassName="h-5 w-5" textClassName="text-sm" />

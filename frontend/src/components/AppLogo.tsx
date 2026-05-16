@@ -10,11 +10,11 @@ type Props = {
 
 export function AppLogo({ iconClassName, textClassName }: Props): React.ReactElement {
   return (
-    <Link to="/app" className="flex items-center gap-2">
+    <Link to="/app" className="flex items-center gap-3">
       <img
         src={woodpeckerLogo}
         alt=""
-        className={cn('dark:invert', iconClassName)}
+        className={cn('shrink-0 dark:invert', iconClassName)}
       />
       <span className={cn('font-semibold text-foreground', textClassName)}>
         Woodpecker
