@@ -83,7 +83,6 @@ _Avoid_: source data, puzzle metadata, display metadata
 
 > **Dev:** "When a user imports a new Lichess puzzle set, do we create a Subset automatically?"
 > **Domain expert:** "No — the Pipeline creates TrainingItems and a SourceImportRun. The user then builds a Subset manually by selecting from those TrainingItems."
-
 > **Dev:** "Can a Run span multiple Subsets?"
 > **Domain expert:** "No. A Run belongs to a Training, which belongs to a Schedule, which is tied to exactly one Subset. To train across multiple puzzle sets, the user composes a Subset from multiple Sources."
 

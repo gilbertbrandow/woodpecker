@@ -103,7 +103,7 @@ export function AboutPage(): React.ReactElement {
       </section>
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-base font-semibold">The founders</h2>
+        <h2 className="text-base font-semibold">The pioneers</h2>
         <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
           {FOUNDERS.map((founder) => (
             <a

@@ -109,12 +109,15 @@ make -C backend dev-session USERNAME=<lichess_username>
 Requires `.env` at the project root with `SECRET_KEY`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` set (the Make target loads them automatically).
 
 **Workflow (for Claude):**
+
 1. Tell Claude which Lichess username to use (e.g. "log in as `brandows`").
 2. Claude runs `make -C backend dev-session USERNAME=brandows` via Bash and captures the output.
 3. Claude injects the cookie into the Playwright browser via `browser_evaluate`:
+
    ```js
    document.cookie = 'session=<value>; path=/'
    ```
+
 4. Claude navigates to `/app` and inspects the authenticated shell.
 
 See `docs/adr/0005-dev-login-endpoint-for-playwright.md` for the full rationale.
