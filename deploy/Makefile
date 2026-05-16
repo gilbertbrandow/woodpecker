@@ -46,6 +46,19 @@ prod-lichess-tactics-themes-import: _confirm-prod-mutation
 prod-openings-import: _confirm-prod-mutation
 	@DATABASE_URL=$(PROD_DB_URL) $(MAKE) -s -C ../pipeline openings-import
 
+# ── Backup validation ──────────────────────────────────────────────────────────
+
+db-backup-validate-latest:
+	@$(SCRIPTS_DIR)/validate-db-backup.sh
+
+db-backup-validate:
+	@S3_KEY="$(S3_KEY)" $(SCRIPTS_DIR)/validate-db-backup.sh
+
+db-backup-validate-clean:
+	@docker rm -f woodpecker-validate-db 2>/dev/null || true
+	@docker volume rm woodpecker-validate-db-data 2>/dev/null || true
+	@echo "[validate] Cleanup done."
+
 # ── Operator ───────────────────────────────────────────────────────────────────
 
 whitelist-add:
@@ -55,4 +68,5 @@ whitelist-add:
         _confirm-prod-mutation \
         prod-lichess-tactics-validate prod-lichess-tactics-import \
         prod-lichess-tactics-themes-import prod-openings-import \
+        db-backup-validate-latest db-backup-validate db-backup-validate-clean \
         whitelist-add
