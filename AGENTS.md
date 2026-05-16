@@ -95,6 +95,30 @@ Rules:
 - Bulk inserts inside migrations must use `sa.text()` with named params and a list of dicts — not the ORM layer.
 - The migration must be safe for a fresh DB (no assumptions about existing data) unless the PR description explicitly states otherwise.
 
+### UI inspection with Playwright (dev session)
+
+The backend provides a standalone script that generates a signed Flask session cookie for any user in the DB, bypassing Lichess OAuth. Nothing goes over HTTP — the cookie is produced locally and injected directly into the Playwright browser.
+
+**Generate a session cookie:**
+
+```bash
+make -C backend dev-session USERNAME=<lichess_username>
+# prints a signed session cookie value to stdout
+```
+
+Requires `.env` at the project root with `SECRET_KEY`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` set (the Make target loads them automatically).
+
+**Workflow (for Claude):**
+1. Tell Claude which Lichess username to use (e.g. "log in as `brandows`").
+2. Claude runs `make -C backend dev-session USERNAME=brandows` via Bash and captures the output.
+3. Claude injects the cookie into the Playwright browser via `browser_evaluate`:
+   ```js
+   document.cookie = 'session=<value>; path=/'
+   ```
+4. Claude navigates to `/app` and inspects the authenticated shell.
+
+See `docs/adr/0005-dev-login-endpoint-for-playwright.md` for the full rationale.
+
 ### Working with AI on a new feature
 
 Use the skill chain in `.claude/skills/`:

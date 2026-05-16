@@ -16,4 +16,10 @@ test-integration:
 test-all:
 	.venv/bin/pytest
 
-.PHONY: setup lint test test-integration test-all
+dev-session:
+	@[ -n "$(USERNAME)" ] || (echo "error: USERNAME is required  Usage: make dev-session USERNAME=<lichess_username>" >&2 && exit 1)
+	@set -a && . ../.env && set +a && \
+	DATABASE_URL="postgresql://$${POSTGRES_USER:-woodpecker}:$${POSTGRES_PASSWORD:-woodpecker}@localhost:5432/$${POSTGRES_DB:-woodpecker}" \
+	.venv/bin/python scripts/dev_session.py $(USERNAME)
+
+.PHONY: setup lint test test-integration test-all dev-session
