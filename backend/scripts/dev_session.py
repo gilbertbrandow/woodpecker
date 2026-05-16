@@ -10,7 +10,7 @@ into a browser (e.g. via document.cookie). Nothing is sent over HTTP.
 import os
 import sys
 
-import psycopg2
+import psycopg2  # type: ignore[import-untyped]
 from flask import Flask
 from flask.sessions import SecureCookieSessionInterface
 

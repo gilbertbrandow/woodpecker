@@ -11,10 +11,9 @@ Requires AWS credentials with ce:GetCostAndUsage permission.
 """
 import re
 import sys
-import calendar
 from datetime import date
 
-import boto3
+import boto3  # type: ignore[import-not-found, import-untyped]
 
 EARLIEST_MONTH = date(2026, 4, 1)
 README_PATH = sys.argv[1] if len(sys.argv) > 1 else "deploy/README.md"
