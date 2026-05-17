@@ -8,6 +8,7 @@ import sqlalchemy as sa
 from flask import Flask
 from flask.testing import FlaskClient
 
+from app import auth_session
 from app.models.user import User, WaitlistEntry, WhitelistEntry
 from app.services.validation import validate_display_name
 from app.services.auth_service import decide_access
@@ -161,6 +162,22 @@ class TestWhitelistBypass:
                 result = get_or_create_user("fake_token")
                 assert result["status"] == "onboarding"
 
+    def test_whitelist_lookup_is_case_insensitive(self, app: Flask, db_session) -> None:  # type: ignore[misc]
+        # Whitelist stores lowercase; Lichess returns canonical mixed-case username.
+        # The whitelist check must still match.
+        entry = WhitelistEntry(
+            lichess_username="wlmixed",
+            created_at=datetime.now(timezone.utc),
+        )
+        db_session.add(entry)
+        db_session.commit()
+
+        with patch.dict(os.environ, {"MAX_USERS": "0"}):
+            with _patch_berserk(_make_lichess_mock("WlMixed")):
+                from app.services.auth_service import get_or_create_user
+                result = get_or_create_user("fake_token")
+                assert result["status"] == "onboarding"
+
 
 # ── Existing user always active ───────────────────────────────────────────────
 
@@ -180,6 +197,24 @@ class TestExistingUserAlwaysActive:
                 from app.services.auth_service import get_or_create_user
                 result = get_or_create_user("fake_token")
                 assert result["status"] == "active"
+
+    def test_returning_user_casing_is_preserved(self, app: Flask, db_session) -> None:  # type: ignore[misc]
+        # Regression: .lower() on the Lichess username broke lookup for users
+        # stored with canonical Lichess casing (e.g. "ChessUser" != "chessuser").
+        user = User(
+            lichess_username="ChessUser",
+            display_name="ChessUser",
+            created_at=datetime.now(timezone.utc),
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        with patch.dict(os.environ, {"MAX_USERS": "1"}):
+            with _patch_berserk(_make_lichess_mock("ChessUser")):
+                from app.services.auth_service import get_or_create_user
+                result = get_or_create_user("fake_token")
+                assert result["status"] == "active"
+                assert result["user_id"] == user.id
 
 
 # ── Waitlist idempotency ──────────────────────────────────────────────────────
@@ -282,6 +317,75 @@ class TestApiResponsePrivacy:
             for participant in data.get("participants", []):
                 assert "lichess_username" not in participant
                 assert "username" not in participant
+
+
+# ── Auth session state machine ────────────────────────────────────────────────
+
+class TestAuthSession:
+    def test_anonymous_is_none(self, app: Flask) -> None:
+        with app.test_request_context("/"):
+            assert auth_session.read() is None
+
+    def test_set_active(self, app: Flask) -> None:
+        with app.test_request_context("/"):
+            auth_session.set_active(42)
+            assert auth_session.read() == {"kind": "active", "user_id": 42}
+
+    def test_set_onboarding(self, app: Flask) -> None:
+        with app.test_request_context("/"):
+            auth_session.set_onboarding("ChessUser", "https://example.com/avatar.jpg")
+            assert auth_session.read() == {
+                "kind": "onboarding",
+                "lichess_username": "ChessUser",
+                "avatar_url": "https://example.com/avatar.jpg",
+            }
+
+    def test_set_onboarding_null_avatar(self, app: Flask) -> None:
+        with app.test_request_context("/"):
+            auth_session.set_onboarding("ChessUser", None)
+            state = auth_session.read()
+            assert state is not None
+            assert state["kind"] == "onboarding"
+            assert state["avatar_url"] is None  # type: ignore[typeddict-item]
+
+    def test_set_waitlisted(self, app: Flask) -> None:
+        with app.test_request_context("/"):
+            auth_session.set_waitlisted("ChessUser")
+            assert auth_session.read() == {"kind": "waitlisted", "lichess_username": "ChessUser"}
+
+    def test_clear_resets_to_none(self, app: Flask) -> None:
+        with app.test_request_context("/"):
+            auth_session.set_active(42)
+            auth_session.clear()
+            assert auth_session.read() is None
+
+    def test_set_active_clears_onboarding(self, app: Flask) -> None:
+        with app.test_request_context("/"):
+            auth_session.set_onboarding("ChessUser", None)
+            auth_session.set_active(42)
+            assert auth_session.read() == {"kind": "active", "user_id": 42}
+
+    def test_set_active_clears_waitlisted(self, app: Flask) -> None:
+        with app.test_request_context("/"):
+            auth_session.set_waitlisted("ChessUser")
+            auth_session.set_active(42)
+            assert auth_session.read() == {"kind": "active", "user_id": 42}
+
+    def test_set_onboarding_clears_active(self, app: Flask) -> None:
+        with app.test_request_context("/"):
+            auth_session.set_active(42)
+            auth_session.set_onboarding("ChessUser", None)
+            state = auth_session.read()
+            assert state is not None
+            assert state["kind"] == "onboarding"
+
+    def test_set_waitlisted_clears_active(self, app: Flask) -> None:
+        with app.test_request_context("/"):
+            auth_session.set_active(42)
+            auth_session.set_waitlisted("ChessUser")
+            state = auth_session.read()
+            assert state is not None
+            assert state["kind"] == "waitlisted"
 
 
 def _seed_participants(db_session) -> dict[str, object]:  # type: ignore[misc]
