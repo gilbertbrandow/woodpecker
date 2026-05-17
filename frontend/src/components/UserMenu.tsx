@@ -57,6 +57,9 @@ export function UserMenu(): React.ReactElement | null {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => void navigate({ to: '/app/profile' })}>
+          Profile
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => void navigate({ to: '/app/settings' })}>
           Settings
         </DropdownMenuItem>

@@ -7,6 +7,7 @@ import { OnboardingPage } from './pages/OnboardingPage'
 import { WaitlistPage } from './pages/WaitlistPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { ProfilePage } from './pages/ProfilePage'
 import { SubsetsListPage } from './pages/SubsetsListPage'
 import { SubsetNewPage } from './pages/SubsetNewPage'
 import { SubsetPage } from './pages/SubsetPage'
@@ -115,6 +116,12 @@ const settingsRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/settings',
   component: SettingsPage,
+})
+
+const profileRoute = createRoute({
+  getParentRoute: () => appShellRoute,
+  path: '/profile',
+  component: ProfilePage,
 })
 
 const subsetsListRoute = createRoute({
@@ -234,6 +241,7 @@ const routeTree = rootRoute.addChildren([
     appShellRoute.addChildren([
       dashboardRoute,
       settingsRoute,
+      profileRoute,
       subsetsListRoute,
       subsetNewRoute,
       subsetRoute,
