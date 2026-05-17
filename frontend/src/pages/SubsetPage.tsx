@@ -183,7 +183,7 @@ function UsedBySchedules({
 
   useEffect(() => {
     api.schedules
-      .list(subsetId)
+      .list({ subsetId })
       .then((data) => setSchedules(data))
       .catch(() => {})
       .finally(() => setLoading(false));

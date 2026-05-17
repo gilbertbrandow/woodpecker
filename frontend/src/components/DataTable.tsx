@@ -34,9 +34,11 @@ type DataTableProps<T> = {
   data: T[]
   globalFilterPlaceholder?: string
   filterableColumns?: FilterableColumn[]
+  filtersSlot?: React.ReactNode
   pageSize?: number
   initialSorting?: SortingState
   onRowClick?: (row: T) => void
+  getRowClassName?: (row: T) => string
   emptyMessage?: string
 }
 
@@ -45,9 +47,11 @@ export function DataTable<T>({
   data,
   globalFilterPlaceholder = 'Search…',
   filterableColumns = [],
+  filtersSlot,
   pageSize = 10,
   initialSorting = [],
   onRowClick,
+  getRowClassName,
   emptyMessage = 'No results.',
 }: DataTableProps<T>): React.ReactElement {
   const [sorting, setSorting] = useState<SortingState>(initialSorting)
@@ -124,6 +128,7 @@ export function DataTable<T>({
             className="h-8 pl-7 text-sm sm:w-56"
           />
         </div>
+        {filtersSlot}
         {filterableColumns.map((fc) => (
           <select
             key={fc.id}
@@ -191,7 +196,10 @@ export function DataTable<T>({
               pageRows.map((row) => (
                 <TableRow
                   key={row.id}
-                  className={onRowClick ? 'cursor-pointer' : undefined}
+                  className={[
+                    onRowClick ? 'cursor-pointer' : '',
+                    getRowClassName ? getRowClassName(row.original) : '',
+                  ].filter(Boolean).join(' ') || undefined}
                   onClick={onRowClick ? () => onRowClick(row.original) : undefined}
                 >
                   {row.getVisibleCells().map((cell) => (

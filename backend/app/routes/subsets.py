@@ -28,7 +28,8 @@ def create_subset() -> tuple[Response, int]:
 @subsets_bp.get("")
 @login_required
 def list_subsets() -> Response:
-    rows = subset_svc.list_subsets(session["user_id"])
+    locked_only = request.args.get("locked") == "true"
+    rows = subset_svc.list_subsets(session["user_id"], locked_only=locked_only)
     return jsonify([subset_svc.subset_to_dict(s, owner) for s, owner in rows])
 
 

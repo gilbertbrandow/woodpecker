@@ -41,7 +41,8 @@ def create_schedule() -> tuple[Response, int]:
 def list_schedules() -> Response:
     subset_id_raw = request.args.get("subsetId")
     subset_id = int(subset_id_raw) if subset_id_raw and subset_id_raw.isdigit() else None
-    schedules = schedule_svc.list_schedules(session["user_id"], subset_id=subset_id)
+    locked_only = request.args.get("locked") == "true"
+    schedules = schedule_svc.list_schedules(session["user_id"], subset_id=subset_id, locked_only=locked_only)
     return jsonify(schedules)
 
 

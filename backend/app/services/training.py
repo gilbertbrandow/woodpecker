@@ -9,6 +9,7 @@ from app.models.training import Training
 from app.models.subset import Subset
 from app.models.user import User
 from app.services.schedule_config import ScheduleConfig
+from app.services.training_state import compute_training_state
 
 
 def _get_owned_training(training_id: int, user_id: int) -> Training:
@@ -162,7 +163,7 @@ def get_training(training_id: int) -> Training:
     return training
 
 
-def list_my_trainings(user_id: int) -> list[dict[str, object]]:
+def list_my_trainings(user_id: int, tz_str: str = "UTC") -> list[dict[str, object]]:
     rows = db.session.execute(
         sa.text("""
             SELECT t.id, t.schedule_id,
@@ -202,9 +203,45 @@ def list_my_trainings(user_id: int) -> list[dict[str, object]]:
         {"uid": user_id},
     ).all()
 
+    now = datetime.now(timezone.utc)
     result: list[dict[str, object]] = []
     for row in rows:
-        total_runs = len(ScheduleConfig.from_dict(row.config).runs) if isinstance(row.config, dict) else 0
+        schedule_cfg: ScheduleConfig | None = None
+        total_runs = 0
+        if isinstance(row.config, dict):
+            schedule_cfg = ScheduleConfig.from_dict(row.config)
+            total_runs = len(schedule_cfg.runs)
+
+        training_obj = Training(
+            id=row.id,
+            user_id=user_id,
+            schedule_id=row.schedule_id,
+            started_at=row.started_at,
+            completed_at=row.completed_at,
+            aborted_at=row.aborted_at,
+        )
+
+        training_state: dict[str, object] = {"state": "not_started", "nextRunIndex": 0, "totalRuns": total_runs}
+        if schedule_cfg is not None:
+            runs_for_training = list(
+                db.session.scalars(
+                    sa.select(Run).where(Run.training_id == row.id)
+                ).all()
+            )
+            completed_runs = [r for r in runs_for_training if r.completed_at is not None and r.aborted_at is None]
+            active_run = next(
+                (r for r in runs_for_training if r.completed_at is None and r.aborted_at is None),
+                None,
+            )
+            training_state = compute_training_state(
+                completed_runs=completed_runs,
+                active_run=active_run,
+                schedule_cfg=schedule_cfg,
+                training=training_obj,
+                now=now,
+                tz_str=tz_str,
+            )
+
         result.append({
             "id": row.id,
             "scheduleId": row.schedule_id,
@@ -217,6 +254,7 @@ def list_my_trainings(user_id: int) -> list[dict[str, object]]:
             "startedAt": row.started_at.isoformat(),
             "completedAt": row.completed_at.isoformat() if row.completed_at else None,
             "abortedAt": row.aborted_at.isoformat() if row.aborted_at else None,
+            "trainingState": training_state,
         })
     return result
 
@@ -258,11 +296,33 @@ def abort_training(training_id: int, user_id: int) -> Training:
     return training
 
 
-def list_all_trainings(schedule_id: int | None = None) -> list[dict[str, object]]:
-    where = "WHERE t.schedule_id = :sid" if schedule_id is not None else ""
+def list_all_trainings(
+    schedule_id: int | None = None,
+    user_ids: list[int] | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> dict[str, object]:
+    conditions = []
+    params: dict[str, object] = {}
+
+    if schedule_id is not None:
+        conditions.append("t.schedule_id = :sid")
+        params["sid"] = schedule_id
+
+    if user_ids:
+        placeholders = ", ".join(f":uid{i}" for i in range(len(user_ids)))
+        conditions.append(f"t.user_id IN ({placeholders})")
+        for i, uid in enumerate(user_ids):
+            params[f"uid{i}"] = uid
+
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    offset = (page - 1) * page_size
+    params["limit"] = page_size
+    params["offset"] = offset
+
     rows = db.session.execute(
         sa.text(f"""
-            SELECT t.id, t.schedule_id,
+            SELECT t.id, t.schedule_id, t.user_id,
                    t.started_at, t.completed_at, t.aborted_at,
                    s.name AS schedule_name, s.subset_id, s.config,
                    u.display_name, u.avatar_url,
@@ -297,14 +357,26 @@ def list_all_trainings(schedule_id: int | None = None) -> list[dict[str, object]
             JOIN users u ON u.id = t.user_id
             {where}
             ORDER BY t.started_at DESC
+            LIMIT :limit OFFSET :offset
         """),
-        {"sid": schedule_id} if schedule_id is not None else {},
+        params,
     ).all()
 
-    result: list[dict[str, object]] = []
+    total: int = db.session.scalar(
+        sa.text(f"""
+            SELECT COUNT(*)
+            FROM trainings t
+            JOIN schedules s ON s.id = t.schedule_id
+            JOIN users u ON u.id = t.user_id
+            {where}
+        """),
+        {k: v for k, v in params.items() if k not in ("limit", "offset")},
+    ) or 0
+
+    items: list[dict[str, object]] = []
     for row in rows:
         total_runs = len(ScheduleConfig.from_dict(row.config).runs) if isinstance(row.config, dict) else 0
-        result.append({
+        items.append({
             "id": row.id,
             "scheduleId": row.schedule_id,
             "scheduleName": row.schedule_name,
@@ -317,11 +389,12 @@ def list_all_trainings(schedule_id: int | None = None) -> list[dict[str, object]
             "completedAt": row.completed_at.isoformat() if row.completed_at else None,
             "abortedAt": row.aborted_at.isoformat() if row.aborted_at else None,
             "user": {
+                "id": row.user_id,
                 "displayName": row.display_name,
                 "avatarUrl": row.avatar_url,
             },
         })
-    return result
+    return {"items": items, "total": total}
 
 
 def training_status(training: Training) -> str:

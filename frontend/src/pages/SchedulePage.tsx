@@ -13,7 +13,6 @@ import {
   type Subset,
   type ScheduleInsightPoint,
   type MyTrainingSummary,
-  type AllTrainingSummary,
   type LeaderboardRun,
 } from "../lib/api";
 import { AreaChart, Area, XAxis, YAxis } from "recharts";
@@ -32,6 +31,14 @@ import { UserAvatar } from "../components/UserAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { StatusBadge } from "../components/StatusBadge";
 import { TrainingTable } from "../components/participations/TrainingTable";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../components/ui/table";
 import { LeaderboardTable } from "../components/leaderboard/LeaderboardTable";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -158,7 +165,6 @@ export function SchedulePage(): React.ReactElement | null {
 
   const [myTraining, setMyTraining] = useState<MyTrainingSummary | null | undefined>(undefined)
   const [enrolling, setEnrolling] = useState(false)
-  const [scheduleTrainings, setScheduleTrainings] = useState<AllTrainingSummary[] | null>(null)
 
   const [activeTab, setActiveTab] = useState("configuration");
   const [insightsData, setInsightsData] = useState<ScheduleInsightPoint[] | null>(null);
@@ -212,14 +218,6 @@ export function SchedulePage(): React.ReactElement | null {
   useEffect(() => {
     setChartsReady(true);
   }, []);
-
-  useEffect(() => {
-    if (activeTab !== "insights" || scheduleTrainings !== null || !user) return;
-    api.training
-      .listAll(id)
-      .then(setScheduleTrainings)
-      .catch(() => {});
-  }, [activeTab, id, user, scheduleTrainings]);
 
   useEffect(() => {
     if (activeTab !== "insights" || insightsData !== null || !user) return;
@@ -575,65 +573,75 @@ export function SchedulePage(): React.ReactElement | null {
           </CollapsibleTrigger>
           <CollapsibleContent>
             <div className="pt-4">
-              <div className="flex flex-col gap-5">
-                  {runs.map((run, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center gap-3 rounded-md bg-muted/50 px-3 py-2.5"
-                    >
-                      <span className="flex-1 text-sm font-medium">
-                        Run {i + 1}
-                      </span>
-                      <div className="flex flex-1 items-center gap-1.5">
-                        <span className="text-xs text-muted-foreground">
-                          Duration
-                        </span>
-                        <DurationInput
-                          value={run.target_hours}
-                          onChange={(h) => updateRun(i, "target_hours", h)}
-                          disabled={locked || isSaving}
-                        />
-                      </div>
-                      <div className="flex flex-1 items-center gap-1.5">
-                        <span className="text-xs text-muted-foreground">
-                          Break
-                        </span>
-                        <DurationInput
-                          value={run.break_after_hours}
-                          onChange={(h) => updateRun(i, "break_after_hours", h)}
-                          disabled={locked || isSaving || i === runs.length - 1}
-                          allowZero
-                        />
-                      </div>
-                      <div className="w-7">
-                        {!locked && runs.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeRun(i)}
-                            disabled={isSaving}
-                            className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
-                            aria-label="Remove run"
+              <div className="flex flex-col gap-4">
+                  <div className="overflow-x-auto rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-full">#</TableHead>
+                          <TableHead className="whitespace-nowrap">Duration</TableHead>
+                          <TableHead className="whitespace-nowrap">Break after</TableHead>
+                          {!locked && <TableHead />}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {runs.map((run, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="whitespace-nowrap text-sm text-muted-foreground tabular-nums">
+                              Run {i + 1}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              <DurationInput
+                                value={run.target_hours}
+                                onChange={(h) => updateRun(i, "target_hours", h)}
+                                disabled={locked || isSaving}
+                              />
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              {i === runs.length - 1 ? (
+                                <span className="text-sm text-muted-foreground/50">N/A</span>
+                              ) : (
+                                <DurationInput
+                                  value={run.break_after_hours}
+                                  onChange={(h) => updateRun(i, "break_after_hours", h)}
+                                  disabled={locked || isSaving}
+                                  allowZero
+                                />
+                              )}
+                            </TableCell>
+                            {!locked && (
+                              <TableCell className="whitespace-nowrap">
+                                {runs.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeRun(i)}
+                                    disabled={isSaving}
+                                    className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
+                                    aria-label="Remove run"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        ))}
+                        {!locked && runs.length < MAX_RUNS && (
+                          <TableRow
+                            className="cursor-pointer text-muted-foreground hover:bg-muted/50"
+                            onClick={() => !isSaving && addRun()}
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                            <TableCell colSpan={4} className="text-sm">
+                              <span className="flex items-center gap-1.5">
+                                <Plus className="h-3.5 w-3.5" />
+                                Add run
+                              </span>
+                            </TableCell>
+                          </TableRow>
                         )}
-                      </div>
-                    </div>
-                  ))}
-                  {!locked && runs.length < MAX_RUNS && (
-                    <button
-                      type="button"
-                      onClick={addRun}
-                      disabled={isSaving}
-                      className="inline-flex h-8 w-fit items-center gap-1.5 rounded-md border px-3 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      Add run
-                    </button>
-                  )}
-                  <p className="text-sm text-muted-foreground">
-                    Total: {formatDuration(totalHours)}
-                  </p>
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
             </div>
           </CollapsibleContent>
@@ -994,11 +1002,7 @@ export function SchedulePage(): React.ReactElement | null {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="pt-4">
-                  {scheduleTrainings === null ? (
-                    <p className="text-sm text-muted-foreground">Loading…</p>
-                  ) : (
-                    <TrainingTable trainings={scheduleTrainings} hideSchedule />
-                  )}
+                  <TrainingTable scheduleId={id} hideSchedule />
                 </div>
               </CollapsibleContent>
             </Collapsible>

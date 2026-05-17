@@ -38,4 +38,31 @@ function AvatarFallback({
   )
 }
 
-export { Avatar, AvatarImage, AvatarFallback }
+function AvatarGroup({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>): React.ReactElement {
+  return (
+    <div
+      className={cn('flex items-center [&>*:not(:first-child)]:-ml-2', className)}
+      {...props}
+    />
+  )
+}
+
+function AvatarGroupCount({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLSpanElement>): React.ReactElement {
+  return (
+    <span
+      className={cn(
+        'relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-background bg-muted text-xs font-medium text-muted-foreground',
+        className,
+      )}
+      {...props}
+    />
+  )
+}
+
+export { Avatar, AvatarImage, AvatarFallback, AvatarGroup, AvatarGroupCount }

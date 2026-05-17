@@ -1,11 +1,12 @@
 import * as React from 'react'
-import { useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Loader2, Trash2 } from 'lucide-react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { UserAvatar } from '../UserAvatar'
 import { StatusBadge } from '../StatusBadge'
 import { DataTable, type FilterableColumn } from '../DataTable'
+import { UserSelector } from '../UserSelector'
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -17,7 +18,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from '../ui/alert-dialog'
-import type { Subset } from '../../lib/api'
+import type { Subset, SelectableUser } from '../../lib/api'
 
 type SubsetsTableProps = {
   subsets: Subset[]
@@ -41,6 +42,15 @@ export function SubsetsTable({
   onDelete,
 }: SubsetsTableProps): React.ReactElement {
   const navigate = useNavigate()
+  const [selectedUsers, setSelectedUsers] = useState<SelectableUser[]>([])
+
+  const filteredSubsets = useMemo(
+    () =>
+      selectedUsers.length > 0
+        ? subsets.filter((s) => selectedUsers.some((u) => u.id === s.ownedBy.id))
+        : subsets,
+    [subsets, selectedUsers],
+  )
 
   const statusOptions = useMemo(
     () =>
@@ -51,19 +61,8 @@ export function SubsetsTable({
     [subsets],
   )
 
-  const ownerOptions = useMemo(
-    () =>
-      Array.from(new Set(subsets.map((s) => s.ownedBy.displayName)))
-        .sort()
-        .map((v) => ({ label: v, value: v })),
-    [subsets],
-  )
-
   const filterableColumns: FilterableColumn[] = [
     { id: 'status', label: 'statuses', options: statusOptions },
-    ...(ownerOptions.length > 1
-      ? [{ id: 'creator', label: 'creators', options: ownerOptions }]
-      : []),
   ]
 
   const columns: ColumnDef<Subset>[] = [
@@ -159,9 +158,12 @@ export function SubsetsTable({
   return (
     <DataTable
       columns={columns}
-      data={subsets}
+      data={filteredSubsets}
       globalFilterPlaceholder="Search subsets…"
       filterableColumns={filterableColumns}
+      filtersSlot={
+        <UserSelector value={selectedUsers} onChange={setSelectedUsers} />
+      }
       pageSize={10}
       onRowClick={(subset) =>
         void navigate({

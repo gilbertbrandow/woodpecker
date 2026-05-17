@@ -1,11 +1,14 @@
 import * as React from 'react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { toast } from 'sonner'
+import { type ColumnDef } from '@tanstack/react-table'
 import { useAuth } from '../context/auth'
 import { api, type Subset } from '../lib/api'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
+import { UserAvatar } from '../components/UserAvatar'
+import { DataTable } from '../components/DataTable'
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -19,7 +22,7 @@ export function ScheduleNewPage(): React.ReactElement | null {
   const { user, loading } = useAuth()
   const navigate = useNavigate()
   const [name, setName] = useState('')
-  const [subsetId, setSubsetId] = useState('')
+  const [selectedSubset, setSelectedSubset] = useState<Subset | null>(null)
   const [subsets, setSubsets] = useState<Subset[]>([])
   const [subsetsLoading, setSubsetsLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -33,25 +36,21 @@ export function ScheduleNewPage(): React.ReactElement | null {
   useEffect(() => {
     if (!user) return
     api.subsets
-      .list()
-      .then((all) => {
-        const locked = all.filter((s) => s.status === 'locked' && s.ownedBy.id === user.id)
-        setSubsets(locked)
-      })
+      .list({ lockedOnly: true })
+      .then(setSubsets)
       .catch(() => toast.error('Failed to load subsets', { description: 'Could not fetch subsets.' }))
       .finally(() => setSubsetsLoading(false))
   }, [user])
 
   if (loading || !user) return null
 
-  const canSubmit = name.trim().length > 0 && subsetId !== '' && !submitting
+  const canSubmit = name.trim().length > 0 && selectedSubset !== null && !submitting
 
-  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
-    e.preventDefault()
-    if (!canSubmit) return
+  const handleSubmit = async (): Promise<void> => {
+    if (!canSubmit || selectedSubset === null) return
     setSubmitting(true)
     try {
-      const schedule = await api.schedules.create(name.trim(), parseInt(subsetId, 10))
+      const schedule = await api.schedules.create(name.trim(), selectedSubset.id)
       void navigate({ to: '/app/schedules/$scheduleId', params: { scheduleId: String(schedule.id) } })
     } catch {
       toast.error('Failed to create schedule', { description: 'Please try again.' })
@@ -59,8 +58,70 @@ export function ScheduleNewPage(): React.ReactElement | null {
     }
   }
 
+  const selectedId = selectedSubset?.id ?? null
+
+  const columns: ColumnDef<Subset>[] = useMemo(
+    () => [
+      {
+        id: 'select',
+        header: 'Selected',
+        enableSorting: false,
+        cell: ({ row }) => (
+          <div className="h-4 w-4 shrink-0 rounded-full border border-primary flex items-center justify-center">
+            {row.original.id === selectedId && (
+              <div className="h-2.5 w-2.5 rounded-full bg-primary" />
+            )}
+          </div>
+        ),
+      },
+      {
+        id: 'owner',
+        header: 'Owner',
+        enableSorting: false,
+        cell: ({ row }) => (
+          <UserAvatar
+            displayName={row.original.ownedBy.displayName}
+            avatarUrl={row.original.ownedBy.avatarUrl}
+          />
+        ),
+      },
+      {
+        accessorKey: 'name',
+        header: 'Name',
+        cell: ({ row }) => (
+          <span className="font-medium">{row.original.name}</span>
+        ),
+      },
+      {
+        id: 'puzzleCount',
+        header: 'Puzzles',
+        accessorFn: (row) => row.puzzleCount,
+        cell: ({ row }) => (
+          <span className="tabular-nums text-muted-foreground">{row.original.puzzleCount}</span>
+        ),
+      },
+      {
+        id: 'lockedAt',
+        header: 'Locked',
+        accessorFn: (row) => row.lockedAt ?? '',
+        cell: ({ row }) => (
+          <span className="text-muted-foreground">
+            {row.original.lockedAt
+              ? new Date(row.original.lockedAt).toLocaleDateString(undefined, {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                })
+              : '—'}
+          </span>
+        ),
+      },
+    ],
+    [selectedId],
+  )
+
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
+    <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
       <Breadcrumb className="mb-6">
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -79,14 +140,10 @@ export function ScheduleNewPage(): React.ReactElement | null {
 
       {!subsetsLoading && subsets.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          You have no locked subsets.{' '}
-          <Link to="/app" className="underline hover:text-foreground">
-            Lock a subset
-          </Link>{' '}
-          before creating a schedule.
+          No locked subsets available. Subsets must be locked before they can be used in a schedule.
         </p>
       ) : (
-        <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-4">
+        <form onSubmit={(e) => { e.preventDefault(); void handleSubmit() }} className="flex flex-col gap-6">
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium" htmlFor="schedule-name">
               Schedule name
@@ -102,28 +159,24 @@ export function ScheduleNewPage(): React.ReactElement | null {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium" htmlFor="schedule-subset">
-              Subset
-            </label>
+            <label className="text-sm font-medium">Subset</label>
             {subsetsLoading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : (
-              <select
-                id="schedule-subset"
-                value={subsetId}
-                onChange={(e) => setSubsetId(e.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              >
-                <option value="">Select a subset…</option>
-                {subsets.map((s) => (
-                  <option key={s.id} value={String(s.id)}>{s.name}</option>
-                ))}
-              </select>
+              <DataTable
+                columns={columns}
+                data={subsets}
+                globalFilterPlaceholder="Search subsets…"
+                pageSize={8}
+                onRowClick={(row) => setSelectedSubset(selectedSubset?.id === row.id ? null : row)}
+                getRowClassName={(row) => row.id === selectedId ? 'bg-muted' : ''}
+                emptyMessage="No locked subsets available."
+              />
             )}
           </div>
 
-          <Button type="submit" disabled={!canSubmit} className="mt-2">
-            {submitting ? 'Creating…' : 'Create'}
+          <Button type="submit" disabled={!canSubmit} className="self-start">
+            {submitting ? 'Creating…' : 'Create schedule'}
           </Button>
         </form>
       )}

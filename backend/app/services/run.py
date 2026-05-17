@@ -513,6 +513,19 @@ def start_run(training_id: int, user_id: int, expected_run_index: int | None = N
     if training.completed_at is not None or training.aborted_at is not None:
         raise ValueError("Training is already terminal.")
 
+    cross_training_active = db.session.scalar(
+        sa.select(Run)
+        .join(Training, Run.training_id == Training.id)
+        .where(
+            Training.user_id == user_id,
+            Run.training_id != training_id,
+            Run.completed_at.is_(None),
+            Run.aborted_at.is_(None),
+        )
+    )
+    if cross_training_active is not None:
+        raise ValueError("You already have an active run in another training.")
+
     active_run = db.session.scalar(
         sa.select(Run).where(
             Run.training_id == training_id,

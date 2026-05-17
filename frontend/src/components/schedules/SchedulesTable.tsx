@@ -1,11 +1,12 @@
 import * as React from 'react'
-import { useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { Loader2, Trash2 } from 'lucide-react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { UserAvatar } from '../UserAvatar'
 import { StatusBadge } from '../StatusBadge'
 import { DataTable, type FilterableColumn } from '../DataTable'
+import { UserSelector } from '../UserSelector'
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -17,7 +18,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from '../ui/alert-dialog'
-import type { ScheduleSummary } from '../../lib/api'
+import type { ScheduleSummary, SelectableUser } from '../../lib/api'
 import { formatDuration } from './DurationInput'
 
 type SchedulesTableProps = {
@@ -42,6 +43,15 @@ export function SchedulesTable({
   onDelete,
 }: SchedulesTableProps): React.ReactElement {
   const navigate = useNavigate()
+  const [selectedUsers, setSelectedUsers] = useState<SelectableUser[]>([])
+
+  const filteredSchedules = useMemo(
+    () =>
+      selectedUsers.length > 0
+        ? schedules.filter((s) => selectedUsers.some((u) => u.id === s.createdBy.id))
+        : schedules,
+    [schedules, selectedUsers],
+  )
 
   const statusOptions = useMemo(
     () =>
@@ -52,19 +62,8 @@ export function SchedulesTable({
     [schedules],
   )
 
-  const creatorOptions = useMemo(
-    () =>
-      Array.from(new Set(schedules.map((s) => s.createdBy.displayName)))
-        .sort()
-        .map((v) => ({ label: v, value: v })),
-    [schedules],
-  )
-
   const filterableColumns: FilterableColumn[] = [
     { id: 'status', label: 'statuses', options: statusOptions },
-    ...(creatorOptions.length > 1
-      ? [{ id: 'creator', label: 'creators', options: creatorOptions }]
-      : []),
   ]
 
   const columns: ColumnDef<ScheduleSummary>[] = [
@@ -114,7 +113,7 @@ export function SchedulesTable({
       header: 'Runs',
       cell: ({ row }) => (
         <span className="tabular-nums text-muted-foreground">
-          {row.original.runCount > 0 ? row.original.runCount : '\u2014'}
+          {row.original.runCount > 0 ? row.original.runCount : '—'}
         </span>
       ),
     },
@@ -123,7 +122,7 @@ export function SchedulesTable({
       header: 'Duration',
       cell: ({ row }) => (
         <span className="tabular-nums text-muted-foreground">
-          {row.original.totalHours > 0 ? formatDuration(row.original.totalHours) : '\u2014'}
+          {row.original.totalHours > 0 ? formatDuration(row.original.totalHours) : '—'}
         </span>
       ),
     },
@@ -186,9 +185,12 @@ export function SchedulesTable({
   return (
     <DataTable
       columns={columns}
-      data={schedules}
+      data={filteredSchedules}
       globalFilterPlaceholder="Search schedules…"
       filterableColumns={filterableColumns}
+      filtersSlot={
+        <UserSelector value={selectedUsers} onChange={setSelectedUsers} />
+      }
       pageSize={10}
       onRowClick={(schedule) =>
         void navigate({
