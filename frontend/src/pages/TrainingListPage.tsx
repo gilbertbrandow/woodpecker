@@ -1,27 +1,11 @@
 import * as React from 'react'
-import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
-import { toast } from 'sonner'
 import { useAuth } from '../context/auth'
-import { api, type AllTrainingSummary } from '../lib/api'
 import { TrainingTable } from '../components/participations/TrainingTable'
 
 export function TrainingListPage(): React.ReactElement | null {
   const { user } = useAuth()
-  const [trainings, setTrainings] = useState<AllTrainingSummary[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    if (!user) return
-    api.training
-      .listAll()
-      .then(setTrainings)
-      .catch(() =>
-        toast.error('Failed to load training', { description: 'Could not fetch your training sessions.' }),
-      )
-      .finally(() => setLoading(false))
-  }, [user])
 
   if (!user) return null
 
@@ -37,14 +21,7 @@ export function TrainingListPage(): React.ReactElement | null {
           New training
         </Link>
       </div>
-
-      {loading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : trainings.length === 0 ? (
-        <p className="text-sm text-muted-foreground">You have not started any training yet.</p>
-      ) : (
-        <TrainingTable trainings={trainings} />
-      )}
+      <TrainingTable />
     </div>
   )
 }
