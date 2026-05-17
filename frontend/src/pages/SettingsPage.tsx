@@ -156,8 +156,8 @@ export function SettingsPage(): React.ReactElement | null {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <section className="py-6 border-b border-border">
-        <h2 className="text-sm font-semibold mb-4">Profile</h2>
+      <section className="py-10 border-b border-border">
+        <h2 className="text-base font-semibold mb-6">Profile</h2>
         <p className="text-xs text-muted-foreground mb-4">
           Lichess account: <span className="text-foreground">{user.username}</span>
         </p>
@@ -301,8 +301,8 @@ export function SettingsPage(): React.ReactElement | null {
         </Button>
       </section>
 
-      <section className="py-6 border-b border-border">
-        <h2 className="text-sm font-semibold mb-6">Solve Settings</h2>
+      <section className="py-10 border-b border-border">
+        <h2 className="text-base font-semibold mb-6">Solve Settings</h2>
 
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Board theme</h3>
         <p className="text-xs text-muted-foreground mb-3">
@@ -393,8 +393,8 @@ export function SettingsPage(): React.ReactElement | null {
         </div>
       </section>
 
-      <section className="py-6">
-        <h2 className="text-sm font-semibold mb-4">Appearance</h2>
+      <section className="py-10">
+        <h2 className="text-base font-semibold mb-6">Appearance</h2>
         <div className="flex items-center justify-between max-w-sm">
           <div>
             <p className="text-sm">Application theme</p>
