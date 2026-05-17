@@ -517,6 +517,7 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
     }
 
 def list_subsets(user_id: int, locked_only: bool = False) -> list[tuple[Subset, User]]:
+    where_clause: sa.ColumnElement[bool]
     if locked_only:
         where_clause = Subset.locked_at.isnot(None)
     else:

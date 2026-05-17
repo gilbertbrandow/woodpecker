@@ -12,6 +12,7 @@ from app.services.schedule_config import ScheduleConfig
 
 
 def _end_of_today_utc(tz_str: str) -> datetime:
+    tz: ZoneInfo | timezone
     try:
         tz = ZoneInfo(tz_str)
     except ZoneInfoNotFoundError:
@@ -90,21 +91,22 @@ def compute_training_state(
         return {"state": "completed"}
 
     if completed_runs:
-        last_run = max(completed_runs, key=lambda r: r.completed_at)  # type: ignore[arg-type]
+        last_run = max(completed_runs, key=lambda r: r.completed_at or datetime.min)
+        assert last_run.completed_at is not None
         run_idx = last_run.run_index
         if run_idx < len(schedule_cfg.runs):
             break_after_hours = schedule_cfg.runs[run_idx].break_after_hours
         else:
             break_after_hours = 0
 
-        break_ends_at = last_run.completed_at + timedelta(hours=break_after_hours)  # type: ignore[operator]
+        break_ends_at = last_run.completed_at + timedelta(hours=break_after_hours)
 
         if now < break_ends_at:
             remaining_ms = int((break_ends_at - now).total_seconds() * 1000)
             return {
                 "state": "on_break",
                 "nextRunIndex": run_idx + 1,
-                "breakStartedAt": last_run.completed_at.isoformat(),  # type: ignore[union-attr]
+                "breakStartedAt": last_run.completed_at.isoformat(),
                 "breakEndsAt": break_ends_at.isoformat(),
                 "breakRemainingMs": remaining_ms,
             }
