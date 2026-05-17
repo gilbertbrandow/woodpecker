@@ -117,13 +117,6 @@ export function BoardPage(): React.ReactElement | null {
     boardKey: ctrl.board.boardKey,
   })
 
-  const [showOverlay, setShowOverlay] = React.useState(false)
-
-  React.useEffect(() => {
-    if (ctrl.overview.data !== null && ctrl.runJustCompleted) {
-      setShowOverlay(true)
-    }
-  }, [ctrl.overview.data, ctrl.runJustCompleted])
 
   const overviewPgnDisplay = ctrl.mode === 'overview' ? (selectedAttempt?.pgnDisplay ?? null) : null
 
@@ -298,15 +291,11 @@ export function BoardPage(): React.ReactElement | null {
         })()
       : null
 
-  const overlayData = overviewData?.runCompleteOverlay ?? null
   const overlayNode =
-    ctrl.mode === 'overview' && showOverlay && overlayData !== null ? (
+    ctrl.mode === 'overview' && ctrl.runCompleteOverlayData !== null ? (
       <RunCompleteOverlay
-        overlayData={overlayData}
-        onClose={() => {
-          setShowOverlay(false)
-          ctrl.actions.dismissRunComplete()
-        }}
+        overlayData={ctrl.runCompleteOverlayData}
+        onClose={() => ctrl.actions.dismissRunComplete()}
       />
     ) : undefined
 

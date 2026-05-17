@@ -69,6 +69,7 @@ export type BoardPageControllerResult = {
   overview: OverviewState
   isLoadingNextPuzzle: boolean
   runJustCompleted: boolean
+  runCompleteOverlayData: NonNullable<RunTrainingItemOverview['runCompleteOverlay']> | null
   inputBlocked: boolean
   actions: BoardPageActions
 }
@@ -135,6 +136,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const [boardKey, setBoardKey] = useState(0)
   const [isLoadingNextPuzzle, setIsLoadingNextPuzzle] = useState(false)
   const [runJustCompleted, setRunJustCompleted] = useState(false)
+  const [runCompleteOverlayData, setRunCompleteOverlayData] = useState<NonNullable<RunTrainingItemOverview['runCompleteOverlay']> | null>(null)
   const [movesPlayed, setMovesPlayed] = useState<string[]>([])
   const [allPliesPlayed, setAllPliesPlayed] = useState<string[]>([])
   const [failedRetryPlies, setFailedRetryPlies] = useState<string[]>([])
@@ -200,6 +202,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const clearOverviewState = useCallback((): void => {
     setOverview(null)
     setSolvingView(null)
+    setRunCompleteOverlayData(null)
     cachedOverviewPuzzleRef.current = null
   }, [])
 
@@ -497,6 +500,9 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
       if (result.runCompletedByThisAttempt) {
         setRunJustCompleted(true)
+        if (result.overview.runCompleteOverlay !== null) {
+          setRunCompleteOverlayData(result.overview.runCompleteOverlay)
+        }
       }
 
       cachedOverviewPuzzleRef.current = result.overview
@@ -799,6 +805,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
   const dismissRunComplete = useCallback((): void => {
     setRunJustCompleted(false)
+    setRunCompleteOverlayData(null)
   }, [])
 
   const turnToMove: Orientation = displayFen.split(' ')[1] === 'b' ? 'black' : 'white'
@@ -829,6 +836,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     overview: { data: overview },
     isLoadingNextPuzzle,
     runJustCompleted,
+    runCompleteOverlayData,
     inputBlocked,
     actions: {
       handleUserMove,
