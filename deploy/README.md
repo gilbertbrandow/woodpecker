@@ -6,7 +6,7 @@ Monthly AWS costs reported by the `aws-cost-report` workflow. Updated automatica
 
 | Month | Total (USD) | EC2 | Route 53 | S3 | Registrar | Tax | Other | SEK paid | Notes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| 2026-04 | $24.00 | $2.29 | $1.01 | $0.10 | $15.00 | $4.80 | $0.81 | | |
+| 2026-04 | $24.00 | $2.29 | $1.01 | $0.10 | $15.00 | $4.80 | $0.81 | SEK225.9 | Registrar is one-off cost for domain, the rest is lower because not full month active |
 
 ## Infrastructure
 
