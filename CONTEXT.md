@@ -37,6 +37,14 @@ _Avoid_: session, training session
 One complete cycle through all TrainingItems in the Schedule's Subset. Belongs to a Training and is indexed within it by `run_index`. Each Run carries its own target accuracy and time limits.
 _Avoid_: session, cycle
 
+**Break**:
+The suggested rest period between two consecutive Runs in a Training. Duration is defined by `break_after_hours` on the preceding RunDefinition in the Schedule config. A Break is a planning aid — the system surfaces whether the user is within or past the expected Break window, but never blocks a new Run from starting early or late.
+_Avoid_: mandatory break, enforced break, cooldown
+
+**Training State**:
+A derived, never-stored summary of where a user currently stands in their Training. Computed at query time from Run timestamps, the Schedule config, and the current wall-clock time. Possible values: `not_started`, `in_progress`, `on_break`, `break_elapsed`, `completed`, `aborted`. Carried as enriched fields on the Training list response — no separate endpoint.
+_Avoid_: training status (ambiguous with Run status), training phase
+
 **TrainingAttempt**:
 A recorded solve attempt on a single TrainingItem within a Run. Captures whether the user solved it correctly and how long it took. A user may make multiple attempts on the same item in one Run.
 _Avoid_: solve, attempt, move

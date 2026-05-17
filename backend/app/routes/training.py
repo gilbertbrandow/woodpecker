@@ -27,7 +27,8 @@ def create_training() -> tuple[Response, int]:
 @training_bp.get("")
 @login_required
 def list_my_trainings() -> Response:
-    return jsonify(training_svc.list_my_trainings(session["user_id"]))
+    tz_str = request.args.get("tz", "UTC")
+    return jsonify(training_svc.list_my_trainings(session["user_id"], tz_str=tz_str))
 
 
 @training_bp.get("/all")
