@@ -17,6 +17,7 @@ import {
   api,
   type Run,
   type Training,
+  type TrainingState,
   type TrainingStatus,
   type TrainingInsights,
 } from '../lib/api'
@@ -226,6 +227,14 @@ function formatDate(iso: string): string {
   })
 }
 
+function formatMs(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000)
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  if (days >= 1) return `${days} day${days !== 1 ? 's' : ''}${hours > 0 ? ` ${hours}h` : ''}`
+  return `${hours} hour${hours !== 1 ? 's' : ''}`
+}
+
 function getRunForSlot(runs: Run[], slotIndex: number): Run | null {
   const slotRuns = runs.filter((r) => r.runIndex === slotIndex)
   const live = slotRuns.find((r) => r.status === 'active' || r.status === 'completed')
@@ -242,6 +251,7 @@ export function TrainingPage(): React.ReactElement | null {
 
   const [training, setTraining] = useState<Training | null>(null)
   const [runs, setRuns] = useState<Run[]>([])
+  const [trainingState, setTrainingState] = useState<TrainingState | null>(null)
   const [pageLoading, setPageLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('configure')
   const [runsOpen, setRunsOpen] = useState(true)
@@ -274,10 +284,12 @@ export function TrainingPage(): React.ReactElement | null {
 
   useEffect(() => {
     if (!user) return
-    Promise.all([api.training.get(id), api.runs.list(id)])
-      .then(([t, fetchedRuns]) => {
+    Promise.all([api.training.get(id), api.runs.list(id), api.training.listMine()])
+      .then(([t, fetchedRuns, myTrainings]) => {
         setTraining(t)
         setRuns(fetchedRuns)
+        const match = myTrainings.find((mt) => mt.id === id)
+        if (match) setTrainingState(match.trainingState)
       })
       .catch(() =>
         toast.error('Failed to load training', {
@@ -425,6 +437,18 @@ export function TrainingPage(): React.ReactElement | null {
       {training.status === 'completed' && training.completedAt && (
         <div className="mb-6 rounded-md border px-4 py-3 text-sm text-muted-foreground">
           Completed on {formatDate(training.completedAt)}.
+        </div>
+      )}
+
+      {trainingState?.state === 'on_break' && (
+        <div className="mb-6 rounded-md border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+          Suggested break · {formatMs(trainingState.breakRemainingMs)} remaining
+        </div>
+      )}
+
+      {trainingState?.state === 'break_elapsed' && (
+        <div className="mb-6 rounded-md border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+          Suggested break ended {formatMs(trainingState.elapsedSinceBreakEndMs)} ago · Ready for Run #{trainingState.nextRunIndex + 1}?
         </div>
       )}
 
