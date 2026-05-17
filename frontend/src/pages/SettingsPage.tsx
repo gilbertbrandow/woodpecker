@@ -143,7 +143,7 @@ export function SettingsPage(): React.ReactElement | null {
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
+    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
       <Breadcrumb className="mb-6">
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -161,7 +161,7 @@ export function SettingsPage(): React.ReactElement | null {
         <p className="text-xs text-muted-foreground mb-4">
           Lichess account: <span className="text-foreground">{user.username}</span>
         </p>
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 mb-8 max-w-sm">
           <label htmlFor="display-name" className="text-xs text-muted-foreground">
             Display name
           </label>
@@ -179,10 +179,8 @@ export function SettingsPage(): React.ReactElement | null {
             </Button>
           </div>
         </div>
-      </section>
 
-      <section className="py-6 border-b border-border">
-        <h2 className="text-sm font-semibold mb-4">Avatar</h2>
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">Avatar</h3>
 
         <div className="mb-6">
           {avatarValue.type === 'custom' ? (
@@ -304,7 +302,9 @@ export function SettingsPage(): React.ReactElement | null {
       </section>
 
       <section className="py-6 border-b border-border">
-        <h2 className="text-sm font-semibold mb-4">Board theme</h2>
+        <h2 className="text-sm font-semibold mb-6">Solve Settings</h2>
+
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Board theme</h3>
         <p className="text-xs text-muted-foreground mb-3">
           Choose the board theme.
         </p>
@@ -339,10 +339,8 @@ export function SettingsPage(): React.ReactElement | null {
             )
           })}
         </div>
-      </section>
 
-      <section className="py-6 border-b border-border">
-        <h2 className="text-sm font-semibold mb-4">Piece set</h2>
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3 mt-6">Piece set</h3>
         <p className="text-xs text-muted-foreground mb-3">
           Choose a piece set.
         </p>
@@ -374,18 +372,8 @@ export function SettingsPage(): React.ReactElement | null {
             )
           })}
         </div>
-      </section>
 
-      <section className="py-6">
-        <h2 className="text-sm font-semibold mb-4">Appearance</h2>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <p className="text-sm">Application theme</p>
-            <p className="text-xs text-muted-foreground mt-4">Switches between light and dark mode.</p>
-          </div>
-          <ThemeToggle />
-        </div>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mt-6 max-w-sm">
           <div>
             <p className="text-sm">Show tenths of seconds</p>
             <p className="text-xs text-muted-foreground mt-1">Display a tenths digit on the puzzle timer (e.g. 01:23.4).</p>
@@ -402,6 +390,17 @@ export function SettingsPage(): React.ReactElement | null {
               className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-background shadow-sm transition-transform ${user.showTimerTenths ? 'translate-x-5' : 'translate-x-0'}`}
             />
           </button>
+        </div>
+      </section>
+
+      <section className="py-6">
+        <h2 className="text-sm font-semibold mb-4">Appearance</h2>
+        <div className="flex items-center justify-between max-w-sm">
+          <div>
+            <p className="text-sm">Application theme</p>
+            <p className="text-xs text-muted-foreground mt-1">Switches between light and dark mode.</p>
+          </div>
+          <ThemeToggle />
         </div>
       </section>
     </div>
