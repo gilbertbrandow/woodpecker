@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useSidebar } from './ui/sidebar'
-import { ChevronsUpDown, LayoutDashboard, Library, Database, CalendarDays, Puzzle, CircleHelp, Settings, LogOut, Play } from 'lucide-react'
+import { ChevronsUpDown, LayoutDashboard, Library, Database, CalendarDays, Puzzle, CircleHelp, Settings, LogOut, Play, User } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../context/auth'
 import { parseAvatarValue } from '../lib/avatar'
@@ -196,8 +196,9 @@ export function AppSidebar({ activeRun }: { activeRun: ActiveRun | null }): Reac
                     <div className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg">
                       {avatarEl}
                     </div>
-                    <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-                      <span className="truncate font-medium">{displayName(user)}</span>
+                    <div className="grid flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
+                      <span className="truncate text-sm font-semibold">{displayName(user)}</span>
+                      <span className="truncate text-[10px] text-muted-foreground">username: {user.username}</span>
                     </div>
                     <ChevronsUpDown className="ml-auto size-4 group-data-[collapsible=icon]:hidden" />
                   </SidebarMenuButton>
@@ -211,12 +212,17 @@ export function AppSidebar({ activeRun }: { activeRun: ActiveRun | null }): Reac
                   <DropdownMenuLabel className="p-0 font-normal">
                     <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                       <div className="flex shrink-0 items-center justify-center">{avatarEl}</div>
-                      <div className="grid flex-1 text-left text-sm leading-tight">
-                        <span className="truncate font-medium">{displayName(user)}</span>
+                      <div className="grid flex-1 text-left leading-tight">
+                        <span className="truncate text-sm font-semibold">{displayName(user)}</span>
+                        <span className="truncate text-[10px] text-muted-foreground">username: {user.username}</span>
                       </div>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => void navigate({ to: '/app/profile' })}>
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => void navigate({ to: '/app/settings' })}>
                     <Settings className="mr-2 h-4 w-4" />
                     Settings
