@@ -67,7 +67,7 @@ def get_or_create_user(access_token: str) -> dict[str, object]:
     lichess_session = berserk.TokenSession(access_token)
     client = berserk.Client(session=lichess_session)
     account = client.account.get()
-    lichess_username: str = account["username"].lower()
+    lichess_username: str = account["username"]
     raw_avatar = account.get("avatar")
     avatar_url: str | None = str(raw_avatar) if raw_avatar is not None else None
 
