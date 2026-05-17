@@ -113,7 +113,7 @@ export function ProfilePage(): React.ReactElement | null {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <section className="py-10 border-b border-border">
+      <section className="py-10">
         <h2 className="text-base font-semibold mb-6">Profile</h2>
         <p className="text-xs text-muted-foreground mb-4">
           Lichess account: <span className="text-foreground">{user.username}</span>
