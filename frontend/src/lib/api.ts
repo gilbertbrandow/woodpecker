@@ -264,7 +264,18 @@ export type MyTrainingSummary = {
 }
 
 export type AllTrainingSummary = MyTrainingSummary & {
-  user: { displayName: string; avatarUrl: string | null }
+  user: { id: number; displayName: string; avatarUrl: string | null }
+}
+
+export type TrainingPage = {
+  items: AllTrainingSummary[]
+  total: number
+}
+
+export type SelectableUser = {
+  id: number
+  displayName: string
+  avatarUrl: string | null
 }
 
 export type ParticipantInfo = {
@@ -723,8 +734,20 @@ export const api = {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
       return request(`/training?tz=${encodeURIComponent(tz)}`)
     },
-    listAll: (scheduleId?: number): Promise<AllTrainingSummary[]> =>
-      request(`/training/all${scheduleId !== undefined ? `?scheduleId=${scheduleId}` : ''}`),
+    listAll: (opts?: {
+      scheduleId?: number
+      userIds?: number[]
+      page?: number
+      pageSize?: number
+    }): Promise<TrainingPage> => {
+      const p = new URLSearchParams()
+      if (opts?.scheduleId !== undefined) p.set('scheduleId', String(opts.scheduleId))
+      if (opts?.userIds?.length) opts.userIds.forEach((id) => p.append('userId', String(id)))
+      if (opts?.page !== undefined) p.set('page', String(opts.page))
+      if (opts?.pageSize !== undefined) p.set('pageSize', String(opts.pageSize))
+      const qs = p.toString()
+      return request(`/training/all${qs ? `?${qs}` : ''}`)
+    },
     setRunTarget: (
       trainingId: number,
       runIndex: number,
@@ -810,6 +833,10 @@ export const api = {
         return request(`/sources/lichess-tactics/items${qs ? `?${qs}` : ''}`)
       },
     },
+  },
+  users: {
+    search: (q: string, limit = 10): Promise<SelectableUser[]> =>
+      request(`/users/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   },
   attempts: {
     complete: (

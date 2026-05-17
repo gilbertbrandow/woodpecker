@@ -34,6 +34,7 @@ type DataTableProps<T> = {
   data: T[]
   globalFilterPlaceholder?: string
   filterableColumns?: FilterableColumn[]
+  filtersSlot?: React.ReactNode
   pageSize?: number
   initialSorting?: SortingState
   onRowClick?: (row: T) => void
@@ -46,6 +47,7 @@ export function DataTable<T>({
   data,
   globalFilterPlaceholder = 'Search…',
   filterableColumns = [],
+  filtersSlot,
   pageSize = 10,
   initialSorting = [],
   onRowClick,
@@ -126,6 +128,7 @@ export function DataTable<T>({
             className="h-8 pl-7 text-sm sm:w-56"
           />
         </div>
+        {filtersSlot}
         {filterableColumns.map((fc) => (
           <select
             key={fc.id}
