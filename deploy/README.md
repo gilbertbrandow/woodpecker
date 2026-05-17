@@ -6,6 +6,7 @@ Monthly AWS costs reported by the `aws-cost-report` workflow. Updated automatica
 
 | Month | Total (USD) | EC2 | Route 53 | S3 | CloudWatch | Other | SEK paid | Notes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 2026-04 | $24.00 | $2.29 | $1.01 | $0.10 | — | $20.61 | | |
 
 ## Infrastructure
 
