@@ -516,16 +516,18 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
         },
     }
 
-def list_subsets(user_id: int) -> list[tuple[Subset, User]]:
+def list_subsets(user_id: int, locked_only: bool = False) -> list[tuple[Subset, User]]:
+    if locked_only:
+        where_clause = Subset.locked_at.isnot(None)
+    else:
+        where_clause = sa.or_(
+            Subset.user_id == user_id,
+            sa.and_(Subset.locked_at.isnot(None), Subset.user_id != user_id),
+        )
     rows = db.session.execute(
         db.select(Subset, User)
         .join(User, User.id == Subset.user_id)
-        .where(
-            sa.or_(
-                Subset.user_id == user_id,
-                sa.and_(Subset.locked_at.isnot(None), Subset.user_id != user_id),
-            )
-        )
+        .where(where_clause)
         .order_by(Subset.created_at.desc())
     ).all()
     return [(row[0], row[1]) for row in rows]

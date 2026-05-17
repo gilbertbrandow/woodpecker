@@ -167,8 +167,12 @@ def get_schedule_insights(schedule_id: int, user_id: int) -> list[dict[str, obje
     return result
 
 
-def list_schedules(user_id: int, subset_id: int | None = None) -> list[dict[str, object]]:
+def list_schedules(user_id: int, subset_id: int | None = None, locked_only: bool = False) -> list[dict[str, object]]:
     subset_clause = "AND s.subset_id = :subset_id" if subset_id is not None else ""
+    if locked_only:
+        access_clause = "s.locked_at IS NOT NULL"
+    else:
+        access_clause = "(s.locked_at IS NOT NULL OR s.user_id = :uid)"
     params: dict[str, object] = {"uid": user_id}
     if subset_id is not None:
         params["subset_id"] = subset_id
@@ -181,7 +185,7 @@ def list_schedules(user_id: int, subset_id: int | None = None) -> list[dict[str,
             FROM schedules s
             JOIN users u ON u.id = s.user_id
             JOIN subsets sub ON sub.id = s.subset_id
-            WHERE (s.locked_at IS NOT NULL OR s.user_id = :uid)
+            WHERE {access_clause}
             {subset_clause}
             ORDER BY s.created_at DESC
         """),
