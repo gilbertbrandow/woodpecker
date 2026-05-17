@@ -240,6 +240,14 @@ export type Training = {
   schedule: TrainingScheduleSummary
 }
 
+export type TrainingState =
+  | { state: 'not_started'; nextRunIndex: number; totalRuns: number }
+  | { state: 'in_progress'; runIndex: number; totalTrainingItems: number; resolvedCount: number; runStartedAt: string; runDeadlineAt: string; isOverdue: boolean; trainingItemsNeededToday: number }
+  | { state: 'on_break'; nextRunIndex: number; breakStartedAt: string; breakEndsAt: string; breakRemainingMs: number }
+  | { state: 'break_elapsed'; nextRunIndex: number; breakEndedAt: string; elapsedSinceBreakEndMs: number }
+  | { state: 'completed' }
+  | { state: 'aborted' }
+
 export type MyTrainingSummary = {
   id: number
   scheduleId: number
@@ -252,6 +260,7 @@ export type MyTrainingSummary = {
   startedAt: string
   completedAt: string | null
   abortedAt: string | null
+  trainingState: TrainingState
 }
 
 export type AllTrainingSummary = MyTrainingSummary & {
@@ -634,7 +643,8 @@ export const api = {
       request<AuthUser>('/settings', { method: 'PATCH', body: JSON.stringify(payload) }),
   },
   subsets: {
-    list: (): Promise<Subset[]> => request('/subsets'),
+    list: (opts?: { lockedOnly?: boolean }): Promise<Subset[]> =>
+      request(`/subsets${opts?.lockedOnly ? '?locked=true' : ''}`),
     get: (id: number): Promise<Subset> => request(`/subsets/${id}`),
     create: (name: string, puzzleCount: number): Promise<Subset> =>
       request('/subsets', { method: 'POST', body: JSON.stringify({ name, puzzleCount }) }),
@@ -667,8 +677,13 @@ export const api = {
     getStats: (id: number): Promise<SubsetStats> => request(`/subsets/${id}/stats`),
   },
   schedules: {
-    list: (subsetId?: number): Promise<ScheduleSummary[]> =>
-      request(`/schedules${subsetId !== undefined ? `?subsetId=${subsetId}` : ''}`),
+    list: (opts?: { subsetId?: number; lockedOnly?: boolean }): Promise<ScheduleSummary[]> => {
+      const params = new URLSearchParams()
+      if (opts?.subsetId !== undefined) params.set('subsetId', String(opts.subsetId))
+      if (opts?.lockedOnly) params.set('locked', 'true')
+      const qs = params.toString()
+      return request(`/schedules${qs ? `?${qs}` : ''}`)
+    },
     get: (id: number): Promise<Schedule> => request(`/schedules/${id}`),
     create: (name: string, subsetId: number): Promise<Schedule> =>
       request('/schedules', { method: 'POST', body: JSON.stringify({ name, subsetId }) }),
@@ -704,7 +719,10 @@ export const api = {
     create: (scheduleId: number): Promise<Training> =>
       request('/training', { method: 'POST', body: JSON.stringify({ scheduleId }) }),
     get: (id: number): Promise<Training> => request(`/training/${id}`),
-    listMine: (): Promise<MyTrainingSummary[]> => request('/training'),
+    listMine: (): Promise<MyTrainingSummary[]> => {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      return request(`/training?tz=${encodeURIComponent(tz)}`)
+    },
     listAll: (scheduleId?: number): Promise<AllTrainingSummary[]> =>
       request(`/training/all${scheduleId !== undefined ? `?scheduleId=${scheduleId}` : ''}`),
     setRunTarget: (

@@ -58,12 +58,10 @@ export function DurationInput({ value, onChange, disabled, allowZero }: Duration
   const handleUnitChange = (e: React.ChangeEvent<HTMLSelectElement>): void => {
     const newUnit = e.target.value as Unit
     const parsed = parseInt(displayValue, 10)
-    const currentHours = (isNaN(parsed) ? (allowZero ? 0 : 1) : parsed) * MULTIPLIERS[unit]
-    const newDisplay = Math.max(allowZero ? 0 : 1, Math.round(currentHours / MULTIPLIERS[newUnit]))
+    const displayNum = isNaN(parsed) ? (allowZero ? 0 : 1) : parsed
     setUnit(newUnit)
-    setDisplayValue(String(newDisplay))
-    lastEmittedRef.current = newDisplay * MULTIPLIERS[newUnit]
-    onChange(newDisplay * MULTIPLIERS[newUnit])
+    lastEmittedRef.current = displayNum * MULTIPLIERS[newUnit]
+    onChange(displayNum * MULTIPLIERS[newUnit])
   }
 
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
