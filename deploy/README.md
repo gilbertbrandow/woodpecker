@@ -1,5 +1,12 @@
 # Deployment
 
+## AWS Costs
+
+Monthly AWS costs reported by the `aws-cost-report` workflow. Updated automatically on the 3rd of each month via a pull request — costs are grouped by service and denominated in USD (AWS billing currency). The **SEK paid** column is filled in manually from the card charge.
+
+| Month | Total (USD) | EC2 | Route 53 | S3 | CloudWatch | Other | SEK paid | Notes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+
 ## Infrastructure
 
 Single EC2 t3.micro in eu-west-1 behind an Elastic IP. Chosen for simplicity and cost (~$10/month); scaling path is stop → resize → start, no data loss.
