@@ -13,7 +13,6 @@ import {
   type Subset,
   type ScheduleInsightPoint,
   type MyTrainingSummary,
-  type AllTrainingSummary,
   type LeaderboardRun,
 } from "../lib/api";
 import { AreaChart, Area, XAxis, YAxis } from "recharts";
@@ -166,7 +165,6 @@ export function SchedulePage(): React.ReactElement | null {
 
   const [myTraining, setMyTraining] = useState<MyTrainingSummary | null | undefined>(undefined)
   const [enrolling, setEnrolling] = useState(false)
-  const [scheduleTrainings, setScheduleTrainings] = useState<AllTrainingSummary[] | null>(null)
 
   const [activeTab, setActiveTab] = useState("configuration");
   const [insightsData, setInsightsData] = useState<ScheduleInsightPoint[] | null>(null);
@@ -220,14 +218,6 @@ export function SchedulePage(): React.ReactElement | null {
   useEffect(() => {
     setChartsReady(true);
   }, []);
-
-  useEffect(() => {
-    if (activeTab !== "insights" || scheduleTrainings !== null || !user) return;
-    api.training
-      .listAll(id)
-      .then(setScheduleTrainings)
-      .catch(() => {});
-  }, [activeTab, id, user, scheduleTrainings]);
 
   useEffect(() => {
     if (activeTab !== "insights" || insightsData !== null || !user) return;
@@ -1012,11 +1002,7 @@ export function SchedulePage(): React.ReactElement | null {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="pt-4">
-                  {scheduleTrainings === null ? (
-                    <p className="text-sm text-muted-foreground">Loading…</p>
-                  ) : (
-                    <TrainingTable trainings={scheduleTrainings} hideSchedule />
-                  )}
+                  <TrainingTable scheduleId={id} hideSchedule />
                 </div>
               </CollapsibleContent>
             </Collapsible>
