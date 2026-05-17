@@ -18,14 +18,15 @@ import boto3  # type: ignore[import-not-found, import-untyped]
 EARLIEST_MONTH = date(2026, 4, 1)
 README_PATH = sys.argv[1] if len(sys.argv) > 1 else "deploy/README.md"
 
-TABLE_HEADER = "| Month | Total (USD) | EC2 | Route 53 | S3 | CloudWatch | Other | SEK paid | Notes |"
+TABLE_HEADER = "| Month | Total (USD) | EC2 | Route 53 | S3 | Registrar | Tax | Other | SEK paid | Notes |"
 
 SERVICE_MAP = {
     "Amazon Elastic Compute Cloud - Compute": "EC2",
     "EC2 - Other": "EC2",
     "Amazon Route 53": "Route 53",
     "Amazon Simple Storage Service": "S3",
-    "Amazon CloudWatch": "CloudWatch",
+    "Amazon Registrar": "Registrar",
+    "Tax": "Tax",
 }
 
 
@@ -68,7 +69,7 @@ def query_month(year, month):
 
 
 def bucket(costs):
-    ec2 = route53 = s3 = cloudwatch = other = 0.0
+    ec2 = route53 = s3 = registrar = tax = other = 0.0
     for service, amount in costs.items():
         col = SERVICE_MAP.get(service)
         if col == "EC2":
@@ -77,26 +78,29 @@ def bucket(costs):
             route53 += amount
         elif col == "S3":
             s3 += amount
-        elif col == "CloudWatch":
-            cloudwatch += amount
+        elif col == "Registrar":
+            registrar += amount
+        elif col == "Tax":
+            tax += amount
         else:
             other += amount
-    total = ec2 + route53 + s3 + cloudwatch + other
-    return total, ec2, route53, s3, cloudwatch, other
+    total = ec2 + route53 + s3 + registrar + tax + other
+    return total, ec2, route53, s3, registrar, tax, other
 
 
 def fmt(value):
     return f"${value:.2f}" if value >= 0.01 else "—"
 
 
-def build_row(year, month, total, ec2, route53, s3, cloudwatch, other):
+def build_row(year, month, total, ec2, route53, s3, registrar, tax, other):
     return (
         f"| {year:04d}-{month:02d} "
         f"| {fmt(total)} "
         f"| {fmt(ec2)} "
         f"| {fmt(route53)} "
         f"| {fmt(s3)} "
-        f"| {fmt(cloudwatch)} "
+        f"| {fmt(registrar)} "
+        f"| {fmt(tax)} "
         f"| {fmt(other)} "
         f"| | |"
     )
@@ -146,8 +150,8 @@ def main():
             continue
         print(f"Fetching {year:04d}-{month:02d}...")
         costs = query_month(year, month)
-        total, ec2, route53, s3, cloudwatch, other = bucket(costs)
-        new_rows.append(build_row(year, month, total, ec2, route53, s3, cloudwatch, other))
+        total, ec2, route53, s3, registrar, tax, other = bucket(costs)
+        new_rows.append(build_row(year, month, total, ec2, route53, s3, registrar, tax, other))
 
     if not new_rows:
         print("No missing months — README is up to date.")
