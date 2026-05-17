@@ -198,7 +198,7 @@ export function AppSidebar({ activeRun }: { activeRun: ActiveRun | null }): Reac
                     </div>
                     <div className="grid flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
                       <span className="truncate text-sm font-semibold">{displayName(user)}</span>
-                      <span className="truncate text-[10px] text-muted-foreground">username: {user.username}</span>
+                      <span className="truncate text-[10px] text-muted-foreground">user: {user.username}</span>
                     </div>
                     <ChevronsUpDown className="ml-auto size-4 group-data-[collapsible=icon]:hidden" />
                   </SidebarMenuButton>
