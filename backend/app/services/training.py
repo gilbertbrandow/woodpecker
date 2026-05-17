@@ -296,11 +296,33 @@ def abort_training(training_id: int, user_id: int) -> Training:
     return training
 
 
-def list_all_trainings(schedule_id: int | None = None) -> list[dict[str, object]]:
-    where = "WHERE t.schedule_id = :sid" if schedule_id is not None else ""
+def list_all_trainings(
+    schedule_id: int | None = None,
+    user_ids: list[int] | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> dict[str, object]:
+    conditions = []
+    params: dict[str, object] = {}
+
+    if schedule_id is not None:
+        conditions.append("t.schedule_id = :sid")
+        params["sid"] = schedule_id
+
+    if user_ids:
+        placeholders = ", ".join(f":uid{i}" for i in range(len(user_ids)))
+        conditions.append(f"t.user_id IN ({placeholders})")
+        for i, uid in enumerate(user_ids):
+            params[f"uid{i}"] = uid
+
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    offset = (page - 1) * page_size
+    params["limit"] = page_size
+    params["offset"] = offset
+
     rows = db.session.execute(
         sa.text(f"""
-            SELECT t.id, t.schedule_id,
+            SELECT t.id, t.schedule_id, t.user_id,
                    t.started_at, t.completed_at, t.aborted_at,
                    s.name AS schedule_name, s.subset_id, s.config,
                    u.display_name, u.avatar_url,
@@ -335,14 +357,26 @@ def list_all_trainings(schedule_id: int | None = None) -> list[dict[str, object]
             JOIN users u ON u.id = t.user_id
             {where}
             ORDER BY t.started_at DESC
+            LIMIT :limit OFFSET :offset
         """),
-        {"sid": schedule_id} if schedule_id is not None else {},
+        params,
     ).all()
 
-    result: list[dict[str, object]] = []
+    total: int = db.session.scalar(
+        sa.text(f"""
+            SELECT COUNT(*)
+            FROM trainings t
+            JOIN schedules s ON s.id = t.schedule_id
+            JOIN users u ON u.id = t.user_id
+            {where}
+        """),
+        {k: v for k, v in params.items() if k not in ("limit", "offset")},
+    ) or 0
+
+    items: list[dict[str, object]] = []
     for row in rows:
         total_runs = len(ScheduleConfig.from_dict(row.config).runs) if isinstance(row.config, dict) else 0
-        result.append({
+        items.append({
             "id": row.id,
             "scheduleId": row.schedule_id,
             "scheduleName": row.schedule_name,
@@ -355,11 +389,12 @@ def list_all_trainings(schedule_id: int | None = None) -> list[dict[str, object]
             "completedAt": row.completed_at.isoformat() if row.completed_at else None,
             "abortedAt": row.aborted_at.isoformat() if row.aborted_at else None,
             "user": {
+                "id": row.user_id,
                 "displayName": row.display_name,
                 "avatarUrl": row.avatar_url,
             },
         })
-    return result
+    return {"items": items, "total": total}
 
 
 def training_status(training: Training) -> str:

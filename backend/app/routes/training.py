@@ -35,8 +35,18 @@ def list_my_trainings() -> Response:
 @login_required
 def list_all_trainings() -> Response:
     schedule_id_raw = request.args.get("scheduleId")
-    schedule_id = int(schedule_id_raw) if schedule_id_raw is not None else None
-    return jsonify(training_svc.list_all_trainings(schedule_id))
+    schedule_id = int(schedule_id_raw) if schedule_id_raw and schedule_id_raw.isdigit() else None
+    user_ids = [int(v) for v in request.args.getlist("userId") if v.isdigit()]
+    page_raw = request.args.get("page", "1")
+    page_size_raw = request.args.get("pageSize", "20")
+    page = max(1, int(page_raw)) if page_raw.isdigit() else 1
+    page_size = min(100, max(1, int(page_size_raw))) if page_size_raw.isdigit() else 20
+    return jsonify(training_svc.list_all_trainings(
+        schedule_id=schedule_id,
+        user_ids=user_ids or None,
+        page=page,
+        page_size=page_size,
+    ))
 
 
 @training_bp.get("/<int:training_id>")
