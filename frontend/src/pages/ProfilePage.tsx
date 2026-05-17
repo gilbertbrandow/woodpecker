@@ -115,9 +115,6 @@ export function ProfilePage(): React.ReactElement | null {
 
       <section className="py-10">
         <h2 className="text-base font-semibold mb-6">Profile</h2>
-        <p className="text-xs text-muted-foreground mb-4">
-          Lichess account: <span className="text-foreground">{user.username}</span>
-        </p>
         <div className="flex flex-col gap-2 mb-8 max-w-sm">
           <label htmlFor="display-name" className="text-xs text-muted-foreground">
             Display name
