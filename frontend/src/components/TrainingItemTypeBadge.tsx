@@ -15,13 +15,13 @@ const BADGE_CONFIG: Record<TrainingItemSource, BadgeConfig> = {
   LICHESS_TACTIC: {
     label: 'Tactic',
     tooltip: 'There exists a short sequence of forcing moves that achieves an immediate advantage.',
-    className: 'border-purple-500/40 bg-purple-100 text-purple-900 dark:bg-purple-900/30 dark:text-purple-300',
+    className: 'border-cyan-500/40 bg-cyan-100 text-cyan-900 dark:bg-cyan-900/30 dark:text-cyan-300',
     icon: <Zap className="h-3 w-3" />,
   },
   POSITIONAL: {
     label: 'Positional',
     tooltip: 'There exists a clear best move, but for strategic rather than tactical reasons.',
-    className: 'border-teal-600/30 bg-teal-50 text-teal-800 dark:bg-teal-900/20 dark:text-teal-400',
+    className: 'border-indigo-500/40 bg-indigo-100 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-300',
     icon: <Compass className="h-3 w-3" />,
   },
   DECOY: {
