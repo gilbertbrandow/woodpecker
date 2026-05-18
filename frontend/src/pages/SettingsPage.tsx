@@ -1,3 +1,4 @@
+import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { useEffect } from 'react'
 import { useNavigate } from '@tanstack/react-router'
@@ -7,14 +8,6 @@ import { useAuth } from '../context/auth'
 import { api } from '../lib/api'
 import { BOARD_THEMES, PIECE_SETS, resolvePieceSet, resolveBoardTheme } from '../lib/themes'
 import { ThemeToggle } from '../components/ThemeToggle'
-import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbSeparator,
-  BreadcrumbPage,
-} from '../components/ui/breadcrumb'
 
 export function SettingsPage(): React.ReactElement | null {
   const { user, loading, updateUser } = useAuth()
@@ -71,26 +64,11 @@ export function SettingsPage(): React.ReactElement | null {
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-      <Breadcrumb className="mb-6">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/app">Home</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Settings</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
-      <section className="py-10 border-b border-border">
+    <PageWrapper>
+<section className="py-10 border-b border-border">
         <h2 className="text-base font-semibold mb-6">Solve Settings</h2>
 
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Board theme</h3>
-        <p className="text-xs text-muted-foreground mb-3">
-          Choose the board theme.
-        </p>
         <div className="flex flex-wrap gap-2">
           {BOARD_THEMES.map((theme) => {
             const isActive = resolveBoardTheme(user.boardTheme ?? '').id === theme.id
@@ -124,9 +102,6 @@ export function SettingsPage(): React.ReactElement | null {
         </div>
 
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3 mt-6">Piece set</h3>
-        <p className="text-xs text-muted-foreground mb-3">
-          Choose a piece set.
-        </p>
         <div className="flex flex-wrap gap-2">
           {PIECE_SETS.map((set) => {
             const isActive = resolvePieceSet(user.pieceTheme ?? '').id === set.id
@@ -156,7 +131,7 @@ export function SettingsPage(): React.ReactElement | null {
           })}
         </div>
 
-        <div className="flex items-center justify-between mt-6 max-w-sm">
+        <div className="flex items-center justify-between mt-8 max-w-sm">
           <div>
             <p className="text-sm">Show tenths of seconds</p>
             <p className="text-xs text-muted-foreground mt-1">Display a tenths digit on the puzzle timer (e.g. 01:23.4).</p>
@@ -186,6 +161,6 @@ export function SettingsPage(): React.ReactElement | null {
           <ThemeToggle />
         </div>
       </section>
-    </div>
+    </PageWrapper>
   )
 }

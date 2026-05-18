@@ -275,6 +275,11 @@ export function BoardPage(): React.ReactElement | null {
       ? overviewData.trainingItem.source
       : (ctrl.solvingView?.trainingItem.source ?? null)
 
+  const trainingItemIdForMetaCard =
+    ctrl.mode === 'overview' && overviewData !== null
+      ? overviewData.runTrainingItem.trainingItemId
+      : ctrl.solvingView?.runTrainingItem.trainingItemId
+
   const timerBar =
     ctrl.mode === 'focus' && ctrl.session.allPliesPlayed.length > 0
       ? (() => {
@@ -466,6 +471,7 @@ export function BoardPage(): React.ReactElement | null {
         <TrainingItemMetaCard
           source={sourceForMetaCard}
           pgnDisplay={pgnDisplay}
+          trainingItemId={trainingItemIdForMetaCard}
           focusMode={ctrl.mode !== 'overview'}
           selectedPly={ctrl.mode === 'overview' ? selectedPly : null}
           onPlyClick={ctrl.mode === 'overview' ? setSelectedPly : undefined}

@@ -1,3 +1,4 @@
+import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { BookOpen, ExternalLink } from 'lucide-react'
 
@@ -33,7 +34,7 @@ const FOUNDERS: Founder[] = [
 
 export function AboutPage(): React.ReactElement {
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 py-8 sm:px-6">
+    <PageWrapper className="flex flex-col gap-10">
       <section className="flex flex-col gap-3">
         <h1 className="text-xl font-semibold">The Woodpecker Method</h1>
         <p className="text-sm leading-relaxed text-muted-foreground">
@@ -130,6 +131,6 @@ export function AboutPage(): React.ReactElement {
           ))}
         </div>
       </section>
-    </div>
+    </PageWrapper>
   )
 }

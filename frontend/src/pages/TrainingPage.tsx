@@ -1,6 +1,7 @@
+import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { useState, useEffect, useMemo } from 'react'
-import { useNavigate, Link, useParams } from '@tanstack/react-router'
+import { useNavigate, useParams } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { ChevronDown, Play } from 'lucide-react'
 import {
@@ -18,7 +19,6 @@ import {
   type Run,
   type Training,
   type TrainingState,
-  type TrainingStatus,
   type TrainingInsights,
 } from '../lib/api'
 import {
@@ -26,14 +26,7 @@ import {
   ChartTooltip,
   type ChartConfig,
 } from '../components/ui/chart'
-import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbSeparator,
-  BreadcrumbPage,
-} from '../components/ui/breadcrumb'
+import { useSetBreadcrumbTitle } from '../hooks/useSetBreadcrumbTitle'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
 import {
   Collapsible,
@@ -205,13 +198,6 @@ function formatSolveSeconds(secs: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-const STATUS_LABELS: Record<TrainingStatus, string> = {
-  draft: 'Not started',
-  in_progress: 'In progress',
-  completed: 'Completed',
-  aborted: 'Aborted',
-}
-
 const SLOT_STATUS_LABELS: Record<'not_started' | 'active' | 'completed' | 'aborted', string> = {
   not_started: 'Not started',
   active: 'In progress',
@@ -263,6 +249,8 @@ export function TrainingPage(): React.ReactElement | null {
   const [insights, setInsights] = useState<TrainingInsights | null>(null)
   const [insightsLoading, setInsightsLoading] = useState(false)
   const [chartsReady, setChartsReady] = useState(false)
+
+  useSetBreadcrumbTitle(training?.schedule?.name)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -364,17 +352,17 @@ export function TrainingPage(): React.ReactElement | null {
 
   if (pageLoading) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+      <PageWrapper>
         <p className="text-sm text-muted-foreground">Loading…</p>
-      </div>
+      </PageWrapper>
     )
   }
 
   if (!training) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+      <PageWrapper>
         <p className="text-sm text-muted-foreground">Training not found.</p>
-      </div>
+      </PageWrapper>
     )
   }
 
@@ -391,28 +379,13 @@ export function TrainingPage(): React.ReactElement | null {
   ) ? completedRunCount : null
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-      <Breadcrumb className="mb-6">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to="/app/training">Training</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>{schedule.name}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+    <PageWrapper>
 
-      <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h1 className="text-xl font-semibold">{schedule.name}</h1>
-            <Badge variant="outline" className="text-xs">
-              {STATUS_LABELS[training.status]}
-            </Badge>
+            <StatusBadge status={trainingState?.state ?? training.status} />
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
             <UserAvatar displayName={training.ownerDisplayName} avatarUrl={training.ownerAvatarUrl} className="h-4 w-4" />
@@ -894,6 +867,6 @@ export function TrainingPage(): React.ReactElement | null {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageWrapper>
   )
 }

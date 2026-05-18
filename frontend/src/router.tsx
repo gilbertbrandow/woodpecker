@@ -109,96 +109,112 @@ const appShellRoute = createRoute({
 const dashboardRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/',
+  staticData: { crumb: { group: 'Activity', leaf: 'Dashboard' } },
   component: DashboardPage,
 })
 
 const settingsRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/settings',
+  staticData: { crumb: { group: 'User', leaf: 'Settings' } },
   component: SettingsPage,
 })
 
 const profileRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/profile',
+  staticData: { crumb: { group: 'User', leaf: 'Profile' } },
   component: ProfilePage,
 })
 
 const subsetsListRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/subsets',
+  staticData: { crumb: { group: 'Setup', leaf: 'Subsets' } },
   component: SubsetsListPage,
 })
 
 const subsetNewRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/subsets/new',
+  staticData: { crumb: { group: 'Setup', parents: [{ label: 'Subsets', to: '/app/subsets' }], leaf: 'New Subset' } },
   component: SubsetNewPage,
 })
 
 const subsetRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/subsets/$subsetId',
+  staticData: { crumb: { group: 'Setup', parents: [{ label: 'Subsets', to: '/app/subsets' }], leaf: null } },
   component: SubsetPage,
 })
 
 const schedulesListRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/schedules',
+  staticData: { crumb: { group: 'Setup', leaf: 'Schedules' } },
   component: SchedulesListPage,
 })
 
 const scheduleNewRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/schedules/new',
+  staticData: { crumb: { group: 'Setup', parents: [{ label: 'Schedules', to: '/app/schedules' }], leaf: 'New Schedule' } },
   component: ScheduleNewPage,
 })
 
 const scheduleRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/schedules/$scheduleId',
+  staticData: { crumb: { group: 'Setup', parents: [{ label: 'Schedules', to: '/app/schedules' }], leaf: null } },
   component: SchedulePage,
 })
 
 const trainingListRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/training',
+  staticData: { crumb: { group: 'Activity', leaf: 'Training' } },
   component: TrainingListPage,
 })
 
 const trainingNewRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/training/new',
+  staticData: { crumb: { group: 'Activity', parents: [{ label: 'Training', to: '/app/training' }], leaf: 'New Training' } },
   component: TrainingNewPage,
 })
 
 const trainingRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/training/$trainingId',
+  staticData: { crumb: { group: 'Activity', parents: [{ label: 'Training', to: '/app/training' }], leaf: null } },
   component: TrainingPage,
 })
 
 const aboutRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/about',
+  staticData: { crumb: { group: 'General', leaf: 'About' } },
   component: AboutPage,
 })
 
 const sourcesListRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/sources',
+  staticData: { crumb: { group: 'Setup', leaf: 'Sources' } },
   component: SourcesListPage,
 })
 
 const lichessTacticsDashboardRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/sources/lichess-tactics',
+  staticData: { crumb: { group: 'Setup', parents: [{ label: 'Sources', to: '/app/sources' }], leaf: 'Lichess Tactics' } },
   component: LichessTacticsSourcePage,
 })
 
 const runRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/runs/$runId',
+  staticData: { crumb: { group: 'Activity', parents: [{ label: 'Training', to: '/app/training' }], leaf: null } },
   component: RunPage,
 })
 
@@ -275,5 +291,12 @@ export const router = createRouter({
 declare module '@tanstack/react-router' {
   interface Register {
     router: typeof router
+  }
+  interface StaticDataRouteOption {
+    crumb?: {
+      group: string
+      parents?: Array<{ label: string; to: string }>
+      leaf: string | null // null = dynamic title from BreadcrumbContext
+    }
   }
 }

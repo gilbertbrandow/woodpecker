@@ -22,6 +22,7 @@ import {
   TableHead,
   TableCell,
 } from './ui/table'
+import { FilterSelect } from './ui/filter-select'
 
 export type FilterableColumn = {
   id: string
@@ -130,21 +131,14 @@ export function DataTable<T>({
         </div>
         {filtersSlot}
         {filterableColumns.map((fc) => (
-          <select
+          <FilterSelect
             key={fc.id}
             value={filterValues[fc.id] ?? ''}
-            onChange={(e) => {
-              setColumnFilter(fc.id, e.target.value)
-            }}
-            className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring sm:w-40"
-          >
-            <option value="">All {fc.label}</option>
-            {fc.options.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            onValueChange={(val) => setColumnFilter(fc.id, val)}
+            placeholder={`All ${fc.label}`}
+            options={fc.options}
+            className="sm:w-40"
+          />
         ))}
       </div>
 

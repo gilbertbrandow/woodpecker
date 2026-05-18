@@ -1,3 +1,4 @@
+import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { useEffect } from 'react'
 import { useNavigate, useParams } from '@tanstack/react-router'
@@ -55,8 +56,8 @@ export function TrainingItemResolverPage(): React.ReactElement {
   }, [runId, runTrainingItemId])
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+    <PageWrapper>
       <p className="text-sm text-muted-foreground">Loading…</p>
-    </div>
+    </PageWrapper>
   )
 }

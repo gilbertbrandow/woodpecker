@@ -1,3 +1,4 @@
+import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
@@ -38,8 +39,8 @@ export function SubsetsListPage(): React.ReactElement | null {
   if (!user) return null
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6">
-      <div className="flex items-center justify-between">
+    <PageWrapper className="flex flex-col gap-6">
+      <div className="flex items-start justify-between">
         <h1 className="text-base font-semibold">Subsets</h1>
         <Link
           to="/app/subsets/new"
@@ -62,6 +63,6 @@ export function SubsetsListPage(): React.ReactElement | null {
           onDelete={(s) => void handleDelete(s)}
         />
       )}
-    </div>
+    </PageWrapper>
   )
 }

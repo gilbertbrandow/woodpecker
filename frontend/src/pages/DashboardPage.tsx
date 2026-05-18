@@ -1,3 +1,4 @@
+import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { api, type LeaderboardRun } from '../lib/api'
@@ -15,13 +16,13 @@ export function DashboardPage(): React.ReactElement {
   }, [])
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6">
+    <PageWrapper className="flex flex-col gap-6">
       <h1 className="text-base font-semibold">Leaderboard</h1>
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
         <LeaderboardTable runs={runs} />
       )}
-    </div>
+    </PageWrapper>
   )
 }

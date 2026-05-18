@@ -99,7 +99,9 @@ export function TrainingTable({
         accessorKey: 'status',
         header: 'Status',
         enableSorting: false,
-        cell: ({ row }) => <StatusBadge status={row.original.status as TrainingStatus} />,
+        cell: ({ row }) => (
+          <StatusBadge status={row.original.trainingState?.state ?? (row.original.status as TrainingStatus)} />
+        ),
         filterFn: 'equals',
       },
       {

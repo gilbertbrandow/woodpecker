@@ -3,6 +3,7 @@ import { Badge } from '../../components/ui/badge'
 import { cn } from '../../lib/utils'
 import type { LichessTacticSourceMetadata, SourceMetadata } from '../../lib/api'
 import type { PlySelection } from './boardPage.helpers'
+import { TrainingItemTypeBadge } from '../../components/TrainingItemTypeBadge'
 
 type DisplayMoveMin = {
   san: string
@@ -129,24 +130,31 @@ function computePrevPly(
 
 function LichessTacticSection({
   source,
+  trainingItemId,
   focusMode,
 }: {
   source: LichessTacticSourceMetadata
+  trainingItemId: number | undefined
   focusMode: boolean
 }): React.ReactElement {
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-baseline gap-4">
+      <div className="flex items-center gap-3">
+        {!focusMode && <TrainingItemTypeBadge sourceType="LICHESS_TACTIC" />}
         <div>
           <span className="text-xs text-muted-foreground">Puzzle </span>
-          <a
-            href={`https://lichess.org/training/${source.displayId}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm font-mono text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-          >
-            #{source.displayId}
-          </a>
+          {focusMode ? (
+            <span className="text-sm font-mono">#{trainingItemId ?? source.displayId}</span>
+          ) : (
+            <a
+              href={`https://lichess.org/training/${source.displayId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-mono text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              #{source.displayId}
+            </a>
+          )}
         </div>
         {!focusMode && (
           <span className="tabular-nums text-sm">
@@ -170,13 +178,15 @@ function LichessTacticSection({
 
 function SourceSection({
   source,
+  trainingItemId,
   focusMode,
 }: {
   source: SourceMetadata
+  trainingItemId: number | undefined
   focusMode: boolean
 }): React.ReactElement | null {
   if (source.sourceType === 'LICHESS_TACTIC') {
-    return <LichessTacticSection source={source} focusMode={focusMode} />
+    return <LichessTacticSection source={source} trainingItemId={trainingItemId} focusMode={focusMode} />
   }
   return null
 }
@@ -184,6 +194,7 @@ function SourceSection({
 type TrainingItemMetaCardProps = {
   source: SourceMetadata
   pgnDisplay: TrainingItemMetaPgnDisplayMin | null
+  trainingItemId?: number
   focusMode?: boolean
   selectedPly?: PlySelection | null
   onPlyClick?: (ply: PlySelection) => void
@@ -192,6 +203,7 @@ type TrainingItemMetaCardProps = {
 export function TrainingItemMetaCard({
   source,
   pgnDisplay,
+  trainingItemId,
   focusMode = false,
   selectedPly,
   onPlyClick,
@@ -215,7 +227,7 @@ export function TrainingItemMetaCard({
 
   return (
     <div className="flex flex-col gap-3 rounded-md border border-border px-3 py-3">
-      <SourceSection source={source} focusMode={focusMode} />
+      <SourceSection source={source} trainingItemId={trainingItemId} focusMode={focusMode} />
       {pgnDisplay !== null && pgnDisplay.mainline.length > 0 && (
         <div className={cn('text-sm leading-relaxed', 'border-t border-border pt-2')}>
           <MoveSequence moves={pgnDisplay.mainline} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />

@@ -100,7 +100,9 @@ export function UserSelector({
             <span className="text-muted-foreground">All users</span>
           ) : (
             <>
-              <span className="text-foreground">Users</span>
+              <span className="text-foreground">
+                {me && value.length === 1 && value[0].id === me.id ? 'Me' : 'Users'}
+              </span>
               <AvatarGroup>
                 {visibleAvatars.map((u) => (
                   <UserAvatar

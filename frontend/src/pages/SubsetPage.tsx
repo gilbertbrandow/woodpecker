@@ -1,6 +1,7 @@
+import { PageWrapper } from '../components/PageWrapper'
 import * as React from "react";
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate, Link, useParams } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ChevronDown, Lock, Trash2, Undo2 } from "lucide-react";
 import { useAuth } from "../context/auth";
@@ -36,14 +37,7 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "../components/ui/alert-dialog";
-import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbSeparator,
-  BreadcrumbPage,
-} from "../components/ui/breadcrumb";
+import { useSetBreadcrumbTitle } from "../hooks/useSetBreadcrumbTitle";
 import {
   RatingChart,
   type RatingValue,
@@ -266,6 +260,8 @@ export function SubsetPage(): React.ReactElement | null {
   const [themesOpen, setThemesOpen] = useState(false);
   const [openingOpen, setOpeningOpen] = useState(false);
 
+  useSetBreadcrumbTitle(subset?.name)
+
   useEffect(() => {
     if (!authLoading && !user) {
       void navigate({ to: "/" });
@@ -424,17 +420,17 @@ export function SubsetPage(): React.ReactElement | null {
 
   if (pageLoading) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+      <PageWrapper>
         <p className="text-sm text-muted-foreground">Loading…</p>
-      </div>
+      </PageWrapper>
     );
   }
 
   if (!subset) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+      <PageWrapper>
         <p className="text-sm text-muted-foreground">Subset not found.</p>
-      </div>
+      </PageWrapper>
     );
   }
 
@@ -446,21 +442,7 @@ export function SubsetPage(): React.ReactElement | null {
   const fillLabel = total === 0 ? "Fill" : "Refill";
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-      <Breadcrumb className="mb-6">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to="/app">Subsets</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>{subset.name}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
+    <PageWrapper>
       <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="text-xl font-semibold">{subset.name}</h1>
         <StatusBadge status={subset.status} />
@@ -470,7 +452,7 @@ export function SubsetPage(): React.ReactElement | null {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="flexflex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
           <TabsList className="mb-6">
             <TabsTrigger value="configuration">Configuration</TabsTrigger>
             <TabsTrigger value="insights">Insights</TabsTrigger>
@@ -730,6 +712,6 @@ export function SubsetPage(): React.ReactElement | null {
           </div>
         </TabsContent>
       </Tabs>
-    </div>
+    </PageWrapper>
   );
 }

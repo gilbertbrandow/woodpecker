@@ -1,6 +1,8 @@
+import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { Link } from '@tanstack/react-router'
 import { useAuth } from '../context/auth'
+import { TrainingItemTypeBadge } from '../components/TrainingItemTypeBadge'
 
 export function SourcesListPage(): React.ReactElement | null {
   const { user } = useAuth()
@@ -8,12 +10,13 @@ export function SourcesListPage(): React.ReactElement | null {
   if (!user) return null
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6">
+    <PageWrapper className="flex flex-col gap-6">
       <h1 className="text-base font-semibold">Sources</h1>
 
       <div className="flex flex-col gap-4 rounded-lg border bg-card p-6">
-        <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-3">
           <h2 className="text-base font-semibold">Lichess Tactics</h2>
+          <TrainingItemTypeBadge sourceType="LICHESS_TACTIC" />
         </div>
 
         <p className="text-sm text-muted-foreground">
@@ -30,6 +33,6 @@ export function SourcesListPage(): React.ReactElement | null {
           </Link>
         </div>
       </div>
-    </div>
+    </PageWrapper>
   )
 }

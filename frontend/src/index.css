@@ -81,6 +81,7 @@
 
   body {
     @apply bg-background text-foreground;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   button:not(:disabled) {
