@@ -1,3 +1,4 @@
+import { PageWrapper } from '../components/PageWrapper'
 import * as React from "react";
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "@tanstack/react-router";
@@ -237,17 +238,17 @@ export function SchedulePage(): React.ReactElement | null {
 
   if (pageLoading) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+      <PageWrapper>
         <p className="text-sm text-muted-foreground">Loading…</p>
-      </div>
+      </PageWrapper>
     );
   }
 
   if (!schedule) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+      <PageWrapper>
         <p className="text-sm text-muted-foreground">Schedule not found.</p>
-      </div>
+      </PageWrapper>
     );
   }
 
@@ -370,8 +371,8 @@ export function SchedulePage(): React.ReactElement | null {
   };
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-<div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <PageWrapper>
+<div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h1 className="text-xl font-semibold">{schedule.name}</h1>
@@ -990,6 +991,6 @@ export function SchedulePage(): React.ReactElement | null {
           </div>
         </TabsContent>
       </Tabs>
-    </div>
+    </PageWrapper>
   );
 }

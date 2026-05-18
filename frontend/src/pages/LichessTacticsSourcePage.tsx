@@ -1,3 +1,4 @@
+import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { useState } from 'react'
 import { useAuth } from '../context/auth'
@@ -12,7 +13,7 @@ export function LichessTacticsSourcePage(): React.ReactElement | null {
   if (!user) return null
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6">
+    <PageWrapper className="flex flex-col gap-6">
       <SourceDetailShell
         breadcrumbParentLabel="Sources"
         breadcrumbParentTo="/app/sources"
@@ -22,6 +23,6 @@ export function LichessTacticsSourcePage(): React.ReactElement | null {
         exploreContent={exploreOpened ? <LichessTacticsExplore /> : null}
         onExploreTabOpen={() => setExploreOpened(true)}
       />
-    </div>
+    </PageWrapper>
   )
 }

@@ -1,3 +1,4 @@
+import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { Link } from '@tanstack/react-router'
 import { useAuth } from '../context/auth'
@@ -8,7 +9,7 @@ export function SourcesListPage(): React.ReactElement | null {
   if (!user) return null
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6">
+    <PageWrapper className="flex flex-col gap-6">
       <h1 className="text-base font-semibold">Sources</h1>
 
       <div className="flex flex-col gap-4 rounded-lg border bg-card p-6">
@@ -30,6 +31,6 @@ export function SourcesListPage(): React.ReactElement | null {
           </Link>
         </div>
       </div>
-    </div>
+    </PageWrapper>
   )
 }

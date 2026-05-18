@@ -1,3 +1,4 @@
+import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
@@ -114,7 +115,7 @@ export function ProfilePage(): React.ReactElement | null {
     )
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+    <PageWrapper>
       <section className="py-10">
         <h2 className="text-base font-semibold mb-6">Profile</h2>
 
@@ -268,6 +269,6 @@ export function ProfilePage(): React.ReactElement | null {
           Update profile
         </Button>
       </section>
-    </div>
+    </PageWrapper>
   )
 }

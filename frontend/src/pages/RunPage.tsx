@@ -1,3 +1,4 @@
+import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams } from '@tanstack/react-router'
@@ -389,17 +390,17 @@ export function RunPage(): React.ReactElement | null {
 
   if (pageLoading) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+      <PageWrapper>
         <p className="text-sm text-muted-foreground">Loading…</p>
-      </div>
+      </PageWrapper>
     )
   }
 
   if (!run || !puzzleList) {
     return (
-      <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+      <PageWrapper>
         <p className="text-sm text-muted-foreground">Run not found.</p>
-      </div>
+      </PageWrapper>
     )
   }
 
@@ -408,7 +409,7 @@ export function RunPage(): React.ReactElement | null {
   const statsLine = `Started ${formatStartedAt(run.startedAt)}`
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+    <PageWrapper>
 <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -479,6 +480,6 @@ export function RunPage(): React.ReactElement | null {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageWrapper>
   )
 }

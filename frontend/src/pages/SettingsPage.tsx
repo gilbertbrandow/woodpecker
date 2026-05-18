@@ -1,3 +1,4 @@
+import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { useEffect } from 'react'
 import { useNavigate } from '@tanstack/react-router'
@@ -63,7 +64,7 @@ export function SettingsPage(): React.ReactElement | null {
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+    <PageWrapper>
 <section className="py-10 border-b border-border">
         <h2 className="text-base font-semibold mb-6">Solve Settings</h2>
 
@@ -160,6 +161,6 @@ export function SettingsPage(): React.ReactElement | null {
           <ThemeToggle />
         </div>
       </section>
-    </div>
+    </PageWrapper>
   )
 }

@@ -1,3 +1,4 @@
+import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
@@ -115,7 +116,7 @@ export function TrainingNewPage(): React.ReactElement | null {
   )
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+    <PageWrapper>
 
       <div className="mb-6">
         <h1 className="text-xl font-semibold">New Training</h1>
@@ -146,6 +147,6 @@ export function TrainingNewPage(): React.ReactElement | null {
           </Button>
         </div>
       )}
-    </div>
+    </PageWrapper>
   )
 }
