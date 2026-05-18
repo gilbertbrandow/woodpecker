@@ -1,9 +1,9 @@
 import * as React from 'react'
-import { Check, CheckCheck, Lock, Layers, Clock, XCircle, CheckCircle2 } from 'lucide-react'
+import { Check, CheckCheck, Lock, Layers, Clock, XCircle, CheckCircle2, PauseCircle } from 'lucide-react'
 import { cn } from '../lib/utils'
 
 type SubsetStatus = 'draft' | 'filled' | 'locked'
-type TrainingStatus = 'draft' | 'in_progress' | 'completed' | 'aborted'
+type TrainingStatus = 'draft' | 'in_progress' | 'on_break' | 'break_elapsed' | 'completed' | 'aborted'
 type PositionStatus = 'not_started' | 'in_progress' | 'solved' | 'solved_with_retries' | 'failed'
 
 export type StatusValue = SubsetStatus | TrainingStatus | PositionStatus
@@ -72,6 +72,18 @@ const STATUS_CONFIG: Record<StatusValue, StatusConfig> = {
     className:
       'border-red-600/30 bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400',
     icon: <XCircle className="h-3 w-3" />,
+  },
+  on_break: {
+    label: 'On break',
+    className:
+      'border-amber-600/30 bg-amber-50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400',
+    icon: <PauseCircle className="h-3 w-3" />,
+  },
+  break_elapsed: {
+    label: 'Break elapsed',
+    className:
+      'border-orange-600/30 bg-orange-50 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400',
+    icon: <Clock className="h-3 w-3" />,
   },
 }
 

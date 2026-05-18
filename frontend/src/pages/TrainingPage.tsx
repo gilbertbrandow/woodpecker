@@ -19,7 +19,6 @@ import {
   type Run,
   type Training,
   type TrainingState,
-  type TrainingStatus,
   type TrainingInsights,
 } from '../lib/api'
 import {
@@ -197,13 +196,6 @@ function formatSolveSeconds(secs: number): string {
   const m = Math.floor(secs / 60)
   const s = secs % 60
   return `${m}:${String(s).padStart(2, '0')}`
-}
-
-const STATUS_LABELS: Record<TrainingStatus, string> = {
-  draft: 'Not started',
-  in_progress: 'In progress',
-  completed: 'Completed',
-  aborted: 'Aborted',
 }
 
 const SLOT_STATUS_LABELS: Record<'not_started' | 'active' | 'completed' | 'aborted', string> = {
@@ -393,9 +385,7 @@ export function TrainingPage(): React.ReactElement | null {
         <div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h1 className="text-xl font-semibold">{schedule.name}</h1>
-            <Badge variant="outline" className="text-xs">
-              {STATUS_LABELS[training.status]}
-            </Badge>
+            <StatusBadge status={trainingState?.state ?? training.status} />
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
             <UserAvatar displayName={training.ownerDisplayName} avatarUrl={training.ownerAvatarUrl} className="h-4 w-4" />
