@@ -3,6 +3,7 @@ import { Badge } from '../../components/ui/badge'
 import { cn } from '../../lib/utils'
 import type { LichessTacticSourceMetadata, SourceMetadata } from '../../lib/api'
 import type { PlySelection } from './boardPage.helpers'
+import { TrainingItemTypeBadge } from '../../components/TrainingItemTypeBadge'
 
 type DisplayMoveMin = {
   san: string
@@ -136,7 +137,8 @@ function LichessTacticSection({
 }): React.ReactElement {
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-baseline gap-4">
+      <div className="flex items-center gap-3">
+        {!focusMode && <TrainingItemTypeBadge sourceType="LICHESS_TACTIC" />}
         <div>
           <span className="text-xs text-muted-foreground">Puzzle </span>
           <a

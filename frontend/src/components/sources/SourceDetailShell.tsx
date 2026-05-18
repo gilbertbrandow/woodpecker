@@ -8,6 +8,7 @@ type Props = {
   breadcrumbParentLabel: string
   breadcrumbParentTo: string
   title: string
+  badge?: React.ReactNode
   summary: string
   aboutContent: React.ReactNode
   exploreContent: React.ReactNode
@@ -18,6 +19,7 @@ export function SourceDetailShell({
   breadcrumbParentLabel,
   breadcrumbParentTo,
   title,
+  badge,
   summary,
   aboutContent,
   exploreContent,
@@ -43,7 +45,10 @@ export function SourceDetailShell({
       </nav>
 
       <div className="flex flex-col gap-1">
-        <h1 className="text-base font-semibold">{title}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-base font-semibold">{title}</h1>
+          {badge}
+        </div>
         <p className="text-sm text-muted-foreground">{summary}</p>
       </div>
 

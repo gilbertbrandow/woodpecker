@@ -10,7 +10,7 @@ import { UserAvatar } from '../UserAvatar'
 import { UserSelector } from '../UserSelector'
 import { Button } from '../ui/button'
 import { useAuth } from '../../context/auth'
-import { api, type AllTrainingSummary, type SelectableUser } from '../../lib/api'
+import { api, type AllTrainingSummary, type SelectableUser, type TrainingStatus } from '../../lib/api'
 
 const PAGE_SIZE = 20
 
@@ -99,7 +99,9 @@ export function TrainingTable({
         accessorKey: 'status',
         header: 'Status',
         enableSorting: false,
-        cell: ({ row }) => <StatusBadge status={row.original.trainingState.state} />,
+        cell: ({ row }) => (
+          <StatusBadge status={row.original.trainingState?.state ?? (row.original.status as TrainingStatus)} />
+        ),
         filterFn: 'equals',
       },
       {
