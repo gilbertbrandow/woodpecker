@@ -11,8 +11,10 @@ import {
 } from '../lib/avatar'
 import { resolvePieceSet } from '../lib/themes'
 import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
 import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar'
 import { DefaultAvatar } from '../components/DefaultAvatar'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
 
 const PIECE_CHESS_NOTATION: Record<string, string> = {
   bk: 'K',
@@ -25,12 +27,15 @@ const PIECE_CHESS_NOTATION: Record<string, string> = {
 export function ProfilePage(): React.ReactElement | null {
   const { user, loading, updateUser } = useAuth()
   const navigate = useNavigate()
+
   const [displayName, setDisplayName] = useState('')
-  const [avatarUrl, setAvatarUrl] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [mode, setMode] = useState<'build' | 'custom'>('build')
   const [selectedPiece, setSelectedPiece] = useState<AvatarPiece>(AVATAR_PIECES[0])
   const [selectedColor, setSelectedColor] = useState<AvatarColor>(AVATAR_COLORS[0])
   const [selectedStyle, setSelectedStyle] = useState<AvatarStyle>(AVATAR_STYLES[0])
+  const [customUrl, setCustomUrl] = useState('')
+  const [urlError, setUrlError] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -39,10 +44,19 @@ export function ProfilePage(): React.ReactElement | null {
   }, [user, loading, navigate])
 
   useEffect(() => {
-    if (user) {
-      setDisplayName(user.displayName)
-      const avatarVal = parseAvatarValue(user.avatarUrl)
-      const defaults = resolveAvatarDefaults(user.username)
+    if (!user) return
+    setDisplayName(user.displayName)
+    const avatarVal = parseAvatarValue(user.avatarUrl)
+    const defaults = resolveAvatarDefaults(user.username)
+    if (avatarVal.type === 'custom') {
+      setMode('custom')
+      setCustomUrl(avatarVal.url)
+      setSelectedPiece(defaults.piece)
+      setSelectedColor(defaults.color)
+      setSelectedStyle(defaults.style)
+    } else {
+      setMode('build')
+      setCustomUrl('')
       setSelectedPiece(avatarVal.type === 'default' ? avatarVal.piece : defaults.piece)
       setSelectedColor(avatarVal.type === 'default' ? avatarVal.color : defaults.color)
       setSelectedStyle(avatarVal.type === 'default' ? avatarVal.style : defaults.style)
@@ -51,14 +65,29 @@ export function ProfilePage(): React.ReactElement | null {
 
   if (loading || !user) return null
 
-  const avatarValue = parseAvatarValue(user.avatarUrl)
+  const handleResetToAuto = (): void => {
+    const defaults = resolveAvatarDefaults(user.username)
+    setMode('build')
+    setSelectedPiece(defaults.piece)
+    setSelectedColor(defaults.color)
+    setSelectedStyle(defaults.style)
+    setCustomUrl('')
+  }
 
-  const saveDisplayName = async (): Promise<void> => {
+  const handleSave = async (): Promise<void> => {
+    if (mode === 'custom' && !customUrl.trim()) {
+      setUrlError(true)
+      return
+    }
     setSaving(true)
     try {
-      const updated = await api.settings.update({ displayName })
+      const avatarUrlValue =
+        mode === 'custom'
+          ? customUrl.trim()
+          : `default:${selectedPiece}:${selectedColor}:${selectedStyle}`
+      const updated = await api.settings.update({ displayName, avatarUrl: avatarUrlValue })
       updateUser(updated)
-      toast('Profile updated', { description: 'Your display name has been saved.' })
+      toast('Profile updated', { description: 'Your profile has been saved.' })
     } catch {
       toast.error('Something went wrong', { description: 'Please try again.' })
     } finally {
@@ -66,172 +95,177 @@ export function ProfilePage(): React.ReactElement | null {
     }
   }
 
-  const saveAvatar = async (): Promise<void> => {
-    setSaving(true)
-    try {
-      const value = avatarUrl.trim() || `default:${selectedPiece}:${selectedColor}:${selectedStyle}`
-      const updated = await api.settings.update({ avatarUrl: value })
-      updateUser(updated)
-      setAvatarUrl('')
-      toast('Avatar updated', { description: 'Your avatar has been saved.' })
-    } catch {
-      toast.error('Something went wrong', { description: 'Please try again.' })
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const resetAvatar = async (): Promise<void> => {
-    try {
-      const updated = await api.settings.update({ avatarUrl: '' })
-      updateUser(updated)
-      toast('Avatar reset', { description: 'Reverted to your generated avatar.' })
-    } catch {
-      toast.error('Something went wrong', { description: 'Please try again.' })
-    }
-  }
+  const previewAvatar =
+    mode === 'custom' && customUrl.trim() ? (
+      <Avatar className="h-16 w-16 shrink-0">
+        <AvatarImage src={customUrl.trim()} alt={displayName} />
+        <AvatarFallback>
+          <DefaultAvatar username={user.username} className="h-16 w-16" />
+        </AvatarFallback>
+      </Avatar>
+    ) : (
+      <DefaultAvatar
+        username={user.username}
+        piece={selectedPiece}
+        color={selectedColor}
+        style={selectedStyle}
+        className="h-16 w-16 shrink-0"
+      />
+    )
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-<section className="py-10">
+    <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+      <section className="py-10">
         <h2 className="text-base font-semibold mb-6">Profile</h2>
-        <div className="flex flex-col gap-2 mb-8 max-w-sm">
-          <label htmlFor="display-name" className="text-xs text-muted-foreground">
-            Display name
-          </label>
-          <div className="flex gap-2">
-            <input
+
+        {/* Preview card */}
+        <div className="inline-flex flex-col min-w-sm rounded-lg border border-border bg-card p-5 mb-4">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-4">Preview</p>
+          <div className="flex items-center gap-4">
+            {previewAvatar}
+            <div className="min-w-0">
+              <p className="text-base font-semibold truncate">
+                {displayName || <span className="text-muted-foreground italic font-normal text-sm">No display name</span>}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">{user.username}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Display name */}
+        <div className="mb-8 mt-6">
+          <h3 className="text-sm font-semibold mb-3">Display name</h3>
+          <div className="flex flex-col gap-1.5 max-w-sm">
+            <Input
               id="display-name"
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               maxLength={32}
-              className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              className="h-9"
             />
-            <Button size="sm" onClick={() => void saveDisplayName()} disabled={saving}>
-              Save
-            </Button>
+            <p className="text-xs text-muted-foreground">2–32 characters. Shown to other users.</p>
           </div>
         </div>
 
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">Avatar</h3>
+        {/* Avatar builder */}
+        <div className="mb-8">
+          <h3 className="text-sm font-semibold mb-3">Avatar</h3>
+          <Tabs value={mode} onValueChange={(v) => setMode(v as 'build' | 'custom')} className="max-w-sm">
+              <TabsList className="w-full">
+                <TabsTrigger value="build" className="flex-1">Build</TabsTrigger>
+                <TabsTrigger value="custom" className="flex-1">Custom URL</TabsTrigger>
+              </TabsList>
 
-        <div className="mb-6">
-          {avatarValue.type === 'custom' ? (
-            <Avatar className="h-16 w-16">
-              <AvatarImage src={avatarValue.url} alt="Your avatar" />
-              <AvatarFallback>
-                <DefaultAvatar username={user.username} className="h-16 w-16" />
-              </AvatarFallback>
-            </Avatar>
-          ) : (
-            <DefaultAvatar
-              username={user.username}
-              piece={selectedPiece}
-              color={selectedColor}
-              style={selectedStyle}
-              className="h-16 w-16"
-            />
-          )}
-        </div>
-
-        <div className="mb-6 flex flex-col gap-5">
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">Color</p>
-            <div className="flex flex-wrap gap-2">
-              {AVATAR_COLORS.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  aria-label={color}
-                  aria-pressed={selectedColor === color}
-                  onClick={() => setSelectedColor(color)}
-                  className={selectedColor === color
-                    ? 'rounded-full ring-2 ring-foreground ring-offset-2 ring-offset-background focus:outline-none'
-                    : 'rounded-full ring-offset-background focus:outline-none hover:ring-1 hover:ring-muted-foreground hover:ring-offset-1'}
-                >
-                  <div className="h-8 w-8 rounded-full" style={{ backgroundColor: AVATAR_COLOR_VALUES[color] }} />
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">Style</p>
-            <div className="flex flex-wrap gap-2">
-              {AVATAR_STYLES.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  aria-label={s}
-                  aria-pressed={selectedStyle === s}
-                  onClick={() => setSelectedStyle(s)}
-                  className={selectedStyle === s
-                    ? 'rounded p-1 ring-2 ring-foreground ring-offset-2 ring-offset-background focus:outline-none'
-                    : 'rounded p-1 ring-offset-background focus:outline-none hover:ring-1 hover:ring-muted-foreground hover:ring-offset-1'}
-                >
-                  <img
-                    src={resolvePieceSet(s).knightPreviewUrl}
-                    alt={s}
-                    className="h-10 w-10 object-contain"
-                    draggable={false}
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">Piece</p>
-            <div className="flex flex-wrap gap-2">
-              {AVATAR_PIECES.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  aria-label={p}
-                  aria-pressed={selectedPiece === p}
-                  onClick={() => setSelectedPiece(p)}
-                  className={selectedPiece === p
-                    ? 'rounded ring-2 ring-foreground ring-offset-2 ring-offset-background focus:outline-none'
-                    : 'rounded ring-offset-background focus:outline-none hover:ring-1 hover:ring-muted-foreground hover:ring-offset-1'}
-                >
-                  <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
-                    <span className="font-chess text-xl">{PIECE_CHESS_NOTATION[p] ?? p}</span>
+              <TabsContent value="build" className="mt-4 flex flex-col gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Color</p>
+                  <div className="flex flex-wrap gap-2">
+                    {AVATAR_COLORS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        aria-label={color}
+                        aria-pressed={selectedColor === color}
+                        onClick={() => setSelectedColor(color)}
+                        className={
+                          selectedColor === color
+                            ? 'rounded-full ring-2 ring-foreground ring-offset-2 ring-offset-background focus:outline-none'
+                            : 'rounded-full ring-offset-background focus:outline-none hover:ring-1 hover:ring-muted-foreground hover:ring-offset-1'
+                        }
+                      >
+                        <div className="h-7 w-7 rounded-full" style={{ backgroundColor: AVATAR_COLOR_VALUES[color] }} />
+                      </button>
+                    ))}
                   </div>
+                </div>
+
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Style</p>
+                  <div className="flex flex-wrap gap-2">
+                    {AVATAR_STYLES.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        aria-label={s}
+                        aria-pressed={selectedStyle === s}
+                        onClick={() => setSelectedStyle(s)}
+                        className={
+                          selectedStyle === s
+                            ? 'rounded p-1 ring-2 ring-foreground ring-offset-2 ring-offset-background focus:outline-none'
+                            : 'rounded p-1 ring-offset-background focus:outline-none hover:ring-1 hover:ring-muted-foreground hover:ring-offset-1'
+                        }
+                      >
+                        <img
+                          src={resolvePieceSet(s).knightPreviewUrl}
+                          alt={s}
+                          className="h-9 w-9 object-contain"
+                          draggable={false}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Piece</p>
+                  <div className="flex flex-wrap gap-2">
+                    {AVATAR_PIECES.map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        aria-label={p}
+                        aria-pressed={selectedPiece === p}
+                        onClick={() => setSelectedPiece(p)}
+                        className={
+                          selectedPiece === p
+                            ? 'rounded ring-2 ring-foreground ring-offset-2 ring-offset-background focus:outline-none'
+                            : 'rounded ring-offset-background focus:outline-none hover:ring-1 hover:ring-muted-foreground hover:ring-offset-1'
+                        }
+                      >
+                        <div className="h-9 w-9 rounded bg-muted flex items-center justify-center">
+                          <span className="font-chess text-lg">{PIECE_CHESS_NOTATION[p] ?? p}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleResetToAuto}
+                  className="self-start text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+                >
+                  Reset to auto
                 </button>
-              ))}
-            </div>
-          </div>
+              </TabsContent>
+
+              <TabsContent value="custom" className="mt-4 flex flex-col gap-2">
+                <Input
+                  id="avatar-url"
+                  type="url"
+                  value={customUrl}
+                  onChange={(e) => {
+                    setCustomUrl(e.target.value)
+                    if (urlError) setUrlError(false)
+                  }}
+                  placeholder="https://example.com/avatar.png"
+                  className={urlError ? 'border-destructive focus-visible:ring-destructive' : ''}
+                />
+                {urlError ? (
+                  <p className="text-xs text-destructive">Enter a URL or switch to Build.</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Paste a direct link to any image hosted online.
+                  </p>
+                )}
+              </TabsContent>
+          </Tabs>
         </div>
 
-        <div className="flex flex-col gap-2 mb-3">
-          <label htmlFor="avatar-url" className="text-xs text-muted-foreground">
-            Custom avatar URL
-          </label>
-          <input
-            id="avatar-url"
-            type="url"
-            value={avatarUrl}
-            onChange={(e) => setAvatarUrl(e.target.value)}
-            placeholder="https://example.com/your-avatar.png"
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-          <p className="text-xs text-muted-foreground">
-            Paste a direct link to any image hosted online. If filled, this takes priority over the pickers above.
-          </p>
-        </div>
-
-        <Button size="sm" onClick={() => void saveAvatar()} disabled={saving} className="mb-6">
-          Save avatar
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => void resetAvatar()}
-          className="px-0 text-muted-foreground hover:bg-transparent hover:text-foreground ml-3"
-        >
-          Reset to auto
+        {/* Save */}
+        <Button onClick={() => void handleSave()} disabled={saving}>
+          Update profile
         </Button>
       </section>
     </div>
