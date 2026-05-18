@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useEffect } from 'react'
-import { Outlet, useNavigate } from '@tanstack/react-router'
+import { Outlet, useNavigate, useMatches, Link } from '@tanstack/react-router'
 import { SidebarProvider, SidebarInset, SidebarTrigger, useSidebar } from './ui/sidebar'
 import { Separator } from './ui/separator'
 import { AppSidebar } from './AppSidebar'
@@ -8,12 +8,56 @@ import { Footer } from './Footer'
 import { ThemeToggle } from './ThemeToggle'
 import { useAuth } from '../context/auth'
 import { Menu, Play } from 'lucide-react'
-import { Link } from '@tanstack/react-router'
 import { AppLogo } from './AppLogo'
 import { useActiveRun } from '../hooks/useActiveRun'
 import type { ActiveRun } from '../lib/api'
 import { buttonVariants } from './ui/button'
 import { cn } from '../lib/utils'
+import { BreadcrumbProvider, useBreadcrumbContext } from '../context/breadcrumb'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from './ui/breadcrumb'
+
+function AppBreadcrumb(): React.ReactElement | null {
+  const matches = useMatches()
+  const { title, dynamicParents } = useBreadcrumbContext()
+
+  const crumbList = matches.map((m) => m.staticData?.crumb).filter(Boolean)
+  const crumb = crumbList[crumbList.length - 1]
+  if (!crumb) return null
+
+  const leafLabel = crumb.leaf ?? title ?? '…'
+  const allParents = [...(crumb.parents ?? []), ...dynamicParents]
+
+  return (
+    <Breadcrumb>
+      <BreadcrumbList>
+        <BreadcrumbItem>
+          <span className="text-muted-foreground text-sm">{crumb.group}</span>
+        </BreadcrumbItem>
+        {allParents.map((parent, i) => (
+          <React.Fragment key={i}>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to={parent.to} className="text-sm">{parent.label}</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+          </React.Fragment>
+        ))}
+        <BreadcrumbSeparator />
+        <BreadcrumbItem>
+          <BreadcrumbPage className="text-sm">{leafLabel}</BreadcrumbPage>
+        </BreadcrumbItem>
+      </BreadcrumbList>
+    </Breadcrumb>
+  )
+}
 
 function AppShellHeader({ activeRun }: { activeRun: ActiveRun | null }): React.ReactElement {
   const { toggleSidebar } = useSidebar()
@@ -34,11 +78,13 @@ function AppShellHeader({ activeRun }: { activeRun: ActiveRun | null }): React.R
           </button>
         </div>
       </div>
-      {/* Desktop: sidebar trigger left, continue button far right */}
+      {/* Desktop: sidebar trigger left, breadcrumb center, continue button far right */}
       <div className="hidden w-full sm:flex sm:items-center sm:gap-2">
         <SidebarTrigger />
         <Separator orientation="vertical" className="h-4" />
         <ThemeToggle />
+        <Separator orientation="vertical" className="h-4 mr-1" />
+        <AppBreadcrumb />
         {activeRun !== null && (
           <Link
             to="/app/runs/$runId/solve"
@@ -66,17 +112,19 @@ export function AppShell(): React.ReactElement {
   }, [user, loading, navigate])
 
   return (
-    <SidebarProvider defaultOpen={true}>
-      <AppSidebar activeRun={activeRun} />
-      <SidebarInset className="h-svh overflow-hidden">
-        <AppShellHeader activeRun={activeRun} />
-        <div className="flex flex-1 flex-col overflow-y-auto">
-          <div className="flex flex-1 flex-col">
-            <Outlet />
+    <BreadcrumbProvider>
+      <SidebarProvider defaultOpen={true}>
+        <AppSidebar activeRun={activeRun} />
+        <SidebarInset className="h-svh overflow-hidden">
+          <AppShellHeader activeRun={activeRun} />
+          <div className="flex flex-1 flex-col overflow-y-auto">
+            <div className="flex flex-1 flex-col">
+              <Outlet />
+            </div>
+            <Footer />
           </div>
-          <Footer />
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+        </SidebarInset>
+      </SidebarProvider>
+    </BreadcrumbProvider>
   )
 }

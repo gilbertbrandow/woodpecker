@@ -13,14 +13,6 @@ import { resolvePieceSet } from '../lib/themes'
 import { Button } from '../components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar'
 import { DefaultAvatar } from '../components/DefaultAvatar'
-import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbSeparator,
-  BreadcrumbPage,
-} from '../components/ui/breadcrumb'
 
 const PIECE_CHESS_NOTATION: Record<string, string> = {
   bk: 'K',
@@ -101,19 +93,7 @@ export function ProfilePage(): React.ReactElement | null {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-      <Breadcrumb className="mb-6">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/app">Home</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Profile</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
-      <section className="py-10">
+<section className="py-10">
         <h2 className="text-base font-semibold mb-6">Profile</h2>
         <div className="flex flex-col gap-2 mb-8 max-w-sm">
           <label htmlFor="display-name" className="text-xs text-muted-foreground">

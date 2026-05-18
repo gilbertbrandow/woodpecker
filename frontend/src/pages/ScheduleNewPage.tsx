@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useState, useEffect, useMemo } from 'react'
-import { useNavigate, Link } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { type ColumnDef } from '@tanstack/react-table'
 import { useAuth } from '../context/auth'
@@ -9,14 +9,6 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { UserAvatar } from '../components/UserAvatar'
 import { DataTable } from '../components/DataTable'
-import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbSeparator,
-  BreadcrumbPage,
-} from '../components/ui/breadcrumb'
 
 export function ScheduleNewPage(): React.ReactElement | null {
   const { user, loading } = useAuth()
@@ -122,21 +114,7 @@ export function ScheduleNewPage(): React.ReactElement | null {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
-      <Breadcrumb className="mb-6">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to="/app">Schedules</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>New schedule</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
-      <h1 className="mb-6 text-xl font-semibold">New schedule</h1>
+<h1 className="mb-6 text-xl font-semibold">New schedule</h1>
 
       {!subsetsLoading && subsets.length === 0 ? (
         <p className="text-sm text-muted-foreground">

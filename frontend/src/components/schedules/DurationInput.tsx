@@ -1,6 +1,13 @@
 import * as React from 'react'
 import { useState, useEffect, useRef } from 'react'
 import { Input } from '../ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select'
 
 type Unit = 'hours' | 'days' | 'weeks' | 'months'
 
@@ -55,8 +62,7 @@ export function DurationInput({ value, onChange, disabled, allowZero }: Duration
     }
   }, [value, allowZero])
 
-  const handleUnitChange = (e: React.ChangeEvent<HTMLSelectElement>): void => {
-    const newUnit = e.target.value as Unit
+  const handleUnitChange = (newUnit: Unit): void => {
     const parsed = parseInt(displayValue, 10)
     const displayNum = isNaN(parsed) ? (allowZero ? 0 : 1) : parsed
     setUnit(newUnit)
@@ -93,17 +99,17 @@ export function DurationInput({ value, onChange, disabled, allowZero }: Duration
         disabled={disabled}
         className="h-8 w-20 text-sm tabular-nums"
       />
-      <select
-        value={unit}
-        onChange={handleUnitChange}
-        disabled={disabled}
-        className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-      >
-        <option value="hours">hours</option>
-        <option value="days">days</option>
-        <option value="weeks">weeks</option>
-        <option value="months">months</option>
-      </select>
+      <Select value={unit} onValueChange={(val) => handleUnitChange(val as Unit)} disabled={disabled}>
+        <SelectTrigger size="sm">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="hours">hours</SelectItem>
+          <SelectItem value="days">days</SelectItem>
+          <SelectItem value="weeks">weeks</SelectItem>
+          <SelectItem value="months">months</SelectItem>
+        </SelectContent>
+      </Select>
     </div>
   )
 }

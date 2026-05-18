@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate, Link, useParams } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ChevronDown, Lock, Trash2, Undo2 } from "lucide-react";
 import { useAuth } from "../context/auth";
@@ -36,14 +36,7 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "../components/ui/alert-dialog";
-import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbSeparator,
-  BreadcrumbPage,
-} from "../components/ui/breadcrumb";
+import { useSetBreadcrumbTitle } from "../hooks/useSetBreadcrumbTitle";
 import {
   RatingChart,
   type RatingValue,
@@ -266,6 +259,8 @@ export function SubsetPage(): React.ReactElement | null {
   const [themesOpen, setThemesOpen] = useState(false);
   const [openingOpen, setOpeningOpen] = useState(false);
 
+  useSetBreadcrumbTitle(subset?.name)
+
   useEffect(() => {
     if (!authLoading && !user) {
       void navigate({ to: "/" });
@@ -447,20 +442,6 @@ export function SubsetPage(): React.ReactElement | null {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-      <Breadcrumb className="mb-6">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to="/app">Subsets</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>{subset.name}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
       <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="text-xl font-semibold">{subset.name}</h1>
         <StatusBadge status={subset.status} />

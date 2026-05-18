@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useState, useEffect, useMemo } from 'react'
-import { useNavigate, Link, useParams } from '@tanstack/react-router'
+import { useNavigate, useParams } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { ChevronDown, Play } from 'lucide-react'
 import {
@@ -26,14 +26,7 @@ import {
   ChartTooltip,
   type ChartConfig,
 } from '../components/ui/chart'
-import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbSeparator,
-  BreadcrumbPage,
-} from '../components/ui/breadcrumb'
+import { useSetBreadcrumbTitle } from '../hooks/useSetBreadcrumbTitle'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
 import {
   Collapsible,
@@ -264,6 +257,8 @@ export function TrainingPage(): React.ReactElement | null {
   const [insightsLoading, setInsightsLoading] = useState(false)
   const [chartsReady, setChartsReady] = useState(false)
 
+  useSetBreadcrumbTitle(training?.schedule?.name)
+
   useEffect(() => {
     if (!authLoading && !user) {
       void navigate({ to: '/' })
@@ -392,19 +387,6 @@ export function TrainingPage(): React.ReactElement | null {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-      <Breadcrumb className="mb-6">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to="/app/training">Training</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>{schedule.name}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
 
       <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>

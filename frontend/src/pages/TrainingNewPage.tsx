@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useState, useEffect, useMemo } from 'react'
-import { useNavigate, Link } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { type ColumnDef } from '@tanstack/react-table'
 import { useAuth } from '../context/auth'
@@ -9,14 +9,6 @@ import { Button } from '../components/ui/button'
 import { UserAvatar } from '../components/UserAvatar'
 import { DataTable } from '../components/DataTable'
 import { formatDuration } from '../components/schedules/DurationInput'
-import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbSeparator,
-  BreadcrumbPage,
-} from '../components/ui/breadcrumb'
 
 export function TrainingNewPage(): React.ReactElement | null {
   const { user, loading } = useAuth()
@@ -124,19 +116,6 @@ export function TrainingNewPage(): React.ReactElement | null {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-      <Breadcrumb className="mb-6">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to="/app/training">Training</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>New Training</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
 
       <div className="mb-6">
         <h1 className="text-xl font-semibold">New Training</h1>

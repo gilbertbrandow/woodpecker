@@ -7,6 +7,7 @@ import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../ui/table'
+import { FilterSelect } from '../ui/filter-select'
 import { formatNumber } from '../../lib/utils'
 
 const OPENING_MAX_CHARS = 24
@@ -175,18 +176,13 @@ export function LichessTacticsItemsSection(): React.ReactElement {
         </div>
 
         {/* Theme select */}
-        <select
+        <FilterSelect
           value={themeFilter}
-          onChange={(e) => handleThemeChange(e.target.value)}
-          className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-        >
-          <option value="">All themes</option>
-          {allThemes.map((t) => (
-            <option key={t.name} value={t.name}>
-              {t.displayName ?? t.name}
-            </option>
-          ))}
-        </select>
+          onValueChange={handleThemeChange}
+          placeholder="All themes"
+          options={allThemes.map((t) => ({ value: t.name, label: t.displayName ?? t.name }))}
+          className="text-xs"
+        />
 
         {/* Opening multi-select */}
         <div className="flex flex-wrap items-center gap-1.5">

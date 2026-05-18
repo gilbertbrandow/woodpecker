@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useState, useEffect } from "react";
-import { useNavigate, Link, useParams } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ChevronDown, Lock, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "../context/auth";
@@ -54,14 +54,7 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "../components/ui/alert-dialog";
-import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbSeparator,
-  BreadcrumbPage,
-} from "../components/ui/breadcrumb";
+import { useSetBreadcrumbTitle } from "../hooks/useSetBreadcrumbTitle";
 import {
   Collapsible,
   CollapsibleTrigger,
@@ -174,6 +167,8 @@ export function SchedulePage(): React.ReactElement | null {
   const [usedByOpen, setUsedByOpen] = useState(true);
   const [leaderboardOpen, setLeaderboardOpen] = useState(true);
   const [leaderboardRuns, setLeaderboardRuns] = useState<LeaderboardRun[] | null>(null);
+
+  useSetBreadcrumbTitle(schedule?.name)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -376,21 +371,7 @@ export function SchedulePage(): React.ReactElement | null {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-      <Breadcrumb className="mb-6">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to="/app">Schedules</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>{schedule.name}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
-      <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+<div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h1 className="text-xl font-semibold">{schedule.name}</h1>

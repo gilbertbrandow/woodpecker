@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { useState, useEffect } from 'react'
-import { useNavigate, Link, useParams } from '@tanstack/react-router'
+import { useState, useEffect, useMemo } from 'react'
+import { useNavigate, useParams } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { ChevronDown } from 'lucide-react'
 import { useAuth } from '../context/auth'
@@ -11,14 +11,7 @@ import {
   type Training,
 } from '../lib/api'
 import { formatNumber, formatSolveTime, formatSolveTimeMs, formatStartedAt } from '../lib/utils'
-import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbSeparator,
-  BreadcrumbPage,
-} from '../components/ui/breadcrumb'
+import { useSetBreadcrumbTitle } from '../hooks/useSetBreadcrumbTitle'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
 import {
   Collapsible,
@@ -345,6 +338,15 @@ export function RunPage(): React.ReactElement | null {
   const [showAbortDialog, setShowAbortDialog] = useState(false)
   const [aborting, setAborting] = useState(false)
 
+  const breadcrumbParents = useMemo(
+    () =>
+      participation && run
+        ? [{ label: participation.schedule.name, to: `/app/training/${run.trainingId}` }]
+        : undefined,
+    [participation, run?.trainingId],
+  )
+  useSetBreadcrumbTitle(run ? `Run ${run.runIndex + 1}` : undefined, breadcrumbParents)
+
   useEffect(() => {
     if (!authLoading && !user) {
       void navigate({ to: '/' })
@@ -401,40 +403,13 @@ export function RunPage(): React.ReactElement | null {
     )
   }
 
-  const scheduleName = participation?.schedule.name ?? '…'
-  const trainingId = run.trainingId
   const isOwner = !!participation && participation.ownerId === user.id
 
   const statsLine = `Started ${formatStartedAt(run.startedAt)}`
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-      <Breadcrumb className="mb-6">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to="/app">Training</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link
-                to="/app/training/$trainingId"
-                params={{ trainingId: String(trainingId) }}
-              >
-                {scheduleName}
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Run {run.runIndex + 1}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+<div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h1 className="text-xl font-semibold">Run {run.runIndex + 1}</h1>
