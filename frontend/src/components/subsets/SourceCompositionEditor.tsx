@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { ChevronDown, CircleHelp, CircleOff } from "lucide-react";
 import {
   Collapsible,
@@ -249,24 +249,10 @@ export function SourceCompositionEditor({
   const activeNames = value.map((e) => e.source);
 
   const [openCards, setOpenCards] = useState<Set<KnownSource>>(
-    () => new Set(activeNames as KnownSource[]),
+    () => new Set<KnownSource>(),
   );
 
   const suppressSync = useRef(false);
-
-  useEffect(() => {
-    if (suppressSync.current) {
-      suppressSync.current = false;
-      return;
-    }
-    setOpenCards((prev) => {
-      const newlyActive = (activeNames as KnownSource[]).filter(
-        (s) => !prev.has(s),
-      );
-      if (newlyActive.length === 0) return prev;
-      return new Set([...prev, ...newlyActive]);
-    });
-  }, [value]);
 
   const toggleSource = (source: KnownSource): void => {
     if (activeNames.includes(source)) {

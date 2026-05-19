@@ -132,11 +132,36 @@ export type LichessTactic = {
   openings: LichessTacticOpening[]
 }
 
+export type LichessTacticRow = LichessTactic & { sourceType: 'LICHESS_TACTIC' }
+
+export type ScrapedPositionalRow = {
+  trainingItemId: number
+  sourceType: 'SCRAPED_POSITIONAL'
+  internalId: number
+  lichessUrl: string
+  difficulty: number
+  difficultyLabel: string
+  difficultyMinRating: number | null
+  difficultyMaxRating: number | null
+  themes: { name: string; displayName: string }[]
+  opening: TrainingItemOpening | null
+}
+
+export type TrainingItemRow = LichessTacticRow | ScrapedPositionalRow
+
 export type SortColumn = 'rating' | 'popularity' | 'nb_plays'
 export type SortOrder = 'asc' | 'desc'
 
 export type LichessTacticPage = {
   puzzles: LichessTactic[]
+  page: number
+  pageSize: number
+  totalPages: number
+  total: number
+}
+
+export type TrainingItemPage = {
+  puzzles: TrainingItemRow[]
   page: number
   pageSize: number
   totalPages: number
@@ -751,7 +776,7 @@ export const api = {
       page?: number,
       sort?: SortColumn,
       order?: SortOrder,
-    ): Promise<LichessTacticPage> => {
+    ): Promise<TrainingItemPage> => {
       const params = new URLSearchParams()
       if (page !== undefined) params.set('page', String(page))
       if (sort) params.set('sort', sort)

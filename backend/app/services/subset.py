@@ -475,15 +475,18 @@ def list_active_puzzles(
     page = max(1, min(page, total_pages))
     offset = (page - 1) * PAGE_SIZE
 
+    # For mixed-source subsets, sort is only meaningful for lichess-specific columns.
+    # Fall back to insertion order when the sort column doesn't apply universally.
     sort_col = VALID_SORT_COLUMNS.get(sort or "", "sti.position")
     order_dir = "DESC" if order == "desc" else "ASC"
 
-    rows = db.session.execute(
+    # Fetch the paginated training item IDs across all source types.
+    ti_rows = db.session.execute(
         sa.text(f"""
-            SELECT p.id, p.puzzle_id, p.rating, p.popularity, p.nb_plays, p.game_url,
-                   p.training_item_id
+            SELECT sti.training_item_id, ti.source_type::text AS source_type
             FROM subset_training_items sti
-            JOIN lichess_tactics p ON p.training_item_id = sti.training_item_id
+            JOIN training_items ti ON ti.id = sti.training_item_id
+            LEFT JOIN lichess_tactics lt ON lt.training_item_id = sti.training_item_id
             WHERE sti.subset_id = :sid
             ORDER BY {sort_col} {order_dir}
             LIMIT :limit OFFSET :offset
@@ -491,52 +494,126 @@ def list_active_puzzles(
         {"sid": subset_id, "limit": PAGE_SIZE, "offset": offset},
     ).all()
 
-    if not rows:
+    if not ti_rows:
         return {"puzzles": [], "page": page, "pageSize": PAGE_SIZE, "totalPages": total_pages, "total": total}
 
-    lichess_tactic_ids = [r.id for r in rows]
+    lichess_ti_ids = [r.training_item_id for r in ti_rows if r.source_type == "LICHESS_TACTIC"]
+    positional_ti_ids = [r.training_item_id for r in ti_rows if r.source_type == "SCRAPED_POSITIONAL"]
 
-    theme_rows = db.session.execute(
+    # ── Lichess tactics ──────────────────────────────────────────────────────
+    lichess_rows = db.session.execute(
         sa.text("""
-            SELECT ltl.lichess_tactic_id, t.name, t.display_name
-            FROM lichess_tactic_theme_links ltl JOIN lichess_tactic_themes t ON t.id = ltl.lichess_tactic_theme_id
-            WHERE ltl.lichess_tactic_id = ANY(:ids)
+            SELECT p.id, p.puzzle_id, p.rating, p.popularity, p.nb_plays, p.game_url,
+                   p.training_item_id
+            FROM lichess_tactics p
+            WHERE p.training_item_id = ANY(:ids)
         """),
-        {"ids": lichess_tactic_ids},
-    ).all()
-    theme_map: dict[int, list[dict[str, str]]] = {}
-    for tr in theme_rows:
-        theme_map.setdefault(tr.lichess_tactic_id, []).append(
-            {"name": tr.name, "displayName": tr.display_name or tr.name}
-        )
+        {"ids": lichess_ti_ids},
+    ).all() if lichess_ti_ids else []
 
-    opening_rows = db.session.execute(
+    lichess_by_ti: dict[int, object] = {r.training_item_id: r for r in lichess_rows}
+    lichess_ids = [r.id for r in lichess_rows]
+
+    lt_theme_map: dict[int, list[dict[str, str]]] = {}
+    lt_opening_map: dict[int, list[dict[str, str]]] = {}
+    if lichess_ids:
+        for tr in db.session.execute(
+            sa.text("""
+                SELECT ltl.lichess_tactic_id, t.name, t.display_name
+                FROM lichess_tactic_theme_links ltl
+                JOIN lichess_tactic_themes t ON t.id = ltl.lichess_tactic_theme_id
+                WHERE ltl.lichess_tactic_id = ANY(:ids)
+            """),
+            {"ids": lichess_ids},
+        ).all():
+            lt_theme_map.setdefault(tr.lichess_tactic_id, []).append(
+                {"name": tr.name, "displayName": tr.display_name or tr.name}
+            )
+        for or_ in db.session.execute(
+            sa.text("""
+                SELECT lto.lichess_tactic_id, o.name, o.display_name, o.eco
+                FROM lichess_tactic_openings lto
+                JOIN openings o ON o.id = lto.opening_id
+                WHERE lto.lichess_tactic_id = ANY(:ids)
+            """),
+            {"ids": lichess_ids},
+        ).all():
+            lt_opening_map.setdefault(or_.lichess_tactic_id, []).append(
+                {"name": or_.name, "displayName": or_.display_name or or_.name, "eco": or_.eco}
+            )
+
+    # ── Scraped positionals ──────────────────────────────────────────────────
+    positional_rows = db.session.execute(
         sa.text("""
-            SELECT lto.lichess_tactic_id, o.name, o.display_name, o.eco
-            FROM lichess_tactic_openings lto JOIN openings o ON o.id = lto.opening_id
-            WHERE lto.lichess_tactic_id = ANY(:ids)
+            SELECT p.id, p.internal_id, p.lichess_url, p.training_item_id,
+                   d.value AS difficulty, d.label AS difficulty_label,
+                   d.min_rating AS difficulty_min_rating, d.max_rating AS difficulty_max_rating,
+                   o.name AS opening_name, o.display_name AS opening_display_name, o.eco AS opening_eco
+            FROM scraped_positional_puzzles p
+            JOIN scraped_positional_difficulties d ON d.id = p.difficulty_id
+            LEFT JOIN openings o ON o.id = p.opening_id
+            WHERE p.training_item_id = ANY(:ids)
         """),
-        {"ids": lichess_tactic_ids},
-    ).all()
-    opening_map: dict[int, list[dict[str, str]]] = {}
-    for or_ in opening_rows:
-        opening_map.setdefault(or_.lichess_tactic_id, []).append(
-            {"name": or_.name, "displayName": or_.display_name or or_.name, "eco": or_.eco}
-        )
+        {"ids": positional_ti_ids},
+    ).all() if positional_ti_ids else []
 
-    puzzles = [
-        {
-            "trainingItemId": r.training_item_id,
-            "puzzleId": r.puzzle_id,
-            "rating": r.rating,
-            "popularity": r.popularity,
-            "nbPlays": r.nb_plays,
-            "gameUrl": r.game_url,
-            "themes": theme_map.get(r.id, []),
-            "openings": opening_map.get(r.id, []),
-        }
-        for r in rows
-    ]
+    positional_by_ti: dict[int, object] = {r.training_item_id: r for r in positional_rows}
+    positional_ids = [r.id for r in positional_rows]
+
+    sp_theme_map: dict[int, list[dict[str, str]]] = {}
+    if positional_ids:
+        for tr in db.session.execute(
+            sa.text("""
+                SELECT sptl.positional_puzzle_id, t.name, t.display_name
+                FROM scraped_positional_theme_links sptl
+                JOIN scraped_positional_themes t ON t.id = sptl.positional_theme_id
+                WHERE sptl.positional_puzzle_id = ANY(:ids)
+            """),
+            {"ids": positional_ids},
+        ).all():
+            sp_theme_map.setdefault(tr.positional_puzzle_id, []).append(
+                {"name": tr.name, "displayName": tr.display_name or tr.name}
+            )
+
+    # ── Assemble in original page order ─────────────────────────────────────
+    puzzles: list[dict[str, object]] = []
+    for ti_row in ti_rows:
+        ti_id = ti_row.training_item_id
+        if ti_row.source_type == "LICHESS_TACTIC":
+            r = lichess_by_ti.get(ti_id)
+            if r is None:
+                continue
+            puzzles.append({
+                "sourceType": "LICHESS_TACTIC",
+                "trainingItemId": ti_id,
+                "puzzleId": r.puzzle_id,
+                "rating": r.rating,
+                "popularity": r.popularity,
+                "nbPlays": r.nb_plays,
+                "gameUrl": r.game_url,
+                "themes": lt_theme_map.get(r.id, []),
+                "openings": lt_opening_map.get(r.id, []),
+            })
+        elif ti_row.source_type == "SCRAPED_POSITIONAL":
+            r = positional_by_ti.get(ti_id)
+            if r is None:
+                continue
+            opening = (
+                {"name": r.opening_name, "displayName": r.opening_display_name or r.opening_name, "eco": r.opening_eco}
+                if r.opening_name else None
+            )
+            puzzles.append({
+                "sourceType": "SCRAPED_POSITIONAL",
+                "trainingItemId": ti_id,
+                "internalId": r.internal_id,
+                "lichessUrl": r.lichess_url,
+                "difficulty": r.difficulty,
+                "difficultyLabel": r.difficulty_label,
+                "difficultyMinRating": r.difficulty_min_rating,
+                "difficultyMaxRating": r.difficulty_max_rating,
+                "themes": sp_theme_map.get(r.id, []),
+                "opening": opening,
+            })
 
     return {"puzzles": puzzles, "page": page, "pageSize": PAGE_SIZE, "totalPages": total_pages, "total": total}
 

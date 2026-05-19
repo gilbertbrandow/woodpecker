@@ -11,11 +11,12 @@ import {
 } from '@tanstack/react-table'
 import { ChevronUp, ChevronDown, ChevronsUpDown, Trash2, Loader2, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
-import { api, type LichessTactic, type SortColumn, type SortOrder } from '../../lib/api'
+import { api, type TrainingItemRow, type SortColumn, type SortOrder } from '../../lib/api'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '../ui/tooltip'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Checkbox } from '../ui/checkbox'
+import { TrainingItemTypeBadge } from '../TrainingItemTypeBadge'
 import {
   Table,
   TableHeader,
@@ -39,7 +40,7 @@ function SortHeader({
   column,
   label,
 }: {
-  column: Column<LichessTactic, unknown>
+  column: Column<TrainingItemRow, unknown>
   label: string
 }): React.ReactElement {
   const sorted = column.getIsSorted()
@@ -61,7 +62,7 @@ function SortHeader({
   )
 }
 
-function LabelBadges({ items }: { items: { name: string; displayName: string | null }[] }): React.ReactElement {
+function LabelBadges({ items }: { items: { name: string; displayName?: string | null }[] }): React.ReactElement {
   const shown = items.slice(0, 2)
   const extra = items.length - 2
   return (
@@ -80,8 +81,33 @@ function LabelBadges({ items }: { items: { name: string; displayName: string | n
   )
 }
 
+function OpeningCell({ row }: { row: TrainingItemRow }): React.ReactElement {
+  const opening =
+    row.sourceType === 'LICHESS_TACTIC'
+      ? (row.openings[1] ?? row.openings[0] ?? null)
+      : row.opening
+
+  if (!opening) return <span className="text-muted-foreground">—</span>
+
+  const label =
+    opening.displayName.length > OPENING_MAX_CHARS
+      ? opening.displayName.slice(0, OPENING_MAX_CHARS - 1) + '…'
+      : opening.displayName
+
+  return (
+    <Tooltip delayDuration={200}>
+      <TooltipTrigger asChild>
+        <span className="cursor-default text-xs text-muted-foreground">{label}</span>
+      </TooltipTrigger>
+      <TooltipContent>
+        <span className="font-mono mr-1.5">{opening.eco}</span>{opening.displayName}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProps): React.ReactElement {
-  const [puzzles, setPuzzles] = useState<LichessTactic[]>([])
+  const [puzzles, setPuzzles] = useState<TrainingItemRow[]>([])
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [pageIndex, setPageIndex] = useState(0)
@@ -95,7 +121,11 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
   const toSortParams = (s: SortingState): { sort?: SortColumn; order?: SortOrder } => {
     const first = s[0]
     if (!first) return {}
-    const col = first.id === 'nbPlays' ? 'nb_plays' : (first.id as SortColumn)
+    const colMap: Partial<Record<string, SortColumn>> = {
+      nbPlays: 'nb_plays',
+      ratingOrDifficulty: 'rating',
+    }
+    const col = colMap[first.id] ?? (first.id as SortColumn)
     return { sort: col, order: first.desc ? 'desc' : 'asc' }
   }
 
@@ -167,7 +197,7 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
     }
   }
 
-  const selectColumn: ColumnDef<LichessTactic> = {
+  const selectColumn: ColumnDef<TrainingItemRow> = {
     id: 'select',
     header: ({ table }) => (
       <Checkbox
@@ -186,7 +216,7 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
     enableSorting: false,
   }
 
-  const actionColumn: ColumnDef<LichessTactic> = {
+  const actionColumn: ColumnDef<TrainingItemRow> = {
     id: 'action',
     header: '',
     enableSorting: false,
@@ -208,75 +238,62 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
     ),
   }
 
-  const columns: ColumnDef<LichessTactic>[] = [
+  const columns: ColumnDef<TrainingItemRow>[] = [
     ...(!locked ? [selectColumn] : []),
     {
-      accessorKey: 'rating',
-      header: ({ column }) => <SortHeader column={column} label="Rating" />,
-      meta: { className: 'min-w-24' } satisfies ColMeta,
-      cell: ({ row }) => <span className="tabular-nums">{row.original.rating}</span>,
+      id: 'sourceType',
+      header: 'Type',
+      enableSorting: false,
+      cell: ({ row }) => <TrainingItemTypeBadge source={row.original.sourceType} />,
     },
     {
-      accessorKey: 'themes',
+      id: 'ratingOrDifficulty',
+      header: ({ column }) => <SortHeader column={column} label="Rating / Level" />,
+      meta: { className: 'min-w-32' } satisfies ColMeta,
+      cell: ({ row }) =>
+        row.original.sourceType === 'LICHESS_TACTIC' ? (
+          <span className="tabular-nums">{row.original.rating}</span>
+        ) : row.original.difficultyMinRating != null && row.original.difficultyMaxRating != null ? (
+          <span className="tabular-nums">{row.original.difficultyMinRating}–{row.original.difficultyMaxRating}</span>
+        ) : (
+          <span className="text-sm">{row.original.difficultyLabel}</span>
+        ),
+    },
+    {
+      id: 'themes',
       header: 'Themes',
       enableSorting: false,
       meta: { className: 'min-w-52' } satisfies ColMeta,
       cell: ({ row }) => <LabelBadges items={row.original.themes} />,
     },
     {
-      accessorKey: 'openings',
+      id: 'opening',
       header: 'Opening',
       enableSorting: false,
       meta: { className: 'min-w-44' } satisfies ColMeta,
-      cell: ({ row }) => {
-        const first = row.original.openings[1] ?? row.original.openings[0]
-        if (!first) return <span className="text-muted-foreground">—</span>
-        const label =
-          first.displayName.length > OPENING_MAX_CHARS
-            ? first.displayName.slice(0, OPENING_MAX_CHARS - 1) + '…'
-            : first.displayName
-        return (
-          <Tooltip delayDuration={200}>
-            <TooltipTrigger asChild>
-              <span className="cursor-default text-xs text-muted-foreground">{label}</span>
-            </TooltipTrigger>
-            <TooltipContent>
-              <span className="font-mono mr-1.5">{first.eco}</span>{first.displayName}
-            </TooltipContent>
-          </Tooltip>
-        )
-      },
+      cell: ({ row }) => <OpeningCell row={row.original} />,
     },
     {
-      accessorKey: 'popularity',
-      header: ({ column }) => <SortHeader column={column} label="Popularity" />,
-      meta: { className: 'min-w-28' } satisfies ColMeta,
-      cell: ({ row }) => <span className="tabular-nums">{row.original.popularity}</span>,
-    },
-    {
-      accessorKey: 'nbPlays',
-      header: ({ column }) => <SortHeader column={column} label="Plays" />,
-      meta: { className: 'min-w-28' } satisfies ColMeta,
-      cell: ({ row }) => (
-        <span className="tabular-nums">{row.original.nbPlays.toLocaleString('sv-SE')}</span>
-      ),
-    },
-    {
-      id: 'game',
+      id: 'link',
       header: '',
       enableSorting: false,
       meta: { className: locked ? 'sticky right-0 bg-background' : 'sticky right-14 bg-background' } satisfies ColMeta,
-      cell: ({ row }) => (
-        <a
-          href={row.original.gameUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-          aria-label="Open game"
-        >
-          <ExternalLink className="h-4 w-4" />
-        </a>
-      ),
+      cell: ({ row }) => {
+        const url = row.original.sourceType === 'LICHESS_TACTIC'
+          ? row.original.gameUrl
+          : row.original.lichessUrl
+        return (
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+            aria-label="Open on Lichess"
+          >
+            <ExternalLink className="h-4 w-4" />
+          </a>
+        )
+      },
     },
     ...(!locked ? [actionColumn] : []),
   ]
@@ -349,19 +366,13 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
           <TableBody>
             {initialLoading ? (
               <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="py-8 text-center text-sm text-muted-foreground"
-                >
+                <TableCell colSpan={columns.length} className="py-8 text-center text-sm text-muted-foreground">
                   Loading…
                 </TableCell>
               </TableRow>
             ) : table.getRowModel().rows.length === 0 ? (
               <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="py-8 text-center text-sm text-muted-foreground"
-                >
+                <TableCell colSpan={columns.length} className="py-8 text-center text-sm text-muted-foreground">
                   No puzzles yet.
                 </TableCell>
               </TableRow>
@@ -369,7 +380,7 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} data-state={row.getIsSelected() ? 'selected' : undefined}>
                   {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className={`whitespace-nowrap ${(cell.column.columnDef.meta as ColMeta | undefined)?.className ?? ''}`}>
+                    <TableCell key={cell.id} className={`whitespace-nowrap ${(cell.column.columnDef.meta as ColMeta | undefined)?.className ?? ''}`}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
