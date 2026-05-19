@@ -33,6 +33,28 @@ export function SourcesListPage(): React.ReactElement | null {
           </Link>
         </div>
       </div>
+
+      <div className="flex flex-col gap-4 rounded-lg border bg-card p-6">
+        <div className="flex items-center gap-3">
+          <h2 className="text-base font-semibold">Scraped Positional</h2>
+          <TrainingItemTypeBadge source="SCRAPED_POSITIONAL" />
+        </div>
+
+        <p className="text-sm text-muted-foreground">
+          Positional puzzles mined from Lichess games and reviewed by titled players. Each puzzle
+          has a single constructive answer — no tactical calculation required, only positional
+          understanding. Covers four difficulty tiers from 1200 to 2500+ Elo.
+        </p>
+
+        <div>
+          <Link
+            to="/app/sources/scraped-positional-puzzles"
+            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            More information
+          </Link>
+        </div>
+      </div>
     </PageWrapper>
   )
 }

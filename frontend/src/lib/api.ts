@@ -622,6 +622,51 @@ export type LichessTacticsThemeDetail = {
   count: number
 }
 
+export type ScrapedPositionalDifficulty = {
+  value: number
+  label: string
+  minRating: number | null
+  maxRating: number | null
+}
+
+export type ScrapedPositionalPuzzle = {
+  internalId: number
+  lichessUrl: string
+  difficulty: ScrapedPositionalDifficulty
+  themes: { name: string; displayName: string }[]
+}
+
+export type ScrapedPositionalPage = {
+  puzzles: ScrapedPositionalPuzzle[]
+  page: number
+  pageSize: number
+  totalPages: number
+  total: number
+}
+
+export type ScrapedPositionalDifficultyDetail = {
+  value: number
+  label: string
+  description: string
+  minRating: number | null
+  maxRating: number | null
+  count: number
+}
+
+export type ScrapedPositionalThemeDetail = {
+  name: string
+  displayName: string
+  description: string
+  count: number
+}
+
+export type ScrapedPositionalSourceRunMetadata = {
+  totalPositionalAfterRun: number
+  difficultyCounts: ScrapedPositionalDifficultyDetail[]
+  themes: ScrapedPositionalThemeDetail[]
+  generatedAt: string
+}
+
 export type LichessTacticsSourceRunMetadata = {
   latestSourceImportRunId: number
   importedCount: number
@@ -831,6 +876,22 @@ export const api = {
         if (params.openings?.length) p.set('openings', params.openings.join(','))
         const qs = p.toString()
         return request(`/sources/lichess-tactics/items${qs ? `?${qs}` : ''}`)
+      },
+    },
+    scrapedPositional: {
+      sourceRunMetadata: (): Promise<{ metadata: ScrapedPositionalSourceRunMetadata | null }> =>
+        request('/sources/scraped-positional/source-run-metadata'),
+      items: (params: {
+        page?: number
+        difficulty?: number
+        theme?: string
+      }): Promise<ScrapedPositionalPage> => {
+        const p = new URLSearchParams()
+        if (params.page !== undefined) p.set('page', String(params.page))
+        if (params.difficulty !== undefined) p.set('difficulty', String(params.difficulty))
+        if (params.theme) p.set('theme', params.theme)
+        const qs = p.toString()
+        return request(`/sources/scraped-positional/items${qs ? `?${qs}` : ''}`)
       },
     },
   },

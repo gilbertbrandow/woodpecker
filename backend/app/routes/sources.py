@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request, Response
 
 from app.decorators import login_required
 from app.services import lichess_tactics_source as svc
+from app.services import scraped_positional_source as pos_svc
 
 sources_bp = Blueprint("sources", __name__, url_prefix="/sources")
 
@@ -22,3 +23,18 @@ def lichess_tactics_items() -> Response:
 @login_required
 def lichess_tactics_source_run_metadata() -> Response:
     return jsonify({"metadata": svc.get_latest_source_run_metadata()})
+
+
+@sources_bp.get("/scraped-positional/items")
+@login_required
+def scraped_positional_items() -> Response:
+    page = max(1, request.args.get("page", 1, type=int))
+    difficulty = request.args.get("difficulty", None, type=int)
+    theme = request.args.get("theme", None, type=str) or None
+    return jsonify(pos_svc.list_items(page, difficulty, theme))
+
+
+@sources_bp.get("/scraped-positional/source-run-metadata")
+@login_required
+def scraped_positional_source_run_metadata() -> Response:
+    return jsonify({"metadata": pos_svc.get_latest_source_run_metadata()})
