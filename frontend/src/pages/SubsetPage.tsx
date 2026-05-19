@@ -3,13 +3,12 @@ import * as React from "react";
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ChevronDown, Lock, Trash2, Undo2 } from "lucide-react";
+import { ChevronDown, Lock, Trash2 } from "lucide-react";
 import { useAuth } from "../context/auth";
 import {
   api,
   type Subset,
   type SubsetConfig,
-  type LichessTacticSourceConfig,
   type SourceEntry,
   type SubsetStats as SubsetStatsType,
   type ScheduleSummary,
@@ -40,141 +39,19 @@ import {
   AlertDialogAction,
 } from "../components/ui/alert-dialog";
 import { useSetBreadcrumbTitle } from "../hooks/useSetBreadcrumbTitle";
-import {
-  RatingChart,
-  type RatingValue,
-} from "../components/subsets/RatingChart";
-import { ThemeWeights } from "../components/subsets/ThemeWeights";
-import {
-  OpeningSelector,
-  type OpeningValue,
-} from "../components/subsets/OpeningSelector";
 import { SubsetStats } from "../components/subsets/SubsetStats";
 import { PuzzleTable } from "../components/subsets/PuzzleTable";
+import {
+  SourceCompositionEditor,
+  DEFAULT_LICHESS_ENTRY,
+} from "../components/subsets/SourceCompositionEditor";
 import {
   Collapsible,
   CollapsibleTrigger,
   CollapsibleContent,
 } from "../components/ui/collapsible";
 
-const RATING_DEFAULT: RatingValue = {
-  min: 1800,
-  max: 2600,
-  mean: 2200,
-  sigma: 100,
-};
-const OPENING_DEFAULT: OpeningValue = { items: [], strength: 0 };
 const MIN_LOCK_PUZZLES = 5;
-
-function getLichessConfig(config: SubsetConfig | null): LichessTacticSourceConfig | null {
-  const entry = config?.sources.find(
-    (s): s is Extract<SourceEntry, { source: 'LICHESS_TACTIC' }> => s.source === 'LICHESS_TACTIC',
-  );
-  return entry?.config ?? null;
-}
-
-function configToRating(config: SubsetConfig | null): RatingValue {
-  const lc = getLichessConfig(config);
-  const min = lc?.rating?.min ?? RATING_DEFAULT.min;
-  const max = lc?.rating?.max ?? RATING_DEFAULT.max;
-  return {
-    min,
-    max,
-    mean: lc?.rating?.mean ?? Math.round((min + max) / 2),
-    sigma: lc?.rating?.sigma ?? RATING_DEFAULT.sigma,
-  };
-}
-
-function configToOpening(config: SubsetConfig | null): OpeningValue {
-  const lc = getLichessConfig(config);
-  return {
-    items: lc?.openings?.items ?? [],
-    strength: lc?.openings?.strength ?? 0,
-  };
-}
-
-function buildConfig(
-  rating: RatingValue,
-  themes: Record<string, number>,
-  opening: OpeningValue,
-): SubsetConfig {
-  const lichessInnerConfig: LichessTacticSourceConfig = {
-    rating: {
-      min: rating.min,
-      max: rating.max,
-      ...(rating.mean !== null ? { mean: rating.mean } : {}),
-      ...(rating.sigma !== null ? { sigma: rating.sigma } : {}),
-    },
-  };
-  const nonDefaultThemes = Object.fromEntries(
-    Object.entries(themes).filter(([, v]) => v !== 1),
-  );
-  if (Object.keys(nonDefaultThemes).length > 0) {
-    lichessInnerConfig.themes = nonDefaultThemes;
-  }
-  if (opening.items.length > 0) {
-    lichessInnerConfig.openings = { items: opening.items, strength: opening.strength };
-  }
-  return {
-    sources: [{ source: 'LICHESS_TACTIC', percentage: 100, config: lichessInnerConfig }],
-  };
-}
-
-function SectionTrigger({
-  title,
-  description,
-  open,
-  changed,
-  onReset,
-  ...rest
-}: {
-  title: string;
-  description: string;
-  open: boolean;
-  changed: boolean;
-  onReset?: () => void;
-} & React.ComponentPropsWithoutRef<"button">): React.ReactElement {
-  return (
-    <button
-      type="button"
-      className="flex h-8 w-full items-center justify-between border-b text-left"
-      {...rest}
-    >
-      <span className="flex items-center gap-2 text-sm font-medium">
-        <ChevronDown
-          className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
-          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
-        />
-        {title}
-        {onReset && changed && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onReset();
-                }}
-              >
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 w-5 p-0 text-muted-foreground"
-                  tabIndex={-1}
-                >
-                  <Undo2 className="h-3.5 w-3.5" />
-                </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>Reset section</TooltipContent>
-          </Tooltip>
-        )}
-      </span>
-      <span className="hidden text-xs text-muted-foreground sm:block">
-        {description}
-      </span>
-    </button>
-  );
-}
 
 function UsedBySchedules({
   subsetId,
@@ -258,10 +135,9 @@ export function SubsetPage(): React.ReactElement | null {
   const [pageLoading, setPageLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>("configuration");
 
-  const [rating, setRating] = useState<RatingValue>(RATING_DEFAULT);
-  const [themes, setThemes] = useState<Record<string, number>>({});
-  const [opening, setOpening] = useState<OpeningValue>(OPENING_DEFAULT);
-  const [isDirty, setIsDirty] = useState(false);
+  const [sources, setSources] = useState<SourceEntry[]>([DEFAULT_LICHESS_ENTRY]);
+  const [savedSources, setSavedSources] = useState<SourceEntry[]>([DEFAULT_LICHESS_ENTRY]);
+  const isDirty = JSON.stringify(sources) !== JSON.stringify(savedSources);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isFilling, setIsFilling] = useState(false);
@@ -269,11 +145,8 @@ export function SubsetPage(): React.ReactElement | null {
   const [total, setTotal] = useState(0);
   const [stats, setStats] = useState<SubsetStatsType | null>(null);
   const [puzzlesOpen, setPuzzlesOpen] = useState(true);
-  const [ratingOpen, setRatingOpen] = useState(true);
-  const [themesOpen, setThemesOpen] = useState(false);
-  const [openingOpen, setOpeningOpen] = useState(false);
 
-  useSetBreadcrumbTitle(subset?.name)
+  useSetBreadcrumbTitle(subset?.name);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -301,18 +174,12 @@ export function SubsetPage(): React.ReactElement | null {
       .get(id)
       .then(async (s) => {
         setSubset(s);
-        setRating(configToRating(s.config));
-        setThemes(getLichessConfig(s.config)?.themes ?? {});
-        setOpening(configToOpening(s.config));
-        setIsDirty(false);
+        const initialSources: SourceEntry[] = s.config?.sources ?? [DEFAULT_LICHESS_ENTRY];
+        setSources(initialSources);
+        setSavedSources(initialSources);
         setActiveTab(s.status === "locked" ? "insights" : "configuration");
         if (s.status !== "draft") {
           await loadStats(id);
-        }
-        if (s.status === "locked") {
-          setRatingOpen(false);
-          setThemesOpen(false);
-          setOpeningOpen(false);
         }
       })
       .catch(() =>
@@ -323,20 +190,14 @@ export function SubsetPage(): React.ReactElement | null {
       .finally(() => setPageLoading(false));
   }, [id, user, loadStats]);
 
-  const markDirty = (): void => setIsDirty(true);
-
   const handleSave = async (): Promise<void> => {
     if (!subset) return;
     setIsSaving(true);
     try {
-      const config = buildConfig(rating, themes, opening);
-      const updated = await api.subsets.saveConfig(
-        id,
-        subset.puzzleCount,
-        config,
-      );
+      const config: SubsetConfig = { sources };
+      const updated = await api.subsets.saveConfig(id, subset.puzzleCount, config);
       setSubset(updated);
-      setIsDirty(false);
+      setSavedSources(sources);
       if (updated.status === "draft") {
         setStats(null);
         setTotal(0);
@@ -357,14 +218,10 @@ export function SubsetPage(): React.ReactElement | null {
     setIsFilling(true);
     try {
       if (isDirty) {
-        const config = buildConfig(rating, themes, opening);
-        const updated = await api.subsets.saveConfig(
-          id,
-          subset.puzzleCount,
-          config,
-        );
+        const config: SubsetConfig = { sources };
+        const updated = await api.subsets.saveConfig(id, subset.puzzleCount, config);
         setSubset(updated);
-        setIsDirty(false);
+        setSavedSources(sources);
         setStats(null);
         setTotal(0);
       }
@@ -417,9 +274,6 @@ export function SubsetPage(): React.ReactElement | null {
     try {
       const updated = await api.subsets.lock(id);
       setSubset(updated);
-      setRatingOpen(false);
-      setThemesOpen(false);
-      setOpeningOpen(false);
       toast("Subset locked", {
         description: "This subset is now frozen and ready for scheduling.",
       });
@@ -546,6 +400,7 @@ export function SubsetPage(): React.ReactElement | null {
             </div>
           )}
         </div>
+
         <TabsContent value="configuration">
           {!locked && isOwn && (
             <div className="flex flex-col gap-3 pb-5">
@@ -565,102 +420,11 @@ export function SubsetPage(): React.ReactElement | null {
             </div>
           )}
 
-          <div className="flex flex-col gap-4">
-            <Collapsible open={ratingOpen} onOpenChange={setRatingOpen}>
-              <CollapsibleTrigger asChild>
-                <SectionTrigger
-                  title="Puzzle rating"
-                  description="Range and concentration of puzzle ratings."
-                  open={ratingOpen}
-                  changed={
-                    JSON.stringify(rating) !== JSON.stringify(RATING_DEFAULT)
-                  }
-                  onReset={
-                    !locked && isOwn
-                      ? () => {
-                          setRating(RATING_DEFAULT);
-                          markDirty();
-                        }
-                      : undefined
-                  }
-                />
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="pt-4">
-                  <RatingChart
-                    value={rating}
-                    onChange={(v) => {
-                      setRating(v);
-                      markDirty();
-                    }}
-                    disabled={locked || !isOwn || isBusy}
-                  />
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-
-            <Collapsible open={themesOpen} onOpenChange={setThemesOpen}>
-              <CollapsibleTrigger asChild>
-                <SectionTrigger
-                  title="Tactical themes"
-                  description="Relative likelihood of each tactical motif."
-                  open={themesOpen}
-                  changed={Object.keys(themes).length > 0}
-                  onReset={
-                    !locked && isOwn
-                      ? () => {
-                          setThemes({});
-                          markDirty();
-                        }
-                      : undefined
-                  }
-                />
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="pt-4">
-                  <ThemeWeights
-                    value={themes}
-                    onChange={(v) => {
-                      setThemes(v);
-                      markDirty();
-                    }}
-                    disabled={locked || !isOwn || isBusy}
-                  />
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-
-            <Collapsible open={openingOpen} onOpenChange={setOpeningOpen}>
-              <CollapsibleTrigger asChild>
-                <SectionTrigger
-                  title="Openings"
-                  description="Favour puzzles from specific openings."
-                  open={openingOpen}
-                  changed={opening.items.length > 0}
-                  onReset={
-                    !locked && isOwn
-                      ? () => {
-                          setOpening(OPENING_DEFAULT);
-                          markDirty();
-                        }
-                      : undefined
-                  }
-                />
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="pt-4">
-                  <OpeningSelector
-                    value={opening}
-                    onChange={(v) => {
-                      setOpening(v);
-                      markDirty();
-                    }}
-                    disabled={locked || !isOwn || isBusy}
-                  />
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          </div>
+          <SourceCompositionEditor
+            value={sources}
+            onChange={setSources}
+            disabled={locked || !isOwn || isBusy}
+          />
 
           {!locked && isOwn && (
             <div className="flex flex-wrap items-center gap-3 pt-4">
