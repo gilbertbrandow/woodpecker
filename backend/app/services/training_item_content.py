@@ -6,6 +6,7 @@ from sqlalchemy.orm import selectinload
 
 from app.extensions import db
 from app.models.lichess_tactic import LichessTactic
+from app.models.scraped_positional_puzzle import ScrapedPositionalPuzzle
 from app.models.training_item import TrainingItem, TrainingItemSource
 from app.services.solve_contract import SolveContract
 
@@ -34,8 +35,19 @@ class LichessTacticMetadata(SourceMetadata):
 
 @dataclass
 class ScrapedPositionalMetadata(SourceMetadata):
+    internal_id: int
+    lichess_url: str
+    difficulty: dict[str, object]
+    themes: list[dict[str, str]] = field(default_factory=list)
+
     def to_api_dict(self) -> dict[str, object]:
-        return {"sourceType": "SCRAPED_POSITIONAL"}
+        return {
+            "sourceType": "SCRAPED_POSITIONAL",
+            "internalId": self.internal_id,
+            "lichessUrl": self.lichess_url,
+            "difficulty": self.difficulty,
+            "themes": self.themes,
+        }
 
 
 @dataclass
@@ -67,13 +79,17 @@ def get_content_batch(training_item_ids: list[int]) -> dict[int, TrainingItemPay
     lichess_ids = [ti.id for ti in items if ti.source_type == TrainingItemSource.LICHESS_TACTIC]
     if lichess_ids:
         result.update(_lichess_tactic_payload_batch(lichess_ids))
-    # Future: add SCRAPED_POSITIONAL, DECOY batches here
+    positional_ids = [ti.id for ti in items if ti.source_type == TrainingItemSource.SCRAPED_POSITIONAL]
+    if positional_ids:
+        result.update(_scraped_positional_payload_batch(positional_ids))
     return result
 
 
 def _dispatch(ti: TrainingItem) -> TrainingItemPayload:
     if ti.source_type == TrainingItemSource.LICHESS_TACTIC:
         return _lichess_tactic_payload(ti.id)
+    if ti.source_type == TrainingItemSource.SCRAPED_POSITIONAL:
+        return _scraped_positional_payload(ti.id)
     raise NotImplementedError(f"No content handler for source_type {ti.source_type!r}")
 
 
@@ -118,3 +134,50 @@ def _lichess_tactic_payload_batch(
         )
         for t in tactics
     }
+
+
+def _scraped_positional_payload(training_item_id: int) -> TrainingItemPayload:
+    puzzle = db.session.execute(
+        sa.select(ScrapedPositionalPuzzle)
+        .options(
+            selectinload(ScrapedPositionalPuzzle.difficulty),
+            selectinload(ScrapedPositionalPuzzle.themes),
+        )
+        .where(ScrapedPositionalPuzzle.training_item_id == training_item_id)
+    ).scalar_one()
+    return _build_positional_payload(puzzle)
+
+
+def _scraped_positional_payload_batch(
+    training_item_ids: list[int],
+) -> dict[int, TrainingItemPayload]:
+    puzzles = db.session.execute(
+        sa.select(ScrapedPositionalPuzzle)
+        .options(
+            selectinload(ScrapedPositionalPuzzle.difficulty),
+            selectinload(ScrapedPositionalPuzzle.themes),
+        )
+        .where(ScrapedPositionalPuzzle.training_item_id.in_(training_item_ids))
+    ).scalars().all()
+    return {p.training_item_id: _build_positional_payload(p) for p in puzzles}
+
+
+def _build_positional_payload(puzzle: ScrapedPositionalPuzzle) -> TrainingItemPayload:
+    d = puzzle.difficulty
+    return TrainingItemPayload(
+        contract=SolveContract(
+            fen=puzzle.fen,
+            plies=puzzle.moves.split(),
+        ),
+        metadata=ScrapedPositionalMetadata(
+            internal_id=puzzle.internal_id,
+            lichess_url=puzzle.lichess_url,
+            difficulty={
+                "value": d.value,
+                "label": d.label,
+                "minRating": d.min_rating,
+                "maxRating": d.max_rating,
+            },
+            themes=[{"name": t.name, "displayName": t.display_name} for t in puzzle.themes],
+        ),
+    )
