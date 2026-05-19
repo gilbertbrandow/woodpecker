@@ -132,7 +132,7 @@ function SourceSelector({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         {ALL_SOURCE_TYPES.map((source) => {
           const active = activeNames.includes(source);
           const isLast = active && sources.length === 1;

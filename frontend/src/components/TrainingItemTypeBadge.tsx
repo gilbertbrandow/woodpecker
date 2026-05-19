@@ -21,7 +21,7 @@ type BadgeConfig = {
 
 const BADGE_CONFIG: Record<TrainingItemType, BadgeConfig> = {
   tactic: {
-    label: 'Tactic',
+    label: 'Tactical',
     tooltip: 'There exists a short sequence of forcing moves that achieves an immediate advantage.',
     className: 'border-cyan-500/40 bg-cyan-100 text-cyan-900 dark:bg-cyan-900/30 dark:text-cyan-300',
     icon: <Zap className="h-3 w-3" />,
