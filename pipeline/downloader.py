@@ -2,6 +2,7 @@ from pathlib import Path
 
 import click
 import requests
+import yaml
 
 
 def ensure_file(raw_dir: Path, name: str, url: str) -> Path:
@@ -28,3 +29,14 @@ def ensure_file(raw_dir: Path, name: str, url: str) -> Path:
     click.echo()
     click.echo(f"Saved {path} ({path.stat().st_size:,} bytes)")
     return path
+
+
+def ensure_source_file(key: str, *, large_note: bool = False) -> Path:
+    data_dir = Path(__file__).parent / "data"
+    with open(data_dir / "sources.yml") as f:
+        sources = yaml.safe_load(f)
+    entry = sources[key][0]
+    path = data_dir / "raw" / entry["name"]
+    if large_note and not path.exists():
+        click.echo(f"Note: {entry['name']} is large (~1 GB compressed). Downloading from {entry['url']} ...")
+    return ensure_file(data_dir / "raw", entry["name"], entry["url"])

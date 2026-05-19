@@ -1,19 +1,17 @@
-from datetime import datetime, timezone
 from pathlib import Path
 
 import click
 
 from db import Session
-from sources.lichess_tactics.downloader import ensure_theme_file, ensure_tactics_file
+from downloader import ensure_source_file
+from run_support import execute_import_run
 from sources.lichess_tactics.theme_importer import import_themes
 from sources.lichess_tactics.tactic_importer import import_tactics
 from sources.lichess_tactics.validators import validate_links as _validate_links
 from app.models.source_import_run import (
-    SourceImportRun,
+    LichessTacticsSourceRunMetadata,
     SourceImportSource,
     SourceImportOperation,
-    SourceImportStatus,
-    LichessTacticsSourceRunMetadata,
 )
 
 
@@ -30,14 +28,14 @@ def themes() -> None:
 @themes.command("ensure-data")
 def themes_ensure_data() -> None:
     """Download theme source files if not present locally."""
-    path = ensure_theme_file()
+    path = ensure_source_file("lichess_tactic_themes")
     click.echo(f"Ready: {path}")
 
 
 @themes.command("import")
 def themes_import() -> None:
     """Import Lichess tactic themes into the database (idempotent)."""
-    file = ensure_theme_file()
+    file = ensure_source_file("lichess_tactic_themes")
     with Session() as session:
         import_themes(session, file)
 
@@ -50,7 +48,7 @@ def tactics() -> None:
 @tactics.command("ensure-data")
 def tactics_ensure_data() -> None:
     """Download the Lichess puzzle CSV if not present locally."""
-    path = ensure_tactics_file()
+    path = ensure_source_file("lichess_tactics", large_note=True)
     click.echo(f"Ready: {path}")
 
 
@@ -68,33 +66,27 @@ def tactics_import(
     batch_size: int,
 ) -> None:
     """Import Lichess tactics with theme and opening links (idempotent)."""
-    file = Path(file_path) if file_path else ensure_tactics_file()
+    file = Path(file_path) if file_path else ensure_source_file("lichess_tactics", large_note=True)
     with Session() as session:
-        run = SourceImportRun(
+        execute_import_run(
+            session,
             source=SourceImportSource.LICHESS_TACTICS,
             operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
-            status=SourceImportStatus.RUNNING,
-            started_at=datetime.now(timezone.utc),
-            parameters_json={
+            parameters={
                 "limit": limit,
                 "min_rating": min_rating,
                 "max_rating": max_rating,
                 "batch_size": batch_size,
                 "file": str(file),
             },
-        )
-        session.add(run)
-        # Commit the RUNNING row before import so the FK on training_items resolves
-        # from the very first batch commit inside import_tactics.
-        session.commit()
-        run_id = run.id
-
-        try:
-            stats = import_tactics(
-                session, file, run_id, limit, min_rating, max_rating, batch_size
-            )
-
-            meta = LichessTacticsSourceRunMetadata(
+            summary_keys=[
+                "imported_count",
+                "total_rows_seen",
+                "skipped_existing_count",
+                "total_tactics_after_run",
+            ],
+            fn=lambda sess, run_id: import_tactics(sess, file, run_id, limit, min_rating, max_rating, batch_size),
+            metadata_factory=lambda run_id, stats, generated_at: LichessTacticsSourceRunMetadata(
                 source_import_run_id=run_id,
                 imported_count=stats["imported_count"],
                 total_tactics_after_run=stats["total_tactics_after_run"],
@@ -106,27 +98,9 @@ def tactics_import(
                 rating_bucket_counts_json=stats["rating_bucket_counts"],
                 theme_counts_json=stats["theme_counts"],
                 opening_counts_json=stats["opening_counts"],
-                generated_at=datetime.now(timezone.utc),
-            )
-            session.add(meta)
-
-            run.status = SourceImportStatus.SUCCEEDED
-            run.finished_at = datetime.now(timezone.utc)
-            run.summary_json = {
-                "imported_count": stats["imported_count"],
-                "total_rows_seen": stats["total_rows_seen"],
-                "skipped_existing_count": stats["skipped_existing_count"],
-                "total_tactics_after_run": stats["total_tactics_after_run"],
-            }
-            session.commit()
-
-        except Exception as e:
-            session.rollback()
-            run.status = SourceImportStatus.FAILED
-            run.finished_at = datetime.now(timezone.utc)
-            run.error_message = str(e)[:2000]
-            session.commit()
-            raise
+                generated_at=generated_at,
+            ),
+        )
 
 
 @lichess_tactics.command("validate-links")

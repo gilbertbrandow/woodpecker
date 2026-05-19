@@ -1,5 +1,6 @@
 import csv
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
@@ -17,6 +18,13 @@ from sources.scraped_positional.enrichment import enrich_batch
 from sources.scraped_positional.theme_seeder import THEME_COLUMN_NAMES
 
 PROGRESS_INTERVAL = 500
+
+
+@dataclass
+class PuzzleBatchResult:
+    imported: int
+    skipped_existing: int
+    enrichment_failures: int
 
 
 def _check_prerequisites(session: Session) -> None:
@@ -46,6 +54,112 @@ def _load_theme_cache(session: Session) -> dict[str, int]:
     return {name: id_ for name, id_ in rows}
 
 
+def process_puzzle_batch(
+    session: Session,
+    batch: list[dict[str, Any]],
+    source_import_run_id: int,
+    difficulty_cache: dict[int, int],
+    theme_cache: dict[str, int],
+    api_token: str | None,
+) -> PuzzleBatchResult:
+    if not batch:
+        return PuzzleBatchResult(imported=0, skipped_existing=0, enrichment_failures=0)
+
+    internal_ids = [p["internal_id"] for p in batch]
+    existing_ids: set[int] = set(
+        session.scalars(
+            select(ScrapedPositionalPuzzle.internal_id).where(
+                ScrapedPositionalPuzzle.internal_id.in_(internal_ids)
+            )
+        ).all()
+    )
+
+    new_puzzles = [p for p in batch if p["internal_id"] not in existing_ids]
+    skipped_existing = len(batch) - len(new_puzzles)
+
+    if not new_puzzles:
+        return PuzzleBatchResult(imported=0, skipped_existing=skipped_existing, enrichment_failures=0)
+
+    enriched = enrich_batch(new_puzzles, api_token)
+
+    enrichment_failures = 0
+    insertable: list[dict[str, Any]] = []
+    insertable_themes: list[list[str]] = []
+    for puzzle, result in zip(new_puzzles, enriched):
+        if result is None:
+            enrichment_failures += 1
+            continue
+        enriched_fen, moves_str = result
+        difficulty_id = difficulty_cache.get(puzzle["difficulty"])
+        if difficulty_id is None:
+            click.echo(f"Warning: unknown difficulty value {puzzle['difficulty']!r}, skipping puzzle {puzzle['internal_id']}")
+            enrichment_failures += 1
+            continue
+        insertable.append({
+            "internal_id": puzzle["internal_id"],
+            "lichess_url": puzzle["lichess_url"],
+            "fen": enriched_fen,
+            "moves": moves_str,
+            "difficulty_id": difficulty_id,
+        })
+        insertable_themes.append(puzzle["themes"])
+
+    if not insertable:
+        return PuzzleBatchResult(imported=0, skipped_existing=skipped_existing, enrichment_failures=enrichment_failures)
+
+    n = len(insertable)
+    ti_result = cast(
+        CursorResult[Any],
+        session.execute(
+            sa.text(
+                "INSERT INTO training_items (source_type, source_import_run_id) "
+                "SELECT 'SCRAPED_POSITIONAL', :run_id FROM generate_series(1, :n) "
+                "RETURNING id"
+            ),
+            {"n": n, "run_id": source_import_run_id},
+        ),
+    )
+    new_ti_ids = [row.id for row in ti_result]
+
+    puzzle_rows = [
+        {**p, "training_item_id": new_ti_ids[i]}
+        for i, p in enumerate(insertable)
+    ]
+    puzzle_result = cast(
+        CursorResult[Any],
+        session.execute(
+            pg_insert(cast(sa.Table, ScrapedPositionalPuzzle.__table__))
+            .values(puzzle_rows)
+            .on_conflict_do_nothing(index_elements=["internal_id"])
+            .returning(ScrapedPositionalPuzzle.__table__.c.id, ScrapedPositionalPuzzle.__table__.c.internal_id)
+        ),
+    )
+    inserted_puzzle_map: dict[int, int] = {row.internal_id: row.id for row in puzzle_result}
+    session.commit()
+
+    theme_links: list[dict[str, int]] = []
+    for puzzle_data, theme_names in zip(insertable, insertable_themes):
+        puzzle_id = inserted_puzzle_map.get(puzzle_data["internal_id"])
+        if puzzle_id is None:
+            continue
+        for theme_name in theme_names:
+            theme_id = theme_cache.get(theme_name)
+            if theme_id is not None:
+                theme_links.append({"positional_puzzle_id": puzzle_id, "positional_theme_id": theme_id})
+
+    if theme_links:
+        session.execute(
+            pg_insert(scraped_positional_theme_links).values(theme_links).on_conflict_do_nothing()
+        )
+        session.commit()
+
+    return PuzzleBatchResult(
+        imported=len(inserted_puzzle_map),
+        skipped_existing=skipped_existing,
+        enrichment_failures=enrichment_failures,
+    )
+
+
 def import_puzzles(
     session: Session,
     file: Path,
@@ -67,104 +181,6 @@ def import_puzzles(
 
     pending: list[dict[str, Any]] = []
 
-    def flush() -> int:
-        nonlocal enrichment_failures, rows_skipped_existing
-
-        if not pending:
-            return 0
-
-        internal_ids = [p["internal_id"] for p in pending]
-        existing_ids: set[int] = set(
-            session.scalars(
-                select(ScrapedPositionalPuzzle.internal_id).where(
-                    ScrapedPositionalPuzzle.internal_id.in_(internal_ids)
-                )
-            ).all()
-        )
-
-        new_puzzles = [p for p in pending if p["internal_id"] not in existing_ids]
-        rows_skipped_existing += len(pending) - len(new_puzzles)
-
-        if not new_puzzles:
-            pending.clear()
-            return 0
-
-        enriched = enrich_batch(new_puzzles, api_token)
-
-        insertable: list[dict[str, Any]] = []
-        insertable_themes: list[list[str]] = []
-        for puzzle, result in zip(new_puzzles, enriched):
-            if result is None:
-                enrichment_failures += 1
-                continue
-            enriched_fen, moves_str = result
-            difficulty_id = difficulty_cache.get(puzzle["difficulty"])
-            if difficulty_id is None:
-                click.echo(f"Warning: unknown difficulty value {puzzle['difficulty']!r}, skipping puzzle {puzzle['internal_id']}")
-                enrichment_failures += 1
-                continue
-            insertable.append({
-                "internal_id": puzzle["internal_id"],
-                "lichess_url": puzzle["lichess_url"],
-                "fen": enriched_fen,
-                "moves": moves_str,
-                "difficulty_id": difficulty_id,
-            })
-            insertable_themes.append(puzzle["themes"])
-
-        if not insertable:
-            pending.clear()
-            return 0
-
-        n = len(insertable)
-        ti_result = cast(
-            CursorResult[Any],
-            session.execute(
-                sa.text(
-                    "INSERT INTO training_items (source_type, source_import_run_id) "
-                    "SELECT 'SCRAPED_POSITIONAL', :run_id FROM generate_series(1, :n) "
-                    "RETURNING id"
-                ),
-                {"n": n, "run_id": source_import_run_id},
-            ),
-        )
-        new_ti_ids = [row.id for row in ti_result]
-
-        puzzle_rows = [
-            {**p, "training_item_id": new_ti_ids[i]}
-            for i, p in enumerate(insertable)
-        ]
-        puzzle_result = cast(
-            CursorResult[Any],
-            session.execute(
-                pg_insert(cast(sa.Table, ScrapedPositionalPuzzle.__table__))
-                .values(puzzle_rows)
-                .on_conflict_do_nothing(index_elements=["internal_id"])
-                .returning(ScrapedPositionalPuzzle.__table__.c.id, ScrapedPositionalPuzzle.__table__.c.internal_id)
-            ),
-        )
-        inserted_puzzle_map: dict[int, int] = {row.internal_id: row.id for row in puzzle_result}
-        session.commit()
-
-        theme_links: list[dict[str, int]] = []
-        for puzzle_data, theme_names in zip(insertable, insertable_themes):
-            puzzle_id = inserted_puzzle_map.get(puzzle_data["internal_id"])
-            if puzzle_id is None:
-                continue
-            for theme_name in theme_names:
-                theme_id = theme_cache.get(theme_name)
-                if theme_id is not None:
-                    theme_links.append({"positional_puzzle_id": puzzle_id, "positional_theme_id": theme_id})
-
-        if theme_links:
-            session.execute(
-                pg_insert(scraped_positional_theme_links).values(theme_links).on_conflict_do_nothing()
-            )
-            session.commit()
-
-        pending.clear()
-        return len(inserted_puzzle_map)
-
     with open(file, newline="", encoding="utf-8") as fh:
         reader = csv.DictReader(fh)
         for row in reader:
@@ -181,7 +197,13 @@ def import_puzzles(
             })
 
             if len(pending) >= batch_size:
-                rows_imported += flush()
+                batch_result = process_puzzle_batch(
+                    session, pending, source_import_run_id, difficulty_cache, theme_cache, api_token
+                )
+                pending.clear()
+                rows_imported += batch_result.imported
+                rows_skipped_existing += batch_result.skipped_existing
+                enrichment_failures += batch_result.enrichment_failures
                 if limit is not None and rows_imported >= limit:
                     break
 
@@ -191,7 +213,13 @@ def import_puzzles(
                     f"Skipped {rows_skipped_existing:,} | Failures {enrichment_failures:,}"
                 )
 
-    rows_imported += flush()
+    if pending:
+        batch_result = process_puzzle_batch(
+            session, pending, source_import_run_id, difficulty_cache, theme_cache, api_token
+        )
+        rows_imported += batch_result.imported
+        rows_skipped_existing += batch_result.skipped_existing
+        enrichment_failures += batch_result.enrichment_failures
 
     elapsed = time.monotonic() - start
     click.echo(

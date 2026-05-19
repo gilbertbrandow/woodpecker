@@ -40,14 +40,3 @@ make openings-import                          # openings reference data first
 make lichess-tactics-themes-import            # theme taxonomy (prerequisite for tactics)
 make lichess-tactics-import                   # tactics (writes source_import_runs + metadata)
 ```
-
-## What gets tracked
-
-Only `lichess-tactics tactics import` writes a `source_import_runs` row and a `lichess_tactics_source_run_metadata` row. Openings and themes imports leave no run trace — they are reference/precursor data.
-
-## Adding a new source
-
-1. Create `pipeline/sources/<source_name>/` with `Dockerfile`, `Makefile`, `commands.py`, and importer logic.
-2. Register the new Click group in `pipeline/cli.py`.
-3. Add Makefile targets in `pipeline/Makefile`.
-4. Add DB enum values and a source-specific metadata table via Alembic migrations in the backend.

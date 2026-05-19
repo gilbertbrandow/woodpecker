@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import sqlalchemy as sa
@@ -62,6 +63,17 @@ class TrainingItemPayload:
     metadata: SourceMetadata
 
 
+_HANDLERS: dict[TrainingItemSource, tuple[
+    Callable[[int], TrainingItemPayload],
+    Callable[[list[int]], dict[int, TrainingItemPayload]],
+]] = {}
+
+
+def _register_handlers() -> None:
+    _HANDLERS[TrainingItemSource.LICHESS_TACTIC] = (_lichess_tactic_payload, _lichess_tactic_payload_batch)
+    _HANDLERS[TrainingItemSource.SCRAPED_POSITIONAL] = (_scraped_positional_payload, _scraped_positional_payload_batch)
+
+
 def get_content(training_item_id: int) -> TrainingItemPayload:
     ti = db.session.get(TrainingItem, training_item_id)
     if ti is None:
@@ -76,21 +88,18 @@ def get_content_batch(training_item_ids: list[int]) -> dict[int, TrainingItemPay
         sa.select(TrainingItem).where(TrainingItem.id.in_(training_item_ids))
     ).scalars().all()
     result: dict[int, TrainingItemPayload] = {}
-    lichess_ids = [ti.id for ti in items if ti.source_type == TrainingItemSource.LICHESS_TACTIC]
-    if lichess_ids:
-        result.update(_lichess_tactic_payload_batch(lichess_ids))
-    positional_ids = [ti.id for ti in items if ti.source_type == TrainingItemSource.SCRAPED_POSITIONAL]
-    if positional_ids:
-        result.update(_scraped_positional_payload_batch(positional_ids))
+    for source_type, (_, batch_handler) in _HANDLERS.items():
+        ids = [ti.id for ti in items if ti.source_type == source_type]
+        if ids:
+            result.update(batch_handler(ids))
     return result
 
 
 def _dispatch(ti: TrainingItem) -> TrainingItemPayload:
-    if ti.source_type == TrainingItemSource.LICHESS_TACTIC:
-        return _lichess_tactic_payload(ti.id)
-    if ti.source_type == TrainingItemSource.SCRAPED_POSITIONAL:
-        return _scraped_positional_payload(ti.id)
-    raise NotImplementedError(f"No content handler for source_type {ti.source_type!r}")
+    handler = _HANDLERS.get(ti.source_type)
+    if handler is None:
+        raise NotImplementedError(f"No content handler for source_type {ti.source_type!r}")
+    return handler[0](ti.id)
 
 
 def _lichess_tactic_payload(training_item_id: int) -> TrainingItemPayload:
@@ -181,3 +190,6 @@ def _build_positional_payload(puzzle: ScrapedPositionalPuzzle) -> TrainingItemPa
             themes=[{"name": t.name, "displayName": t.display_name} for t in puzzle.themes],
         ),
     )
+
+
+_register_handlers()

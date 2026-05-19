@@ -8,6 +8,7 @@ back one ply to produce the enriched (pre-opponent) FEN and the paired moves str
 """
 import json
 import time
+from collections.abc import Callable
 from typing import Any
 
 import chess
@@ -17,6 +18,8 @@ import requests
 LICHESS_EXPORT_URL = "https://lichess.org/api/games/export/_ids"
 REQUEST_TIMEOUT = 60
 RATE_LIMIT_SLEEP = 1.0
+
+FetchFn = Callable[[list[str], str | None], dict[str, str]]
 
 
 def fetch_game_moves(game_ids: list[str], api_token: str | None) -> dict[str, str]:
@@ -88,6 +91,8 @@ def enrich_batch(
     puzzles: list[dict[str, Any]],
     api_token: str | None,
     batch_size: int = 300,
+    *,
+    fetch_fn: FetchFn = fetch_game_moves,
 ) -> list[tuple[str, str] | None]:
     """
     Enrich a list of puzzle dicts with FEN and moves via Lichess API.
@@ -102,7 +107,7 @@ def enrich_batch(
         game_ids = [p["lichess_game_id"] for p in batch]
 
         try:
-            moves_map = fetch_game_moves(game_ids, api_token)
+            moves_map = fetch_fn(game_ids, api_token)
         except requests.HTTPError as exc:
             click.echo(f"Warning: Lichess API HTTP error for batch at offset {batch_start}: {exc}")
             continue

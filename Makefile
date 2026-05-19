@@ -48,9 +48,9 @@ migrate-rollback:
 	$(LOCAL_COMPOSE) exec backend flask --app app db downgrade $(rev)
 
 seed-dev:
-	$(MAKE) -C pipeline openings-import
-	$(MAKE) -C pipeline lichess-tactics-themes-import
-	$(MAKE) -C pipeline lichess-tactics-import ARGS="--limit $(SEED_DEV_LIMIT)"
+	$(MAKE) -C pipeline import-openings
+	$(MAKE) -C pipeline import-lichess-tactics ARGS="--limit $(SEED_DEV_LIMIT)"
+	$(MAKE) -C pipeline import-scraped-positional ARGS="--limit $(SEED_DEV_LIMIT)"
 
 setup:
 	$(MAKE) -C backend setup

@@ -1,19 +1,17 @@
-from datetime import datetime, timezone
 from pathlib import Path
 
 import click
 
 from db import Session
+from downloader import ensure_source_file
+from run_support import execute_import_run
 from sources.scraped_positional.difficulty_seeder import seed_difficulties
-from sources.scraped_positional.downloader import ensure_puzzles_file
 from sources.scraped_positional.puzzle_importer import import_puzzles
 from sources.scraped_positional.theme_seeder import seed_themes
 from app.models.source_import_run import (
     ScrapedPositionalSourceRunMetadata,
     SourceImportOperation,
-    SourceImportRun,
     SourceImportSource,
-    SourceImportStatus,
 )
 
 _IMPORT_OPTIONS = [
@@ -41,25 +39,20 @@ def _execute_puzzle_import(
     api_token: str | None,
 ) -> None:
     with Session() as session:
-        run = SourceImportRun(
+        execute_import_run(
+            session,
             source=SourceImportSource.SCRAPED_POSITIONAL,
             operation=SourceImportOperation.SCRAPED_POSITIONAL_IMPORT,
-            status=SourceImportStatus.RUNNING,
-            started_at=datetime.now(timezone.utc),
-            parameters_json={
-                "limit": limit,
-                "batch_size": batch_size,
-                "file": str(file),
-            },
-        )
-        session.add(run)
-        session.commit()
-        run_id = run.id
-
-        try:
-            stats = import_puzzles(session, file, run_id, api_token, limit, batch_size)
-
-            meta = ScrapedPositionalSourceRunMetadata(
+            parameters={"limit": limit, "batch_size": batch_size, "file": str(file)},
+            summary_keys=[
+                "imported_count",
+                "total_rows_seen",
+                "skipped_existing_count",
+                "enrichment_failures_count",
+                "total_positional_after_run",
+            ],
+            fn=lambda sess, run_id: import_puzzles(sess, file, run_id, api_token, limit, batch_size),
+            metadata_factory=lambda run_id, stats, generated_at: ScrapedPositionalSourceRunMetadata(
                 source_import_run_id=run_id,
                 imported_count=stats["imported_count"],
                 skipped_existing_count=stats["skipped_existing_count"],
@@ -67,28 +60,9 @@ def _execute_puzzle_import(
                 total_positional_after_run=stats["total_positional_after_run"],
                 difficulty_counts_json=stats["difficulty_counts"],
                 theme_counts_json=stats["theme_counts"],
-                generated_at=datetime.now(timezone.utc),
-            )
-            session.add(meta)
-
-            run.status = SourceImportStatus.SUCCEEDED
-            run.finished_at = datetime.now(timezone.utc)
-            run.summary_json = {
-                "imported_count": stats["imported_count"],
-                "total_rows_seen": stats["total_rows_seen"],
-                "skipped_existing_count": stats["skipped_existing_count"],
-                "enrichment_failures_count": stats["enrichment_failures_count"],
-                "total_positional_after_run": stats["total_positional_after_run"],
-            }
-            session.commit()
-
-        except Exception as e:
-            session.rollback()
-            run.status = SourceImportStatus.FAILED
-            run.finished_at = datetime.now(timezone.utc)
-            run.error_message = str(e)[:2000]
-            session.commit()
-            raise
+                generated_at=generated_at,
+            ),
+        )
 
 
 @click.group("positional")
@@ -128,7 +102,7 @@ def puzzles() -> None:
 @puzzles.command("ensure-data")
 def puzzles_ensure_data() -> None:
     """Download the positional puzzle CSV if not present locally."""
-    path = ensure_puzzles_file()
+    path = ensure_source_file("scraped_positional")
     click.echo(f"Ready: {path}")
 
 
@@ -136,7 +110,7 @@ def puzzles_ensure_data() -> None:
 @_add_import_options
 def puzzles_import(limit: int | None, batch_size: int, api_token: str | None) -> None:
     """Import positional puzzles with FEN enrichment via Lichess API (idempotent)."""
-    file = ensure_puzzles_file()
+    file = ensure_source_file("scraped_positional")
     _execute_puzzle_import(file, limit, batch_size, api_token)
 
 
@@ -160,7 +134,7 @@ def import_all(limit: int | None, batch_size: int, api_token: str | None) -> Non
         seed_themes(session)
 
     click.echo("--- Ensuring puzzle data ---")
-    file = ensure_puzzles_file()
+    file = ensure_source_file("scraped_positional")
 
     click.echo("--- Importing puzzles ---")
     _execute_puzzle_import(file, limit, batch_size, api_token)
