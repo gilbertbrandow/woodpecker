@@ -89,6 +89,7 @@ export type SubsetConfig = {
 
 export type LichessTacticTheme = { name: string; displayName: string | null }
 export type LichessTacticOpening = { name: string; displayName: string; eco: string }
+export type TrainingItemOpening = { name: string; displayName: string; eco: string }
 
 export type LichessTacticSourceMetadata = {
   sourceType: 'LICHESS_TACTIC'
@@ -96,10 +97,16 @@ export type LichessTacticSourceMetadata = {
   rating: number
   gameUrl: string
   themes: LichessTacticTheme[]
+  opening: TrainingItemOpening | null
 }
 
 export type ScrapedPositionalSourceMetadata = {
   sourceType: 'SCRAPED_POSITIONAL'
+  internalId: number
+  lichessUrl: string
+  difficulty: ScrapedPositionalDifficulty
+  themes: { name: string; displayName: string }[]
+  opening: TrainingItemOpening | null
 }
 
 export type DecoySourceMetadata = {

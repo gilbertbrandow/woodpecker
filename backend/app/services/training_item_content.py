@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.extensions import db
 from app.models.lichess_tactic import LichessTactic
+from app.models.opening import Opening
 from app.models.scraped_positional_puzzle import ScrapedPositionalPuzzle
 from app.models.training_item import TrainingItem, TrainingItemSource
 from app.services.solve_contract import SolveContract
@@ -23,6 +24,7 @@ class LichessTacticMetadata(SourceMetadata):
     rating: int
     game_url: str
     themes: list[dict[str, str | None]] = field(default_factory=list)
+    opening: dict[str, object] | None = None
 
     def to_api_dict(self) -> dict[str, object]:
         return {
@@ -31,6 +33,7 @@ class LichessTacticMetadata(SourceMetadata):
             "rating": self.rating,
             "gameUrl": self.game_url,
             "themes": self.themes,
+            "opening": self.opening,
         }
 
 
@@ -40,6 +43,7 @@ class ScrapedPositionalMetadata(SourceMetadata):
     lichess_url: str
     difficulty: dict[str, object]
     themes: list[dict[str, str]] = field(default_factory=list)
+    opening: dict[str, object] | None = None
 
     def to_api_dict(self) -> dict[str, object]:
         return {
@@ -48,6 +52,7 @@ class ScrapedPositionalMetadata(SourceMetadata):
             "lichessUrl": self.lichess_url,
             "difficulty": self.difficulty,
             "themes": self.themes,
+            "opening": self.opening,
         }
 
 
@@ -104,7 +109,9 @@ def _dispatch(ti: TrainingItem) -> TrainingItemPayload:
 
 def _lichess_tactic_payload(training_item_id: int) -> TrainingItemPayload:
     tactic = db.session.execute(
-        sa.select(LichessTactic).where(LichessTactic.training_item_id == training_item_id)
+        sa.select(LichessTactic)
+        .options(selectinload(LichessTactic.themes), selectinload(LichessTactic.openings))
+        .where(LichessTactic.training_item_id == training_item_id)
     ).scalar_one()
     return TrainingItemPayload(
         contract=SolveContract(
@@ -116,6 +123,7 @@ def _lichess_tactic_payload(training_item_id: int) -> TrainingItemPayload:
             rating=tactic.rating,
             game_url=tactic.game_url,
             themes=[{"name": t.name, "displayName": t.display_name} for t in tactic.themes],
+            opening=_opening_dict(tactic.openings[-1]) if tactic.openings else None,
         ),
     )
 
@@ -125,7 +133,7 @@ def _lichess_tactic_payload_batch(
 ) -> dict[int, TrainingItemPayload]:
     tactics = db.session.execute(
         sa.select(LichessTactic)
-        .options(selectinload(LichessTactic.themes))
+        .options(selectinload(LichessTactic.themes), selectinload(LichessTactic.openings))
         .where(LichessTactic.training_item_id.in_(training_item_ids))
     ).scalars().all()
     return {
@@ -139,6 +147,7 @@ def _lichess_tactic_payload_batch(
                 rating=t.rating,
                 game_url=t.game_url,
                 themes=[{"name": th.name, "displayName": th.display_name} for th in t.themes],
+                opening=_opening_dict(t.openings[-1]) if t.openings else None,
             ),
         )
         for t in tactics
@@ -151,6 +160,7 @@ def _scraped_positional_payload(training_item_id: int) -> TrainingItemPayload:
         .options(
             selectinload(ScrapedPositionalPuzzle.difficulty),
             selectinload(ScrapedPositionalPuzzle.themes),
+            selectinload(ScrapedPositionalPuzzle.opening),
         )
         .where(ScrapedPositionalPuzzle.training_item_id == training_item_id)
     ).scalar_one()
@@ -165,6 +175,7 @@ def _scraped_positional_payload_batch(
         .options(
             selectinload(ScrapedPositionalPuzzle.difficulty),
             selectinload(ScrapedPositionalPuzzle.themes),
+            selectinload(ScrapedPositionalPuzzle.opening),
         )
         .where(ScrapedPositionalPuzzle.training_item_id.in_(training_item_ids))
     ).scalars().all()
@@ -188,8 +199,17 @@ def _build_positional_payload(puzzle: ScrapedPositionalPuzzle) -> TrainingItemPa
                 "maxRating": d.max_rating,
             },
             themes=[{"name": t.name, "displayName": t.display_name} for t in puzzle.themes],
+            opening=_opening_dict(puzzle.opening) if puzzle.opening else None,
         ),
     )
+
+
+def _opening_dict(opening: Opening) -> dict[str, object]:
+    return {
+        "name": opening.name,
+        "displayName": opening.display_name,
+        "eco": opening.eco,
+    }
 
 
 _register_handlers()
