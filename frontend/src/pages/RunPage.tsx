@@ -163,20 +163,13 @@ function InsightsTab({ run, puzzleList }: { run: Run; puzzleList: RunTrainingIte
 
 function ConfigureTab({
   run,
-  puzzleList,
-  runIdStr,
   participation,
   isOwner,
 }: {
   run: Run
-  puzzleList: RunTrainingItemList
-  runIdStr: string
   participation: Training | null
   isOwner: boolean
 }): React.ReactElement {
-  const [targetsOpen, setTargetsOpen] = useState(true)
-  const [puzzlesOpen, setPuzzlesOpen] = useState(false)
-
   const runTarget = participation?.runTargets.find((t) => t.runIndex === run.runIndex)
   const [accuracy, setAccuracy] = useState<number | null>(runTarget?.targetAccuracy ?? null)
   const [solveSeconds, setSolveSeconds] = useState<number | null>(runTarget?.targetSolveSeconds ?? null)
@@ -206,116 +199,62 @@ function ConfigureTab({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <Collapsible open={targetsOpen} onOpenChange={setTargetsOpen}>
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className="flex w-full items-center justify-between border-b pb-2.5 text-left"
-          >
-            <span className="flex items-center gap-2 text-sm font-medium">
-              <ChevronDown
-                className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
-                style={{ transform: targetsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
-              />
-              Targets
+    <div className="flex flex-col gap-7">
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-medium">Accuracy</span>
+            <span className="text-xs text-muted-foreground">
+              % of puzzles solved on the first attempt without failures
             </span>
-            <span className="hidden text-xs text-muted-foreground sm:block">
-              Personal goals for this run
-            </span>
-          </button>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="flex flex-col gap-7 pt-5 pb-3">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-sm font-medium">Accuracy</span>
-                  <span className="text-xs text-muted-foreground">
-                    % of puzzles solved on the first attempt without failures
-                  </span>
-                </div>
-                <span className="shrink-0 tabular-nums text-sm font-medium">
-                  {accuracy !== null ? `${accuracy} %` : '—'}
-                </span>
-              </div>
-              <Slider
-                min={0}
-                max={100}
-                step={1}
-                value={[accuracy ?? 0]}
-                onValueChange={([v]) => setAccuracy(v ?? 0)}
-                onValueCommit={([v]) => void saveTarget(v ?? 0, solveSeconds)}
-                disabled={!isActive || saving || !isOwner}
-                className={accuracy === null ? 'opacity-40' : ''}
-              />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>0%</span>
-                <span>100%</span>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-sm font-medium">Solve time</span>
-                  <span className="text-xs text-muted-foreground">
-                    Target average time to solve each puzzle
-                  </span>
-                </div>
-                <span className="shrink-0 tabular-nums text-sm font-medium">
-                  {solveSeconds !== null ? `${formatSolveTime(solveSeconds)} m:s` : '—'}
-                </span>
-              </div>
-              <Slider
-                min={0}
-                max={600}
-                step={5}
-                value={[solveSeconds ?? 0]}
-                onValueChange={([v]) => setSolveSeconds(v ?? 0)}
-                onValueCommit={([v]) => void saveTarget(accuracy, v ?? 0)}
-                disabled={!isActive || saving || !isOwner}
-                className={solveSeconds === null ? 'opacity-40' : ''}
-              />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>0:00</span>
-                <span>10:00</span>
-              </div>
-            </div>
-
-
           </div>
-        </CollapsibleContent>
-      </Collapsible>
+          <span className="shrink-0 tabular-nums text-sm font-medium">
+            {accuracy !== null ? `${accuracy} %` : '—'}
+          </span>
+        </div>
+        <Slider
+          min={0}
+          max={100}
+          step={1}
+          value={[accuracy ?? 0]}
+          onValueChange={([v]) => setAccuracy(v ?? 0)}
+          onValueCommit={([v]) => void saveTarget(v ?? 0, solveSeconds)}
+          disabled={!isActive || saving || !isOwner}
+          className={accuracy === null ? 'opacity-40' : ''}
+        />
+        <div className="flex justify-between text-xs text-muted-foreground">
+          <span>0%</span>
+          <span>100%</span>
+        </div>
+      </div>
 
-      <Collapsible open={puzzlesOpen} onOpenChange={setPuzzlesOpen}>
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className="flex w-full items-center justify-between border-b pb-2.5 text-left"
-          >
-            <span className="flex items-center gap-2 text-sm font-medium">
-              <ChevronDown
-                className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
-                style={{ transform: puzzlesOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
-              />
-              Puzzles{puzzleList.trainingItems.length > 0 ? ` (${puzzleList.trainingItems.length})` : ''}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-medium">Solve time</span>
+            <span className="text-xs text-muted-foreground">
+              Target average time to solve each puzzle
             </span>
-            <span className="hidden text-xs text-muted-foreground sm:block">
-              All puzzles in this run
-            </span>
-          </button>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="pt-6">
-            <RunTrainingItemTable
-              trainingItems={puzzleList.trainingItems}
-              runIdStr={runIdStr}
-              isActive={isActive}
-            />
           </div>
-        </CollapsibleContent>
-      </Collapsible>
+          <span className="shrink-0 tabular-nums text-sm font-medium">
+            {solveSeconds !== null ? `${formatSolveTime(solveSeconds)} m:s` : '—'}
+          </span>
+        </div>
+        <Slider
+          min={0}
+          max={600}
+          step={5}
+          value={[solveSeconds ?? 0]}
+          onValueChange={([v]) => setSolveSeconds(v ?? 0)}
+          onValueCommit={([v]) => void saveTarget(accuracy, v ?? 0)}
+          disabled={!isActive || saving || !isOwner}
+          className={solveSeconds === null ? 'opacity-40' : ''}
+        />
+        <div className="flex justify-between text-xs text-muted-foreground">
+          <span>0:00</span>
+          <span>10:00</span>
+        </div>
+      </div>
     </div>
   )
 }
@@ -453,10 +392,20 @@ export function RunPage(): React.ReactElement | null {
       <Tabs defaultValue="configure">
         <TabsList className="mb-6">
           <TabsTrigger value="configure">Configure</TabsTrigger>
+          <TabsTrigger value="puzzles">
+            Puzzles{puzzleList.trainingItems.length > 0 ? ` (${puzzleList.trainingItems.length})` : ''}
+          </TabsTrigger>
           <TabsTrigger value="insights">Insights</TabsTrigger>
         </TabsList>
         <TabsContent value="configure">
-          <ConfigureTab run={run} puzzleList={puzzleList} runIdStr={runIdStr} participation={participation} isOwner={isOwner} />
+          <ConfigureTab run={run} participation={participation} isOwner={isOwner} />
+        </TabsContent>
+        <TabsContent value="puzzles">
+          <RunTrainingItemTable
+            trainingItems={puzzleList.trainingItems}
+            runIdStr={runIdStr}
+            isActive={run.status === 'active'}
+          />
         </TabsContent>
         <TabsContent value="insights">
           <InsightsTab run={run} puzzleList={puzzleList} />

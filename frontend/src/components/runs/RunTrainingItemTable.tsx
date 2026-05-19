@@ -13,6 +13,7 @@ import {
 } from '@tanstack/react-table'
 import { ChevronUp, ChevronDown, ChevronsUpDown, ExternalLink, Play, Eye } from 'lucide-react'
 import { StatusBadge } from '../StatusBadge'
+import { TrainingItemTypeBadge } from '../TrainingItemTypeBadge'
 import { Button } from '../ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 import {
@@ -109,6 +110,12 @@ export function RunTrainingItemTable({ trainingItems, runIdStr, isActive }: RunT
 
   const columns: ColumnDef<RunTrainingItemListItem>[] = [
     {
+      id: 'sourceType',
+      header: 'Type',
+      enableSorting: false,
+      cell: ({ row }) => <TrainingItemTypeBadge source={row.original.source.sourceType} />,
+    },
+    {
       accessorKey: 'position',
       header: '#',
       enableSorting: false,
@@ -119,15 +126,23 @@ export function RunTrainingItemTable({ trainingItems, runIdStr, isActive }: RunT
     },
     {
       id: 'rating',
-      header: ({ column }) => <SortHeader column={column} label="Rating" />,
+      header: ({ column }) => <SortHeader column={column} label="Rating / Level" />,
       meta: { className: 'min-w-24' } satisfies ColMeta,
       accessorFn: (row) =>
         row.source.sourceType === 'LICHESS_TACTIC' ? row.source.rating : null,
       cell: ({ row }) => {
         const src = row.original.source
-        return src.sourceType === 'LICHESS_TACTIC'
-          ? <span className="tabular-nums">{src.rating}</span>
-          : <span className="text-muted-foreground">—</span>
+        if (src.sourceType === 'LICHESS_TACTIC') {
+          return <span className="tabular-nums">{src.rating}</span>
+        }
+        if (src.sourceType === 'SCRAPED_POSITIONAL') {
+          const { minRating, maxRating } = src.difficulty
+          if (minRating != null && maxRating != null) {
+            return <span className="tabular-nums">{minRating}–{maxRating}</span>
+          }
+          return <span className="text-sm">{src.difficulty.label}</span>
+        }
+        return <span className="text-muted-foreground">—</span>
       },
     },
     {
@@ -163,15 +178,20 @@ export function RunTrainingItemTable({ trainingItems, runIdStr, isActive }: RunT
       meta: { className: 'sticky right-0 bg-background w-28' } satisfies ColMeta,
       cell: ({ row }) => {
         const item = row.original
-        const lichessSrc = item.source.sourceType === 'LICHESS_TACTIC' ? item.source : null
+        const src = item.source
+        const externalUrl = src.sourceType === 'LICHESS_TACTIC'
+          ? `https://lichess.org/training/${src.displayId}`
+          : src.sourceType === 'SCRAPED_POSITIONAL'
+            ? src.lichessUrl
+            : null
         return (
           <div className="flex items-center gap-0.5">
-            {lichessSrc !== null && (
+            {externalUrl !== null && (
               <ActionButton
-                tooltip="Open puzzle on Lichess"
+                tooltip="Open on Lichess"
                 onClick={(e) => {
                   e.stopPropagation()
-                  window.open(`https://lichess.org/training/${lichessSrc.displayId}`, '_blank', 'noopener,noreferrer')
+                  window.open(externalUrl, '_blank', 'noopener,noreferrer')
                 }}
               >
                 <ExternalLink className="h-4 w-4" />
