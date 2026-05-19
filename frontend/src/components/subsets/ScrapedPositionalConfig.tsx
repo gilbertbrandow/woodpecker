@@ -112,9 +112,6 @@ export function ScrapedPositionalConfig({
                 )
               })}
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              No selection = all difficulties included
-            </p>
           </CollapsibleContent>
         </Collapsible>
       )}
@@ -160,7 +157,6 @@ export function ScrapedPositionalConfig({
                 )
               })}
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">No selection = all themes included</p>
           </CollapsibleContent>
         </Collapsible>
       )}

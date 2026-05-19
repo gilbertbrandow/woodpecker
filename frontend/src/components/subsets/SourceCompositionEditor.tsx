@@ -1,6 +1,6 @@
 import * as React from "react";
-import { useState } from "react";
-import { ChevronDown, CircleHelp } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { ChevronDown, CircleHelp, CircleOff } from "lucide-react";
 import {
   Collapsible,
   CollapsibleTrigger,
@@ -19,6 +19,7 @@ import { ThemeWeights } from "./ThemeWeights";
 import { OpeningSelector, type OpeningValue } from "./OpeningSelector";
 import { ScrapedPositionalConfig } from "./ScrapedPositionalConfig";
 import { TrainingItemTypeBadge } from "../TrainingItemTypeBadge";
+import { cn } from "../../lib/utils";
 
 const RATING_DEFAULT: RatingValue = {
   min: 1800,
@@ -77,118 +78,6 @@ function defaultConfig(
 ): LichessTacticSourceConfig | ScrapedPositionalSourceConfig {
   if (source === "LICHESS_TACTIC") return { ...DEFAULT_LICHESS_ENTRY.config };
   return {};
-}
-
-// ─── Source selector ────────────────────────────────────────────────────────
-
-function SourceSelector({
-  sources,
-  onChange,
-  disabled,
-}: {
-  sources: SourceEntry[];
-  onChange: (v: SourceEntry[]) => void;
-  disabled: boolean;
-}): React.ReactElement {
-  const activeNames = sources.map((s) => s.source);
-
-  const toggleSource = (source: KnownSource): void => {
-    if (activeNames.includes(source)) {
-      if (sources.length === 1) return;
-      const remaining = sources.filter((s) => s.source !== source);
-      onChange(equalSplit(remaining) as SourceEntry[]);
-    } else {
-      const newEntry = {
-        source,
-        percentage: 0,
-        config: defaultConfig(source),
-      } as SourceEntry;
-      const combined = [...sources, newEntry];
-      const ordered = ORDERED_SOURCES.filter((s) =>
-        combined.some((e) => e.source === s),
-      ).map((s) => combined.find((e) => e.source === s)!);
-      onChange(equalSplit(ordered) as SourceEntry[]);
-    }
-  };
-
-  const updateSplit = (
-    newSegments: Array<{ source: string; percentage: number }>,
-  ): void => {
-    const pctMap = new Map(newSegments.map((s) => [s.source, s.percentage]));
-    onChange(
-      sources.map((e) => ({
-        ...e,
-        percentage: pctMap.get(e.source) ?? e.percentage,
-      })) as SourceEntry[],
-    );
-  };
-
-  const segments = ORDERED_SOURCES.filter((s) => activeNames.includes(s)).map(
-    (s) => ({
-      source: s,
-      percentage: sources.find((e) => e.source === s)?.percentage ?? 0,
-    }),
-  );
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-2 gap-3">
-        {ALL_SOURCE_TYPES.map((source) => {
-          const active = activeNames.includes(source);
-          const isLast = active && sources.length === 1;
-          return (
-            <div
-              key={source}
-              className="flex flex-col gap-2.5 rounded-md border p-3"
-            >
-              <div className="flex items-center justify-between">
-                <TrainingItemTypeBadge source={source} />
-                <a
-                  href={SOURCE_ABOUT_URLS[source]}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-                  aria-label={`About ${SOURCE_LABELS[source]}`}
-                >
-                  <CircleHelp className="h-3.5 w-3.5" />
-                </a>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <span
-                  className={`text-xs font-medium leading-tight transition-colors ${active ? "" : "text-muted-foreground"}`}
-                >
-                  {SOURCE_LABELS[source]}
-                </span>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span>
-                      <Switch
-                        checked={active}
-                        onCheckedChange={() => toggleSource(source)}
-                        disabled={disabled || isLast}
-                        className={isLast ? "disabled:opacity-100" : undefined}
-                      />
-                    </span>
-                  </TooltipTrigger>
-                  {isLast && (
-                    <TooltipContent>
-                      At least one source must be active
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <SplitSlider
-        segments={segments}
-        onChange={updateSplit}
-        disabled={disabled}
-      />
-    </div>
-  );
 }
 
 // ─── Lichess Tactic config ───────────────────────────────────────────────────
@@ -350,45 +239,6 @@ function LichessTacticConfigEditor({
   );
 }
 
-// ─── Source config card ──────────────────────────────────────────────────────
-
-function SourceCard({
-  entry,
-  disabled,
-  onConfigChange,
-}: {
-  entry: SourceEntry;
-  disabled: boolean;
-  onConfigChange: (
-    cfg: LichessTacticSourceConfig | ScrapedPositionalSourceConfig,
-  ) => void;
-}): React.ReactElement {
-  const label = SOURCE_LABELS[entry.source as KnownSource] ?? entry.source;
-
-  return (
-    <div className="rounded-md border">
-      <div className="border-b px-4 py-3">
-        <p className="text-sm font-medium">{label}</p>
-      </div>
-      <div className="px-4 py-4">
-        {entry.source === "LICHESS_TACTIC" ? (
-          <LichessTacticConfigEditor
-            config={entry.config}
-            onChange={onConfigChange}
-            disabled={disabled}
-          />
-        ) : (
-          <ScrapedPositionalConfig
-            value={entry.config}
-            onChange={onConfigChange}
-            disabled={disabled}
-          />
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ─── Main export ─────────────────────────────────────────────────────────────
 
 export function SourceCompositionEditor({
@@ -396,26 +246,213 @@ export function SourceCompositionEditor({
   onChange,
   disabled = false,
 }: SourceCompositionEditorProps): React.ReactElement {
+  const activeNames = value.map((e) => e.source);
+
+  const [openCards, setOpenCards] = useState<Set<KnownSource>>(
+    () => new Set(activeNames as KnownSource[]),
+  );
+
+  const suppressSync = useRef(false);
+
+  useEffect(() => {
+    if (suppressSync.current) {
+      suppressSync.current = false;
+      return;
+    }
+    setOpenCards((prev) => {
+      const newlyActive = (activeNames as KnownSource[]).filter(
+        (s) => !prev.has(s),
+      );
+      if (newlyActive.length === 0) return prev;
+      return new Set([...prev, ...newlyActive]);
+    });
+  }, [value]);
+
+  const toggleSource = (source: KnownSource): void => {
+    if (activeNames.includes(source)) {
+      if (value.length === 1) return;
+      suppressSync.current = true;
+      onChange(
+        equalSplit(value.filter((s) => s.source !== source)) as SourceEntry[],
+      );
+      if (openCards.has(source)) {
+        setOpenCards((prev) => {
+          const next = new Set(prev);
+          next.delete(source);
+          return next;
+        });
+      }
+    } else {
+      suppressSync.current = true;
+      const newEntry = {
+        source,
+        percentage: 0,
+        config: defaultConfig(source),
+      } as SourceEntry;
+      const combined = [...value, newEntry];
+      const ordered = ORDERED_SOURCES.filter((s) =>
+        combined.some((e) => e.source === s),
+      ).map((s) => combined.find((e) => e.source === s)!);
+      onChange(equalSplit(ordered) as SourceEntry[]);
+    }
+  };
+
+  const toggleCard = (source: KnownSource): void => {
+    setOpenCards((prev) => {
+      const next = new Set(prev);
+      if (next.has(source)) next.delete(source);
+      else next.add(source);
+      return next;
+    });
+  };
+
+  const updateSplit = (
+    newSegments: Array<{ source: string; percentage: number }>,
+  ): void => {
+    suppressSync.current = true;
+    const pctMap = new Map(newSegments.map((s) => [s.source, s.percentage]));
+    onChange(
+      value.map((e) => ({
+        ...e,
+        percentage: pctMap.get(e.source) ?? e.percentage,
+      })) as SourceEntry[],
+    );
+  };
+
+  const segments = ORDERED_SOURCES.filter((s) => activeNames.includes(s)).map(
+    (s) => ({
+      source: s,
+      percentage: value.find((e) => e.source === s)?.percentage ?? 0,
+    }),
+  );
+
   const updateConfig = (
     index: number,
     config: LichessTacticSourceConfig | ScrapedPositionalSourceConfig,
   ): void => {
-    const next = value.map((e, i) => (i === index ? { ...e, config } : e));
-    onChange(next as SourceEntry[]);
+    suppressSync.current = true;
+    onChange(
+      value.map((e, i) => (i === index ? { ...e, config } : e)) as SourceEntry[],
+    );
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <SourceSelector sources={value} onChange={onChange} disabled={disabled} />
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-3">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Sources
+        </p>
 
-      {value.map((entry, index) => (
-        <SourceCard
-          key={entry.source}
-          entry={entry}
+      {ORDERED_SOURCES.map((source) => {
+        const isActive = activeNames.includes(source);
+        const isOpen = openCards.has(source);
+        const isLast = isActive && value.length === 1;
+        const entryIndex = value.findIndex((e) => e.source === source);
+        const entry = value[entryIndex];
+
+        return (
+          <Collapsible key={source} open={isActive && isOpen}>
+            <div
+              className={cn(
+                "rounded-lg border transition-colors",
+                !isActive && "bg-muted/30",
+              )}
+            >
+              <div
+                className={cn(
+                  "flex items-center gap-3 px-4 py-3",
+                  isActive && "cursor-pointer select-none",
+                )}
+                onClick={() => isActive && toggleCard(source)}
+              >
+                {isActive ? (
+                  <ChevronDown
+                    className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
+                    style={{
+                      transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    }}
+                  />
+                ) : (
+                  <CircleOff className="h-4 w-4 shrink-0 text-muted-foreground/40" />
+                )}
+
+                <div className="flex flex-1 items-center gap-2">
+                  <TrainingItemTypeBadge source={source} />
+                  <span
+                    className={cn(
+                      "text-sm font-medium",
+                      !isActive && "text-muted-foreground",
+                    )}
+                  >
+                    {SOURCE_LABELS[source]}
+                  </span>
+                </div>
+
+                <a
+                  href={SOURCE_ABOUT_URLS[source]}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                  aria-label={`About ${SOURCE_LABELS[source]}`}
+                >
+                  <CircleHelp className="h-3.5 w-3.5" />
+                </a>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex items-center" onClick={(e) => e.stopPropagation()}>
+                      <Switch
+                        checked={isActive}
+                        onCheckedChange={() => toggleSource(source)}
+                        disabled={disabled || isLast}
+                        className={isLast ? "disabled:opacity-100" : undefined}
+                      />
+                    </span>
+                  </TooltipTrigger>
+                  {isLast && (
+                    <TooltipContent>
+                      At least one source must be active
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </div>
+
+              <CollapsibleContent>
+                {entry && (
+                  <div className="border-t px-4 pb-5 pt-4">
+                    {entry.source === "LICHESS_TACTIC" ? (
+                      <LichessTacticConfigEditor
+                        config={entry.config}
+                        onChange={(cfg) => updateConfig(entryIndex, cfg)}
+                        disabled={disabled}
+                      />
+                    ) : (
+                      <ScrapedPositionalConfig
+                        value={entry.config}
+                        onChange={(cfg) => updateConfig(entryIndex, cfg)}
+                        disabled={disabled}
+                      />
+                    )}
+                  </div>
+                )}
+              </CollapsibleContent>
+            </div>
+          </Collapsible>
+        );
+      })}
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Distribution
+        </p>
+        <SplitSlider
+          segments={segments}
+          onChange={updateSplit}
           disabled={disabled}
-          onConfigChange={(cfg) => updateConfig(index, cfg)}
         />
-      ))}
+      </div>
     </div>
   );
 }

@@ -144,7 +144,6 @@ export function SubsetPage(): React.ReactElement | null {
 
   const [total, setTotal] = useState(0);
   const [stats, setStats] = useState<SubsetStatsType | null>(null);
-  const [puzzlesOpen, setPuzzlesOpen] = useState(true);
 
   useSetBreadcrumbTitle(subset?.name);
 
@@ -322,11 +321,23 @@ export function SubsetPage(): React.ReactElement | null {
         <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
           <TabsList className="mb-6">
             <TabsTrigger value="configuration">Configuration</TabsTrigger>
+            <TabsTrigger value="puzzles">
+              Puzzles{total > 0 ? ` (${total})` : ""}
+            </TabsTrigger>
             <TabsTrigger value="insights">Insights</TabsTrigger>
           </TabsList>
 
           {!locked && isOwn && (
             <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void handleSave()}
+                disabled={!isDirty || isBusy}
+              >
+                {isSaving ? "Saving…" : "Save"}
+              </Button>
+
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button size="sm" variant="outline" disabled={isBusy}>
@@ -426,53 +437,19 @@ export function SubsetPage(): React.ReactElement | null {
             disabled={locked || !isOwn || isBusy}
           />
 
-          {!locked && isOwn && (
-            <div className="flex flex-wrap items-center gap-3 pt-4">
-              <Button
-                onClick={() => void handleSave()}
-                disabled={!isDirty || isBusy}
-                variant="outline"
-              >
-                {isSaving ? "Saving…" : "Save configuration"}
-              </Button>
-            </div>
-          )}
+        </TabsContent>
 
-          {total > 0 && (
-            <div className="mt-6">
-              <Collapsible open={puzzlesOpen} onOpenChange={setPuzzlesOpen}>
-                <CollapsibleTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between border-b pb-2.5 text-left"
-                  >
-                    <span className="flex items-center gap-2 text-sm font-medium">
-                      <ChevronDown
-                        className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
-                        style={{
-                          transform: puzzlesOpen
-                            ? "rotate(180deg)"
-                            : "rotate(0deg)",
-                        }}
-                      />
-                      Puzzles{total > 0 ? ` (${total})` : ""}
-                    </span>
-                    <span className="hidden text-xs text-muted-foreground sm:block">
-                      All puzzles currently in this subset
-                    </span>
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="pt-6">
-                    <PuzzleTable
-                      subsetId={id}
-                      locked={locked}
-                      onTotalChange={handleTotalChange}
-                    />
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            </div>
+        <TabsContent value="puzzles">
+          {total > 0 ? (
+            <PuzzleTable
+              subsetId={id}
+              locked={locked}
+              onTotalChange={handleTotalChange}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No puzzles yet — fill the subset first.
+            </p>
           )}
         </TabsContent>
 
