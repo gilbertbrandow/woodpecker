@@ -540,42 +540,28 @@ def list_active_puzzles(
     return {"puzzles": puzzles, "page": page, "pageSize": PAGE_SIZE, "totalPages": total_pages, "total": total}
 
 
-def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
-    subset = _get_viewable_subset(subset_id, user_id)
-
-    active_rows = db.session.execute(
-        sa.text("""
-            SELECT p.id, p.rating, p.popularity, p.nb_plays
-            FROM subset_training_items sti JOIN lichess_tactics p ON p.training_item_id = sti.training_item_id
-            WHERE sti.subset_id = :sid
-        """),
-        {"sid": subset_id},
-    ).all()
-
-    sources: list[dict] = (subset.config or {}).get("sources", [])  # type: ignore[assignment]
-    lichess_cfg: dict[str, object] = next(
-        (s.get("config") or {} for s in sources if s.get("source") == "LICHESS_TACTIC"),
-        {},
-    )
-    _rating_val = lichess_cfg.get("rating")
+def _lichess_stats(
+    training_item_ids: list[int],
+    config: dict[str, object],
+) -> dict[str, object]:
+    _rating_val = config.get("rating")
     rating_cfg: dict[str, object] = _rating_val if isinstance(_rating_val, dict) else {}
     _min = rating_cfg.get("min")
     _max = rating_cfg.get("max")
     rating_min: int | None = int(_min) if isinstance(_min, (int, float)) else None
     rating_max: int | None = int(_max) if isinstance(_max, (int, float)) else None
 
-    if not active_rows:
+    if not training_item_ids:
         rating_buckets: list[dict[str, int]] = []
         if rating_min is not None and rating_max is not None:
-            start_bucket = (int(rating_min) // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
-            end_bucket = ((int(rating_max) + RATING_BUCKET_SIZE - 1) // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
-
+            start = (rating_min // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
+            end = ((rating_max + RATING_BUCKET_SIZE - 1) // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
             rating_buckets = [
                 {"min": b, "max": b + RATING_BUCKET_SIZE, "count": 0}
-                for b in range(start_bucket, end_bucket, RATING_BUCKET_SIZE)
+                for b in range(start, end, RATING_BUCKET_SIZE)
             ]
-
         return {
+            "count": 0,
             "ratingBuckets": rating_buckets,
             "themes": [],
             "openings": [],
@@ -583,34 +569,33 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
             "avgNbPlays": 0,
             "avgRating": 0,
             "noOpeningCount": 0,
-            "totalActive": 0,
-            "ratingRange": {
-                "min": rating_min,
-                "max": rating_max,
-                "step": RATING_BUCKET_SIZE,
-            },
+            "ratingRange": {"min": rating_min, "max": rating_max, "step": RATING_BUCKET_SIZE},
         }
 
-    int_ids = [r.id for r in active_rows]
-    total = len(active_rows)
-    avg_popularity = sum(r.popularity for r in active_rows) / total
-    avg_nb_plays = sum(r.nb_plays for r in active_rows) / total
-    avg_rating = round(sum(r.rating for r in active_rows) / total)
+    tactic_rows = db.session.execute(
+        sa.text("""
+            SELECT lt.id, lt.rating, lt.popularity, lt.nb_plays
+            FROM lichess_tactics lt
+            WHERE lt.training_item_id = ANY(:ids)
+        """),
+        {"ids": training_item_ids},
+    ).all()
 
-    actual_min = rating_min if rating_min is not None else min(r.rating for r in active_rows)
-    actual_max = rating_max if rating_max is not None else max(r.rating for r in active_rows)
+    lt_ids = [r.id for r in tactic_rows]
+    count = len(tactic_rows)
+    avg_popularity = sum(r.popularity for r in tactic_rows) / count
+    avg_nb_plays = sum(r.nb_plays for r in tactic_rows) / count
+    avg_rating = round(sum(r.rating for r in tactic_rows) / count)
+
+    actual_min = rating_min if rating_min is not None else min(r.rating for r in tactic_rows)
+    actual_max = rating_max if rating_max is not None else max(r.rating for r in tactic_rows)
     start_bucket = (actual_min // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
     end_bucket = ((actual_max + RATING_BUCKET_SIZE - 1) // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
-
-    bucket_map: dict[int, int] = {
-        b: 0 for b in range(start_bucket, end_bucket, RATING_BUCKET_SIZE)
-    }
-
-    for r in active_rows:
-        bucket_min = (r.rating // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
-        if bucket_min in bucket_map:
-            bucket_map[bucket_min] += 1
-
+    bucket_map: dict[int, int] = {b: 0 for b in range(start_bucket, end_bucket, RATING_BUCKET_SIZE)}
+    for r in tactic_rows:
+        b = (r.rating // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
+        if b in bucket_map:
+            bucket_map[b] += 1
     rating_buckets = [
         {"min": k, "max": k + RATING_BUCKET_SIZE, "count": v}
         for k, v in sorted(bucket_map.items())
@@ -619,12 +604,13 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
     theme_rows = db.session.execute(
         sa.text("""
             SELECT t.name, t.display_name, t.description, COUNT(*) AS cnt
-            FROM lichess_tactic_theme_links ltl JOIN lichess_tactic_themes t ON t.id = ltl.lichess_tactic_theme_id
+            FROM lichess_tactic_theme_links ltl
+            JOIN lichess_tactic_themes t ON t.id = ltl.lichess_tactic_theme_id
             WHERE ltl.lichess_tactic_id = ANY(:ids)
             GROUP BY t.name, t.display_name, t.description
             ORDER BY cnt DESC
         """),
-        {"ids": int_ids},
+        {"ids": lt_ids},
     ).all()
     themes: list[dict[str, object]] = [
         {"name": r.name, "displayName": r.display_name, "description": r.description, "count": r.cnt}
@@ -634,38 +620,137 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
     opening_rows = db.session.execute(
         sa.text("""
             SELECT o.name, o.display_name, COUNT(*) AS cnt
-            FROM lichess_tactic_openings lto JOIN openings o ON o.id = lto.opening_id
+            FROM lichess_tactic_openings lto
+            JOIN openings o ON o.id = lto.opening_id
             WHERE lto.lichess_tactic_id = ANY(:ids)
             GROUP BY o.name, o.display_name
             ORDER BY cnt DESC
         """),
-        {"ids": int_ids},
+        {"ids": lt_ids},
     ).all()
     openings: list[dict[str, object]] = [
         {"name": r.name, "displayName": r.display_name, "count": r.cnt} for r in opening_rows
     ]
 
-    with_opening = db.session.execute(
-        sa.text("SELECT COUNT(DISTINCT lichess_tactic_id) FROM lichess_tactic_openings WHERE lichess_tactic_id = ANY(:ids)"),
-        {"ids": int_ids},
-    ).scalar()
-    no_opening_count = total - int(with_opening or 0)
+    with_opening: int = db.session.execute(
+        sa.text("""
+            SELECT COUNT(DISTINCT lichess_tactic_id)
+            FROM lichess_tactic_openings
+            WHERE lichess_tactic_id = ANY(:ids)
+        """),
+        {"ids": lt_ids},
+    ).scalar() or 0
 
     return {
+        "count": count,
         "ratingBuckets": rating_buckets,
         "themes": themes,
         "openings": openings,
         "avgPopularity": round(avg_popularity, 1),
         "avgNbPlays": round(avg_nb_plays, 1),
         "avgRating": avg_rating,
-        "noOpeningCount": no_opening_count,
-        "totalActive": total,
-        "ratingRange": {
-            "min": rating_min,
-            "max": rating_max,
-            "step": RATING_BUCKET_SIZE,
-        },
+        "noOpeningCount": count - with_opening,
+        "ratingRange": {"min": rating_min, "max": rating_max, "step": RATING_BUCKET_SIZE},
     }
+
+
+def _positional_stats(training_item_ids: list[int]) -> dict[str, object]:
+    if not training_item_ids:
+        return {"count": 0, "difficultyDistribution": [], "themes": [], "openings": []}
+
+    diff_rows = db.session.execute(
+        sa.text("""
+            SELECT spd.value, spd.label, COUNT(*) AS cnt
+            FROM scraped_positional_puzzles spp
+            JOIN scraped_positional_difficulties spd ON spd.id = spp.difficulty_id
+            WHERE spp.training_item_id = ANY(:ids)
+            GROUP BY spd.value, spd.label
+            ORDER BY spd.value
+        """),
+        {"ids": training_item_ids},
+    ).all()
+    difficulty_distribution: list[dict[str, object]] = [
+        {"value": r.value, "label": r.label, "count": r.cnt} for r in diff_rows
+    ]
+
+    theme_rows = db.session.execute(
+        sa.text("""
+            SELECT spt.name, spt.display_name, COUNT(*) AS cnt
+            FROM scraped_positional_puzzles spp
+            JOIN scraped_positional_theme_links sptl ON sptl.positional_puzzle_id = spp.id
+            JOIN scraped_positional_themes spt ON spt.id = sptl.positional_theme_id
+            WHERE spp.training_item_id = ANY(:ids)
+            GROUP BY spt.name, spt.display_name
+            ORDER BY cnt DESC
+        """),
+        {"ids": training_item_ids},
+    ).all()
+    themes: list[dict[str, object]] = [
+        {"name": r.name, "displayName": r.display_name, "count": r.cnt} for r in theme_rows
+    ]
+
+    opening_rows = db.session.execute(
+        sa.text("""
+            SELECT o.name, o.display_name, COUNT(*) AS cnt
+            FROM scraped_positional_puzzles spp
+            JOIN openings o ON o.id = spp.opening_id
+            WHERE spp.training_item_id = ANY(:ids)
+              AND spp.opening_id IS NOT NULL
+            GROUP BY o.name, o.display_name
+            ORDER BY cnt DESC
+        """),
+        {"ids": training_item_ids},
+    ).all()
+    openings: list[dict[str, object]] = [
+        {"name": r.name, "displayName": r.display_name, "count": r.cnt} for r in opening_rows
+    ]
+
+    return {
+        "count": len(training_item_ids),
+        "difficultyDistribution": difficulty_distribution,
+        "themes": themes,
+        "openings": openings,
+    }
+
+
+def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
+    subset = _get_viewable_subset(subset_id, user_id)
+
+    item_rows = db.session.execute(
+        sa.text("""
+            SELECT ti.id, ti.source_type::text AS source_type
+            FROM subset_training_items sti
+            JOIN training_items ti ON ti.id = sti.training_item_id
+            WHERE sti.subset_id = :sid
+        """),
+        {"sid": subset_id},
+    ).all()
+
+    total = len(item_rows)
+    by_source: dict[str, list[int]] = {}
+    for r in item_rows:
+        by_source.setdefault(r.source_type, []).append(r.id)
+
+    sources_config: list[dict] = (subset.config or {}).get("sources", [])  # type: ignore[assignment]
+    configured_sources = {s["source"] for s in sources_config if isinstance(s, dict) and "source" in s}
+
+    sources_out: dict[str, object] = {}
+
+    if "LICHESS_TACTIC" in configured_sources or "LICHESS_TACTIC" in by_source:
+        lt_config: dict[str, object] = next(
+            (s.get("config") or {} for s in sources_config if s.get("source") == "LICHESS_TACTIC"),
+            {},
+        )
+        sources_out["LICHESS_TACTIC"] = _lichess_stats(
+            by_source.get("LICHESS_TACTIC", []), lt_config
+        )
+
+    if "SCRAPED_POSITIONAL" in configured_sources or "SCRAPED_POSITIONAL" in by_source:
+        sources_out["SCRAPED_POSITIONAL"] = _positional_stats(
+            by_source.get("SCRAPED_POSITIONAL", [])
+        )
+
+    return {"sources": sources_out, "totalActive": total}
 
 def list_subsets(user_id: int, locked_only: bool = False) -> list[tuple[Subset, User]]:
     where_clause: sa.ColumnElement[bool]
