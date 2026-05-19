@@ -98,15 +98,15 @@ export type LichessTacticSourceMetadata = {
   themes: LichessTacticTheme[]
 }
 
-export type PositionalSourceMetadata = {
-  sourceType: 'POSITIONAL'
+export type ScrapedPositionalSourceMetadata = {
+  sourceType: 'SCRAPED_POSITIONAL'
 }
 
 export type DecoySourceMetadata = {
   sourceType: 'DECOY'
 }
 
-export type SourceMetadata = LichessTacticSourceMetadata | PositionalSourceMetadata | DecoySourceMetadata
+export type SourceMetadata = LichessTacticSourceMetadata | ScrapedPositionalSourceMetadata | DecoySourceMetadata
 
 export type LichessTactic = {
   puzzleId: string
@@ -152,7 +152,7 @@ export type Opening = {
   eco: string | null
 }
 
-export type TrainingItemSource = 'LICHESS_TACTIC' | 'DECOY' | 'POSITIONAL'
+export type TrainingItemSource = 'LICHESS_TACTIC' | 'DECOY' | 'SCRAPED_POSITIONAL'
 
 export type TrainingItem = {
   id: number

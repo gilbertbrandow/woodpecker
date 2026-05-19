@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 class TrainingItemSource(enum.Enum):
     LICHESS_TACTIC = "LICHESS_TACTIC"
     DECOY = "DECOY"
-    POSITIONAL = "POSITIONAL"
+    SCRAPED_POSITIONAL = "SCRAPED_POSITIONAL"
 
 
 class TrainingItem(Base):

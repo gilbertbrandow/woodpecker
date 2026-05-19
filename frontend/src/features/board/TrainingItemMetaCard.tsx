@@ -140,7 +140,7 @@ function LichessTacticSection({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-3">
-        {!focusMode && <TrainingItemTypeBadge sourceType="LICHESS_TACTIC" />}
+        {!focusMode && <TrainingItemTypeBadge source="LICHESS_TACTIC" />}
         <div>
           <span className="text-xs text-muted-foreground">Puzzle </span>
           {focusMode ? (

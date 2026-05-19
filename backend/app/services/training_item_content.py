@@ -33,9 +33,9 @@ class LichessTacticMetadata(SourceMetadata):
 
 
 @dataclass
-class PositionalMetadata(SourceMetadata):
+class ScrapedPositionalMetadata(SourceMetadata):
     def to_api_dict(self) -> dict[str, object]:
-        return {"sourceType": "POSITIONAL"}
+        return {"sourceType": "SCRAPED_POSITIONAL"}
 
 
 @dataclass
@@ -67,7 +67,7 @@ def get_content_batch(training_item_ids: list[int]) -> dict[int, TrainingItemPay
     lichess_ids = [ti.id for ti in items if ti.source_type == TrainingItemSource.LICHESS_TACTIC]
     if lichess_ids:
         result.update(_lichess_tactic_payload_batch(lichess_ids))
-    # Future: add POSITIONAL, DECOY batches here
+    # Future: add SCRAPED_POSITIONAL, DECOY batches here
     return result
 
 

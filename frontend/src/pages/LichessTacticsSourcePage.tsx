@@ -19,7 +19,7 @@ export function LichessTacticsSourcePage(): React.ReactElement | null {
         breadcrumbParentLabel="Sources"
         breadcrumbParentTo="/app/sources"
         title="Lichess Tactics"
-        badge={<TrainingItemTypeBadge sourceType="LICHESS_TACTIC" />}
+        badge={<TrainingItemTypeBadge source="LICHESS_TACTIC" />}
         summary="Tactical puzzles imported from the Lichess puzzle database."
         aboutContent={<LichessTacticsAbout />}
         exploreContent={exploreOpened ? <LichessTacticsExplore /> : null}

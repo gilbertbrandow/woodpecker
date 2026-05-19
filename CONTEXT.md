@@ -9,14 +9,22 @@ A generic, source-agnostic record for one solvable puzzle. Carries only identity
 _Avoid_: puzzle (overloaded with UI usage), item
 
 **Source**:
-A named external puzzle data provider. Each Source has its own Pipeline importer, a source-specific metadata table, and its own solving semantics — what counts as "correct" is defined per Source, not by the generic solving engine. Current sources: `LICHESS_TACTIC`, `POSITIONAL`, `DECOY`.
+A named external puzzle data provider. Each Source has its own Pipeline importer, a source-specific metadata table, and its own solving semantics — what counts as "correct" is defined per Source, not by the generic solving engine. Current sources: `LICHESS_TACTIC`, `SCRAPED_POSITIONAL`, `DECOY`.
 _Avoid_: dataset, data source
 
 **Lichess Tactic**:
 A TrainingItem sourced from the Lichess tactics database. Solved by playing a full exact UCI move sequence. Overview shows the Lichess puzzle ID, themes, and opening.
 
-**Positional**:
-A TrainingItem from the Positional source. Solved by playing a single exact correct move (same validation logic as Lichess Tactic, just a shorter sequence). Overview shows source-specific metadata distinct from Lichess.
+**Scraped Positional**:
+A TrainingItem from the `SCRAPED_POSITIONAL` source (dataset from github.com/neilgd/chess-position-analysis-results). Solved by playing a single exact correct move. The stored FEN is the position *before* the opponent's last move (identical convention to Lichess Tactic); the opponent move is prepended at import time via Lichess API enrichment. Overview shows the internal puzzle ID linked to the Lichess game position, a PositionalDifficulty badge, and PositionalTheme badges.
+
+**PositionalDifficulty**:
+A seeded lookup record describing a difficulty tier for `SCRAPED_POSITIONAL` puzzles. Carries a numeric value (1–4), a label (e.g. "Hard"), a description, and a nullable ELO rating range (`min_rating`, `max_rating`). Displayed as a badge showing both the label and the rating range. Seeded by `positional difficulties import` before puzzle import.
+_Avoid_: rating, level
+
+**PositionalTheme**:
+A categorical tag applied to a `SCRAPED_POSITIONAL` puzzle (e.g. `space`, `kingsafety`, `prophylaxis`). Seeded by `positional themes import` before puzzle import. Each theme carries a `name` (raw CSV column key), `display_name`, and `description`. A puzzle may have multiple PositionalThemes, stored via a pivot table.
+_Avoid_: tag, category
 
 **Decoy**:
 A TrainingItem from the Decoy source. Solved by playing any one of a set of accepted moves. This is the only source type with a non-exact-match validation rule.

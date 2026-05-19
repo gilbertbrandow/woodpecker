@@ -16,7 +16,7 @@ export function SourcesListPage(): React.ReactElement | null {
       <div className="flex flex-col gap-4 rounded-lg border bg-card p-6">
         <div className="flex items-center gap-3">
           <h2 className="text-base font-semibold">Lichess Tactics</h2>
-          <TrainingItemTypeBadge sourceType="LICHESS_TACTIC" />
+          <TrainingItemTypeBadge source="LICHESS_TACTIC" />
         </div>
 
         <p className="text-sm text-muted-foreground">
