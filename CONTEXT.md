@@ -73,8 +73,12 @@ _Avoid_: tag, category, topic
 A standardized encyclopedia code identifying a chess opening by its initial move sequence (e.g. `A00`, `D30`). Used by the `openings` Pipeline source.
 _Avoid_: opening code
 
+**SourceComposition**:
+The breakdown of a Subset by Source, expressed as integer percentages that always sum to 100. Stored as part of the Subset config. Each entry carries a Source identifier, a percentage, and a per-source filter config. Determines how many TrainingItems are drawn from each Source during sampling. A Subset with a single Source has a SourceComposition of 100% for that Source. Percentages are hard caps — if a Source's eligible pool is smaller than its allocation, that Source fills what it can and the shortfall is reported to the user rather than redistributed.
+_Avoid_: source split, source ratio, source weights
+
 **Mixed-source Subset**:
-A Subset composed of TrainingItems from multiple Sources (e.g. 60% Lichess Tactics, 20% Positional, 20% Decoy). Within a single Run a user may encounter any source type. The solving loop, overview stats, and attempt history are source-agnostic; only the TrainingItem metadata display varies.
+A Subset whose SourceComposition references more than one Source (e.g. 60% Lichess Tactics, 40% Scraped Positional). Within a single Run a user may encounter any source type. The solving loop, overview stats, and attempt history are source-agnostic; only the TrainingItem metadata display varies.
 
 **SolveContract**:
 The source-agnostic interface between the content dispatcher and the solving engine. Contains the starting FEN and an interleaved sequence of plies (opponent and player moves alternating). Opponent plies are always exact UCI strings; player plies are either a single exact UCI move or a set of accepted UCI moves (set-match). The engine operates exclusively on SolveContracts and never branches on source type.

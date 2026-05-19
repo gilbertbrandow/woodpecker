@@ -38,7 +38,7 @@ function ExternalA({
 
 export function ScrapedPositionalAbout(): React.ReactElement {
   return (
-    <div className="flex flex-col gap-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <Section title="About this source">
         <p>
           This source contains positional puzzles mined from the Lichess games
