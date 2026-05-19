@@ -1,10 +1,10 @@
 import json
+import random
 from datetime import datetime, timezone
 
 import sqlalchemy as sa
 
 from app.extensions import db
-from app.models.lichess_tactic import LichessTactic
 from app.models.schedule import Schedule
 from app.models.subset import Subset, SubsetTrainingItem
 from app.models.user import User
@@ -18,6 +18,7 @@ VALID_SORT_COLUMNS: dict[str, str] = {
     "popularity": "p.popularity",
     "nb_plays": "p.nb_plays",
 }
+VALID_SOURCES = {"LICHESS_TACTIC", "SCRAPED_POSITIONAL"}
 
 
 def subset_status(subset: Subset) -> str:
@@ -48,9 +49,45 @@ def subset_to_dict(subset: Subset, owner: User | None = None) -> dict[str, objec
     return d
 
 
-def _parse_config(config: dict[str, object]) -> tuple[
-    int, int, float | None, float | None, str, list[str], float
-]:
+def _validate_sources_config(config: dict[str, object]) -> None:
+    sources = config.get("sources")
+    if not isinstance(sources, list) or not sources:
+        raise ValueError("config.sources must be a non-empty array.")
+    total_pct = 0
+    for entry in sources:
+        if not isinstance(entry, dict):
+            raise ValueError("Each source entry must be an object.")
+        source = entry.get("source")
+        if source not in VALID_SOURCES:
+            raise ValueError(
+                f"Invalid source '{source}'. Must be one of: {', '.join(sorted(VALID_SOURCES))}."
+            )
+        pct = entry.get("percentage")
+        if not isinstance(pct, int) or pct < 1:
+            raise ValueError("Each source percentage must be an integer >= 1.")
+        total_pct += pct
+    if total_pct != 100:
+        raise ValueError(f"Source percentages must sum to 100 (got {total_pct}).")
+
+
+def _distribute_counts(sources: list[dict], total: int) -> list[int]:
+    """Largest-remainder distribution so counts sum exactly to total."""
+    exact = [total * s["percentage"] / 100 for s in sources]
+    floored = [int(v) for v in exact]
+    remainder = total - sum(floored)
+    fractions = sorted(
+        range(len(sources)), key=lambda i: exact[i] - floored[i], reverse=True
+    )
+    for i in fractions[:remainder]:
+        floored[i] += 1
+    return floored
+
+
+def _sample_lichess_tactics(
+    config: dict[str, object],
+    subset_id: int,
+    count: int,
+) -> list[int]:
     rating_cfg = config.get("rating") or {}
     if not isinstance(rating_cfg, dict):
         rating_cfg = {}
@@ -76,18 +113,6 @@ def _parse_config(config: dict[str, object]) -> tuple[
         opening_items = list(items_raw) if isinstance(items_raw, list) else []  # type: ignore[arg-type]
         if opening_items:
             opening_strength = float(openings_cfg.get("strength", 0.0))  # type: ignore[arg-type]
-
-    return rating_min, rating_max, mu, sigma, theme_weights_json, opening_items, opening_strength
-
-
-def _sample_puzzles(
-    subset_id: int,
-    config: dict[str, object],
-    count: int,
-) -> list[int]:
-    rating_min, rating_max, mu, sigma, theme_weights_json, opening_items, opening_strength = (
-        _parse_config(config)
-    )
 
     rows = db.session.execute(
         sa.text("""
@@ -161,12 +186,130 @@ def _sample_puzzles(
     return [row.id for row in rows]
 
 
+def _sample_scraped_positionals(
+    config: dict[str, object],
+    subset_id: int,
+    count: int,
+) -> list[int]:
+    difficulties_raw = config.get("difficulty")
+    difficulties: list[int] = (
+        [int(d) for d in difficulties_raw]  # type: ignore[union-attr]
+        if isinstance(difficulties_raw, list) and difficulties_raw
+        else []
+    )
+
+    themes_raw = config.get("themes")
+    theme_names: list[str] = (
+        [str(t) for t in themes_raw]  # type: ignore[union-attr]
+        if isinstance(themes_raw, list) and themes_raw
+        else []
+    )
+
+    opening_cfg = config.get("opening") or {}
+    opening_items: list[str] = []
+    opening_strength = 0.0
+    if isinstance(opening_cfg, dict):
+        items_raw = opening_cfg.get("items", [])
+        opening_items = list(items_raw) if isinstance(items_raw, list) else []  # type: ignore[arg-type]
+        if opening_items:
+            opening_strength = float(opening_cfg.get("strength", 0.0))  # type: ignore[arg-type]
+
+    rows = db.session.execute(
+        sa.text("""
+            WITH RECURSIVE
+            opening_descendants AS (
+                SELECT id FROM openings WHERE name = ANY(:opening_keys)
+                UNION ALL
+                SELECT o.id FROM openings o
+                JOIN opening_descendants d ON o.parent_id = d.id
+            ),
+            eligible AS (
+                SELECT ti.id
+                FROM training_items ti
+                JOIN scraped_positional_puzzles spp ON spp.training_item_id = ti.id
+                JOIN scraped_positional_difficulties spd ON spd.id = spp.difficulty_id
+                WHERE (:difficulty_count = 0 OR spd.value = ANY(:difficulties))
+                  AND ti.id NOT IN (
+                      SELECT training_item_id FROM subset_training_items
+                      WHERE subset_id = :sid
+                  )
+            ),
+            theme_filtered AS (
+                SELECT e.id
+                FROM eligible e
+                WHERE (:theme_count = 0 OR EXISTS (
+                    SELECT 1
+                    FROM scraped_positional_puzzles spp2
+                    JOIN scraped_positional_theme_links sptl ON sptl.positional_puzzle_id = spp2.id
+                    JOIN scraped_positional_themes spt ON spt.id = sptl.positional_theme_id
+                    WHERE spp2.training_item_id = e.id
+                      AND spt.name = ANY(:theme_names)
+                ))
+            ),
+            weighted AS (
+                SELECT
+                    tf.id,
+                    CASE
+                        WHEN :opening_strength = 0 THEN 1.0
+                        WHEN EXISTS (
+                            SELECT 1 FROM scraped_positional_puzzles spp3
+                            WHERE spp3.training_item_id = tf.id
+                              AND spp3.opening_id IN (SELECT id FROM opening_descendants)
+                        ) THEN 1.0
+                        ELSE 1.0 - :opening_strength
+                    END AS weight
+                FROM theme_filtered tf
+            )
+            SELECT id
+            FROM weighted
+            WHERE weight > 0
+            ORDER BY ln(random()) / weight DESC
+            LIMIT :count
+        """),
+        {
+            "sid": subset_id,
+            "difficulties": difficulties,
+            "difficulty_count": len(difficulties),
+            "theme_names": theme_names,
+            "theme_count": len(theme_names),
+            "opening_keys": opening_items,
+            "opening_strength": opening_strength,
+            "count": count,
+        },
+    ).all()
+
+    return [row.id for row in rows]
+
+
+def _sample_all_sources(
+    sources: list[dict],
+    subset_id: int,
+    total_count: int,
+) -> list[int]:
+    counts = _distribute_counts(sources, total_count)
+    all_ids: list[int] = []
+    for source_entry, count in zip(sources, counts):
+        if count == 0:
+            continue
+        cfg: dict[str, object] = source_entry.get("config") or {}
+        source = source_entry["source"]
+        if source == "LICHESS_TACTIC":
+            ids = _sample_lichess_tactics(cfg, subset_id, count)
+        elif source == "SCRAPED_POSITIONAL":
+            ids = _sample_scraped_positionals(cfg, subset_id, count)
+        else:
+            ids = []
+        all_ids.extend(ids)
+    random.shuffle(all_ids)
+    return all_ids
+
+
 def _sample_and_insert(
     subset_id: int,
-    config: dict[str, object],
+    sources: list[dict],
     count: int,
 ) -> int:
-    sampled_ids = _sample_puzzles(subset_id, config, count)
+    sampled_ids = _sample_all_sources(sources, subset_id, count)
 
     if not sampled_ids:
         return 0
@@ -216,6 +359,7 @@ def save_config(
         raise PermissionError("Subset is locked.")
     if not (5 <= puzzle_count <= 1000):
         raise ValueError("puzzle_count must be between 5 and 1000.")
+    _validate_sources_config(config)
 
     db.session.execute(
         sa.delete(SubsetTrainingItem).where(SubsetTrainingItem.subset_id == subset_id)
@@ -234,13 +378,17 @@ def fill(subset_id: int, user_id: int) -> tuple[int, int]:
     if subset.config is None or subset.puzzle_count is None:
         raise ValueError("Configuration is not set.")
 
+    sources: list[dict] = (subset.config or {}).get("sources", [])  # type: ignore[assignment]
+    if not sources:
+        raise ValueError("Configuration is not set.")
+
     db.session.execute(
         sa.delete(SubsetTrainingItem).where(SubsetTrainingItem.subset_id == subset_id)
     )
 
     filled = _sample_and_insert(
         subset_id=subset_id,
-        config=subset.config,
+        sources=sources,
         count=subset.puzzle_count,
     )
     db.session.commit()
@@ -254,6 +402,10 @@ def refill(subset_id: int, user_id: int) -> tuple[int, int]:
     if subset.config is None or subset.puzzle_count is None:
         raise ValueError("Configuration is not set.")
 
+    sources: list[dict] = (subset.config or {}).get("sources", [])  # type: ignore[assignment]
+    if not sources:
+        raise ValueError("Configuration is not set.")
+
     active_count: int = db.session.execute(
         db.select(db.func.count()).where(SubsetTrainingItem.subset_id == subset_id)
     ).scalar_one()
@@ -264,32 +416,26 @@ def refill(subset_id: int, user_id: int) -> tuple[int, int]:
 
     filled = _sample_and_insert(
         subset_id=subset_id,
-        config=subset.config,
+        sources=sources,
         count=needed,
     )
     db.session.commit()
     return filled, needed
 
 
-def discard_puzzle(subset_id: int, lichess_puzzle_id: str, user_id: int) -> None:
+def discard_puzzle(subset_id: int, training_item_id: int, user_id: int) -> None:
     subset = _get_owned_subset(subset_id, user_id)
     if subset.locked_at is not None:
         raise PermissionError("Subset is locked.")
 
-    tactic = db.session.execute(
-        db.select(LichessTactic).where(LichessTactic.puzzle_id == lichess_puzzle_id)
-    ).scalar_one_or_none()
-    if tactic is None:
-        raise LookupError("Puzzle not found.")
-
     row = db.session.execute(
         db.select(SubsetTrainingItem).where(
             SubsetTrainingItem.subset_id == subset_id,
-            SubsetTrainingItem.training_item_id == tactic.training_item_id,
+            SubsetTrainingItem.training_item_id == training_item_id,
         )
     ).scalar_one_or_none()
     if row is None:
-        raise LookupError("Puzzle is not a member of this subset.")
+        raise LookupError("Training item not found in this subset.")
 
     db.session.delete(row)
     db.session.commit()
@@ -406,7 +552,12 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
         {"sid": subset_id},
     ).all()
 
-    _rating_val = (subset.config or {}).get("rating")
+    sources: list[dict] = (subset.config or {}).get("sources", [])  # type: ignore[assignment]
+    lichess_cfg: dict[str, object] = next(
+        (s.get("config") or {} for s in sources if s.get("source") == "LICHESS_TACTIC"),
+        {},
+    )
+    _rating_val = lichess_cfg.get("rating")
     rating_cfg: dict[str, object] = _rating_val if isinstance(_rating_val, dict) else {}
     _min = rating_cfg.get("min")
     _max = rating_cfg.get("max")
