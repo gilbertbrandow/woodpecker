@@ -88,7 +88,7 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
   const [sorting, setSorting] = useState<SortingState>([])
   const [initialLoading, setInitialLoading] = useState(true)
   const [fetching, setFetching] = useState(false)
-  const [discarding, setDiscarding] = useState<string | null>(null)
+  const [discarding, setDiscarding] = useState<number | null>(null)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [discardingSelected, setDiscardingSelected] = useState(false)
 
@@ -127,10 +127,10 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
     void fetchPage(pageIndex, sorting, puzzles.length > 0)
   }, [fetchPage, pageIndex, sorting])
 
-  const handleDiscard = async (puzzleId: string): Promise<void> => {
-    setDiscarding(puzzleId)
+  const handleDiscard = async (trainingItemId: number): Promise<void> => {
+    setDiscarding(trainingItemId)
     try {
-      await api.subsets.discardTrainingItem(subsetId, puzzleId)
+      await api.subsets.discardTrainingItem(subsetId, trainingItemId)
       const isLastOnPage = puzzles.length === 1
       const newPageIndex = isLastOnPage && pageIndex > 0 ? pageIndex - 1 : pageIndex
       setRowSelection({})
@@ -151,7 +151,7 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
     if (ids.length === 0) return
     setDiscardingSelected(true)
     try {
-      await Promise.all(ids.map((id) => api.subsets.discardTrainingItem(subsetId, id)))
+      await Promise.all(ids.map((id) => api.subsets.discardTrainingItem(subsetId, Number(id))))
       setRowSelection({})
       const remaining = puzzles.length - ids.length
       const newPageIndex = remaining === 0 && pageIndex > 0 ? pageIndex - 1 : pageIndex
@@ -194,12 +194,12 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
     cell: ({ row }) => (
       <button
         type="button"
-        onClick={() => void handleDiscard(row.original.puzzleId)}
+        onClick={() => void handleDiscard(row.original.trainingItemId)}
         disabled={discarding !== null || discardingSelected}
         className="flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
         aria-label="Remove puzzle"
       >
-        {discarding === row.original.puzzleId ? (
+        {discarding === row.original.trainingItemId ? (
           <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
           <Trash2 className="h-4 w-4" />
@@ -288,7 +288,7 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
     manualPagination: true,
     pageCount: totalPages,
     enableRowSelection: !locked,
-    getRowId: (row) => row.puzzleId,
+    getRowId: (row) => String(row.trainingItemId),
     state: {
       sorting,
       pagination: { pageIndex, pageSize: 25 },

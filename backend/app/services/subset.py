@@ -526,6 +526,7 @@ def list_active_puzzles(
 
     puzzles = [
         {
+            "trainingItemId": r.training_item_id,
             "puzzleId": r.puzzle_id,
             "rating": r.rating,
             "popularity": r.popularity,

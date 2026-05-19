@@ -73,18 +73,24 @@ export type Subset = {
   ownedBy: { id: number; displayName: string; avatarUrl: string | null }
 }
 
-export type SubsetConfig = {
-  rating?: {
-    min?: number
-    max?: number
-    mean?: number
-    sigma?: number
-  }
+export type LichessTacticSourceConfig = {
+  rating?: { min?: number; max?: number; mean?: number; sigma?: number }
   themes?: Record<string, number>
-  openings?: {
-    items?: string[]
-    strength?: number
-  }
+  openings?: { items?: string[]; strength?: number }
+}
+
+export type ScrapedPositionalSourceConfig = {
+  difficulty?: number[]
+  themes?: string[]
+  opening?: { items?: string[]; strength?: number }
+}
+
+export type SourceEntry =
+  | { source: 'LICHESS_TACTIC'; percentage: number; config: LichessTacticSourceConfig }
+  | { source: 'SCRAPED_POSITIONAL'; percentage: number; config: ScrapedPositionalSourceConfig }
+
+export type SubsetConfig = {
+  sources: SourceEntry[]
 }
 
 export type LichessTacticTheme = { name: string; displayName: string | null }
@@ -116,6 +122,7 @@ export type DecoySourceMetadata = {
 export type SourceMetadata = LichessTacticSourceMetadata | ScrapedPositionalSourceMetadata | DecoySourceMetadata
 
 export type LichessTactic = {
+  trainingItemId: number
   puzzleId: string
   rating: number
   popularity: number
@@ -136,7 +143,8 @@ export type LichessTacticPage = {
   total: number
 }
 
-export type SubsetStats = {
+export type LichessTacticStats = {
+  count: number
   ratingBuckets: { min: number; max: number; count: number }[]
   themes: { name: string; displayName: string; description: string; count: number }[]
   openings: { name: string; displayName: string; count: number }[]
@@ -144,6 +152,21 @@ export type SubsetStats = {
   avgNbPlays: number
   avgRating: number
   noOpeningCount: number
+  ratingRange: { min: number | null; max: number | null; step: number }
+}
+
+export type ScrapedPositionalStats = {
+  count: number
+  difficultyDistribution: { value: number; label: string; count: number }[]
+  themes: { name: string; displayName: string; count: number }[]
+  openings: { name: string; displayName: string; count: number }[]
+}
+
+export type SubsetStats = {
+  sources: {
+    LICHESS_TACTIC?: LichessTacticStats
+    SCRAPED_POSITIONAL?: ScrapedPositionalStats
+  }
   totalActive: number
 }
 
@@ -736,8 +759,8 @@ export const api = {
       const qs = params.toString()
       return request(`/subsets/${id}/puzzles${qs ? `?${qs}` : ''}`)
     },
-    discardTrainingItem: (id: number, puzzleId: string): Promise<void> =>
-      request(`/subsets/${id}/puzzles/${puzzleId}`, { method: 'DELETE' }),
+    discardTrainingItem: (id: number, trainingItemId: number): Promise<void> =>
+      request(`/subsets/${id}/puzzles/${trainingItemId}`, { method: 'DELETE' }),
     getStats: (id: number): Promise<SubsetStats> => request(`/subsets/${id}/stats`),
   },
   schedules: {

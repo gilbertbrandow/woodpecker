@@ -9,6 +9,8 @@ import {
   api,
   type Subset,
   type SubsetConfig,
+  type LichessTacticSourceConfig,
+  type SourceEntry,
   type SubsetStats as SubsetStatsType,
   type ScheduleSummary,
 } from "../lib/api";
@@ -64,21 +66,30 @@ const RATING_DEFAULT: RatingValue = {
 const OPENING_DEFAULT: OpeningValue = { items: [], strength: 0 };
 const MIN_LOCK_PUZZLES = 5;
 
+function getLichessConfig(config: SubsetConfig | null): LichessTacticSourceConfig | null {
+  const entry = config?.sources.find(
+    (s): s is Extract<SourceEntry, { source: 'LICHESS_TACTIC' }> => s.source === 'LICHESS_TACTIC',
+  );
+  return entry?.config ?? null;
+}
+
 function configToRating(config: SubsetConfig | null): RatingValue {
-  const min = config?.rating?.min ?? RATING_DEFAULT.min;
-  const max = config?.rating?.max ?? RATING_DEFAULT.max;
+  const lc = getLichessConfig(config);
+  const min = lc?.rating?.min ?? RATING_DEFAULT.min;
+  const max = lc?.rating?.max ?? RATING_DEFAULT.max;
   return {
     min,
     max,
-    mean: config?.rating?.mean ?? Math.round((min + max) / 2),
-    sigma: config?.rating?.sigma ?? RATING_DEFAULT.sigma,
+    mean: lc?.rating?.mean ?? Math.round((min + max) / 2),
+    sigma: lc?.rating?.sigma ?? RATING_DEFAULT.sigma,
   };
 }
 
 function configToOpening(config: SubsetConfig | null): OpeningValue {
+  const lc = getLichessConfig(config);
   return {
-    items: config?.openings?.items ?? [],
-    strength: config?.openings?.strength ?? 0,
+    items: lc?.openings?.items ?? [],
+    strength: lc?.openings?.strength ?? 0,
   };
 }
 
@@ -87,7 +98,7 @@ function buildConfig(
   themes: Record<string, number>,
   opening: OpeningValue,
 ): SubsetConfig {
-  const config: SubsetConfig = {
+  const lichessInnerConfig: LichessTacticSourceConfig = {
     rating: {
       min: rating.min,
       max: rating.max,
@@ -99,12 +110,14 @@ function buildConfig(
     Object.entries(themes).filter(([, v]) => v !== 1),
   );
   if (Object.keys(nonDefaultThemes).length > 0) {
-    config.themes = nonDefaultThemes;
+    lichessInnerConfig.themes = nonDefaultThemes;
   }
   if (opening.items.length > 0) {
-    config.openings = { items: opening.items, strength: opening.strength };
+    lichessInnerConfig.openings = { items: opening.items, strength: opening.strength };
   }
-  return config;
+  return {
+    sources: [{ source: 'LICHESS_TACTIC', percentage: 100, config: lichessInnerConfig }],
+  };
 }
 
 function SectionTrigger({
@@ -289,7 +302,7 @@ export function SubsetPage(): React.ReactElement | null {
       .then(async (s) => {
         setSubset(s);
         setRating(configToRating(s.config));
-        setThemes(s.config?.themes ?? {});
+        setThemes(getLichessConfig(s.config)?.themes ?? {});
         setOpening(configToOpening(s.config));
         setIsDirty(false);
         setActiveTab(s.status === "locked" ? "insights" : "configuration");
