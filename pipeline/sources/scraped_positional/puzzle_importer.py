@@ -11,10 +11,11 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
+from app.models.opening import Opening
 from app.models.scraped_positional_difficulty import ScrapedPositionalDifficulty
 from app.models.scraped_positional_puzzle import ScrapedPositionalPuzzle, scraped_positional_theme_links
 from app.models.scraped_positional_theme import ScrapedPositionalTheme
-from sources.scraped_positional.enrichment import enrich_batch
+from sources.scraped_positional.enrichment import OPENING_PLY_CUTOFF, enrich_batch
 from sources.scraped_positional.theme_seeder import THEME_COLUMN_NAMES
 
 PROGRESS_INTERVAL = 500
@@ -25,6 +26,33 @@ class PuzzleBatchResult:
     imported: int
     skipped_existing: int
     enrichment_failures: int
+
+
+def _load_opening_caches(session: Session) -> tuple[dict[str, int], dict[str, list[tuple[int, str]]]]:
+    rows = session.execute(select(Opening.id, Opening.eco, Opening.display_name)).all()
+    by_display_name: dict[str, int] = {}
+    by_eco: dict[str, list[tuple[int, str]]] = {}
+    for id_, eco, display_name in rows:
+        by_display_name[display_name] = id_
+        by_eco.setdefault(eco, []).append((id_, display_name))
+    return by_display_name, by_eco
+
+
+def _find_opening_id(
+    opening_data: dict[str, Any],
+    by_display_name: dict[str, int],
+    by_eco: dict[str, list[tuple[int, str]]],
+) -> int | None:
+    name = opening_data.get("name", "")
+    eco = opening_data.get("eco", "")
+    if name in by_display_name:
+        return by_display_name[name]
+    candidates = by_eco.get(eco, [])
+    click.echo(
+        f"Warning: no display_name match for opening {name!r} (ECO {eco!r}), "
+        f"{len(candidates)} ECO candidate(s) — skipping"
+    )
+    return None
 
 
 def _check_prerequisites(session: Session) -> None:
@@ -60,6 +88,8 @@ def process_puzzle_batch(
     source_import_run_id: int,
     difficulty_cache: dict[int, int],
     theme_cache: dict[str, int],
+    opening_by_display_name: dict[str, int],
+    opening_by_eco: dict[str, list[tuple[int, str]]],
     api_token: str | None,
 ) -> PuzzleBatchResult:
     if not batch:
@@ -89,18 +119,25 @@ def process_puzzle_batch(
         if result is None:
             enrichment_failures += 1
             continue
-        enriched_fen, moves_str = result
+        enriched_fen, moves_str, opening_data = result
         difficulty_id = difficulty_cache.get(puzzle["difficulty"])
         if difficulty_id is None:
             click.echo(f"Warning: unknown difficulty value {puzzle['difficulty']!r}, skipping puzzle {puzzle['internal_id']}")
             enrichment_failures += 1
             continue
+        if opening_data is None and puzzle["move_number"] <= OPENING_PLY_CUTOFF:
+            click.echo(
+                f"Warning: puzzle {puzzle['internal_id']} at ply {puzzle['move_number']} "
+                f"(within cutoff) — Lichess returned no opening for game {puzzle['lichess_game_id']}"
+            )
+        opening_id = _find_opening_id(opening_data, opening_by_display_name, opening_by_eco) if opening_data else None
         insertable.append({
             "internal_id": puzzle["internal_id"],
             "lichess_url": puzzle["lichess_url"],
             "fen": enriched_fen,
             "moves": moves_str,
             "difficulty_id": difficulty_id,
+            "opening_id": opening_id,
         })
         insertable_themes.append(puzzle["themes"])
 
@@ -172,6 +209,7 @@ def import_puzzles(
 
     difficulty_cache = _load_difficulty_cache(session)
     theme_cache = _load_theme_cache(session)
+    opening_by_display_name, opening_by_eco = _load_opening_caches(session)
 
     start = time.monotonic()
     rows_read = 0
@@ -198,7 +236,8 @@ def import_puzzles(
 
             if len(pending) >= batch_size:
                 batch_result = process_puzzle_batch(
-                    session, pending, source_import_run_id, difficulty_cache, theme_cache, api_token
+                    session, pending, source_import_run_id, difficulty_cache, theme_cache,
+                    opening_by_display_name, opening_by_eco, api_token
                 )
                 pending.clear()
                 rows_imported += batch_result.imported
@@ -215,7 +254,8 @@ def import_puzzles(
 
     if pending:
         batch_result = process_puzzle_batch(
-            session, pending, source_import_run_id, difficulty_cache, theme_cache, api_token
+            session, pending, source_import_run_id, difficulty_cache, theme_cache,
+            opening_by_display_name, opening_by_eco, api_token
         )
         rows_imported += batch_result.imported
         rows_skipped_existing += batch_result.skipped_existing

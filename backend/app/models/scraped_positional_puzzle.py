@@ -4,6 +4,7 @@ from sqlalchemy import Column, ForeignKey, Index, Integer, Table, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.extensions import Base
+from app.models.opening import Opening
 from app.models.scraped_positional_difficulty import ScrapedPositionalDifficulty
 from app.models.scraped_positional_theme import ScrapedPositionalTheme
 
@@ -32,6 +33,9 @@ class ScrapedPositionalPuzzle(Base):
     difficulty_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("scraped_positional_difficulties.id"), nullable=False
     )
+    opening_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("openings.id"), nullable=True
+    )
 
     training_item: Mapped["TrainingItem"] = relationship(
         "TrainingItem", back_populates="positional_puzzle", uselist=False
@@ -40,5 +44,9 @@ class ScrapedPositionalPuzzle(Base):
     themes: Mapped[list[ScrapedPositionalTheme]] = relationship(
         "ScrapedPositionalTheme", secondary=scraped_positional_theme_links, lazy="select"
     )
+    opening: Mapped[Opening | None] = relationship("Opening")
 
-    __table_args__ = (Index("ix_scraped_positional_puzzles_difficulty_id", "difficulty_id"),)
+    __table_args__ = (
+        Index("ix_scraped_positional_puzzles_difficulty_id", "difficulty_id"),
+        Index("ix_scraped_positional_puzzles_opening_id", "opening_id"),
+    )
