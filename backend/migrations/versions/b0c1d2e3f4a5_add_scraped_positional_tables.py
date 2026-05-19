@@ -110,7 +110,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["source_import_run_id"],
             ["source_import_runs.id"],
-            name="scraped_positional_source_run_metadata_source_import_run_id_fkey",
+            name="scraped_positional_source_run_metadata_src_import_run_id_fkey",
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
