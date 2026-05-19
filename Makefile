@@ -50,7 +50,7 @@ migrate-rollback:
 seed-dev:
 	$(MAKE) -C pipeline import-openings
 	$(MAKE) -C pipeline import-lichess-tactics ARGS="--limit $(SEED_DEV_LIMIT)"
-	$(MAKE) -C pipeline import-scraped-positional ARGS="--limit $(SEED_DEV_LIMIT)"
+	$(MAKE) -C pipeline import-scraped-positional
 
 setup:
 	$(MAKE) -C backend setup

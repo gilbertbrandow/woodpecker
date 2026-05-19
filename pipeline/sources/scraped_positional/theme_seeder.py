@@ -12,12 +12,12 @@ THEMES = [
     {
         "name": "initiative",
         "display_name": "Initiative",
-        "description": "Maintaining pressure and keeping the opponent on the back foot.",
+        "description": "Maintaining pressure and control of the game.",
     },
     {
         "name": "development",
         "display_name": "Piece Development",
-        "description": "Mobilising pieces efficiently to reach optimal squares.",
+        "description": "Maximize the value of yout pieces or hinder your opponent.",
     },
     {
         "name": "endgame",
@@ -27,7 +27,7 @@ THEMES = [
     {
         "name": "space",
         "display_name": "Gaining Space",
-        "description": "Advancing pawns or repositioning pieces to control more territory.",
+        "description": "Gain control of more parts of the board.",
     },
     {
         "name": "trading",
@@ -42,7 +42,7 @@ THEMES = [
     {
         "name": "coordination",
         "display_name": "Piece Co-ordination",
-        "description": "Harmonising pieces so they support each other effectively.",
+        "description": "Harmonising pieces so they coordinate effectively.",
     },
     {
         "name": "exploitingweakness",
@@ -57,7 +57,7 @@ THEMES = [
     {
         "name": "restriction",
         "display_name": "Restricting Opponent's Pieces",
-        "description": "Limiting the mobility or scope of the opponent's key pieces.",
+        "description": "Limiting the mobility or scope of the opponent's pieces.",
     },
     {
         "name": "fixingstructure",
@@ -67,7 +67,7 @@ THEMES = [
     {
         "name": "centrecontrol",
         "display_name": "Controlling the Centre",
-        "description": "Contesting or dominating the central squares to dictate play.",
+        "description": "Contesting or dominating the central squares to control the game.",
     },
     {
         "name": "other",
