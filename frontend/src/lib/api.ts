@@ -634,6 +634,7 @@ export type ScrapedPositionalPuzzle = {
   lichessUrl: string
   difficulty: ScrapedPositionalDifficulty
   themes: { name: string; displayName: string }[]
+  opening: { name: string; displayName: string; eco: string } | null
 }
 
 export type ScrapedPositionalPage = {
@@ -885,11 +886,13 @@ export const api = {
         page?: number
         difficulty?: number
         theme?: string
+        opening?: string
       }): Promise<ScrapedPositionalPage> => {
         const p = new URLSearchParams()
         if (params.page !== undefined) p.set('page', String(params.page))
         if (params.difficulty !== undefined) p.set('difficulty', String(params.difficulty))
         if (params.theme) p.set('theme', params.theme)
+        if (params.opening) p.set('opening', params.opening)
         const qs = p.toString()
         return request(`/sources/scraped-positional/items${qs ? `?${qs}` : ''}`)
       },

@@ -50,6 +50,58 @@ export function ScrapedPositionalDashboard({ metadata }: Props): React.ReactElem
         <StatCard label="Difficulty tiers" value={String(metadata.difficultyCounts.length)} />
       </div>
 
+      {chartsReady && metadata.difficultyCounts.length > 0 && (
+        <div className="rounded-md border p-4">
+          <div className="mb-4">
+            <p className="text-sm font-semibold">Difficulty distribution</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              How puzzles are spread across the four rating buckets
+            </p>
+          </div>
+          <ChartContainer config={CHART_CONFIG} className="h-48 min-w-0 w-full">
+            <BarChart
+              data={metadata.difficultyCounts}
+              margin={{ top: 4, right: 4, left: 16, bottom: 8 }}
+              barCategoryGap="28%"
+            >
+              <XAxis
+                type="category"
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                interval={0}
+                tick={{ fontSize: 11 }}
+              />
+              <YAxis hide />
+              <ChartTooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null
+                  const d = payload[0]?.payload as {
+                    label: string
+                    description: string
+                    minRating: number | null
+                    maxRating: number | null
+                    count: number
+                  }
+                  return (
+                    <div className="rounded border bg-background px-3 py-2 text-xs shadow-md">
+                      <p className="font-medium text-foreground">{d.label}</p>
+                      {d.minRating !== null && d.maxRating !== null && (
+                        <p className="mt-0.5 text-muted-foreground">{d.minRating}–{d.maxRating} Elo</p>
+                      )}
+                      <p className="mt-1.5 tabular-nums text-foreground">
+                        {formatNumber(d.count)} puzzles
+                      </p>
+                    </div>
+                  )
+                }}
+              />
+              <Bar dataKey="count" isAnimationActive={false} radius={[2, 2, 0, 0]} fill={CHART_COLOR} />
+            </BarChart>
+          </ChartContainer>
+        </div>
+      )}
+
       {chartsReady && themeBars.length > 0 && (
         <div className="rounded-md border p-4">
           <div className="mb-4">

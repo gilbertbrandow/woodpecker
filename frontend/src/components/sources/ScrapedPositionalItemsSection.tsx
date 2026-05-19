@@ -1,19 +1,23 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   api,
   type ScrapedPositionalPage,
   type ScrapedPositionalDifficultyDetail,
   type ScrapedPositionalThemeDetail,
+  type Opening,
 } from '../../lib/api'
 import { Skeleton } from '../ui/skeleton'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../ui/table'
 import { FilterSelect } from '../ui/filter-select'
 import { Badge } from '../ui/badge'
+import { Input } from '../ui/input'
 import { PositionalDifficultyBadge } from '../PositionalDifficultyBadge'
 import { formatNumber } from '../../lib/utils'
+
+const OPENING_MAX_CHARS = 24
 
 function ThemeBadges({
   themes,
@@ -46,9 +50,24 @@ type Props = {
 export function ScrapedPositionalItemsSection({ difficulties, themes }: Props): React.ReactElement {
   const [difficultyFilter, setDifficultyFilter] = useState('')
   const [themeFilter, setThemeFilter] = useState('')
+  const [selectedOpening, setSelectedOpening] = useState<Opening | null>(null)
+  const [openingSearch, setOpeningSearch] = useState('')
+  const [openingResults, setOpeningResults] = useState<Opening[]>([])
+  const [openingDropdownOpen, setOpeningDropdownOpen] = useState(false)
   const [page, setPage] = useState(1)
   const [result, setResult] = useState<ScrapedPositionalPage | null>(null)
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (openingSearch.length < 2) {
+      setOpeningResults([])
+      return
+    }
+    const t = setTimeout(() => {
+      api.openings.search(openingSearch).then(setOpeningResults).catch(() => {})
+    }, 300)
+    return () => clearTimeout(t)
+  }, [openingSearch])
 
   useEffect(() => {
     setLoading(true)
@@ -57,17 +76,21 @@ export function ScrapedPositionalItemsSection({ difficulties, themes }: Props): 
         page,
         difficulty: difficultyFilter ? Number(difficultyFilter) : undefined,
         theme: themeFilter || undefined,
+        opening: selectedOpening?.name,
       })
       .then(setResult)
       .catch(() => toast.error('Failed to load puzzles', { description: 'Please try again.' }))
       .finally(() => setLoading(false))
-  }, [page, difficultyFilter, themeFilter])
+  }, [page, difficultyFilter, themeFilter, selectedOpening])
 
-  const hasFilters = difficultyFilter || themeFilter
+  const hasFilters = difficultyFilter || themeFilter || selectedOpening
 
   const resetFilters = (): void => {
     setDifficultyFilter('')
     setThemeFilter('')
+    setSelectedOpening(null)
+    setOpeningSearch('')
+    setOpeningResults([])
     setPage(1)
   }
 
@@ -78,6 +101,19 @@ export function ScrapedPositionalItemsSection({ difficulties, themes }: Props): 
 
   const handleThemeChange = (val: string): void => {
     setThemeFilter(val)
+    setPage(1)
+  }
+
+  const selectOpening = (o: Opening): void => {
+    setSelectedOpening(o)
+    setOpeningSearch('')
+    setOpeningResults([])
+    setOpeningDropdownOpen(false)
+    setPage(1)
+  }
+
+  const clearOpening = (): void => {
+    setSelectedOpening(null)
     setPage(1)
   }
 
@@ -96,7 +132,7 @@ export function ScrapedPositionalItemsSection({ difficulties, themes }: Props): 
         )}
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <FilterSelect
           value={difficultyFilter}
           onValueChange={handleDifficultyChange}
@@ -116,6 +152,51 @@ export function ScrapedPositionalItemsSection({ difficulties, themes }: Props): 
           options={themes.map((t) => ({ value: t.name, label: t.displayName }))}
           className="text-xs"
         />
+        {selectedOpening ? (
+          <div className="flex h-8 items-center gap-1 rounded-md border border-input bg-background px-2 text-xs">
+            <span className="max-w-[160px] truncate">{selectedOpening.displayName ?? selectedOpening.name}</span>
+            <button
+              type="button"
+              onClick={clearOpening}
+              className="ml-0.5 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        ) : (
+          <div className="relative">
+            <Input
+              type="text"
+              placeholder="Filter by opening…"
+              value={openingSearch}
+              onChange={(e) => {
+                setOpeningSearch(e.target.value)
+                setOpeningDropdownOpen(true)
+              }}
+              onFocus={() => { if (openingResults.length > 0) setOpeningDropdownOpen(true) }}
+              onBlur={() => setTimeout(() => setOpeningDropdownOpen(false), 150)}
+              className="h-8 w-44 text-xs"
+            />
+            {openingDropdownOpen && openingResults.length > 0 && (
+              <ul className="absolute z-50 mt-1 max-h-52 w-72 overflow-y-auto rounded-md border bg-background shadow-md">
+                {openingResults.map((o) => (
+                  <li key={o.name}>
+                    <button
+                      type="button"
+                      onMouseDown={() => selectOpening(o)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-accent"
+                    >
+                      {o.eco && (
+                        <span className="shrink-0 font-mono text-muted-foreground">{o.eco}</span>
+                      )}
+                      <span className="text-foreground">{o.displayName ?? o.name}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -134,17 +215,27 @@ export function ScrapedPositionalItemsSection({ difficulties, themes }: Props): 
                 <TableRow>
                   <TableHead className="w-44">Difficulty</TableHead>
                   <TableHead>Themes</TableHead>
+                  <TableHead className="hidden sm:table-cell">Opening</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {result.puzzles.map((p) => (
+                {result.puzzles.map((p) => {
+                  const openingLabel = p.opening
+                    ? p.opening.displayName.length > OPENING_MAX_CHARS
+                      ? p.opening.displayName.slice(0, OPENING_MAX_CHARS - 1) + '…'
+                      : p.opening.displayName
+                    : '—'
+                  return (
                   <TableRow key={p.internalId}>
                     <TableCell>
                       <PositionalDifficultyBadge difficulty={p.difficulty} />
                     </TableCell>
                     <TableCell>
                       <ThemeBadges themes={p.themes} />
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell text-xs text-muted-foreground">
+                      {openingLabel}
                     </TableCell>
                     <TableCell>
                       <a
@@ -158,7 +249,8 @@ export function ScrapedPositionalItemsSection({ difficulties, themes }: Props): 
                       </a>
                     </TableCell>
                   </TableRow>
-                ))}
+                  )
+                })}
               </TableBody>
             </Table>
           </div>

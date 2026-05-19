@@ -1,12 +1,8 @@
 import * as React from 'react'
 import { useRef } from 'react'
-import { Link } from '@tanstack/react-router'
-import { ChevronRight } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs'
 
 type Props = {
-  breadcrumbParentLabel: string
-  breadcrumbParentTo: string
   title: string
   badge?: React.ReactNode
   summary: string
@@ -16,8 +12,6 @@ type Props = {
 }
 
 export function SourceDetailShell({
-  breadcrumbParentLabel,
-  breadcrumbParentTo,
   title,
   badge,
   summary,
@@ -36,14 +30,6 @@ export function SourceDetailShell({
 
   return (
     <div className="flex flex-col gap-6">
-      <nav className="flex items-center gap-1 text-sm text-muted-foreground">
-        <Link to={breadcrumbParentTo} className="hover:text-foreground">
-          {breadcrumbParentLabel}
-        </Link>
-        <ChevronRight className="h-3.5 w-3.5" />
-        <span className="text-foreground">{title}</span>
-      </nav>
-
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-3">
           <h1 className="text-base font-semibold">{title}</h1>

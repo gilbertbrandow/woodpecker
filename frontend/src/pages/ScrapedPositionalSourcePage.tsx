@@ -16,8 +16,6 @@ export function ScrapedPositionalSourcePage(): React.ReactElement | null {
   return (
     <PageWrapper className="flex flex-col gap-6">
       <SourceDetailShell
-        breadcrumbParentLabel="Sources"
-        breadcrumbParentTo="/app/sources"
         title="Scraped Positional"
         badge={<TrainingItemTypeBadge source="SCRAPED_POSITIONAL" />}
         summary="Positional puzzles curated from Lichess games, each with a single constructive answer."

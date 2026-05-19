@@ -2,6 +2,7 @@ from sqlalchemy import func, select, exists
 from sqlalchemy.orm import selectinload
 
 from app.extensions import db
+from app.models.opening import Opening
 from app.models.scraped_positional_difficulty import ScrapedPositionalDifficulty
 from app.models.scraped_positional_puzzle import (
     ScrapedPositionalPuzzle,
@@ -29,10 +30,15 @@ def _serialize_puzzle(p: ScrapedPositionalPuzzle) -> dict:
             "maxRating": p.difficulty.max_rating,
         },
         "themes": [{"name": th.name, "displayName": th.display_name} for th in p.themes],
+        "opening": (
+            {"name": p.opening.name, "displayName": p.opening.display_name, "eco": p.opening.eco}
+            if p.opening
+            else None
+        ),
     }
 
 
-def list_items(page: int, difficulty_value: int | None, theme_name: str | None) -> dict:
+def list_items(page: int, difficulty_value: int | None, theme_name: str | None, opening_name: str | None) -> dict:
     conditions = []
 
     if difficulty_value is not None:
@@ -58,6 +64,14 @@ def list_items(page: int, difficulty_value: int | None, theme_name: str | None) 
             )
         )
 
+    if opening_name:
+        opening_id_subq = (
+            select(Opening.id)
+            .where(Opening.name == opening_name)
+            .scalar_subquery()
+        )
+        conditions.append(ScrapedPositionalPuzzle.opening_id == opening_id_subq)
+
     total: int = db.session.execute(
         select(func.count()).select_from(ScrapedPositionalPuzzle).where(*conditions)
     ).scalar_one()
@@ -70,6 +84,7 @@ def list_items(page: int, difficulty_value: int | None, theme_name: str | None) 
             .options(
                 selectinload(ScrapedPositionalPuzzle.difficulty),
                 selectinload(ScrapedPositionalPuzzle.themes),
+                selectinload(ScrapedPositionalPuzzle.opening),
             )
             .order_by(ScrapedPositionalPuzzle.id)
             .limit(ITEMS_PAGE_SIZE)
