@@ -30,8 +30,8 @@ def fetch_game_moves(game_ids: list[str], api_token: str | None) -> dict[str, st
 
     response = requests.post(
         LICHESS_EXPORT_URL,
-        data={"ids": ",".join(game_ids)},
-        headers=headers,
+        data=",".join(game_ids),
+        headers={**headers, "Content-Type": "text/plain"},
         timeout=REQUEST_TIMEOUT,
         stream=True,
     )
@@ -70,13 +70,16 @@ def enrich_puzzle(
     if len(moves) < ply:
         return None
 
+    # Lichess NDJSON returns moves in SAN (e.g. "Nf6", "O-O"), not UCI.
+    # Parse each SAN move via python-chess to replay the game and extract UCI.
     board = chess.Board()
     try:
         for i in range(ply - 1):
-            board.push_uci(moves[i])
+            board.push_san(moves[i])
         enriched_fen = board.fen()
-        opponent_move = moves[ply - 1]
-        return (enriched_fen, f"{opponent_move} {best_move}")
+        opponent_move_obj = board.parse_san(moves[ply - 1])
+        opponent_uci = opponent_move_obj.uci()
+        return (enriched_fen, f"{opponent_uci} {best_move}")
     except Exception:
         return None
 
