@@ -23,7 +23,7 @@ Open [http://localhost:5173](http://localhost:5173) and sign in with your Liches
 
 On subsequent starts, `make up` is enough (no rebuild needed).
 
-`make seed-dev` imports shared opening data, Lichess tactic themes, and a bounded set of Lichess tactics for local development. The default tactic import limit is 1000.
+`make seed-dev` imports openings, Lichess tactics (themes + puzzles), and scraped positional puzzles, each bounded by `SEED_DEV_LIMIT` (default: 10 000). Override with `make seed-dev SEED_DEV_LIMIT=1000`.
 
 ### Windows
 
@@ -48,18 +48,17 @@ make test-all          # full suite
 
 ## Importing puzzle data
 
-Puzzle data is managed by the standalone pipeline package. See [pipeline/data/README.md](pipeline/data/README.md) for full instructions.
+Puzzle data is managed by the standalone pipeline package. See [pipeline/README.md](pipeline/README.md) for full instructions.
 
 For a full local import, run:
 
 ```bash
-make -C pipeline shared-openings-import
-make -C pipeline lichess-tactics-themes-import
-make -C pipeline lichess-tactics-import
-make -C pipeline lichess-tactics-validate
+make -C pipeline import-openings
+make -C pipeline import-lichess-tactics
+make -C pipeline import-scraped-positional
 ```
 
-Each step downloads its source data automatically on first run.
+Each command downloads its source data automatically on first run. Run in the order shown — openings must precede tactics.
 
 ## Deployment
 

@@ -16,7 +16,7 @@ _Avoid_: dataset, data source
 A TrainingItem sourced from the Lichess tactics database. Solved by playing a full exact UCI move sequence. Overview shows the Lichess puzzle ID, themes, and opening.
 
 **Scraped Positional**:
-A TrainingItem from the `SCRAPED_POSITIONAL` source (dataset from github.com/neilgd/chess-position-analysis-results). Solved by playing a single exact correct move. The stored FEN is the position *before* the opponent's last move (identical convention to Lichess Tactic); the opponent move is prepended at import time via Lichess API enrichment. Overview shows the internal puzzle ID linked to the Lichess game position, a PositionalDifficulty badge, and PositionalTheme badges.
+A TrainingItem from the `SCRAPED_POSITIONAL` source (dataset from github.com/neilgd/chess-position-analysis-results). Solved by playing a single exact correct move. The stored FEN is the position _before_ the opponent's last move (identical convention to Lichess Tactic); the opponent move is prepended at import time via Lichess API enrichment. Overview shows the internal puzzle ID linked to the Lichess game position, a PositionalDifficulty badge, and PositionalTheme badges.
 
 **PositionalDifficulty**:
 A seeded lookup record describing a difficulty tier for `SCRAPED_POSITIONAL` puzzles. Carries a numeric value (1–4), a label (e.g. "Hard"), a description, and a nullable ELO rating range (`min_rating`, `max_rating`). Displayed as a badge showing both the label and the rating range. Seeded by `positional difficulties import` before puzzle import.
