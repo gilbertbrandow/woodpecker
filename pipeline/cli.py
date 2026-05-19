@@ -10,6 +10,7 @@ import click
 
 from openings.commands import openings
 from sources.lichess_tactics.commands import lichess_tactics
+from sources.scraped_positional.commands import positional
 
 
 @click.group()
@@ -19,6 +20,7 @@ def cli() -> None:
 
 cli.add_command(openings)
 cli.add_command(lichess_tactics)
+cli.add_command(positional)
 
 
 if __name__ == "__main__":
