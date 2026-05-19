@@ -5,11 +5,15 @@ from app.models.source_import_run import (
     SourceImportOperation,
     SourceImportStatus,
     LichessTacticsSourceRunMetadata,
+    ScrapedPositionalSourceRunMetadata,
 )
 from app.models.training_item import TrainingItem, TrainingItemSource
 from app.models.lichess_tactic import LichessTactic, lichess_tactic_theme_links, lichess_tactic_openings
 from app.models.lichess_tactic_theme import LichessTacticTheme
 from app.models.opening import Opening
+from app.models.scraped_positional_difficulty import ScrapedPositionalDifficulty
+from app.models.scraped_positional_theme import ScrapedPositionalTheme
+from app.models.scraped_positional_puzzle import ScrapedPositionalPuzzle, scraped_positional_theme_links
 from app.models.subset import Subset, SubsetTrainingItem
 from app.models.schedule import Schedule
 from app.models.training import Training
@@ -24,6 +28,7 @@ __all__ = [
     "SourceImportOperation",
     "SourceImportStatus",
     "LichessTacticsSourceRunMetadata",
+    "ScrapedPositionalSourceRunMetadata",
     "TrainingItem",
     "TrainingItemSource",
     "LichessTactic",
@@ -31,6 +36,10 @@ __all__ = [
     "lichess_tactic_openings",
     "LichessTacticTheme",
     "Opening",
+    "ScrapedPositionalDifficulty",
+    "ScrapedPositionalTheme",
+    "ScrapedPositionalPuzzle",
+    "scraped_positional_theme_links",
     "Subset",
     "SubsetTrainingItem",
     "Schedule",

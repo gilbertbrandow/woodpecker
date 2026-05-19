@@ -62,7 +62,7 @@ def test_lichess_metadata_to_api_dict_has_source_type_discriminant() -> None:
     assert api["rating"] == 1500
 
 
-@pytest.mark.parametrize("source_type", [TrainingItemSource.POSITIONAL, TrainingItemSource.DECOY])
+@pytest.mark.parametrize("source_type", [TrainingItemSource.SCRAPED_POSITIONAL, TrainingItemSource.DECOY])
 def test_dispatch_raises_for_unimplemented_source_types(source_type: TrainingItemSource) -> None:
     ti = MagicMock()
     ti.source_type = source_type

@@ -14,10 +14,12 @@ if TYPE_CHECKING:
 
 class SourceImportSource(enum.Enum):
     LICHESS_TACTICS = "LICHESS_TACTICS"
+    SCRAPED_POSITIONAL = "SCRAPED_POSITIONAL"
 
 
 class SourceImportOperation(enum.Enum):
     LICHESS_TACTICS_IMPORT = "LICHESS_TACTICS_IMPORT"
+    SCRAPED_POSITIONAL_IMPORT = "SCRAPED_POSITIONAL_IMPORT"
 
 
 class SourceImportStatus(enum.Enum):
@@ -51,6 +53,9 @@ class SourceImportRun(Base):
     metadata_row: Mapped["LichessTacticsSourceRunMetadata | None"] = relationship(
         "LichessTacticsSourceRunMetadata", back_populates="source_import_run", uselist=False
     )
+    positional_metadata_row: Mapped["ScrapedPositionalSourceRunMetadata | None"] = relationship(
+        "ScrapedPositionalSourceRunMetadata", back_populates="source_import_run", uselist=False
+    )
 
 
 class LichessTacticsSourceRunMetadata(Base):
@@ -78,4 +83,31 @@ class LichessTacticsSourceRunMetadata(Base):
 
     __table_args__ = (
         UniqueConstraint("source_import_run_id", name="uq_lichess_meta_source_import_run_id"),
+    )
+
+
+class ScrapedPositionalSourceRunMetadata(Base):
+    __tablename__ = "scraped_positional_source_run_metadata"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_import_run_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("source_import_runs.id"), nullable=False
+    )
+    imported_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    skipped_existing_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    enrichment_failures_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    total_positional_after_run: Mapped[int] = mapped_column(Integer, nullable=False)
+    difficulty_counts_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    theme_counts_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    source_import_run: Mapped["SourceImportRun"] = relationship(
+        "SourceImportRun", back_populates="positional_metadata_row"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "source_import_run_id",
+            name="uq_scraped_positional_source_run_metadata_source_import_run_id",
+        ),
     )
