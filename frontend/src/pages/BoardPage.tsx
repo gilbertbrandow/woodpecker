@@ -9,7 +9,7 @@ import { BoardPageShell } from '../features/board/BoardPageShell'
 import { BoardBreadcrumbs } from '../features/board/BoardBreadcrumbs'
 import { BoardCenterColumn } from '../features/board/BoardCenterColumn'
 import { TimerCard } from '../features/board/TimerCard'
-import { TrainingItemMetaCard } from '../features/board/TrainingItemMetaCard'
+import { TrainingItemMetaCard, MobileOverviewMetaBar } from '../features/board/TrainingItemMetaCard'
 import { MoveStatusCard } from '../features/board/MoveStatusCard'
 import { AttemptTypeCard } from '../features/board/AttemptTypeCard'
 import { OverviewSidebarLeft } from '../features/board/OverviewSidebarLeft'
@@ -325,20 +325,19 @@ export function BoardPage(): React.ReactElement | null {
     ) : null
 
   const centerMobileHeader =
-    ctrl.solvingView !== null ? (
+    ctrl.mode === 'overview' && overviewData !== null ? (
+      <MobileOverviewMetaBar
+        source={overviewData.trainingItem.source}
+        pgnDisplay={overviewPgnDisplay}
+        trainingItemId={overviewData.runTrainingItem.trainingItemId}
+        selectedPly={selectedPly}
+        onPlyClick={setSelectedPly}
+      />
+    ) : ctrl.solvingView !== null ? (
       <AttemptTypeCard
         isPractice={ctrl.solvingView.attempt.attemptType === 'practice'}
         currentTryNumber={ctrl.solvingView.runTrainingItem.currentTryNumber}
         maxTriesPerPuzzle={ctrl.solvingView.runTrainingItem.maxTriesPerItem}
-        compact={true}
-      />
-    ) : overviewData !== null ? (
-      <AttemptTypeCard
-        isPractice={false}
-        currentTryNumber={
-          overviewData.runTrainingItem.maxTriesPerItem - overviewData.runTrainingItem.triesRemaining + 1
-        }
-        maxTriesPerPuzzle={overviewData.runTrainingItem.maxTriesPerItem}
         compact={true}
       />
     ) : null
@@ -406,14 +405,6 @@ export function BoardPage(): React.ReactElement | null {
           selectedAttemptId={selectedAttemptId}
           onSelectAttempt={handleSelectAttemptForTable}
         />
-        {overviewPgnDisplay !== null && (
-          <TrainingItemMetaCard
-            source={overviewData.trainingItem.source}
-            pgnDisplay={overviewPgnDisplay}
-            selectedPly={ctrl.mode === 'overview' ? selectedPly : null}
-            onPlyClick={ctrl.mode === 'overview' ? setSelectedPly : undefined}
-          />
-        )}
       </div>
     ) : undefined
 
