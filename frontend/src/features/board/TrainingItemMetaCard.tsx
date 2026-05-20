@@ -1,7 +1,8 @@
 import * as React from 'react'
+import { ChevronDown } from 'lucide-react'
 import { Badge } from '../../components/ui/badge'
 import { cn } from '../../lib/utils'
-import type { LichessTacticSourceMetadata, SourceMetadata } from '../../lib/api'
+import type { LichessTacticSourceMetadata, ScrapedPositionalSourceMetadata, SourceMetadata } from '../../lib/api'
 import type { PlySelection } from './boardPage.helpers'
 import { TrainingItemTypeBadge } from '../../components/TrainingItemTypeBadge'
 
@@ -140,26 +141,54 @@ function LichessTacticSection({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-3">
-        {!focusMode && <TrainingItemTypeBadge sourceType="LICHESS_TACTIC" />}
         <div>
           <span className="text-xs text-muted-foreground">Puzzle </span>
-          {focusMode ? (
-            <span className="text-sm font-mono">#{trainingItemId ?? source.displayId}</span>
-          ) : (
-            <a
-              href={`https://lichess.org/training/${source.displayId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-mono text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-            >
-              #{source.displayId}
-            </a>
-          )}
+          <span className="text-sm font-mono">#{trainingItemId ?? source.displayId}</span>
         </div>
+        {!focusMode && <TrainingItemTypeBadge source="LICHESS_TACTIC" />}
         {!focusMode && (
           <span className="tabular-nums text-sm">
             <span className="text-xs text-muted-foreground">Rating </span>
             {source.rating}
+          </span>
+        )}
+      </div>
+      {!focusMode && source.themes.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {source.themes.map((t) => (
+            <Badge key={t.name} variant="outline" className="text-xs font-normal">
+              {t.displayName}
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ScrapedPositionalSection({
+  source,
+  trainingItemId,
+  focusMode,
+}: {
+  source: ScrapedPositionalSourceMetadata
+  trainingItemId: number | undefined
+  focusMode: boolean
+}): React.ReactElement {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-3">
+        <div>
+          <span className="text-xs text-muted-foreground">Puzzle </span>
+          <span className="text-sm font-mono">#{trainingItemId ?? source.internalId}</span>
+        </div>
+        {!focusMode && <TrainingItemTypeBadge source="SCRAPED_POSITIONAL" />}
+        {!focusMode && (
+          <span className="tabular-nums text-sm">
+            <span className="text-xs text-muted-foreground">Rating </span>
+            {source.difficulty.minRating != null && source.difficulty.maxRating != null
+              ? `${source.difficulty.minRating}–${source.difficulty.maxRating}`
+              : source.difficulty.label}
           </span>
         )}
       </div>
@@ -188,6 +217,9 @@ function SourceSection({
   if (source.sourceType === 'LICHESS_TACTIC') {
     return <LichessTacticSection source={source} trainingItemId={trainingItemId} focusMode={focusMode} />
   }
+  if (source.sourceType === 'SCRAPED_POSITIONAL') {
+    return <ScrapedPositionalSection source={source} trainingItemId={trainingItemId} focusMode={focusMode} />
+  }
   return null
 }
 
@@ -198,6 +230,112 @@ type TrainingItemMetaCardProps = {
   focusMode?: boolean
   selectedPly?: PlySelection | null
   onPlyClick?: (ply: PlySelection) => void
+}
+
+type PuzzleSummary = {
+  puzzleId: string | number
+  ratingDisplay: string | number
+  sourceType: 'LICHESS_TACTIC' | 'SCRAPED_POSITIONAL' | null
+}
+
+function resolvePuzzleSummary(source: SourceMetadata, trainingItemId: number | undefined): PuzzleSummary {
+  if (source.sourceType === 'LICHESS_TACTIC') {
+    return {
+      puzzleId: trainingItemId ?? source.displayId,
+      ratingDisplay: source.rating,
+      sourceType: 'LICHESS_TACTIC',
+    }
+  }
+  if (source.sourceType === 'SCRAPED_POSITIONAL') {
+    const { minRating, maxRating, label } = source.difficulty
+    return {
+      puzzleId: trainingItemId ?? source.internalId,
+      ratingDisplay: minRating != null && maxRating != null ? `${minRating}–${maxRating}` : label,
+      sourceType: 'SCRAPED_POSITIONAL',
+    }
+  }
+  return { puzzleId: '', ratingDisplay: '', sourceType: null }
+}
+
+type MobileOverviewMetaBarProps = {
+  source: SourceMetadata
+  pgnDisplay: TrainingItemMetaPgnDisplayMin | null
+  trainingItemId?: number
+  selectedPly?: PlySelection | null
+  onPlyClick?: (ply: PlySelection) => void
+}
+
+export function MobileOverviewMetaBar({
+  source,
+  pgnDisplay,
+  trainingItemId,
+  selectedPly,
+  onPlyClick,
+}: MobileOverviewMetaBarProps): React.ReactElement {
+  const [isOpen, setIsOpen] = React.useState(false)
+
+  const opening = source.sourceType !== 'DECOY' ? source.opening : null
+  const themes: Array<{ name: string; displayName: string | null }> =
+    source.sourceType !== 'DECOY' ? source.themes : []
+  const hasDetails =
+    opening !== null || themes.length > 0 || (pgnDisplay !== null && pgnDisplay.mainline.length > 0)
+
+  const { puzzleId, ratingDisplay, sourceType } = resolvePuzzleSummary(source, trainingItemId)
+
+  return (
+    <div className={cn('relative border border-border bg-background', isOpen ? 'rounded-t-md' : 'rounded-md')}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((v) => !v)}
+        disabled={!hasDetails}
+        className="flex w-full items-center justify-between gap-2 px-3 py-3.5"
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0 font-mono text-sm">#{puzzleId}</span>
+          {sourceType !== null && <TrainingItemTypeBadge source={sourceType} />}
+          <span className="shrink-0 text-sm tabular-nums">
+            <span className="text-xs text-muted-foreground">Rating: </span>
+            {ratingDisplay}
+          </span>
+        </div>
+        {hasDetails && (
+          <ChevronDown
+            className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', isOpen && 'rotate-180')}
+          />
+        )}
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-[-1px] right-[-1px] z-50 flex flex-col gap-3 rounded-b-md border border-t-0 border-border bg-background px-3 pb-3 pt-3 shadow-md">
+          {opening !== null && (
+            <div className="flex items-center gap-1.5 overflow-hidden">
+              <span className="shrink-0 font-mono text-xs font-semibold">{opening.eco}</span>
+              <span className="truncate text-xs text-muted-foreground">{opening.displayName}</span>
+            </div>
+          )}
+          {themes.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {themes.map((t) => (
+                <Badge key={t.name} variant="outline" className="text-xs font-normal">
+                  {t.displayName ?? t.name}
+                </Badge>
+              ))}
+            </div>
+          )}
+          {pgnDisplay !== null && pgnDisplay.mainline.length > 0 && (
+            <div className="border-t border-border pt-2 text-sm leading-relaxed">
+              <MoveSequence moves={pgnDisplay.mainline} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />
+              {pgnDisplay.variation !== null && (
+                <span className="text-xs">
+                  (<MoveSequence moves={pgnDisplay.variation} line="variation" selectedPly={selectedPly} onPlyClick={onPlyClick} />)
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function TrainingItemMetaCard({
@@ -225,9 +363,18 @@ export function TrainingItemMetaCard({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onPlyClick, selectedPly, pgnDisplay])
 
+  const opening =
+    source.sourceType !== 'DECOY' ? source.opening : null
+
   return (
     <div className="flex flex-col gap-3 rounded-md border border-border px-3 py-3">
       <SourceSection source={source} trainingItemId={trainingItemId} focusMode={focusMode} />
+      {opening !== null && (
+        <div className="flex items-center gap-1.5 border-t border-border pt-3 pb-1 overflow-hidden">
+          <span className="font-mono text-xs font-semibold shrink-0">{opening.eco}</span>
+          <span className="text-xs text-muted-foreground truncate">{opening.displayName}</span>
+        </div>
+      )}
       {pgnDisplay !== null && pgnDisplay.mainline.length > 0 && (
         <div className={cn('text-sm leading-relaxed', 'border-t border-border pt-2')}>
           <MoveSequence moves={pgnDisplay.mainline} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />

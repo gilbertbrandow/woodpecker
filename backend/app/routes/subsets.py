@@ -141,11 +141,11 @@ def get_puzzles(subset_id: int) -> tuple[Response, int] | Response:
     return jsonify(result)
 
 
-@subsets_bp.delete("/<int:subset_id>/puzzles/<lichess_puzzle_id>")
+@subsets_bp.delete("/<int:subset_id>/puzzles/<int:training_item_id>")
 @login_required
-def discard_puzzle(subset_id: int, lichess_puzzle_id: str) -> tuple[Response, int]:
+def discard_puzzle(subset_id: int, training_item_id: int) -> tuple[Response, int]:
     try:
-        subset_svc.discard_puzzle(subset_id, lichess_puzzle_id, session["user_id"])
+        subset_svc.discard_puzzle(subset_id, training_item_id, session["user_id"])
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
     except PermissionError as e:

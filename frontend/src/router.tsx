@@ -20,6 +20,7 @@ import { TrainingNewPage } from './pages/TrainingNewPage'
 import { AboutPage } from './pages/AboutPage'
 import { SourcesListPage } from './pages/SourcesListPage'
 import { LichessTacticsSourcePage } from './pages/LichessTacticsSourcePage'
+import { ScrapedPositionalSourcePage } from './pages/ScrapedPositionalSourcePage'
 import { RunPage } from './pages/RunPage'
 import { RunResolverPage } from './pages/RunResolverPage'
 import { TrainingItemResolverPage } from './pages/TrainingItemResolverPage'
@@ -211,6 +212,13 @@ const lichessTacticsDashboardRoute = createRoute({
   component: LichessTacticsSourcePage,
 })
 
+const scrapedPositionalRoute = createRoute({
+  getParentRoute: () => appShellRoute,
+  path: '/sources/scraped-positional-puzzles',
+  staticData: { crumb: { group: 'Setup', parents: [{ label: 'Sources', to: '/app/sources' }], leaf: 'Scraped Positional' } },
+  component: ScrapedPositionalSourcePage,
+})
+
 const runRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/runs/$runId',
@@ -271,6 +279,7 @@ const routeTree = rootRoute.addChildren([
       runRoute,
       sourcesListRoute,
       lichessTacticsDashboardRoute,
+      scrapedPositionalRoute,
     ]),
     solveFlowRoute.addChildren([
       runSolveRoute,

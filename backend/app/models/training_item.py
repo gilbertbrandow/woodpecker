@@ -8,13 +8,14 @@ from app.extensions import Base
 
 if TYPE_CHECKING:
     from app.models.lichess_tactic import LichessTactic
+    from app.models.scraped_positional_puzzle import ScrapedPositionalPuzzle
     from app.models.source_import_run import SourceImportRun
 
 
 class TrainingItemSource(enum.Enum):
     LICHESS_TACTIC = "LICHESS_TACTIC"
     DECOY = "DECOY"
-    POSITIONAL = "POSITIONAL"
+    SCRAPED_POSITIONAL = "SCRAPED_POSITIONAL"
 
 
 class TrainingItem(Base):
@@ -30,6 +31,9 @@ class TrainingItem(Base):
 
     lichess_tactic: Mapped["LichessTactic"] = relationship(
         "LichessTactic", back_populates="training_item", uselist=False
+    )
+    positional_puzzle: Mapped["ScrapedPositionalPuzzle"] = relationship(
+        "ScrapedPositionalPuzzle", back_populates="training_item", uselist=False
     )
     source_import_run: Mapped["SourceImportRun | None"] = relationship(
         "SourceImportRun", back_populates="training_items"

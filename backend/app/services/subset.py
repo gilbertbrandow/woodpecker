@@ -1,10 +1,11 @@
 import json
+import random
 from datetime import datetime, timezone
+from typing import Any
 
 import sqlalchemy as sa
 
 from app.extensions import db
-from app.models.lichess_tactic import LichessTactic
 from app.models.schedule import Schedule
 from app.models.subset import Subset, SubsetTrainingItem
 from app.models.user import User
@@ -18,6 +19,7 @@ VALID_SORT_COLUMNS: dict[str, str] = {
     "popularity": "p.popularity",
     "nb_plays": "p.nb_plays",
 }
+VALID_SOURCES = {"LICHESS_TACTIC", "SCRAPED_POSITIONAL"}
 
 
 def subset_status(subset: Subset) -> str:
@@ -48,9 +50,45 @@ def subset_to_dict(subset: Subset, owner: User | None = None) -> dict[str, objec
     return d
 
 
-def _parse_config(config: dict[str, object]) -> tuple[
-    int, int, float | None, float | None, str, list[str], float
-]:
+def _validate_sources_config(config: dict[str, object]) -> None:
+    sources = config.get("sources")
+    if not isinstance(sources, list) or not sources:
+        raise ValueError("config.sources must be a non-empty array.")
+    total_pct = 0
+    for entry in sources:
+        if not isinstance(entry, dict):
+            raise ValueError("Each source entry must be an object.")
+        source = entry.get("source")
+        if source not in VALID_SOURCES:
+            raise ValueError(
+                f"Invalid source '{source}'. Must be one of: {', '.join(sorted(VALID_SOURCES))}."
+            )
+        pct = entry.get("percentage")
+        if not isinstance(pct, int) or pct < 1:
+            raise ValueError("Each source percentage must be an integer >= 1.")
+        total_pct += pct
+    if total_pct != 100:
+        raise ValueError(f"Source percentages must sum to 100 (got {total_pct}).")
+
+
+def _distribute_counts(sources: list[dict], total: int) -> list[int]:
+    """Largest-remainder distribution so counts sum exactly to total."""
+    exact = [total * s["percentage"] / 100 for s in sources]
+    floored = [int(v) for v in exact]
+    remainder = total - sum(floored)
+    fractions = sorted(
+        range(len(sources)), key=lambda i: exact[i] - floored[i], reverse=True
+    )
+    for i in fractions[:remainder]:
+        floored[i] += 1
+    return floored
+
+
+def _sample_lichess_tactics(
+    config: dict[str, object],
+    subset_id: int,
+    count: int,
+) -> list[int]:
     rating_cfg = config.get("rating") or {}
     if not isinstance(rating_cfg, dict):
         rating_cfg = {}
@@ -76,18 +114,6 @@ def _parse_config(config: dict[str, object]) -> tuple[
         opening_items = list(items_raw) if isinstance(items_raw, list) else []  # type: ignore[arg-type]
         if opening_items:
             opening_strength = float(openings_cfg.get("strength", 0.0))  # type: ignore[arg-type]
-
-    return rating_min, rating_max, mu, sigma, theme_weights_json, opening_items, opening_strength
-
-
-def _sample_puzzles(
-    subset_id: int,
-    config: dict[str, object],
-    count: int,
-) -> list[int]:
-    rating_min, rating_max, mu, sigma, theme_weights_json, opening_items, opening_strength = (
-        _parse_config(config)
-    )
 
     rows = db.session.execute(
         sa.text("""
@@ -125,7 +151,7 @@ def _sample_puzzles(
             weighted AS (
                 SELECT
                     e.id,
-                    COALESCE(ts.score, 0.0)
+                    COALESCE(ts.score, 1.0)
                     * CASE
                         WHEN :mu IS NULL OR :sigma IS NULL THEN 1.0
                         ELSE exp(-0.5 * power((e.rating::float - CAST(:mu AS float)) / CAST(:sigma AS float), 2))
@@ -161,12 +187,130 @@ def _sample_puzzles(
     return [row.id for row in rows]
 
 
+def _sample_scraped_positionals(
+    config: dict[str, object],
+    subset_id: int,
+    count: int,
+) -> list[int]:
+    difficulties_raw = config.get("difficulty")
+    difficulties: list[int] = (
+        [int(d) for d in difficulties_raw]  # type: ignore[union-attr]
+        if isinstance(difficulties_raw, list) and difficulties_raw
+        else []
+    )
+
+    themes_raw = config.get("themes")
+    theme_names: list[str] = (
+        [str(t) for t in themes_raw]  # type: ignore[union-attr]
+        if isinstance(themes_raw, list) and themes_raw
+        else []
+    )
+
+    opening_cfg = config.get("opening") or {}
+    opening_items: list[str] = []
+    opening_strength = 0.0
+    if isinstance(opening_cfg, dict):
+        items_raw = opening_cfg.get("items", [])
+        opening_items = list(items_raw) if isinstance(items_raw, list) else []  # type: ignore[arg-type]
+        if opening_items:
+            opening_strength = float(opening_cfg.get("strength", 0.0))  # type: ignore[arg-type]
+
+    rows = db.session.execute(
+        sa.text("""
+            WITH RECURSIVE
+            opening_descendants AS (
+                SELECT id FROM openings WHERE name = ANY(:opening_keys)
+                UNION ALL
+                SELECT o.id FROM openings o
+                JOIN opening_descendants d ON o.parent_id = d.id
+            ),
+            eligible AS (
+                SELECT ti.id
+                FROM training_items ti
+                JOIN scraped_positional_puzzles spp ON spp.training_item_id = ti.id
+                JOIN scraped_positional_difficulties spd ON spd.id = spp.difficulty_id
+                WHERE (:difficulty_count = 0 OR spd.value = ANY(:difficulties))
+                  AND ti.id NOT IN (
+                      SELECT training_item_id FROM subset_training_items
+                      WHERE subset_id = :sid
+                  )
+            ),
+            theme_filtered AS (
+                SELECT e.id
+                FROM eligible e
+                WHERE (:theme_count = 0 OR EXISTS (
+                    SELECT 1
+                    FROM scraped_positional_puzzles spp2
+                    JOIN scraped_positional_theme_links sptl ON sptl.positional_puzzle_id = spp2.id
+                    JOIN scraped_positional_themes spt ON spt.id = sptl.positional_theme_id
+                    WHERE spp2.training_item_id = e.id
+                      AND spt.name = ANY(:theme_names)
+                ))
+            ),
+            weighted AS (
+                SELECT
+                    tf.id,
+                    CASE
+                        WHEN :opening_strength = 0 THEN 1.0
+                        WHEN EXISTS (
+                            SELECT 1 FROM scraped_positional_puzzles spp3
+                            WHERE spp3.training_item_id = tf.id
+                              AND spp3.opening_id IN (SELECT id FROM opening_descendants)
+                        ) THEN 1.0
+                        ELSE 1.0 - :opening_strength
+                    END AS weight
+                FROM theme_filtered tf
+            )
+            SELECT id
+            FROM weighted
+            WHERE weight > 0
+            ORDER BY ln(random()) / weight DESC
+            LIMIT :count
+        """),
+        {
+            "sid": subset_id,
+            "difficulties": difficulties,
+            "difficulty_count": len(difficulties),
+            "theme_names": theme_names,
+            "theme_count": len(theme_names),
+            "opening_keys": opening_items,
+            "opening_strength": opening_strength,
+            "count": count,
+        },
+    ).all()
+
+    return [row.id for row in rows]
+
+
+def _sample_all_sources(
+    sources: list[dict],
+    subset_id: int,
+    total_count: int,
+) -> list[int]:
+    counts = _distribute_counts(sources, total_count)
+    all_ids: list[int] = []
+    for source_entry, count in zip(sources, counts):
+        if count == 0:
+            continue
+        cfg: dict[str, object] = source_entry.get("config") or {}
+        source = source_entry["source"]
+        if source == "LICHESS_TACTIC":
+            ids = _sample_lichess_tactics(cfg, subset_id, count)
+        elif source == "SCRAPED_POSITIONAL":
+            ids = _sample_scraped_positionals(cfg, subset_id, count)
+        else:
+            ids = []
+        all_ids.extend(ids)
+    random.shuffle(all_ids)
+    return all_ids
+
+
 def _sample_and_insert(
     subset_id: int,
-    config: dict[str, object],
+    sources: list[dict],
     count: int,
 ) -> int:
-    sampled_ids = _sample_puzzles(subset_id, config, count)
+    sampled_ids = _sample_all_sources(sources, subset_id, count)
 
     if not sampled_ids:
         return 0
@@ -216,6 +360,7 @@ def save_config(
         raise PermissionError("Subset is locked.")
     if not (5 <= puzzle_count <= 1000):
         raise ValueError("puzzle_count must be between 5 and 1000.")
+    _validate_sources_config(config)
 
     db.session.execute(
         sa.delete(SubsetTrainingItem).where(SubsetTrainingItem.subset_id == subset_id)
@@ -234,13 +379,17 @@ def fill(subset_id: int, user_id: int) -> tuple[int, int]:
     if subset.config is None or subset.puzzle_count is None:
         raise ValueError("Configuration is not set.")
 
+    sources: list[dict] = (subset.config or {}).get("sources", [])  # type: ignore[assignment]
+    if not sources:
+        raise ValueError("Configuration is not set.")
+
     db.session.execute(
         sa.delete(SubsetTrainingItem).where(SubsetTrainingItem.subset_id == subset_id)
     )
 
     filled = _sample_and_insert(
         subset_id=subset_id,
-        config=subset.config,
+        sources=sources,
         count=subset.puzzle_count,
     )
     db.session.commit()
@@ -254,6 +403,10 @@ def refill(subset_id: int, user_id: int) -> tuple[int, int]:
     if subset.config is None or subset.puzzle_count is None:
         raise ValueError("Configuration is not set.")
 
+    sources: list[dict] = (subset.config or {}).get("sources", [])  # type: ignore[assignment]
+    if not sources:
+        raise ValueError("Configuration is not set.")
+
     active_count: int = db.session.execute(
         db.select(db.func.count()).where(SubsetTrainingItem.subset_id == subset_id)
     ).scalar_one()
@@ -264,32 +417,26 @@ def refill(subset_id: int, user_id: int) -> tuple[int, int]:
 
     filled = _sample_and_insert(
         subset_id=subset_id,
-        config=subset.config,
+        sources=sources,
         count=needed,
     )
     db.session.commit()
     return filled, needed
 
 
-def discard_puzzle(subset_id: int, lichess_puzzle_id: str, user_id: int) -> None:
+def discard_puzzle(subset_id: int, training_item_id: int, user_id: int) -> None:
     subset = _get_owned_subset(subset_id, user_id)
     if subset.locked_at is not None:
         raise PermissionError("Subset is locked.")
 
-    tactic = db.session.execute(
-        db.select(LichessTactic).where(LichessTactic.puzzle_id == lichess_puzzle_id)
-    ).scalar_one_or_none()
-    if tactic is None:
-        raise LookupError("Puzzle not found.")
-
     row = db.session.execute(
         db.select(SubsetTrainingItem).where(
             SubsetTrainingItem.subset_id == subset_id,
-            SubsetTrainingItem.training_item_id == tactic.training_item_id,
+            SubsetTrainingItem.training_item_id == training_item_id,
         )
     ).scalar_one_or_none()
     if row is None:
-        raise LookupError("Puzzle is not a member of this subset.")
+        raise LookupError("Training item not found in this subset.")
 
     db.session.delete(row)
     db.session.commit()
@@ -329,15 +476,18 @@ def list_active_puzzles(
     page = max(1, min(page, total_pages))
     offset = (page - 1) * PAGE_SIZE
 
+    # For mixed-source subsets, sort is only meaningful for lichess-specific columns.
+    # Fall back to insertion order when the sort column doesn't apply universally.
     sort_col = VALID_SORT_COLUMNS.get(sort or "", "sti.position")
     order_dir = "DESC" if order == "desc" else "ASC"
 
-    rows = db.session.execute(
+    # Fetch the paginated training item IDs across all source types.
+    ti_rows = db.session.execute(
         sa.text(f"""
-            SELECT p.id, p.puzzle_id, p.rating, p.popularity, p.nb_plays, p.game_url,
-                   p.training_item_id
+            SELECT sti.training_item_id, ti.source_type::text AS source_type
             FROM subset_training_items sti
-            JOIN lichess_tactics p ON p.training_item_id = sti.training_item_id
+            JOIN training_items ti ON ti.id = sti.training_item_id
+            LEFT JOIN lichess_tactics lt ON lt.training_item_id = sti.training_item_id
             WHERE sti.subset_id = :sid
             ORDER BY {sort_col} {order_dir}
             LIMIT :limit OFFSET :offset
@@ -345,86 +495,152 @@ def list_active_puzzles(
         {"sid": subset_id, "limit": PAGE_SIZE, "offset": offset},
     ).all()
 
-    if not rows:
+    if not ti_rows:
         return {"puzzles": [], "page": page, "pageSize": PAGE_SIZE, "totalPages": total_pages, "total": total}
 
-    lichess_tactic_ids = [r.id for r in rows]
+    lichess_ti_ids = [r.training_item_id for r in ti_rows if r.source_type == "LICHESS_TACTIC"]
+    positional_ti_ids = [r.training_item_id for r in ti_rows if r.source_type == "SCRAPED_POSITIONAL"]
 
-    theme_rows = db.session.execute(
+    # ── Lichess tactics ──────────────────────────────────────────────────────
+    lichess_rows = db.session.execute(
         sa.text("""
-            SELECT ltl.lichess_tactic_id, t.name, t.display_name
-            FROM lichess_tactic_theme_links ltl JOIN lichess_tactic_themes t ON t.id = ltl.lichess_tactic_theme_id
-            WHERE ltl.lichess_tactic_id = ANY(:ids)
+            SELECT p.id, p.puzzle_id, p.rating, p.popularity, p.nb_plays, p.game_url,
+                   p.training_item_id
+            FROM lichess_tactics p
+            WHERE p.training_item_id = ANY(:ids)
         """),
-        {"ids": lichess_tactic_ids},
-    ).all()
-    theme_map: dict[int, list[dict[str, str]]] = {}
-    for tr in theme_rows:
-        theme_map.setdefault(tr.lichess_tactic_id, []).append(
-            {"name": tr.name, "displayName": tr.display_name or tr.name}
-        )
+        {"ids": lichess_ti_ids},
+    ).all() if lichess_ti_ids else []
 
-    opening_rows = db.session.execute(
+    lichess_by_ti: dict[int, Any] = {r.training_item_id: r for r in lichess_rows}
+    lichess_ids = [r.id for r in lichess_rows]
+
+    lt_theme_map: dict[int, list[dict[str, str]]] = {}
+    lt_opening_map: dict[int, list[dict[str, str]]] = {}
+    if lichess_ids:
+        for tr in db.session.execute(
+            sa.text("""
+                SELECT ltl.lichess_tactic_id, t.name, t.display_name
+                FROM lichess_tactic_theme_links ltl
+                JOIN lichess_tactic_themes t ON t.id = ltl.lichess_tactic_theme_id
+                WHERE ltl.lichess_tactic_id = ANY(:ids)
+            """),
+            {"ids": lichess_ids},
+        ).all():
+            lt_theme_map.setdefault(tr.lichess_tactic_id, []).append(
+                {"name": tr.name, "displayName": tr.display_name or tr.name}
+            )
+        for or_ in db.session.execute(
+            sa.text("""
+                SELECT lto.lichess_tactic_id, o.name, o.display_name, o.eco
+                FROM lichess_tactic_openings lto
+                JOIN openings o ON o.id = lto.opening_id
+                WHERE lto.lichess_tactic_id = ANY(:ids)
+            """),
+            {"ids": lichess_ids},
+        ).all():
+            lt_opening_map.setdefault(or_.lichess_tactic_id, []).append(
+                {"name": or_.name, "displayName": or_.display_name or or_.name, "eco": or_.eco}
+            )
+
+    # ── Scraped positionals ──────────────────────────────────────────────────
+    positional_rows = db.session.execute(
         sa.text("""
-            SELECT lto.lichess_tactic_id, o.name, o.display_name, o.eco
-            FROM lichess_tactic_openings lto JOIN openings o ON o.id = lto.opening_id
-            WHERE lto.lichess_tactic_id = ANY(:ids)
+            SELECT p.id, p.internal_id, p.lichess_url, p.training_item_id,
+                   d.value AS difficulty, d.label AS difficulty_label,
+                   d.min_rating AS difficulty_min_rating, d.max_rating AS difficulty_max_rating,
+                   o.name AS opening_name, o.display_name AS opening_display_name, o.eco AS opening_eco
+            FROM scraped_positional_puzzles p
+            JOIN scraped_positional_difficulties d ON d.id = p.difficulty_id
+            LEFT JOIN openings o ON o.id = p.opening_id
+            WHERE p.training_item_id = ANY(:ids)
         """),
-        {"ids": lichess_tactic_ids},
-    ).all()
-    opening_map: dict[int, list[dict[str, str]]] = {}
-    for or_ in opening_rows:
-        opening_map.setdefault(or_.lichess_tactic_id, []).append(
-            {"name": or_.name, "displayName": or_.display_name or or_.name, "eco": or_.eco}
-        )
+        {"ids": positional_ti_ids},
+    ).all() if positional_ti_ids else []
 
-    puzzles = [
-        {
-            "puzzleId": r.puzzle_id,
-            "rating": r.rating,
-            "popularity": r.popularity,
-            "nbPlays": r.nb_plays,
-            "gameUrl": r.game_url,
-            "themes": theme_map.get(r.id, []),
-            "openings": opening_map.get(r.id, []),
-        }
-        for r in rows
-    ]
+    positional_by_ti: dict[int, Any] = {r.training_item_id: r for r in positional_rows}
+    positional_ids = [r.id for r in positional_rows]
+
+    sp_theme_map: dict[int, list[dict[str, str]]] = {}
+    if positional_ids:
+        for tr in db.session.execute(
+            sa.text("""
+                SELECT sptl.positional_puzzle_id, t.name, t.display_name
+                FROM scraped_positional_theme_links sptl
+                JOIN scraped_positional_themes t ON t.id = sptl.positional_theme_id
+                WHERE sptl.positional_puzzle_id = ANY(:ids)
+            """),
+            {"ids": positional_ids},
+        ).all():
+            sp_theme_map.setdefault(tr.positional_puzzle_id, []).append(
+                {"name": tr.name, "displayName": tr.display_name or tr.name}
+            )
+
+    # ── Assemble in original page order ─────────────────────────────────────
+    puzzles: list[dict[str, object]] = []
+    for ti_row in ti_rows:
+        ti_id = ti_row.training_item_id
+        if ti_row.source_type == "LICHESS_TACTIC":
+            r = lichess_by_ti.get(ti_id)
+            if r is None:
+                continue
+            puzzles.append({
+                "sourceType": "LICHESS_TACTIC",
+                "trainingItemId": ti_id,
+                "puzzleId": r.puzzle_id,
+                "rating": r.rating,
+                "popularity": r.popularity,
+                "nbPlays": r.nb_plays,
+                "gameUrl": r.game_url,
+                "themes": lt_theme_map.get(r.id, []),
+                "openings": lt_opening_map.get(r.id, []),
+            })
+        elif ti_row.source_type == "SCRAPED_POSITIONAL":
+            r = positional_by_ti.get(ti_id)
+            if r is None:
+                continue
+            opening = (
+                {"name": r.opening_name, "displayName": r.opening_display_name or r.opening_name, "eco": r.opening_eco}
+                if r.opening_name else None
+            )
+            puzzles.append({
+                "sourceType": "SCRAPED_POSITIONAL",
+                "trainingItemId": ti_id,
+                "internalId": r.internal_id,
+                "lichessUrl": r.lichess_url,
+                "difficulty": r.difficulty,
+                "difficultyLabel": r.difficulty_label,
+                "difficultyMinRating": r.difficulty_min_rating,
+                "difficultyMaxRating": r.difficulty_max_rating,
+                "themes": sp_theme_map.get(r.id, []),
+                "opening": opening,
+            })
 
     return {"puzzles": puzzles, "page": page, "pageSize": PAGE_SIZE, "totalPages": total_pages, "total": total}
 
 
-def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
-    subset = _get_viewable_subset(subset_id, user_id)
-
-    active_rows = db.session.execute(
-        sa.text("""
-            SELECT p.id, p.rating, p.popularity, p.nb_plays
-            FROM subset_training_items sti JOIN lichess_tactics p ON p.training_item_id = sti.training_item_id
-            WHERE sti.subset_id = :sid
-        """),
-        {"sid": subset_id},
-    ).all()
-
-    _rating_val = (subset.config or {}).get("rating")
+def _lichess_stats(
+    training_item_ids: list[int],
+    config: dict[str, object],
+) -> dict[str, object]:
+    _rating_val = config.get("rating")
     rating_cfg: dict[str, object] = _rating_val if isinstance(_rating_val, dict) else {}
     _min = rating_cfg.get("min")
     _max = rating_cfg.get("max")
     rating_min: int | None = int(_min) if isinstance(_min, (int, float)) else None
     rating_max: int | None = int(_max) if isinstance(_max, (int, float)) else None
 
-    if not active_rows:
+    if not training_item_ids:
         rating_buckets: list[dict[str, int]] = []
         if rating_min is not None and rating_max is not None:
-            start_bucket = (int(rating_min) // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
-            end_bucket = ((int(rating_max) + RATING_BUCKET_SIZE - 1) // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
-
+            start = (rating_min // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
+            end = ((rating_max + RATING_BUCKET_SIZE - 1) // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
             rating_buckets = [
                 {"min": b, "max": b + RATING_BUCKET_SIZE, "count": 0}
-                for b in range(start_bucket, end_bucket, RATING_BUCKET_SIZE)
+                for b in range(start, end, RATING_BUCKET_SIZE)
             ]
-
         return {
+            "count": 0,
             "ratingBuckets": rating_buckets,
             "themes": [],
             "openings": [],
@@ -432,34 +648,33 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
             "avgNbPlays": 0,
             "avgRating": 0,
             "noOpeningCount": 0,
-            "totalActive": 0,
-            "ratingRange": {
-                "min": rating_min,
-                "max": rating_max,
-                "step": RATING_BUCKET_SIZE,
-            },
+            "ratingRange": {"min": rating_min, "max": rating_max, "step": RATING_BUCKET_SIZE},
         }
 
-    int_ids = [r.id for r in active_rows]
-    total = len(active_rows)
-    avg_popularity = sum(r.popularity for r in active_rows) / total
-    avg_nb_plays = sum(r.nb_plays for r in active_rows) / total
-    avg_rating = round(sum(r.rating for r in active_rows) / total)
+    tactic_rows = db.session.execute(
+        sa.text("""
+            SELECT lt.id, lt.rating, lt.popularity, lt.nb_plays
+            FROM lichess_tactics lt
+            WHERE lt.training_item_id = ANY(:ids)
+        """),
+        {"ids": training_item_ids},
+    ).all()
 
-    actual_min = rating_min if rating_min is not None else min(r.rating for r in active_rows)
-    actual_max = rating_max if rating_max is not None else max(r.rating for r in active_rows)
+    lt_ids = [r.id for r in tactic_rows]
+    count = len(tactic_rows)
+    avg_popularity = sum(r.popularity for r in tactic_rows) / count
+    avg_nb_plays = sum(r.nb_plays for r in tactic_rows) / count
+    avg_rating = round(sum(r.rating for r in tactic_rows) / count)
+
+    actual_min = rating_min if rating_min is not None else min(r.rating for r in tactic_rows)
+    actual_max = rating_max if rating_max is not None else max(r.rating for r in tactic_rows)
     start_bucket = (actual_min // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
     end_bucket = ((actual_max + RATING_BUCKET_SIZE - 1) // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
-
-    bucket_map: dict[int, int] = {
-        b: 0 for b in range(start_bucket, end_bucket, RATING_BUCKET_SIZE)
-    }
-
-    for r in active_rows:
-        bucket_min = (r.rating // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
-        if bucket_min in bucket_map:
-            bucket_map[bucket_min] += 1
-
+    bucket_map: dict[int, int] = {b: 0 for b in range(start_bucket, end_bucket, RATING_BUCKET_SIZE)}
+    for r in tactic_rows:
+        b = (r.rating // RATING_BUCKET_SIZE) * RATING_BUCKET_SIZE
+        if b in bucket_map:
+            bucket_map[b] += 1
     rating_buckets = [
         {"min": k, "max": k + RATING_BUCKET_SIZE, "count": v}
         for k, v in sorted(bucket_map.items())
@@ -468,12 +683,13 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
     theme_rows = db.session.execute(
         sa.text("""
             SELECT t.name, t.display_name, t.description, COUNT(*) AS cnt
-            FROM lichess_tactic_theme_links ltl JOIN lichess_tactic_themes t ON t.id = ltl.lichess_tactic_theme_id
+            FROM lichess_tactic_theme_links ltl
+            JOIN lichess_tactic_themes t ON t.id = ltl.lichess_tactic_theme_id
             WHERE ltl.lichess_tactic_id = ANY(:ids)
             GROUP BY t.name, t.display_name, t.description
             ORDER BY cnt DESC
         """),
-        {"ids": int_ids},
+        {"ids": lt_ids},
     ).all()
     themes: list[dict[str, object]] = [
         {"name": r.name, "displayName": r.display_name, "description": r.description, "count": r.cnt}
@@ -483,38 +699,137 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
     opening_rows = db.session.execute(
         sa.text("""
             SELECT o.name, o.display_name, COUNT(*) AS cnt
-            FROM lichess_tactic_openings lto JOIN openings o ON o.id = lto.opening_id
+            FROM lichess_tactic_openings lto
+            JOIN openings o ON o.id = lto.opening_id
             WHERE lto.lichess_tactic_id = ANY(:ids)
             GROUP BY o.name, o.display_name
             ORDER BY cnt DESC
         """),
-        {"ids": int_ids},
+        {"ids": lt_ids},
     ).all()
     openings: list[dict[str, object]] = [
         {"name": r.name, "displayName": r.display_name, "count": r.cnt} for r in opening_rows
     ]
 
-    with_opening = db.session.execute(
-        sa.text("SELECT COUNT(DISTINCT lichess_tactic_id) FROM lichess_tactic_openings WHERE lichess_tactic_id = ANY(:ids)"),
-        {"ids": int_ids},
-    ).scalar()
-    no_opening_count = total - int(with_opening or 0)
+    with_opening: int = db.session.execute(
+        sa.text("""
+            SELECT COUNT(DISTINCT lichess_tactic_id)
+            FROM lichess_tactic_openings
+            WHERE lichess_tactic_id = ANY(:ids)
+        """),
+        {"ids": lt_ids},
+    ).scalar() or 0
 
     return {
+        "count": count,
         "ratingBuckets": rating_buckets,
         "themes": themes,
         "openings": openings,
         "avgPopularity": round(avg_popularity, 1),
         "avgNbPlays": round(avg_nb_plays, 1),
         "avgRating": avg_rating,
-        "noOpeningCount": no_opening_count,
-        "totalActive": total,
-        "ratingRange": {
-            "min": rating_min,
-            "max": rating_max,
-            "step": RATING_BUCKET_SIZE,
-        },
+        "noOpeningCount": count - with_opening,
+        "ratingRange": {"min": rating_min, "max": rating_max, "step": RATING_BUCKET_SIZE},
     }
+
+
+def _positional_stats(training_item_ids: list[int]) -> dict[str, object]:
+    if not training_item_ids:
+        return {"count": 0, "difficultyDistribution": [], "themes": [], "openings": []}
+
+    diff_rows = db.session.execute(
+        sa.text("""
+            SELECT spd.value, spd.label, COUNT(*) AS cnt
+            FROM scraped_positional_puzzles spp
+            JOIN scraped_positional_difficulties spd ON spd.id = spp.difficulty_id
+            WHERE spp.training_item_id = ANY(:ids)
+            GROUP BY spd.value, spd.label
+            ORDER BY spd.value
+        """),
+        {"ids": training_item_ids},
+    ).all()
+    difficulty_distribution: list[dict[str, object]] = [
+        {"value": r.value, "label": r.label, "count": r.cnt} for r in diff_rows
+    ]
+
+    theme_rows = db.session.execute(
+        sa.text("""
+            SELECT spt.name, spt.display_name, COUNT(*) AS cnt
+            FROM scraped_positional_puzzles spp
+            JOIN scraped_positional_theme_links sptl ON sptl.positional_puzzle_id = spp.id
+            JOIN scraped_positional_themes spt ON spt.id = sptl.positional_theme_id
+            WHERE spp.training_item_id = ANY(:ids)
+            GROUP BY spt.name, spt.display_name
+            ORDER BY cnt DESC
+        """),
+        {"ids": training_item_ids},
+    ).all()
+    themes: list[dict[str, object]] = [
+        {"name": r.name, "displayName": r.display_name, "count": r.cnt} for r in theme_rows
+    ]
+
+    opening_rows = db.session.execute(
+        sa.text("""
+            SELECT o.name, o.display_name, COUNT(*) AS cnt
+            FROM scraped_positional_puzzles spp
+            JOIN openings o ON o.id = spp.opening_id
+            WHERE spp.training_item_id = ANY(:ids)
+              AND spp.opening_id IS NOT NULL
+            GROUP BY o.name, o.display_name
+            ORDER BY cnt DESC
+        """),
+        {"ids": training_item_ids},
+    ).all()
+    openings: list[dict[str, object]] = [
+        {"name": r.name, "displayName": r.display_name, "count": r.cnt} for r in opening_rows
+    ]
+
+    return {
+        "count": len(training_item_ids),
+        "difficultyDistribution": difficulty_distribution,
+        "themes": themes,
+        "openings": openings,
+    }
+
+
+def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
+    subset = _get_viewable_subset(subset_id, user_id)
+
+    item_rows = db.session.execute(
+        sa.text("""
+            SELECT ti.id, ti.source_type::text AS source_type
+            FROM subset_training_items sti
+            JOIN training_items ti ON ti.id = sti.training_item_id
+            WHERE sti.subset_id = :sid
+        """),
+        {"sid": subset_id},
+    ).all()
+
+    total = len(item_rows)
+    by_source: dict[str, list[int]] = {}
+    for r in item_rows:
+        by_source.setdefault(r.source_type, []).append(r.id)
+
+    sources_config: list[dict] = (subset.config or {}).get("sources", [])  # type: ignore[assignment]
+    configured_sources = {s["source"] for s in sources_config if isinstance(s, dict) and "source" in s}
+
+    sources_out: dict[str, object] = {}
+
+    if "LICHESS_TACTIC" in configured_sources or "LICHESS_TACTIC" in by_source:
+        lt_config: dict[str, object] = next(
+            (s.get("config") or {} for s in sources_config if s.get("source") == "LICHESS_TACTIC"),
+            {},
+        )
+        sources_out["LICHESS_TACTIC"] = _lichess_stats(
+            by_source.get("LICHESS_TACTIC", []), lt_config
+        )
+
+    if "SCRAPED_POSITIONAL" in configured_sources or "SCRAPED_POSITIONAL" in by_source:
+        sources_out["SCRAPED_POSITIONAL"] = _positional_stats(
+            by_source.get("SCRAPED_POSITIONAL", [])
+        )
+
+    return {"sources": sources_out, "totalActive": total}
 
 def list_subsets(user_id: int, locked_only: bool = False) -> list[tuple[Subset, User]]:
     where_clause: sa.ColumnElement[bool]

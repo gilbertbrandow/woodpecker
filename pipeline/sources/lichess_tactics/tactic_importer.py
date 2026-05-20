@@ -1,6 +1,7 @@
 import csv
 import io
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import IO, Any, cast
 from urllib.parse import urlsplit, urlunsplit
@@ -54,6 +55,13 @@ OPENING_ALIASES: dict[str, str] = {
     "Gedults_Opening": "Barnes_Opening",
     "Gedults_Opening_Other_variations": "Barnes_Opening",
 }
+
+
+@dataclass
+class TacticBatchResult:
+    inserted: int
+    unknown_themes: set[str] = field(default_factory=set)
+    unknown_openings: set[str] = field(default_factory=set)
 
 
 def _player_oriented_game_url(game_url: str, fen: str) -> str:
@@ -132,6 +140,111 @@ def _check_prerequisites(session: Session) -> None:
         )
 
 
+def process_tactic_batch(
+    session: Session,
+    batch: list[dict[str, Any]],
+    batch_themes: list[list[str]],
+    batch_openings: list[list[str]],
+    source_import_run_id: int,
+    theme_cache: dict[str, int],
+    opening_cache: dict[str, int],
+    fuzzy_opening_cache: dict[str, int | None],
+) -> TacticBatchResult:
+    if not batch:
+        return TacticBatchResult(inserted=0)
+
+    tactic_puzzle_ids = [t["puzzle_id"] for t in batch]
+
+    existing_rows = session.execute(
+        select(LichessTactic.puzzle_id, LichessTactic.training_item_id).where(
+            LichessTactic.puzzle_id.in_(tactic_puzzle_ids)
+        )
+    ).all()
+    existing_map: dict[str, int] = {r.puzzle_id: r.training_item_id for r in existing_rows}
+
+    new_tactics = [t for t in batch if t["puzzle_id"] not in existing_map]
+
+    unknown_themes: set[str] = set()
+    unknown_openings: set[str] = set()
+    inserted_count = 0
+
+    if new_tactics:
+        ti_result = cast(
+            CursorResult[Any],
+            session.execute(
+                sa.text(
+                    "INSERT INTO training_items (source_type, source_import_run_id) "
+                    "SELECT 'LICHESS_TACTIC', :run_id FROM generate_series(1, :n) "
+                    "RETURNING id"
+                ),
+                {"n": len(new_tactics), "run_id": source_import_run_id},
+            ),
+        )
+        new_ids = [row.id for row in ti_result]
+
+        lichess_tactic_rows = [
+            {**tactic, "training_item_id": new_ids[i]}
+            for i, tactic in enumerate(new_tactics)
+        ]
+        stmt = pg_insert(cast(sa.Table, LichessTactic.__table__)).values(lichess_tactic_rows).on_conflict_do_nothing(
+            index_elements=["puzzle_id"]
+        )
+        result = cast(CursorResult[Any], session.execute(stmt))
+        session.commit()
+        inserted_count = result.rowcount if result.rowcount >= 0 else 0
+
+    if inserted_count > 0:
+        all_tactic_id_map = {
+            row.puzzle_id: row.id
+            for row in session.execute(
+                select(LichessTactic.puzzle_id, LichessTactic.id).where(
+                    LichessTactic.puzzle_id.in_(tactic_puzzle_ids)
+                )
+            ).all()
+        }
+
+        theme_assoc: list[dict[str, int]] = []
+        opening_assoc: list[dict[str, int]] = []
+
+        for tactic_row, t_list, o_list in zip(batch, batch_themes, batch_openings):
+            tid = all_tactic_id_map.get(str(tactic_row["puzzle_id"]))
+            if tid is None:
+                continue
+            for t in t_list:
+                theme_id = theme_cache.get(t)
+                if theme_id is not None:
+                    theme_assoc.append({"lichess_tactic_id": tid, "lichess_tactic_theme_id": theme_id})
+                else:
+                    unknown_themes.add(t)
+            for o in o_list:
+                lookup_key = OPENING_ALIASES.get(o, o)
+                oid = opening_cache.get(lookup_key)
+                if oid is None:
+                    if o not in fuzzy_opening_cache:
+                        fuzzy_opening_cache[o] = _fuzzy_match_opening(o, opening_cache)
+                    oid = fuzzy_opening_cache[o]
+                if oid is not None:
+                    opening_assoc.append({"lichess_tactic_id": tid, "opening_id": oid})
+                else:
+                    unknown_openings.add(o)
+
+        if theme_assoc:
+            session.execute(
+                pg_insert(lichess_tactic_theme_links).values(theme_assoc).on_conflict_do_nothing()
+            )
+        if opening_assoc:
+            session.execute(
+                pg_insert(lichess_tactic_openings).values(opening_assoc).on_conflict_do_nothing()
+            )
+        session.commit()
+
+    return TacticBatchResult(
+        inserted=inserted_count,
+        unknown_themes=unknown_themes,
+        unknown_openings=unknown_openings,
+    )
+
+
 def import_tactics(
     session: Session,
     file: Path,
@@ -147,107 +260,16 @@ def import_tactics(
     rows_read = 0
     rows_inserted = 0
     rows_skipped = 0
-    unknown_themes: set[str] = set()
-    unknown_openings: set[str] = set()
+    all_unknown_themes: set[str] = set()
+    all_unknown_openings: set[str] = set()
 
     theme_cache: dict[str, int] = _load_cache(session, LichessTacticTheme)
     opening_cache: dict[str, int] = _load_cache(session, Opening)
-    fuzzy_opening_cache: dict[str, int | None] = {}  # computed once per unique unknown tag
+    fuzzy_opening_cache: dict[str, int | None] = {}
 
     tactic_batch: list[dict[str, Any]] = []
     batch_themes: list[list[str]] = []
     batch_openings: list[list[str]] = []
-
-    def flush() -> int:
-        if not tactic_batch:
-            return 0
-
-        tactic_puzzle_ids = [t["puzzle_id"] for t in tactic_batch]
-
-        existing_rows = session.execute(
-            select(LichessTactic.puzzle_id, LichessTactic.training_item_id).where(
-                LichessTactic.puzzle_id.in_(tactic_puzzle_ids)
-            )
-        ).all()
-        existing_map: dict[str, int] = {r.puzzle_id: r.training_item_id for r in existing_rows}
-
-        new_tactics = [t for t in tactic_batch if t["puzzle_id"] not in existing_map]
-
-        inserted_count = 0
-        if new_tactics:
-            ti_result = cast(
-                CursorResult[Any],
-                session.execute(
-                    sa.text(
-                        "INSERT INTO training_items (source_type, source_import_run_id) "
-                        "SELECT 'LICHESS_TACTIC', :run_id FROM generate_series(1, :n) "
-                        "RETURNING id"
-                    ),
-                    {"n": len(new_tactics), "run_id": source_import_run_id},
-                ),
-            )
-            new_ids = [row.id for row in ti_result]
-
-            lichess_tactic_rows = [
-                {**tactic, "training_item_id": new_ids[i]}
-                for i, tactic in enumerate(new_tactics)
-            ]
-            stmt = pg_insert(cast(sa.Table, LichessTactic.__table__)).values(lichess_tactic_rows).on_conflict_do_nothing(
-                index_elements=["puzzle_id"]
-            )
-            result = cast(CursorResult[Any], session.execute(stmt))
-            session.commit()
-            inserted_count = result.rowcount if result.rowcount >= 0 else 0
-
-        if inserted_count > 0:
-            all_tactic_id_map = {
-                row.puzzle_id: row.id
-                for row in session.execute(
-                    select(LichessTactic.puzzle_id, LichessTactic.id).where(
-                        LichessTactic.puzzle_id.in_(tactic_puzzle_ids)
-                    )
-                ).all()
-            }
-
-            theme_assoc: list[dict[str, int]] = []
-            opening_assoc: list[dict[str, int]] = []
-
-            for tactic_row, t_list, o_list in zip(tactic_batch, batch_themes, batch_openings):
-                tid = all_tactic_id_map.get(str(tactic_row["puzzle_id"]))
-                if tid is None:
-                    continue
-                for t in t_list:
-                    theme_id = theme_cache.get(t)
-                    if theme_id is not None:
-                        theme_assoc.append({"lichess_tactic_id": tid, "lichess_tactic_theme_id": theme_id})
-                    else:
-                        unknown_themes.add(t)
-                for o in o_list:
-                    lookup_key = OPENING_ALIASES.get(o, o)
-                    oid = opening_cache.get(lookup_key)
-                    if oid is None:
-                        if o not in fuzzy_opening_cache:
-                            fuzzy_opening_cache[o] = _fuzzy_match_opening(o, opening_cache)
-                        oid = fuzzy_opening_cache[o]
-                    if oid is not None:
-                        opening_assoc.append({"lichess_tactic_id": tid, "opening_id": oid})
-                    else:
-                        unknown_openings.add(o)
-
-            if theme_assoc:
-                session.execute(
-                    pg_insert(lichess_tactic_theme_links).values(theme_assoc).on_conflict_do_nothing()
-                )
-            if opening_assoc:
-                session.execute(
-                    pg_insert(lichess_tactic_openings).values(opening_assoc).on_conflict_do_nothing()
-                )
-            session.commit()
-
-        tactic_batch.clear()
-        batch_themes.clear()
-        batch_openings.clear()
-        return inserted_count
 
     stream, fh = _open_stream(file)
     try:
@@ -275,32 +297,46 @@ def import_tactics(
                 batch_openings.append(row["OpeningTags"].split() if row["OpeningTags"] else [])
 
                 if len(tactic_batch) >= batch_size:
-                    rows_inserted += flush()
+                    batch_result = process_tactic_batch(
+                        session, tactic_batch, batch_themes, batch_openings,
+                        source_import_run_id, theme_cache, opening_cache, fuzzy_opening_cache,
+                    )
+                    tactic_batch.clear()
+                    batch_themes.clear()
+                    batch_openings.clear()
+                    rows_inserted += batch_result.inserted
+                    all_unknown_themes |= batch_result.unknown_themes
+                    all_unknown_openings |= batch_result.unknown_openings
                     if limit is not None and rows_inserted >= limit:
                         break
 
             if rows_read % PROGRESS_INTERVAL == 0:
                 click.echo(f"Read {rows_read:,} | Inserted {rows_inserted:,} | Skipped {rows_skipped:,}")
 
-        rows_inserted += flush()
+        if tactic_batch:
+            batch_result = process_tactic_batch(
+                session, tactic_batch, batch_themes, batch_openings,
+                source_import_run_id, theme_cache, opening_cache, fuzzy_opening_cache,
+            )
+            rows_inserted += batch_result.inserted
+            all_unknown_themes |= batch_result.unknown_themes
+            all_unknown_openings |= batch_result.unknown_openings
     finally:
         fh.close()
 
     elapsed = time.monotonic() - start
     click.echo(f"\nDone. Inserted: {rows_inserted:,} | Skipped: {rows_skipped:,} | Time: {elapsed:.1f}s")
 
-    if unknown_themes:
-        click.echo(f"Warning: {len(unknown_themes)} unknown theme key(s): {', '.join(sorted(unknown_themes))}")
-    if unknown_openings:
+    if all_unknown_themes:
+        click.echo(f"Warning: {len(all_unknown_themes)} unknown theme key(s): {', '.join(sorted(all_unknown_themes))}")
+    if all_unknown_openings:
         click.echo(
-            f"Note: {len(unknown_openings)} opening tag(s) could not be resolved (no exact or fuzzy match): "
-            + ", ".join(sorted(unknown_openings))
+            f"Note: {len(all_unknown_openings)} opening tag(s) could not be resolved (no exact or fuzzy match): "
+            + ", ".join(sorted(all_unknown_openings))
         )
 
-    # Global snapshot: total tactics in DB after this run completes.
     total_after = session.scalar(select(func.count()).select_from(LichessTactic)) or 0
 
-    # All remaining stats are scoped to this run only via source_import_run_id.
     run_scalars = session.execute(
         sa_text("""
             SELECT

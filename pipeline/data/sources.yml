@@ -17,3 +17,7 @@ lichess_tactic_themes:
 lichess_tactics:
   - name: lichess_db_puzzle.csv.zst
     url: https://database.lichess.org/lichess_db_puzzle.csv.zst
+
+scraped_positional:
+  - name: chess-positions.csv
+    url: https://raw.githubusercontent.com/neilgd/chess-position-analysis-results/master/data/chess-positions.csv

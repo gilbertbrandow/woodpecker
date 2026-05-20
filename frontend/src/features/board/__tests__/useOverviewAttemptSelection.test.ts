@@ -22,7 +22,7 @@ function makeOverviewData(attempts: OverviewAttemptView[], selectedAttemptId: nu
       status: 'solved', triesRemaining: 3, maxTriesPerItem: 3,
       qualifyingAttemptId: null, trainingId: null, scheduleName: null,
     },
-    trainingItem: { fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', solution: ['e2e4'], source: { sourceType: 'POSITIONAL' } },
+    trainingItem: { fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', solution: ['e2e4'], source: { sourceType: 'SCRAPED_POSITIONAL', internalId: 1, lichessUrl: 'https://lichess.org/training/1', difficulty: { value: 1, label: 'Easy', minRating: null, maxRating: null }, themes: [], opening: null } },
     selectedAttemptId,
     attempts,
     sameTrainingItemAcrossRuns: [],

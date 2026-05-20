@@ -87,9 +87,8 @@ export function RatingChart({
   };
 
   return (
-    <div className="rounded-md border p-4">
+    <div>
       <div className="mb-4">
-        <p className="text-sm font-semibold">Range & Distribution</p>
         <p className="mt-1 text-xs text-muted-foreground">
           Puzzles are sampled within the range, weighted towards the mean and concentrated around said mean according to σ.
         </p>

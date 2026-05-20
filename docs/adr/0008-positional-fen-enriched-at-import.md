@@ -1,0 +1,5 @@
+# Positional puzzle FEN enriched at import time, not at solve time
+
+The source CSV for Positional puzzles provides the FEN of the position where the user must play. The system requires FEN = position *before* the opponent's last move (the SolveContract invariant: index 0 is always an opponent ply). Rather than storing the raw CSV FEN and reconstructing the pre-opponent FEN at solve time, the Pipeline fetches each Lichess game via `berserk` (`games.export_multi` in batches of up to 300), walks back one ply, and stores the enriched FEN + `"opponent_move best_move"` as the `moves` string — identical in shape to `lichess_tactics.moves`.
+
+The solve-time alternative was rejected because it would require special-casing the SolveContract parity assumption in the board engine and frontend for a single source type. Enriching at import time keeps the backend's `_scraped_positional_payload()` structurally identical to `_lichess_tactic_payload()` and leaves all solving code source-agnostic. Puzzles that cannot be enriched (Lichess API failure) are skipped and counted in the `SourceImportRun` stats.

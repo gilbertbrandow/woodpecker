@@ -73,22 +73,29 @@ export type Subset = {
   ownedBy: { id: number; displayName: string; avatarUrl: string | null }
 }
 
-export type SubsetConfig = {
-  rating?: {
-    min?: number
-    max?: number
-    mean?: number
-    sigma?: number
-  }
+export type LichessTacticSourceConfig = {
+  rating?: { min?: number; max?: number; mean?: number; sigma?: number }
   themes?: Record<string, number>
-  openings?: {
-    items?: string[]
-    strength?: number
-  }
+  openings?: { items?: string[]; strength?: number }
+}
+
+export type ScrapedPositionalSourceConfig = {
+  difficulty?: number[]
+  themes?: string[]
+  opening?: { items?: string[]; strength?: number }
+}
+
+export type SourceEntry =
+  | { source: 'LICHESS_TACTIC'; percentage: number; config: LichessTacticSourceConfig }
+  | { source: 'SCRAPED_POSITIONAL'; percentage: number; config: ScrapedPositionalSourceConfig }
+
+export type SubsetConfig = {
+  sources: SourceEntry[]
 }
 
 export type LichessTacticTheme = { name: string; displayName: string | null }
 export type LichessTacticOpening = { name: string; displayName: string; eco: string }
+export type TrainingItemOpening = { name: string; displayName: string; eco: string }
 
 export type LichessTacticSourceMetadata = {
   sourceType: 'LICHESS_TACTIC'
@@ -96,19 +103,26 @@ export type LichessTacticSourceMetadata = {
   rating: number
   gameUrl: string
   themes: LichessTacticTheme[]
+  opening: TrainingItemOpening | null
 }
 
-export type PositionalSourceMetadata = {
-  sourceType: 'POSITIONAL'
+export type ScrapedPositionalSourceMetadata = {
+  sourceType: 'SCRAPED_POSITIONAL'
+  internalId: number
+  lichessUrl: string
+  difficulty: ScrapedPositionalDifficulty
+  themes: { name: string; displayName: string }[]
+  opening: TrainingItemOpening | null
 }
 
 export type DecoySourceMetadata = {
   sourceType: 'DECOY'
 }
 
-export type SourceMetadata = LichessTacticSourceMetadata | PositionalSourceMetadata | DecoySourceMetadata
+export type SourceMetadata = LichessTacticSourceMetadata | ScrapedPositionalSourceMetadata | DecoySourceMetadata
 
 export type LichessTactic = {
+  trainingItemId: number
   puzzleId: string
   rating: number
   popularity: number
@@ -117,6 +131,23 @@ export type LichessTactic = {
   themes: LichessTacticTheme[]
   openings: LichessTacticOpening[]
 }
+
+export type LichessTacticRow = LichessTactic & { sourceType: 'LICHESS_TACTIC' }
+
+export type ScrapedPositionalRow = {
+  trainingItemId: number
+  sourceType: 'SCRAPED_POSITIONAL'
+  internalId: number
+  lichessUrl: string
+  difficulty: number
+  difficultyLabel: string
+  difficultyMinRating: number | null
+  difficultyMaxRating: number | null
+  themes: { name: string; displayName: string }[]
+  opening: TrainingItemOpening | null
+}
+
+export type TrainingItemRow = LichessTacticRow | ScrapedPositionalRow
 
 export type SortColumn = 'rating' | 'popularity' | 'nb_plays'
 export type SortOrder = 'asc' | 'desc'
@@ -129,7 +160,16 @@ export type LichessTacticPage = {
   total: number
 }
 
-export type SubsetStats = {
+export type TrainingItemPage = {
+  puzzles: TrainingItemRow[]
+  page: number
+  pageSize: number
+  totalPages: number
+  total: number
+}
+
+export type LichessTacticStats = {
+  count: number
   ratingBuckets: { min: number; max: number; count: number }[]
   themes: { name: string; displayName: string; description: string; count: number }[]
   openings: { name: string; displayName: string; count: number }[]
@@ -137,6 +177,21 @@ export type SubsetStats = {
   avgNbPlays: number
   avgRating: number
   noOpeningCount: number
+  ratingRange: { min: number | null; max: number | null; step: number }
+}
+
+export type ScrapedPositionalStats = {
+  count: number
+  difficultyDistribution: { value: number; label: string; count: number }[]
+  themes: { name: string; displayName: string; count: number }[]
+  openings: { name: string; displayName: string; count: number }[]
+}
+
+export type SubsetStats = {
+  sources: {
+    LICHESS_TACTIC?: LichessTacticStats
+    SCRAPED_POSITIONAL?: ScrapedPositionalStats
+  }
   totalActive: number
 }
 
@@ -152,7 +207,7 @@ export type Opening = {
   eco: string | null
 }
 
-export type TrainingItemSource = 'LICHESS_TACTIC' | 'DECOY' | 'POSITIONAL'
+export type TrainingItemSource = 'LICHESS_TACTIC' | 'DECOY' | 'SCRAPED_POSITIONAL'
 
 export type TrainingItem = {
   id: number
@@ -622,6 +677,52 @@ export type LichessTacticsThemeDetail = {
   count: number
 }
 
+export type ScrapedPositionalDifficulty = {
+  value: number
+  label: string
+  minRating: number | null
+  maxRating: number | null
+}
+
+export type ScrapedPositionalPuzzle = {
+  internalId: number
+  lichessUrl: string
+  difficulty: ScrapedPositionalDifficulty
+  themes: { name: string; displayName: string }[]
+  opening: { name: string; displayName: string; eco: string } | null
+}
+
+export type ScrapedPositionalPage = {
+  puzzles: ScrapedPositionalPuzzle[]
+  page: number
+  pageSize: number
+  totalPages: number
+  total: number
+}
+
+export type ScrapedPositionalDifficultyDetail = {
+  value: number
+  label: string
+  description: string
+  minRating: number | null
+  maxRating: number | null
+  count: number
+}
+
+export type ScrapedPositionalThemeDetail = {
+  name: string
+  displayName: string
+  description: string
+  count: number
+}
+
+export type ScrapedPositionalSourceRunMetadata = {
+  totalPositionalAfterRun: number
+  difficultyCounts: ScrapedPositionalDifficultyDetail[]
+  themes: ScrapedPositionalThemeDetail[]
+  generatedAt: string
+}
+
 export type LichessTacticsSourceRunMetadata = {
   latestSourceImportRunId: number
   importedCount: number
@@ -675,7 +776,7 @@ export const api = {
       page?: number,
       sort?: SortColumn,
       order?: SortOrder,
-    ): Promise<LichessTacticPage> => {
+    ): Promise<TrainingItemPage> => {
       const params = new URLSearchParams()
       if (page !== undefined) params.set('page', String(page))
       if (sort) params.set('sort', sort)
@@ -683,8 +784,8 @@ export const api = {
       const qs = params.toString()
       return request(`/subsets/${id}/puzzles${qs ? `?${qs}` : ''}`)
     },
-    discardTrainingItem: (id: number, puzzleId: string): Promise<void> =>
-      request(`/subsets/${id}/puzzles/${puzzleId}`, { method: 'DELETE' }),
+    discardTrainingItem: (id: number, trainingItemId: number): Promise<void> =>
+      request(`/subsets/${id}/puzzles/${trainingItemId}`, { method: 'DELETE' }),
     getStats: (id: number): Promise<SubsetStats> => request(`/subsets/${id}/stats`),
   },
   schedules: {
@@ -831,6 +932,24 @@ export const api = {
         if (params.openings?.length) p.set('openings', params.openings.join(','))
         const qs = p.toString()
         return request(`/sources/lichess-tactics/items${qs ? `?${qs}` : ''}`)
+      },
+    },
+    scrapedPositional: {
+      sourceRunMetadata: (): Promise<{ metadata: ScrapedPositionalSourceRunMetadata | null }> =>
+        request('/sources/scraped-positional/source-run-metadata'),
+      items: (params: {
+        page?: number
+        difficulty?: number
+        theme?: string
+        opening?: string
+      }): Promise<ScrapedPositionalPage> => {
+        const p = new URLSearchParams()
+        if (params.page !== undefined) p.set('page', String(params.page))
+        if (params.difficulty !== undefined) p.set('difficulty', String(params.difficulty))
+        if (params.theme) p.set('theme', params.theme)
+        if (params.opening) p.set('opening', params.opening)
+        const qs = p.toString()
+        return request(`/sources/scraped-positional/items${qs ? `?${qs}` : ''}`)
       },
     },
   },
