@@ -46,6 +46,9 @@ prod-lichess-tactics-themes-import: _confirm-prod-mutation
 prod-openings-import: _confirm-prod-mutation
 	@DATABASE_URL=$(PROD_DB_URL) $(MAKE) -s -C ../pipeline openings-import
 
+prod-scraped-positional-import: _confirm-prod-mutation
+	@DATABASE_URL=$(PROD_DB_URL) $(MAKE) -s -C ../pipeline import-scraped-positional ARGS="$(ARGS)"
+
 # ── Backup validation ──────────────────────────────────────────────────────────
 
 db-backup-validate-latest:
@@ -68,5 +71,6 @@ whitelist-add:
         _confirm-prod-mutation \
         prod-lichess-tactics-validate prod-lichess-tactics-import \
         prod-lichess-tactics-themes-import prod-openings-import \
+        prod-scraped-positional-import \
         db-backup-validate-latest db-backup-validate db-backup-validate-clean \
         whitelist-add
