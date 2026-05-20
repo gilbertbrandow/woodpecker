@@ -1,6 +1,7 @@
 import json
 import random
 from datetime import datetime, timezone
+from typing import Any
 
 import sqlalchemy as sa
 
@@ -150,7 +151,7 @@ def _sample_lichess_tactics(
             weighted AS (
                 SELECT
                     e.id,
-                    COALESCE(ts.score, 0.0)
+                    COALESCE(ts.score, 1.0)
                     * CASE
                         WHEN :mu IS NULL OR :sigma IS NULL THEN 1.0
                         ELSE exp(-0.5 * power((e.rating::float - CAST(:mu AS float)) / CAST(:sigma AS float), 2))
@@ -511,7 +512,7 @@ def list_active_puzzles(
         {"ids": lichess_ti_ids},
     ).all() if lichess_ti_ids else []
 
-    lichess_by_ti: dict[int, object] = {r.training_item_id: r for r in lichess_rows}
+    lichess_by_ti: dict[int, Any] = {r.training_item_id: r for r in lichess_rows}
     lichess_ids = [r.id for r in lichess_rows]
 
     lt_theme_map: dict[int, list[dict[str, str]]] = {}
@@ -557,7 +558,7 @@ def list_active_puzzles(
         {"ids": positional_ti_ids},
     ).all() if positional_ti_ids else []
 
-    positional_by_ti: dict[int, object] = {r.training_item_id: r for r in positional_rows}
+    positional_by_ti: dict[int, Any] = {r.training_item_id: r for r in positional_rows}
     positional_ids = [r.id for r in positional_rows]
 
     sp_theme_map: dict[int, list[dict[str, str]]] = {}
