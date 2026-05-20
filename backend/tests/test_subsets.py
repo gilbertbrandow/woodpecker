@@ -332,7 +332,7 @@ _MIGRATION_SQL = """
             )
         )
     )
-    WHERE config IS NOT NULL
+    WHERE config @> '{}'::jsonb
       AND NOT (config ? 'sources')
 """
 

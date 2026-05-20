@@ -30,7 +30,7 @@ def upgrade() -> None:
                 )
             )
         )
-        WHERE config IS NOT NULL
+        WHERE config @> '{}'::jsonb
           AND NOT (config ? 'sources')
     """))
 
