@@ -302,7 +302,17 @@ class TestOnboardingEndpoint:
 @pytest.mark.integration
 class TestApiResponsePrivacy:
     def test_leaderboard_does_not_contain_lichess_username(self, app: Flask, db_session) -> None:  # type: ignore[misc]
+        user = User(
+            lichess_username="privlbuser",
+            display_name="Priv LB User",
+            created_at=datetime.now(timezone.utc),
+        )
+        db_session.add(user)
+        db_session.flush()
+
         with app.test_client() as client:
+            with client.session_transaction() as sess:
+                sess["user_id"] = user.id
             response = client.get("/leaderboard")
             assert response.status_code == 200
             data = response.get_json()
