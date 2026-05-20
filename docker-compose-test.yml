@@ -2,6 +2,9 @@ services:
   backend:
     build:
       target: dev
+    volumes:
+      - ./backend/tests:/app/tests:ro
+      - ./backend/pytest.ini:/app/pytest.ini:ro
     environment:
       SECRET_KEY: ci-test-secret
       LICHESS_CLIENT_ID: test
