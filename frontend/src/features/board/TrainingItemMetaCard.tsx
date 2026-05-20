@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Badge } from '../../components/ui/badge'
 import { cn } from '../../lib/utils'
-import type { LichessTacticSourceMetadata, ScrapedPositionalSourceMetadata, SourceMetadata, TrainingItemOpening } from '../../lib/api'
+import type { LichessTacticSourceMetadata, ScrapedPositionalSourceMetadata, SourceMetadata } from '../../lib/api'
 import type { PlySelection } from './boardPage.helpers'
 import { TrainingItemTypeBadge } from '../../components/TrainingItemTypeBadge'
 
@@ -128,15 +128,6 @@ function computePrevPly(
   return selected.index > 0 ? { line: 'main', index: selected.index - 1 } : null
 }
 
-function OpeningBadge({ opening }: { opening: TrainingItemOpening }): React.ReactElement {
-  return (
-    <Badge variant="secondary" className="text-xs font-normal gap-1">
-      <span className="font-mono text-muted-foreground">{opening.eco}</span>
-      {opening.displayName}
-    </Badge>
-  )
-}
-
 function LichessTacticSection({
   source,
   trainingItemId,
@@ -149,22 +140,11 @@ function LichessTacticSection({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-3">
-        {!focusMode && <TrainingItemTypeBadge source="LICHESS_TACTIC" />}
         <div>
           <span className="text-xs text-muted-foreground">Puzzle </span>
-          {focusMode ? (
-            <span className="text-sm font-mono">#{trainingItemId ?? source.displayId}</span>
-          ) : (
-            <a
-              href={`https://lichess.org/training/${source.displayId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-mono text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-            >
-              #{source.displayId}
-            </a>
-          )}
+          <span className="text-sm font-mono">#{trainingItemId ?? source.displayId}</span>
         </div>
+        {!focusMode && <TrainingItemTypeBadge source="LICHESS_TACTIC" />}
         {!focusMode && (
           <span className="tabular-nums text-sm">
             <span className="text-xs text-muted-foreground">Rating </span>
@@ -172,9 +152,8 @@ function LichessTacticSection({
           </span>
         )}
       </div>
-      {!focusMode && (source.themes.length > 0 || source.opening !== null) && (
+      {!focusMode && source.themes.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {source.opening !== null && <OpeningBadge opening={source.opening} />}
           {source.themes.map((t) => (
             <Badge key={t.name} variant="outline" className="text-xs font-normal">
               {t.displayName}
@@ -198,29 +177,22 @@ function ScrapedPositionalSection({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-3">
-        {!focusMode && <TrainingItemTypeBadge source="SCRAPED_POSITIONAL" />}
         <div>
           <span className="text-xs text-muted-foreground">Puzzle </span>
-          {focusMode ? (
-            <span className="text-sm font-mono">#{trainingItemId ?? source.internalId}</span>
-          ) : (
-            <a
-              href={source.lichessUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-mono text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-            >
-              #{source.internalId}
-            </a>
-          )}
+          <span className="text-sm font-mono">#{trainingItemId ?? source.internalId}</span>
         </div>
+        {!focusMode && <TrainingItemTypeBadge source="SCRAPED_POSITIONAL" />}
         {!focusMode && (
-          <span className="text-xs text-muted-foreground">{source.difficulty.label}</span>
+          <span className="tabular-nums text-sm">
+            <span className="text-xs text-muted-foreground">Rating </span>
+            {source.difficulty.minRating != null && source.difficulty.maxRating != null
+              ? `${source.difficulty.minRating}–${source.difficulty.maxRating}`
+              : source.difficulty.label}
+          </span>
         )}
       </div>
-      {!focusMode && (source.themes.length > 0 || source.opening !== null) && (
+      {!focusMode && source.themes.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {source.opening !== null && <OpeningBadge opening={source.opening} />}
           {source.themes.map((t) => (
             <Badge key={t.name} variant="outline" className="text-xs font-normal">
               {t.displayName}
@@ -284,9 +256,18 @@ export function TrainingItemMetaCard({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onPlyClick, selectedPly, pgnDisplay])
 
+  const opening =
+    source.sourceType !== 'DECOY' ? source.opening : null
+
   return (
     <div className="flex flex-col gap-3 rounded-md border border-border px-3 py-3">
       <SourceSection source={source} trainingItemId={trainingItemId} focusMode={focusMode} />
+      {opening !== null && (
+        <div className="flex items-center gap-1.5 border-t border-border pt-3 pb-1 overflow-hidden">
+          <span className="font-mono text-xs font-semibold shrink-0">{opening.eco}</span>
+          <span className="text-xs text-muted-foreground truncate">Hungarian Opening: Reversed Brooklyn Defense, Brooklyn Benko Gambit</span>
+        </div>
+      )}
       {pgnDisplay !== null && pgnDisplay.mainline.length > 0 && (
         <div className={cn('text-sm leading-relaxed', 'border-t border-border pt-2')}>
           <MoveSequence moves={pgnDisplay.mainline} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />

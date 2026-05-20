@@ -22,6 +22,7 @@ from app.services.schedule_config import ScheduleConfig
 from app.services.solve_contract import SolveContract
 from app.services.training_item_content import (
     LichessTacticMetadata,
+    ScrapedPositionalMetadata,
     SourceMetadata,
     get_content,
     get_content_batch,
@@ -1028,9 +1029,12 @@ def _compute_overview_actions(run: Run, metadata: SourceMetadata) -> dict[str, o
     elif run.aborted_at is not None:
         disabled_reason = "Run aborted"
 
-    analyze_url: str | None = (
-        metadata.game_url if isinstance(metadata, LichessTacticMetadata) else None
-    )
+    if isinstance(metadata, LichessTacticMetadata):
+        analyze_url: str | None = metadata.game_url
+    elif isinstance(metadata, ScrapedPositionalMetadata):
+        analyze_url = metadata.lichess_url
+    else:
+        analyze_url = None
 
     return {
         "runStatus": run.status,
