@@ -105,6 +105,7 @@ def _patch_berserk(mock_client: MagicMock):  # type: ignore[misc]
 
 # ── Cap behavior ──────────────────────────────────────────────────────────────
 
+@pytest.mark.integration
 class TestCapBehavior:
     def test_user_below_cap_gets_onboarding(self, app: Flask, db_session) -> None:  # type: ignore[misc]
         with patch.dict(os.environ, {"MAX_USERS": "5"}):
@@ -140,6 +141,7 @@ class TestCapBehavior:
 
 # ── Whitelist bypass ──────────────────────────────────────────────────────────
 
+@pytest.mark.integration
 class TestWhitelistBypass:
     def test_whitelisted_user_bypasses_cap(self, app: Flask, db_session) -> None:  # type: ignore[misc]
         for i in range(5):
@@ -181,6 +183,7 @@ class TestWhitelistBypass:
 
 # ── Existing user always active ───────────────────────────────────────────────
 
+@pytest.mark.integration
 class TestExistingUserAlwaysActive:
     def test_existing_user_always_active(self, app: Flask, db_session) -> None:  # type: ignore[misc]
         for i in range(10):
@@ -219,6 +222,7 @@ class TestExistingUserAlwaysActive:
 
 # ── Waitlist idempotency ──────────────────────────────────────────────────────
 
+@pytest.mark.integration
 class TestWaitlistIdempotency:
     def test_two_logins_produce_one_waitlist_row(self, app: Flask, db_session) -> None:  # type: ignore[misc]
         for i in range(3):
@@ -247,6 +251,7 @@ class TestWaitlistIdempotency:
 
 # ── Onboarding endpoint ───────────────────────────────────────────────────────
 
+@pytest.mark.integration
 class TestOnboardingEndpoint:
     def test_onboarding_creates_user(self, app: Flask, db_session) -> None:  # type: ignore[misc]
         with app.test_client() as client:
@@ -294,6 +299,7 @@ class TestOnboardingEndpoint:
 
 # ── API response privacy ──────────────────────────────────────────────────────
 
+@pytest.mark.integration
 class TestApiResponsePrivacy:
     def test_leaderboard_does_not_contain_lichess_username(self, app: Flask, db_session) -> None:  # type: ignore[misc]
         with app.test_client() as client:

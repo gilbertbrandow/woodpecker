@@ -63,6 +63,7 @@ def _login(client: FlaskClient, user_id: int) -> None:
 
 # ── Unit: model persistence ────────────────────────────────────────────────────
 
+@pytest.mark.integration
 class TestSourceImportRunModel:
     def test_can_persist_running_run(self, db_session) -> None:
         from app.models.source_import_run import SourceImportRun, SourceImportSource, SourceImportOperation, SourceImportStatus
