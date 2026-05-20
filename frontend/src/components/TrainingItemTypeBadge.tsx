@@ -51,6 +51,7 @@ export function TrainingItemTypeBadge({ source, itemType, className }: TrainingI
   if (!resolvedType) return null
 
   const config = BADGE_CONFIG[resolvedType]
+  if (!config) return null
   return (
     <Tooltip>
       <TooltipTrigger asChild>
