@@ -142,6 +142,8 @@ def create_training(user_id: int, schedule_id: int) -> Training:
         sa.select(Training).where(
             Training.schedule_id == schedule_id,
             Training.user_id == user_id,
+            Training.aborted_at.is_(None),
+            Training.completed_at.is_(None),
         )
     )
     if existing is not None:
@@ -291,7 +293,17 @@ def abort_training(training_id: int, user_id: int) -> Training:
     training = _get_owned_training(training_id, user_id)
     if training.completed_at is not None or training.aborted_at is not None:
         raise ValueError("Training is already terminal.")
-    training.aborted_at = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    training.aborted_at = now
+    active_run = db.session.scalar(
+        sa.select(Run).where(
+            Run.training_id == training.id,
+            Run.completed_at.is_(None),
+            Run.aborted_at.is_(None),
+        )
+    )
+    if active_run is not None:
+        active_run.aborted_at = now
     db.session.commit()
     return training
 
