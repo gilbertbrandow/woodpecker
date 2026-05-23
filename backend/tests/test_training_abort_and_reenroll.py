@@ -139,7 +139,7 @@ class TestAbortTrainingCascade:
 
         client.post(f"/training/{world['training_id']}/abort")
         resp = client.post(f"/training/{world['training_id']}/abort")
-        assert resp.status_code in (400, 409)
+        assert resp.status_code == 409
 
 
 @pytest.mark.integration

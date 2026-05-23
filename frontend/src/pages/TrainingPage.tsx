@@ -245,6 +245,7 @@ export function TrainingPage(): React.ReactElement | null {
   const [statsOpen, setStatsOpen] = useState(true)
   const [showAbortDialog, setShowAbortDialog] = useState(false)
   const [aborting, setAborting] = useState(false)
+  const [startingNewTraining, setStartingNewTraining] = useState(false)
   const [startingIndex, setStartingIndex] = useState<number | null>(null)
   const [insights, setInsights] = useState<TrainingInsights | null>(null)
   const [insightsLoading, setInsightsLoading] = useState(false)
@@ -322,8 +323,6 @@ export function TrainingPage(): React.ReactElement | null {
       setShowAbortDialog(false)
     }
   }
-
-  const [startingNewTraining, setStartingNewTraining] = useState(false)
 
   const handleStartNewTraining = async (): Promise<void> => {
     if (!training || startingNewTraining) return

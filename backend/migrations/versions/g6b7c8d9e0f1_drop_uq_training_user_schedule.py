@@ -1,7 +1,7 @@
 """drop unique constraint uq_training_user_schedule
 
 Revision ID: g6b7c8d9e0f1
-Revises: f5a6b7c8d9e0
+Revises: d3e4f5a6b7c8
 Create Date: 2026-05-23
 
 """
