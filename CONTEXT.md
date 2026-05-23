@@ -27,7 +27,8 @@ A categorical tag applied to a `SCRAPED_POSITIONAL` puzzle (e.g. `space`, `kings
 _Avoid_: tag, category
 
 **Decoy**:
-A TrainingItem from the Decoy source. Solved by playing any one of a set of accepted moves. This is the only source type with a non-exact-match validation rule.
+A TrainingItem from the `DECOY` source. Sourced from classical OTB master games: a position (from move 20 onwards) where the engine confirms at least three moves are within 50 centipawns of the best evaluation. Solved by playing any one of those accepted moves — the only source type with a set-match (non-exact) validation rule. The stored FEN is the position before the opponent's last move, consistent with the SolveContract invariant. Each Decoy is linked to an Opening (via ECO code from the source game's PGN headers) for display and filtering. Configurable in a SourceComposition by opening (ECO hierarchy).
+_Avoid_: dud tactic, decision position (pipeline-internal term only)
 
 **Subset**:
 A user-curated collection of TrainingItems, forming the fixed puzzle set for one training cycle. A Subset can draw from one or more Sources.
@@ -38,7 +39,7 @@ A pre-configured training plan linking a Subset to a time-based recurrence and a
 _Avoid_: plan, recurring session
 
 **Training**:
-A user's active engagement with one Schedule. At most one Training exists per user per Schedule. Tracks when the user started, completed, or aborted their work through the Schedule's Runs.
+A user's active engagement with one Schedule. At most one non-terminal Training (i.e. not `aborted` and not `completed`) exists per user per Schedule; multiple historical Trainings are permitted. Tracks when the user started, completed, or aborted their work through the Schedule's Runs.
 _Avoid_: session, training session
 
 **Run**:

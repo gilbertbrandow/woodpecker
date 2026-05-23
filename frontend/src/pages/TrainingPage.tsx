@@ -323,6 +323,20 @@ export function TrainingPage(): React.ReactElement | null {
     }
   }
 
+  const [startingNewTraining, setStartingNewTraining] = useState(false)
+
+  const handleStartNewTraining = async (): Promise<void> => {
+    if (!training || startingNewTraining) return
+    setStartingNewTraining(true)
+    try {
+      const newTraining = await api.training.create(training.scheduleId)
+      void navigate({ to: '/app/training/$trainingId', params: { trainingId: String(newTraining.id) } })
+    } catch {
+      toast.error('Failed to start new training', { description: 'Please try again.' })
+      setStartingNewTraining(false)
+    }
+  }
+
   const runCount = training?.schedule.runCount ?? 0
   const puzzleCount = training?.schedule.subset.puzzleCount ?? 0
 
@@ -402,8 +416,19 @@ export function TrainingPage(): React.ReactElement | null {
       </div>
 
       {training.status === 'aborted' && training.abortedAt && (
-        <div className="mb-6 rounded-md border border-amber-600/30 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950/20 dark:text-amber-400">
-          This training was aborted on {formatDate(training.abortedAt)}.
+        <div className="mb-6 flex items-center justify-between rounded-md border border-amber-600/30 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950/20 dark:text-amber-400">
+          <span>This training was aborted on {formatDate(training.abortedAt)}.</span>
+          {isOwner && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handleStartNewTraining()}
+              disabled={startingNewTraining}
+              className="ml-4 shrink-0 border-amber-600/40 text-amber-800 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/20"
+            >
+              {startingNewTraining ? 'Starting…' : 'Start new training'}
+            </Button>
+          )}
         </div>
       )}
 
