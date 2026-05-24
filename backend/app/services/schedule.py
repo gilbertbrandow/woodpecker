@@ -167,32 +167,72 @@ def get_schedule_insights(schedule_id: int, user_id: int) -> list[dict[str, obje
     return result
 
 
-def list_schedules(user_id: int, subset_id: int | None = None, locked_only: bool = False) -> list[dict[str, object]]:
-    subset_clause = "AND s.subset_id = :subset_id" if subset_id is not None else ""
+def list_schedules(
+    user_id: int,
+    subset_id: int | None = None,
+    locked_only: bool = False,
+    statuses: list[str] | None = None,
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+    user_ids: list[int] | None = None,
+) -> dict[str, object]:
     if locked_only:
         access_clause = "s.locked_at IS NOT NULL"
     else:
         access_clause = "(s.locked_at IS NOT NULL OR s.user_id = :uid)"
+
     params: dict[str, object] = {"uid": user_id}
+    conditions: list[str] = [f"WHERE {access_clause}"]
+
     if subset_id is not None:
+        conditions.append("AND s.subset_id = :subset_id")
         params["subset_id"] = subset_id
+    if search:
+        conditions.append("AND s.name ILIKE :search")
+        params["search"] = f"%{search}%"
+    if user_ids:
+        uid_list = ",".join(str(int(uid)) for uid in user_ids)
+        conditions.append(f"AND s.user_id IN ({uid_list})")
+    if statuses and not locked_only:
+        status_parts: list[str] = []
+        if "locked" in statuses:
+            status_parts.append("s.locked_at IS NOT NULL")
+        if "draft" in statuses:
+            status_parts.append("s.locked_at IS NULL")
+        if status_parts:
+            conditions.append(f"AND ({' OR '.join(status_parts)})")
+
+    where_sql = " ".join(conditions)
+    base_sql = f"""
+        FROM schedules s
+        JOIN users u ON u.id = s.user_id
+        JOIN subsets sub ON sub.id = s.subset_id
+        {where_sql}
+    """
+
+    if locked_only:
+        total: int | None = None
+        limit_clause = ""
+    else:
+        total = int(db.session.execute(sa.text(f"SELECT COUNT(*) {base_sql}"), params).scalar_one())
+        offset = (page - 1) * page_size
+        limit_clause = f"LIMIT {page_size} OFFSET {offset}"
+
     rows = db.session.execute(
         sa.text(f"""
             SELECT s.id, s.name, s.description, s.config,
                    s.created_at, s.locked_at, s.subset_id,
                    u.id AS user_id, u.display_name, u.avatar_url,
                    sub.name AS subset_name
-            FROM schedules s
-            JOIN users u ON u.id = s.user_id
-            JOIN subsets sub ON sub.id = s.subset_id
-            WHERE {access_clause}
-            {subset_clause}
+            {base_sql}
             ORDER BY s.created_at DESC
+            {limit_clause}
         """),
         params,
     ).all()
 
-    result: list[dict[str, object]] = []
+    items: list[dict[str, object]] = []
     for row in rows:
         if isinstance(row.config, dict):
             schedule_cfg = ScheduleConfig.from_dict(row.config)
@@ -203,7 +243,7 @@ def list_schedules(user_id: int, subset_id: int | None = None, locked_only: bool
             run_count = 0
             total_hours = 0
             puzzle_order = None
-        result.append({
+        items.append({
             "id": row.id,
             "name": row.name,
             "description": row.description,
@@ -217,4 +257,5 @@ def list_schedules(user_id: int, subset_id: int | None = None, locked_only: bool
             "createdAt": row.created_at.isoformat(),
             "lockedAt": row.locked_at.isoformat() if row.locked_at else None,
         })
-    return result
+
+    return {"items": items, "total": total if total is not None else len(items)}
