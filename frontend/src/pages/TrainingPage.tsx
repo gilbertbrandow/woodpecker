@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams, Link } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { Ban, ChevronDown, Play } from 'lucide-react'
+import { type ColumnDef } from '@tanstack/react-table'
 import {
   ComposedChart,
   Bar,
@@ -47,15 +48,8 @@ import { Button } from '../components/ui/button'
 import { UserAvatar } from '../components/UserAvatar'
 import { Badge } from '../components/ui/badge'
 import { StatusBadge } from '../components/StatusBadge'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../components/ui/table'
 import { ProgressBar } from '../components/ProgressBar'
+import { DataTable } from '../components/DataTable'
 import { formatDuration } from '../components/schedules/DurationInput'
 import { formatStartedAt } from '../lib/utils'
 
@@ -205,6 +199,18 @@ const SLOT_STATUS_LABELS: Record<'not_started' | 'active' | 'completed' | 'abort
   aborted: 'Aborted',
 }
 
+type RunSlotRow = {
+  index: number
+  targetHours: number
+  breakAfterHours: number
+  slotStatus: 'not_started' | 'active' | 'completed' | 'aborted'
+  run: Run | null
+  progressValue: number
+  progressTooltip: string
+  canStart: boolean
+  isStarting: boolean
+}
+
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
     year: 'numeric',
@@ -348,6 +354,153 @@ export function TrainingPage(): React.ReactElement | null {
   )
   const solveTimeCompletedCount = solveTimeData.filter((d) => d.completed).length
 
+  const runRows = useMemo<RunSlotRow[]>(() => {
+    if (!training || !user) return []
+    const sch = training.schedule
+    const defs = sch.runs
+    const isOwner = training.ownerId === user.id
+    const canManage = isOwner && (training.status === 'draft' || training.status === 'in_progress')
+    const completedCount = runs.filter((r) => r.status === 'completed').length
+    const hasActive = runs.some((r) => r.status === 'active')
+    const startableIdx = (canManage && !hasActive && completedCount < sch.runCount) ? completedCount : null
+    return Array.from({ length: sch.runCount }, (_, i) => {
+      const runDef = defs[i] ?? { target_hours: 0, break_after_hours: 0 }
+      const run = getRunForSlot(runs, i)
+      const slotStatus: RunSlotRow['slotStatus'] =
+        run === null ? 'not_started'
+        : run.status === 'active' ? 'active'
+        : run.status === 'completed' ? 'completed'
+        : 'aborted'
+      const resolved = run !== null ? run.solvedCount + run.solvedWithRetriesCount + run.failedCount : 0
+      const progressValue = run !== null && run.totalItems > 0 ? (resolved / run.totalItems) * 100 : 0
+      return {
+        index: i,
+        targetHours: runDef.target_hours,
+        breakAfterHours: runDef.break_after_hours,
+        slotStatus,
+        run,
+        progressValue,
+        progressTooltip: run !== null ? `${resolved} / ${run.totalItems} puzzles completed` : 'Not started yet',
+        canStart: startableIdx === i && slotStatus !== 'active' && slotStatus !== 'completed',
+        isStarting: startingIndex === i,
+      }
+    })
+  }, [training, user, runs, startingIndex])
+
+  const runColumns = useMemo<ColumnDef<RunSlotRow>[]>(() => {
+    const canManage = !!training && !!user && training.ownerId === user.id && (training.status === 'draft' || training.status === 'in_progress')
+    return [
+      {
+        id: 'index',
+        header: '#',
+        enableSorting: false,
+        cell: ({ row }) => (
+          <span className="tabular-nums text-sm text-muted-foreground">{row.original.index + 1}</span>
+        ),
+      },
+      {
+        id: 'status',
+        header: 'Status',
+        enableSorting: false,
+        cell: ({ row }) => {
+          const { slotStatus } = row.original
+          return slotStatus === 'active' ? (
+            <Badge variant="outline" className="text-xs border-blue-500/30 bg-blue-500/10 text-blue-600 dark:border-blue-400/30 dark:bg-blue-400/10 dark:text-blue-400">
+              {SLOT_STATUS_LABELS[slotStatus]}
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-xs">{SLOT_STATUS_LABELS[slotStatus]}</Badge>
+          )
+        },
+      },
+      {
+        id: 'progress',
+        header: 'Progress',
+        enableSorting: false,
+        cell: ({ row }) => (
+          <ProgressBar value={row.original.progressValue} tooltipLabel={row.original.progressTooltip} className="w-28" />
+        ),
+      },
+      {
+        id: 'duration',
+        header: 'Duration',
+        enableSorting: false,
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">{formatDuration(row.original.targetHours)}</span>
+        ),
+      },
+      {
+        id: 'break',
+        header: 'Break',
+        enableSorting: false,
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">
+            {row.original.breakAfterHours > 0
+              ? formatDuration(row.original.breakAfterHours)
+              : <span className="text-muted-foreground/40">—</span>}
+          </span>
+        ),
+      },
+      {
+        id: 'startedAt',
+        header: 'Started',
+        enableSorting: false,
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">
+            {row.original.run?.startedAt
+              ? formatDate(row.original.run.startedAt)
+              : <span className="text-muted-foreground/40">—</span>}
+          </span>
+        ),
+      },
+      {
+        id: 'completedAt',
+        header: 'Completed',
+        enableSorting: false,
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">
+            {row.original.run?.completedAt
+              ? formatDate(row.original.run.completedAt)
+              : <span className="text-muted-foreground/40">—</span>}
+          </span>
+        ),
+      },
+      ...(canManage ? [{
+        id: 'actions',
+        header: '',
+        enableSorting: false,
+        meta: { className: 'sticky right-0 bg-background w-0' },
+        cell: ({ row }: { row: { original: RunSlotRow } }) => {
+          const { canStart, isStarting, slotStatus, run, index } = row.original
+          return (
+            <div className="flex items-center justify-end gap-1.5">
+              {canStart && (
+                <Button
+                  size="sm"
+                  disabled={startingIndex !== null}
+                  onClick={(e) => { e.stopPropagation(); void handleStartRun(index) }}
+                  className="h-6 px-2 text-xs bg-foreground text-background hover:bg-foreground/90"
+                >
+                  {isStarting ? 'Starting…' : 'Start run'}
+                </Button>
+              )}
+              {slotStatus === 'active' && run !== null && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); void navigate({ to: '/app/runs/$runId/solve', params: { runId: String(run.id) } }) }}
+                  className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                  aria-label="Continue run"
+                >
+                  <Play className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          )
+        },
+      } as ColumnDef<RunSlotRow>] : []),
+    ]
+  }, [training, user, startingIndex, handleStartRun, navigate])
+
   if (authLoading || !user) return null
 
   if (pageLoading) {
@@ -367,16 +520,8 @@ export function TrainingPage(): React.ReactElement | null {
   }
 
   const { schedule } = training
-  const runDefs = schedule.runs
   const isOwner = training.ownerId === user.id
-  const canManageRuns = isOwner && (training.status === 'draft' || training.status === 'in_progress')
   const completedRunCount = runs.filter((r) => r.status === 'completed').length
-  const hasActiveRun = runs.some((r) => r.status === 'active')
-  const startableRunIndex = (
-    canManageRuns &&
-    !hasActiveRun &&
-    completedRunCount < schedule.runCount
-  ) ? completedRunCount : null
 
   return (
     <PageWrapper>
@@ -482,107 +627,18 @@ export function TrainingPage(): React.ReactElement | null {
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-          <div className="rounded-md border mt-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10">#</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Break</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Progress</TableHead>
-                  {canManageRuns && (
-                    <TableHead className="sticky right-0 bg-background" />
-                  )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Array.from({ length: schedule.runCount }, (_, i) => {
-                  const runDef = runDefs[i] ?? { target_hours: 0, break_after_hours: 0 }
-                  const run = getRunForSlot(runs, i)
-                  const slotStatus: 'not_started' | 'active' | 'completed' | 'aborted' =
-                    run === null ? 'not_started'
-                    : run.status === 'active' ? 'active'
-                    : run.status === 'completed' ? 'completed'
-                    : 'aborted'
-                  const canStartThisRow = startableRunIndex === i && slotStatus !== 'active' && slotStatus !== 'completed'
-                  const starting = startingIndex === i
-                  const resolved = run !== null ? run.solvedCount + run.solvedWithRetriesCount + run.failedCount : 0
-                  const progressValue = run !== null && run.totalItems > 0 ? (resolved / run.totalItems) * 100 : 0
-                  const progressTooltip = run !== null
-                    ? `${resolved} / ${run.totalItems} puzzles completed`
-                    : 'Not started yet'
-
-                  return (
-                    <TableRow
-                      key={i}
-                      className={run !== null ? 'cursor-pointer' : ''}
-                      onClick={() => {
-                        if (run !== null) void navigate({ to: '/app/runs/$runId', params: { runId: String(run.id) } })
-                      }}
-                    >
-                      <TableCell className="tabular-nums text-sm text-muted-foreground">
-                        {i + 1}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatDuration(runDef.target_hours)}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {runDef.break_after_hours > 0 ? formatDuration(runDef.break_after_hours) : <span className="text-muted-foreground/40">—</span>}
-                      </TableCell>
-                      <TableCell>
-                        {slotStatus === 'active' ? (
-                          <Badge
-                            variant="outline"
-                            className="text-xs border-blue-500/30 bg-blue-500/10 text-blue-600 dark:border-blue-400/30 dark:bg-blue-400/10 dark:text-blue-400"
-                          >
-                            {SLOT_STATUS_LABELS[slotStatus]}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-xs">
-                            {SLOT_STATUS_LABELS[slotStatus]}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <ProgressBar
-                          value={progressValue}
-                          tooltipLabel={progressTooltip}
-                          className="w-28"
-                        />
-                      </TableCell>
-                      {canManageRuns && (
-                        <TableCell className="sticky right-0 bg-background text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {canStartThisRow && (
-                              <Button
-                                size="sm"
-                                disabled={startingIndex !== null}
-                                onClick={(e) => { e.stopPropagation(); void handleStartRun(i) }}
-                                className="bg-foreground text-background hover:bg-foreground/90"
-                              >
-                                {starting ? 'Starting…' : 'Start run'}
-                              </Button>
-                            )}
-                            {slotStatus === 'active' && run !== null && (
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); void navigate({ to: '/app/runs/$runId/solve', params: { runId: String(run.id) } }) }}
-                                className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-                                aria-label="Continue run"
-                              >
-                                <Play className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-            </div>
+              <div className="mt-6">
+                <DataTable
+                  columns={runColumns}
+                  data={runRows}
+                  hideSearch={true}
+                  pageSize={schedule.runCount}
+                  onRowClick={(row) => {
+                    if (row.run !== null) void navigate({ to: '/app/runs/$runId', params: { runId: String(row.run.id) } })
+                  }}
+                  getRowClassName={(row) => row.run !== null ? 'cursor-pointer' : ''}
+                />
+              </div>
             </CollapsibleContent>
           </Collapsible>
         </TabsContent>

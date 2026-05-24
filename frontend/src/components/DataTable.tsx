@@ -23,6 +23,9 @@ import {
   TableCell,
 } from './ui/table'
 import { FilterSelect } from './ui/filter-select'
+import { cn } from '../lib/utils'
+
+type ColMeta = { className?: string }
 
 export type FilterableColumn = {
   id: string
@@ -36,6 +39,7 @@ type DataTableProps<T> = {
   globalFilterPlaceholder?: string
   filterableColumns?: FilterableColumn[]
   filtersSlot?: React.ReactNode
+  hideSearch?: boolean
   pageSize?: number
   initialSorting?: SortingState
   onRowClick?: (row: T) => void
@@ -49,6 +53,7 @@ export function DataTable<T>({
   globalFilterPlaceholder = 'Search…',
   filterableColumns = [],
   filtersSlot,
+  hideSearch = false,
   pageSize = 10,
   initialSorting = [],
   onRowClick,
@@ -116,31 +121,35 @@ export function DataTable<T>({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder={globalFilterPlaceholder}
-            value={globalFilter}
-            onChange={(e) => {
-              setGlobalFilter(e.target.value)
-              table.setPageIndex(0)
-            }}
-            className="h-8 pl-7 text-sm sm:w-56"
-          />
+      {(!hideSearch || filtersSlot || filterableColumns.length > 0) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {!hideSearch && (
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder={globalFilterPlaceholder}
+                value={globalFilter}
+                onChange={(e) => {
+                  setGlobalFilter(e.target.value)
+                  table.setPageIndex(0)
+                }}
+                className="h-8 pl-7 text-sm sm:w-56"
+              />
+            </div>
+          )}
+          {filtersSlot}
+          {filterableColumns.map((fc) => (
+            <FilterSelect
+              key={fc.id}
+              value={filterValues[fc.id] ?? ''}
+              onValueChange={(val) => setColumnFilter(fc.id, val)}
+              placeholder={`All ${fc.label}`}
+              options={fc.options}
+              className="sm:w-40"
+            />
+          ))}
         </div>
-        {filtersSlot}
-        {filterableColumns.map((fc) => (
-          <FilterSelect
-            key={fc.id}
-            value={filterValues[fc.id] ?? ''}
-            onValueChange={(val) => setColumnFilter(fc.id, val)}
-            placeholder={`All ${fc.label}`}
-            options={fc.options}
-            className="sm:w-40"
-          />
-        ))}
-      </div>
+      )}
 
       <div className="overflow-x-auto rounded-md border">
         <Table className="min-w-max">
@@ -151,7 +160,7 @@ export function DataTable<T>({
                   const canSort = h.column.getCanSort()
                   const sorted = h.column.getIsSorted()
                   return (
-                    <TableHead key={h.id} className="whitespace-nowrap">
+                    <TableHead key={h.id} className={cn('whitespace-nowrap', (h.column.columnDef.meta as ColMeta | undefined)?.className)}>
                       {h.isPlaceholder ? null : canSort ? (
                         <button
                           type="button"
@@ -197,7 +206,7 @@ export function DataTable<T>({
                   onClick={onRowClick ? () => onRowClick(row.original) : undefined}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="whitespace-nowrap">
+                    <TableCell key={cell.id} className={cn('whitespace-nowrap', (cell.column.columnDef.meta as ColMeta | undefined)?.className)}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
