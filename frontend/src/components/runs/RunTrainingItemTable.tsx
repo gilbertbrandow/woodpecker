@@ -1,68 +1,20 @@
 import * as React from 'react'
-import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
-  flexRender,
-  type ColumnDef,
-  type SortingState,
-  type Column,
-} from '@tanstack/react-table'
-import { ChevronUp, ChevronDown, ChevronsUpDown, ExternalLink, Play, Eye } from 'lucide-react'
+import { type ColumnDef } from '@tanstack/react-table'
+import { ExternalLink, Play, Eye } from 'lucide-react'
 import { StatusBadge } from '../StatusBadge'
 import { TrainingItemTypeBadge } from '../TrainingItemTypeBadge'
-import { Button } from '../ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from '../ui/table'
+import { DataTable } from '../DataTable'
 import { type RunTrainingItemListItem } from '../../lib/api'
 import { formatSolveTimeMs } from '../../lib/utils'
 
 const PAGE_SIZE = 25
 
-
-
-type ColMeta = { className?: string }
-
 type RunTrainingItemTableProps = {
   trainingItems: RunTrainingItemListItem[]
   runIdStr: string
   isActive: boolean
-}
-
-function SortHeader({
-  column,
-  label,
-}: {
-  column: Column<RunTrainingItemListItem, unknown>
-  label: string
-}): React.ReactElement {
-  const sorted = column.getIsSorted()
-  return (
-    <button
-      type="button"
-      className="flex items-center gap-1 hover:text-foreground"
-      onClick={() => column.toggleSorting(sorted === 'asc')}
-    >
-      {label}
-      {sorted === 'asc' ? (
-        <ChevronUp className="h-3.5 w-3.5" />
-      ) : sorted === 'desc' ? (
-        <ChevronDown className="h-3.5 w-3.5" />
-      ) : (
-        <ChevronsUpDown className="h-3.5 w-3.5 opacity-40" />
-      )}
-    </button>
-  )
 }
 
 type ActionButtonProps = {
@@ -98,7 +50,6 @@ function ActionButton({ tooltip, onClick, disabled = false, children }: ActionBu
 
 export function RunTrainingItemTable({ trainingItems, runIdStr, isActive }: RunTrainingItemTableProps): React.ReactElement {
   const navigate = useNavigate()
-  const [sorting, setSorting] = useState<SortingState>([])
 
   const openSolveItem = (runTrainingItemId: number): void => {
     if (!isActive) return
@@ -110,24 +61,24 @@ export function RunTrainingItemTable({ trainingItems, runIdStr, isActive }: RunT
 
   const columns: ColumnDef<RunTrainingItemListItem>[] = [
     {
+      accessorKey: 'position',
+      header: '#',
+      enableSorting: false,
+      meta: { className: 'w-0' },
+      cell: ({ row }) => (
+        <span className="font-mono text-sm text-muted-foreground">{row.original.position + 1}</span>
+      ),
+    },
+    {
       id: 'sourceType',
       header: 'Type',
       enableSorting: false,
       cell: ({ row }) => <TrainingItemTypeBadge source={row.original.source.sourceType} />,
     },
     {
-      accessorKey: 'position',
-      header: '#',
-      enableSorting: false,
-      meta: { className: 'w-12 text-right' } satisfies ColMeta,
-      cell: ({ row }) => (
-        <span className="font-mono text-sm text-muted-foreground">{row.original.position + 1}</span>
-      ),
-    },
-    {
       id: 'rating',
-      header: ({ column }) => <SortHeader column={column} label="Rating / Level" />,
-      meta: { className: 'min-w-24' } satisfies ColMeta,
+      header: 'Rating / Level',
+      meta: { className: 'min-w-24' },
       accessorFn: (row) =>
         row.source.sourceType === 'LICHESS_TACTIC' ? row.source.rating : null,
       cell: ({ row }) => {
@@ -149,13 +100,13 @@ export function RunTrainingItemTable({ trainingItems, runIdStr, isActive }: RunT
       accessorKey: 'positionStatus',
       header: 'Status',
       enableSorting: false,
-      meta: { className: 'min-w-32' } satisfies ColMeta,
+      meta: { className: 'min-w-32' },
       cell: ({ row }) => <StatusBadge status={row.original.positionStatus} />,
     },
     {
       accessorKey: 'timeMs',
-      header: ({ column }) => <SortHeader column={column} label="Time" />,
-      meta: { className: 'min-w-28' } satisfies ColMeta,
+      header: 'Time',
+      meta: { className: 'min-w-28' },
       sortUndefined: 'last',
       cell: ({ row }) => (
         <span className="tabular-nums">
@@ -165,8 +116,8 @@ export function RunTrainingItemTable({ trainingItems, runIdStr, isActive }: RunT
     },
     {
       accessorKey: 'tryCount',
-      header: ({ column }) => <SortHeader column={column} label="Tries" />,
-      meta: { className: 'min-w-20 text-right' } satisfies ColMeta,
+      header: 'Tries',
+      meta: { className: 'min-w-20 text-right' },
       cell: ({ row }) => (
         <span className="tabular-nums">{row.original.tryCount > 0 ? row.original.tryCount : '—'}</span>
       ),
@@ -175,7 +126,7 @@ export function RunTrainingItemTable({ trainingItems, runIdStr, isActive }: RunT
       id: 'actions',
       header: '',
       enableSorting: false,
-      meta: { className: 'sticky right-0 bg-background w-28' } satisfies ColMeta,
+      meta: { className: 'sticky right-0 bg-background w-0' },
       cell: ({ row }) => {
         const item = row.original
         const src = item.source
@@ -228,95 +179,14 @@ export function RunTrainingItemTable({ trainingItems, runIdStr, isActive }: RunT
     },
   ]
 
-  const table = useReactTable({
-    data: trainingItems,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    initialState: {
-      pagination: { pageIndex: 0, pageSize: PAGE_SIZE },
-    },
-    state: { sorting },
-    onSortingChange: (updater) => {
-      const next = typeof updater === 'function' ? updater(sorting) : updater
-      setSorting(next)
-      table.setPageIndex(0)
-    },
-  })
-
-  const { pageIndex } = table.getState().pagination
-  const total = trainingItems.length
-  const start = pageIndex * PAGE_SIZE + 1
-  const end = Math.min(pageIndex * PAGE_SIZE + table.getRowModel().rows.length, total)
-
   return (
-    <div className="flex flex-col gap-4">
-      <div className="overflow-x-auto rounded-md border">
-        <Table className="min-w-max">
-          <TableHeader>
-            {table.getHeaderGroups().map((hg) => (
-              <TableRow key={hg.id}>
-                {hg.headers.map((h) => (
-                  <TableHead key={h.id} className={`whitespace-nowrap ${(h.column.columnDef.meta as ColMeta | undefined)?.className ?? ''}`}>
-                    {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="py-8 text-center text-sm text-muted-foreground">
-                  No puzzles yet.
-                </TableCell>
-              </TableRow>
-            ) : (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className={isActive ? 'cursor-pointer' : undefined}
-                  onClick={() => openSolveItem(row.original.runTrainingItemId)}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className={`whitespace-nowrap ${(cell.column.columnDef.meta as ColMeta | undefined)?.className ?? ''}`}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      <div className="flex flex-col items-start gap-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-        <span>
-          {total === 0 ? 'No puzzles' : `Showing ${start}–${end} of ${total}`}
-        </span>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            ← Prev
-          </Button>
-          <span className="tabular-nums">
-            Page {pageIndex + 1} of {table.getPageCount()}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            Next →
-          </Button>
-        </div>
-      </div>
-    </div>
+    <DataTable
+      columns={columns}
+      data={trainingItems}
+      hideSearch={true}
+      pageSize={PAGE_SIZE}
+      emptyMessage="No puzzles yet."
+      onRowClick={isActive ? (item) => openSolveItem(item.runTrainingItemId) : undefined}
+    />
   )
 }
