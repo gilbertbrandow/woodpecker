@@ -882,8 +882,6 @@ export const api = {
     list: (trainingId: number): Promise<Run[]> =>
       request(`/training/${trainingId}/runs`),
     get: (runId: number): Promise<Run> => request(`/runs/${runId}`),
-    abort: (runId: number): Promise<Run> =>
-      request(`/runs/${runId}/abort`, { method: 'POST' }),
     trainingItems: (runId: number): Promise<RunTrainingItemList> =>
       request(`/runs/${runId}/training-items`),
     getTrainingItem: (runId: number, runTrainingItemId: number): Promise<RunTrainingItemFull> =>

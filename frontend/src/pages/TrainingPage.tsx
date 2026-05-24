@@ -408,7 +408,7 @@ export function TrainingPage(): React.ReactElement | null {
           </div>
         </div>
         {isOwner && training.status === 'in_progress' && (
-          <Button variant="ghost" size="sm" onClick={() => setShowAbortDialog(true)}>
+          <Button variant="destructive" size="sm" onClick={() => setShowAbortDialog(true)}>
             Abort training
           </Button>
         )}
@@ -885,8 +885,9 @@ export function TrainingPage(): React.ReactElement | null {
             <AlertDialogAction
               onClick={() => void handleAbortTraining()}
               disabled={aborting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {aborting ? 'Aborting…' : 'Abort'}
+              {aborting ? 'Aborting…' : 'Abort training'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
