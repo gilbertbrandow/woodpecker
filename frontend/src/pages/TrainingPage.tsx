@@ -1,9 +1,9 @@
 import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { useState, useEffect, useMemo } from 'react'
-import { useNavigate, useParams } from '@tanstack/react-router'
+import { useNavigate, useParams, Link } from '@tanstack/react-router'
 import { toast } from 'sonner'
-import { ChevronDown, Play } from 'lucide-react'
+import { Ban, ChevronDown, Play } from 'lucide-react'
 import {
   ComposedChart,
   Bar,
@@ -395,15 +395,16 @@ export function TrainingPage(): React.ReactElement | null {
           </div>
         </div>
         {isOwner && training.status === 'in_progress' && (
-          <Button variant="ghost" size="sm" onClick={() => setShowAbortDialog(true)}>
+          <Button variant="destructive" size="sm" onClick={() => setShowAbortDialog(true)}>
             Abort training
           </Button>
         )}
       </div>
 
       {training.status === 'aborted' && training.abortedAt && (
-        <div className="mb-6 rounded-md border border-amber-600/30 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950/20 dark:text-amber-400">
-          This training was aborted on {formatDate(training.abortedAt)}.
+        <div className="mb-6 flex items-start gap-3 rounded-md border border-amber-600/30 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950/20 dark:text-amber-400">
+          <Ban className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>This training was aborted on {formatDate(training.abortedAt)}.{isOwner && (<> To train this schedule again, <Link to="/app/training/new" className="underline underline-offset-2 hover:opacity-75">start a new training</Link>.</>)}</span>
         </div>
       )}
 
@@ -861,8 +862,9 @@ export function TrainingPage(): React.ReactElement | null {
             <AlertDialogAction
               onClick={() => void handleAbortTraining()}
               disabled={aborting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {aborting ? 'Aborting…' : 'Abort'}
+              {aborting ? 'Aborting…' : 'Abort training'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

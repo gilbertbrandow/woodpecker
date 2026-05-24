@@ -148,16 +148,3 @@ def get_training_item_history(run_id: int, training_item_id: int) -> tuple[Respo
     return jsonify(result)
 
 
-@runs_bp.post("/<int:run_id>/abort")
-@login_required
-def abort_run(run_id: int) -> tuple[Response, int] | Response:
-    try:
-        run = run_svc.abort_run(run_id, session["user_id"])
-    except LookupError as e:
-        return jsonify({"error": str(e)}), 404
-    except PermissionError as e:
-        return jsonify({"error": str(e)}), 403
-    except ValueError as e:
-        code = 409 if "terminal" in str(e) else 400
-        return jsonify({"error": str(e)}), code
-    return jsonify(run_svc.run_dict(run))

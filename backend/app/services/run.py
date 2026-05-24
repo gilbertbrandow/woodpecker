@@ -1381,15 +1381,6 @@ def get_training_item_history(run_id: int, training_item_id: int, user_id: int) 
     }
 
 
-def abort_run(run_id: int, user_id: int) -> Run:
-    run = _get_owned_run(run_id, user_id)
-    if run.completed_at is not None or run.aborted_at is not None:
-        raise ValueError("Run is already terminal.")
-    run.aborted_at = datetime.now(timezone.utc)
-    db.session.commit()
-    return run
-
-
 def get_attempt(
     run_id: int, run_puzzle_id: int, attempt_id: int, user_id: int
 ) -> dict[str, object]:

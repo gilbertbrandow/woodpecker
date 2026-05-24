@@ -142,6 +142,8 @@ def create_training(user_id: int, schedule_id: int) -> Training:
         sa.select(Training).where(
             Training.schedule_id == schedule_id,
             Training.user_id == user_id,
+            Training.aborted_at.is_(None),
+            Training.completed_at.is_(None),
         )
     )
     if existing is not None:
@@ -291,14 +293,39 @@ def abort_training(training_id: int, user_id: int) -> Training:
     training = _get_owned_training(training_id, user_id)
     if training.completed_at is not None or training.aborted_at is not None:
         raise ValueError("Training is already terminal.")
-    training.aborted_at = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    training.aborted_at = now
+    active_run = db.session.scalar(
+        sa.select(Run).where(
+            Run.training_id == training.id,
+            Run.completed_at.is_(None),
+            Run.aborted_at.is_(None),
+        )
+    )
+    if active_run is not None:
+        active_run.aborted_at = now
     db.session.commit()
     return training
+
+
+_STATUS_SQL: dict[str, str] = {
+    "draft": (
+        "t.aborted_at IS NULL AND t.completed_at IS NULL"
+        " AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.training_id = t.id)"
+    ),
+    "in_progress": (
+        "t.aborted_at IS NULL AND t.completed_at IS NULL"
+        " AND EXISTS (SELECT 1 FROM runs r WHERE r.training_id = t.id)"
+    ),
+    "completed": "t.aborted_at IS NULL AND t.completed_at IS NOT NULL",
+    "aborted": "t.aborted_at IS NOT NULL",
+}
 
 
 def list_all_trainings(
     schedule_id: int | None = None,
     user_ids: list[int] | None = None,
+    statuses: list[str] | None = None,
     page: int = 1,
     page_size: int = 20,
 ) -> dict[str, object]:
@@ -314,6 +341,11 @@ def list_all_trainings(
         conditions.append(f"t.user_id IN ({placeholders})")
         for i, uid in enumerate(user_ids):
             params[f"uid{i}"] = uid
+
+    valid_statuses = [s for s in (statuses or []) if s in _STATUS_SQL]
+    if valid_statuses:
+        parts = " OR ".join(f"({_STATUS_SQL[s]})" for s in valid_statuses)
+        conditions.append(f"({parts})")
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
     offset = (page - 1) * page_size

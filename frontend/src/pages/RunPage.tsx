@@ -23,16 +23,6 @@ import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Slider } from '../components/ui/slider'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../components/ui/alert-dialog'
-import {
   Table,
   TableBody,
   TableCell,
@@ -275,9 +265,6 @@ export function RunPage(): React.ReactElement | null {
   const [puzzleList, setPuzzleList] = useState<RunTrainingItemList | null>(null)
   const [participation, setParticipation] = useState<Training | null>(null)
   const [pageLoading, setPageLoading] = useState(true)
-  const [showAbortDialog, setShowAbortDialog] = useState(false)
-  const [aborting, setAborting] = useState(false)
-
   const breadcrumbParents = useMemo(
     () =>
       participation && run
@@ -309,21 +296,6 @@ export function RunPage(): React.ReactElement | null {
       )
       .finally(() => setPageLoading(false))
   }, [runId, user])
-
-  const handleAbort = async (): Promise<void> => {
-    if (!run || aborting) return
-    setAborting(true)
-    try {
-      const updated = await api.runs.abort(run.id)
-      setRun(updated)
-      toast('Run aborted', { description: 'You can restart this run slot at any time.' })
-    } catch {
-      toast.error('Failed to abort run', { description: 'Please try again.' })
-    } finally {
-      setAborting(false)
-      setShowAbortDialog(false)
-    }
-  }
 
   if (authLoading || !user) return null
 
@@ -379,12 +351,6 @@ export function RunPage(): React.ReactElement | null {
             >
               Continue
             </Button>
-            <Button
-              variant="ghost"
-              onClick={() => setShowAbortDialog(true)}
-            >
-              Abort
-            </Button>
           </div>
         )}
       </div>
@@ -412,23 +378,6 @@ export function RunPage(): React.ReactElement | null {
         </TabsContent>
       </Tabs>
 
-      <AlertDialog open={showAbortDialog} onOpenChange={setShowAbortDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Abort run?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This cannot be undone. Your progress so far will be preserved but the run must be
-              restarted from scratch.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void handleAbort()} disabled={aborting}>
-              {aborting ? 'Aborting…' : 'Abort run'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </PageWrapper>
   )
 }
