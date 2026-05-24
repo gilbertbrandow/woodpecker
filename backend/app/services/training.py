@@ -308,9 +308,24 @@ def abort_training(training_id: int, user_id: int) -> Training:
     return training
 
 
+_STATUS_SQL: dict[str, str] = {
+    "draft": (
+        "t.aborted_at IS NULL AND t.completed_at IS NULL"
+        " AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.training_id = t.id)"
+    ),
+    "in_progress": (
+        "t.aborted_at IS NULL AND t.completed_at IS NULL"
+        " AND EXISTS (SELECT 1 FROM runs r WHERE r.training_id = t.id)"
+    ),
+    "completed": "t.aborted_at IS NULL AND t.completed_at IS NOT NULL",
+    "aborted": "t.aborted_at IS NOT NULL",
+}
+
+
 def list_all_trainings(
     schedule_id: int | None = None,
     user_ids: list[int] | None = None,
+    statuses: list[str] | None = None,
     page: int = 1,
     page_size: int = 20,
 ) -> dict[str, object]:
@@ -326,6 +341,11 @@ def list_all_trainings(
         conditions.append(f"t.user_id IN ({placeholders})")
         for i, uid in enumerate(user_ids):
             params[f"uid{i}"] = uid
+
+    valid_statuses = [s for s in (statuses or []) if s in _STATUS_SQL]
+    if valid_statuses:
+        parts = " OR ".join(f"({_STATUS_SQL[s]})" for s in valid_statuses)
+        conditions.append(f"({parts})")
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
     offset = (page - 1) * page_size

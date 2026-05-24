@@ -838,12 +838,14 @@ export const api = {
     listAll: (opts?: {
       scheduleId?: number
       userIds?: number[]
+      statuses?: string[]
       page?: number
       pageSize?: number
     }): Promise<TrainingPage> => {
       const p = new URLSearchParams()
       if (opts?.scheduleId !== undefined) p.set('scheduleId', String(opts.scheduleId))
       if (opts?.userIds?.length) opts.userIds.forEach((id) => p.append('userId', String(id)))
+      if (opts?.statuses?.length) opts.statuses.forEach((s) => p.append('status', s))
       if (opts?.page !== undefined) p.set('page', String(opts.page))
       if (opts?.pageSize !== undefined) p.set('pageSize', String(opts.pageSize))
       const qs = p.toString()
