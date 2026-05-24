@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -21,7 +21,7 @@ import {
   TableHead,
   TableCell,
 } from './ui/table'
-import { FilterSelect } from './ui/filter-select'
+import { MultiSelectFilter } from './ui/multi-select-filter'
 import { cn } from '../lib/utils'
 
 type ColMeta = { className?: string }
@@ -29,7 +29,7 @@ type ColMeta = { className?: string }
 export type FilterableColumn = {
   id: string
   label: string
-  options: { label: string; value: string }[]
+  options: { label: string; value: string; icon?: React.ReactNode }[]
 }
 
 export type ServerPagination = {
@@ -53,6 +53,7 @@ type DataTableProps<T> = {
   emptyMessage?: string
   loading?: boolean
   serverPagination?: ServerPagination
+  onFilterChange?: (id: string, values: string[]) => void
 }
 
 export function DataTable<T>({
@@ -69,26 +70,12 @@ export function DataTable<T>({
   emptyMessage = 'No results.',
   loading = false,
   serverPagination,
+  onFilterChange,
 }: DataTableProps<T>): React.ReactElement {
   const [sorting, setSorting] = useState<SortingState>(initialSorting)
   const [globalFilter, setGlobalFilter] = useState('')
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-
-  const filterValues = useMemo<Record<string, string>>(() => {
-    const result: Record<string, string> = {}
-    for (const f of columnFilters) {
-      if (typeof f.value === 'string') result[f.id] = f.value
-    }
-    return result
-  }, [columnFilters])
-
-  const setColumnFilter = (id: string, value: string): void => {
-    setColumnFilters((prev) => {
-      const without = prev.filter((f) => f.id !== id)
-      if (value === '') return without
-      return [...without, { id, value }]
-    })
-  }
+  const [filterSelections, setFilterSelections] = useState<Record<string, string[]>>({})
 
   const table = useReactTable({
     data,
@@ -124,6 +111,19 @@ export function DataTable<T>({
     },
   })
 
+  const handleFilterableColumnChange = (id: string, values: string[]): void => {
+    setFilterSelections((prev) => ({ ...prev, [id]: values }))
+    onFilterChange?.(id, values)
+    if (!onFilterChange) {
+      setColumnFilters((prev) => {
+        const without = prev.filter((f) => f.id !== id)
+        if (values.length === 0) return without
+        return [...without, { id, value: values }]
+      })
+      table.setPageIndex(0)
+    }
+  }
+
   const { pageIndex } = table.getState().pagination
   const totalFiltered = table.getFilteredRowModel().rows.length
   const pageRows = table.getRowModel().rows
@@ -150,13 +150,12 @@ export function DataTable<T>({
           )}
           {filtersSlot}
           {filterableColumns.map((fc) => (
-            <FilterSelect
+            <MultiSelectFilter
               key={fc.id}
-              value={filterValues[fc.id] ?? ''}
-              onValueChange={(val) => setColumnFilter(fc.id, val)}
-              placeholder={`All ${fc.label}`}
+              label={`All ${fc.label}`}
               options={fc.options}
-              className="sm:w-40"
+              selected={filterSelections[fc.id] ?? []}
+              onChange={(values) => handleFilterableColumnChange(fc.id, values)}
             />
           ))}
           {loading && <Loader2 className="ml-auto h-4 w-4 animate-spin text-muted-foreground" />}

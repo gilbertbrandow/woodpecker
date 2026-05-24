@@ -8,7 +8,6 @@ import { StatusBadge } from '../StatusBadge'
 import { DataTable } from '../DataTable'
 import { UserSelector } from '../UserSelector'
 import { Input } from '../ui/input'
-import { MultiSelectFilter } from '../ui/multi-select-filter'
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -84,10 +83,14 @@ export function SchedulesTable({ subsetId, onCountChange }: SchedulesTableProps)
       .finally(() => setLoading(false))
   }, [user, subsetId, debouncedSearch, page, selectedUsers, selectedStatuses, onCountChange, refreshKey])
 
-  const statusOptions = [
-    { label: 'Draft', value: 'draft', icon: <PencilLine className="h-3.5 w-3.5 text-muted-foreground" /> },
-    { label: 'Locked', value: 'locked', icon: <Lock className="h-3.5 w-3.5 text-violet-600" /> },
-  ]
+  const statusFilterColumn = {
+    id: 'status',
+    label: 'statuses',
+    options: [
+      { label: 'Draft', value: 'draft', icon: <PencilLine className="h-3.5 w-3.5 text-muted-foreground" /> },
+      { label: 'Locked', value: 'locked', icon: <Lock className="h-3.5 w-3.5 text-violet-600" /> },
+    ],
+  }
 
   // Refs keep cell renderers current without invalidating the columns memo
   const deletingIdRef = useRef(deletingId)
@@ -244,14 +247,12 @@ export function SchedulesTable({ subsetId, onCountChange }: SchedulesTableProps)
             />
           </div>
           <UserSelector value={selectedUsers} onChange={setSelectedUsers} />
-          <MultiSelectFilter
-            label="All statuses"
-            options={statusOptions}
-            selected={selectedStatuses}
-            onChange={setSelectedStatuses}
-          />
         </>
       }
+      filterableColumns={[statusFilterColumn]}
+      onFilterChange={(id, values) => {
+        if (id === 'status') setSelectedStatuses(values)
+      }}
       serverPagination={{ totalRows: total, page, pageSize: PAGE_SIZE, onPageChange: setPage }}
       pageSize={PAGE_SIZE}
       onRowClick={(schedule) =>
