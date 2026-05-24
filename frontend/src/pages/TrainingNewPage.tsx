@@ -29,7 +29,7 @@ export function TrainingNewPage(): React.ReactElement | null {
     if (!user) return
     api.schedules
       .list({ lockedOnly: true })
-      .then(setSchedules)
+      .then((r) => setSchedules(r.items))
       .catch(() => toast.error('Failed to load schedules', { description: 'Could not fetch schedules.' }))
       .finally(() => setSchedulesLoading(false))
   }, [user])

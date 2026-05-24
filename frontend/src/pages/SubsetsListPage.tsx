@@ -1,40 +1,12 @@
 import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
-import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
-import { toast } from 'sonner'
 import { useAuth } from '../context/auth'
-import { api, type Subset } from '../lib/api'
 import { SubsetsTable } from '../components/subsets/SubsetsTable'
 
 export function SubsetsListPage(): React.ReactElement | null {
   const { user } = useAuth()
-  const [subsets, setSubsets] = useState<Subset[]>([])
-  const [loading, setLoading] = useState(true)
-  const [deletingId, setDeletingId] = useState<number | null>(null)
-
-  useEffect(() => {
-    if (!user) return
-    api.subsets
-      .list()
-      .then(setSubsets)
-      .catch(() => toast.error('Failed to load subsets', { description: 'Could not fetch subsets.' }))
-      .finally(() => setLoading(false))
-  }, [user])
-
-  const handleDelete = async (subset: Subset): Promise<void> => {
-    setDeletingId(subset.id)
-    try {
-      await api.subsets.delete(subset.id)
-      setSubsets((prev) => prev.filter((s) => s.id !== subset.id))
-      toast('Subset deleted', { description: `"${subset.name}" has been removed.` })
-    } catch {
-      toast.error('Failed to delete subset', { description: 'Please try again.' })
-    } finally {
-      setDeletingId(null)
-    }
-  }
 
   if (!user) return null
 
@@ -50,19 +22,7 @@ export function SubsetsListPage(): React.ReactElement | null {
           New subset
         </Link>
       </div>
-
-      {loading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : subsets.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No subsets yet. Create one to get started.</p>
-      ) : (
-        <SubsetsTable
-          subsets={subsets}
-          currentUserId={user.id}
-          deletingId={deletingId}
-          onDelete={(s) => void handleDelete(s)}
-        />
-      )}
+      <SubsetsTable />
     </PageWrapper>
   )
 }
