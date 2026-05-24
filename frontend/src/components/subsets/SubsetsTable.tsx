@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Loader2, Search, Trash2 } from 'lucide-react'
+import { Loader2, Search, Trash2, PencilLine, Layers, Lock } from 'lucide-react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { UserAvatar } from '../UserAvatar'
 import { StatusBadge } from '../StatusBadge'
@@ -77,9 +77,9 @@ export function SubsetsTable(): React.ReactElement {
   }, [user, debouncedSearch, page, selectedUsers, selectedStatuses, refreshKey])
 
   const statusOptions = [
-    { label: 'Draft', value: 'draft' },
-    { label: 'Filled', value: 'filled' },
-    { label: 'Locked', value: 'locked' },
+    { label: 'Draft', value: 'draft', icon: <PencilLine className="h-3.5 w-3.5 text-muted-foreground" /> },
+    { label: 'Filled', value: 'filled', icon: <Layers className="h-3.5 w-3.5 text-blue-600" /> },
+    { label: 'Locked', value: 'locked', icon: <Lock className="h-3.5 w-3.5 text-violet-600" /> },
   ]
 
   // Refs keep cell renderers current without invalidating the columns memo

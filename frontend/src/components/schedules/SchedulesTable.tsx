@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
-import { Loader2, Search, Trash2 } from 'lucide-react'
+import { Loader2, Search, Trash2, PencilLine, Lock } from 'lucide-react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { UserAvatar } from '../UserAvatar'
 import { StatusBadge } from '../StatusBadge'
@@ -85,8 +85,8 @@ export function SchedulesTable({ subsetId, onCountChange }: SchedulesTableProps)
   }, [user, subsetId, debouncedSearch, page, selectedUsers, selectedStatuses, onCountChange, refreshKey])
 
   const statusOptions = [
-    { label: 'Draft', value: 'draft' },
-    { label: 'Locked', value: 'locked' },
+    { label: 'Draft', value: 'draft', icon: <PencilLine className="h-3.5 w-3.5 text-muted-foreground" /> },
+    { label: 'Locked', value: 'locked', icon: <Lock className="h-3.5 w-3.5 text-violet-600" /> },
   ]
 
   // Refs keep cell renderers current without invalidating the columns memo

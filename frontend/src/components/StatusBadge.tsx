@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Check, CheckCheck, Lock, Layers, Clock, XCircle, CheckCircle2, PauseCircle, Timer } from 'lucide-react'
+import { Check, CheckCheck, Lock, Layers, Clock, XCircle, CheckCircle2, PauseCircle, Timer, PencilLine } from 'lucide-react'
 import { cn } from '../lib/utils'
 
 type SubsetStatus = 'draft' | 'filled' | 'locked'
@@ -16,9 +16,9 @@ type StatusConfig = {
 
 const STATUS_CONFIG: Record<StatusValue, StatusConfig> = {
   draft: {
-    label: 'Not started',
+    label: 'Draft',
     className: 'border text-foreground bg-transparent',
-    icon: <Timer className="h-3 w-3" />,
+    icon: <PencilLine className="h-3 w-3" />,
   },
   not_started: {
     label: 'Not started',
