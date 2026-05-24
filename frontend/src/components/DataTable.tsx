@@ -11,7 +11,7 @@ import {
   type SortingState,
   type ColumnFiltersState,
 } from '@tanstack/react-table'
-import { ArrowUp, ArrowDown, ArrowUpDown, Search } from 'lucide-react'
+import { ArrowUp, ArrowDown, ArrowUpDown, Search, Loader2 } from 'lucide-react'
 import { Input } from './ui/input'
 import { Button } from './ui/button'
 import {
@@ -33,6 +33,13 @@ export type FilterableColumn = {
   options: { label: string; value: string }[]
 }
 
+export type ServerPagination = {
+  totalRows: number
+  page: number
+  pageSize: number
+  onPageChange: (page: number) => void
+}
+
 type DataTableProps<T> = {
   columns: ColumnDef<T>[]
   data: T[]
@@ -45,6 +52,8 @@ type DataTableProps<T> = {
   onRowClick?: (row: T) => void
   getRowClassName?: (row: T) => string
   emptyMessage?: string
+  loading?: boolean
+  serverPagination?: ServerPagination
 }
 
 export function DataTable<T>({
@@ -59,6 +68,8 @@ export function DataTable<T>({
   onRowClick,
   getRowClassName,
   emptyMessage = 'No results.',
+  loading = false,
+  serverPagination,
 }: DataTableProps<T>): React.ReactElement {
   const [sorting, setSorting] = useState<SortingState>(initialSorting)
   const [globalFilter, setGlobalFilter] = useState('')
@@ -103,6 +114,7 @@ export function DataTable<T>({
       table.setPageIndex(0)
     },
     globalFilterFn: 'includesString',
+    manualPagination: !!serverPagination,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -121,7 +133,7 @@ export function DataTable<T>({
 
   return (
     <div className="flex flex-col gap-3">
-      {(!hideSearch || filtersSlot || filterableColumns.length > 0) && (
+      {(!hideSearch || filtersSlot || filterableColumns.length > 0 || loading) && (
         <div className="flex flex-wrap items-center gap-2">
           {!hideSearch && (
             <div className="relative">
@@ -148,6 +160,7 @@ export function DataTable<T>({
               className="sm:w-40"
             />
           ))}
+          {loading && <Loader2 className="ml-auto h-4 w-4 animate-spin text-muted-foreground" />}
         </div>
       )}
 
@@ -186,7 +199,7 @@ export function DataTable<T>({
             ))}
           </TableHeader>
           <TableBody>
-            {pageRows.length === 0 ? (
+            {pageRows.length === 0 && !loading ? (
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
@@ -217,34 +230,65 @@ export function DataTable<T>({
         </Table>
       </div>
 
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>
-          {totalFiltered === 0
-            ? 'No results'
-            : `Showing ${start}–${end} of ${totalFiltered}`}
-        </span>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            ← Prev
-          </Button>
-          <span className="tabular-nums">
-            {pageIndex + 1} / {table.getPageCount() || 1}
+      {serverPagination ? (
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>
+            {serverPagination.totalRows === 0
+              ? 'No results'
+              : `Showing ${(serverPagination.page - 1) * serverPagination.pageSize + 1}–${Math.min(serverPagination.page * serverPagination.pageSize, serverPagination.totalRows)} of ${serverPagination.totalRows}`}
           </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            Next →
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => serverPagination.onPageChange(serverPagination.page - 1)}
+              disabled={serverPagination.page <= 1 || loading}
+            >
+              ← Prev
+            </Button>
+            <span className="tabular-nums">
+              {serverPagination.page} / {Math.max(1, Math.ceil(serverPagination.totalRows / serverPagination.pageSize))}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => serverPagination.onPageChange(serverPagination.page + 1)}
+              disabled={serverPagination.page * serverPagination.pageSize >= serverPagination.totalRows || loading}
+            >
+              Next →
+            </Button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>
+            {totalFiltered === 0
+              ? 'No results'
+              : `Showing ${start}–${end} of ${totalFiltered}`}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+            >
+              ← Prev
+            </Button>
+            <span className="tabular-nums">
+              {pageIndex + 1} / {table.getPageCount() || 1}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+            >
+              Next →
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
