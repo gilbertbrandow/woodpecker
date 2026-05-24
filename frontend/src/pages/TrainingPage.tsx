@@ -1,9 +1,9 @@
 import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { useState, useEffect, useMemo } from 'react'
-import { useNavigate, useParams } from '@tanstack/react-router'
+import { useNavigate, useParams, Link } from '@tanstack/react-router'
 import { toast } from 'sonner'
-import { ChevronDown, Play } from 'lucide-react'
+import { Ban, ChevronDown, Play } from 'lucide-react'
 import {
   ComposedChart,
   Bar,
@@ -245,7 +245,6 @@ export function TrainingPage(): React.ReactElement | null {
   const [statsOpen, setStatsOpen] = useState(true)
   const [showAbortDialog, setShowAbortDialog] = useState(false)
   const [aborting, setAborting] = useState(false)
-  const [startingNewTraining, setStartingNewTraining] = useState(false)
   const [startingIndex, setStartingIndex] = useState<number | null>(null)
   const [insights, setInsights] = useState<TrainingInsights | null>(null)
   const [insightsLoading, setInsightsLoading] = useState(false)
@@ -321,18 +320,6 @@ export function TrainingPage(): React.ReactElement | null {
     } finally {
       setAborting(false)
       setShowAbortDialog(false)
-    }
-  }
-
-  const handleStartNewTraining = async (): Promise<void> => {
-    if (!training || startingNewTraining) return
-    setStartingNewTraining(true)
-    try {
-      const newTraining = await api.training.create(training.scheduleId)
-      void navigate({ to: '/app/training/$trainingId', params: { trainingId: String(newTraining.id) } })
-    } catch {
-      toast.error('Failed to start new training', { description: 'Please try again.' })
-      setStartingNewTraining(false)
     }
   }
 
@@ -415,19 +402,9 @@ export function TrainingPage(): React.ReactElement | null {
       </div>
 
       {training.status === 'aborted' && training.abortedAt && (
-        <div className="mb-6 flex items-center justify-between rounded-md border border-amber-600/30 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950/20 dark:text-amber-400">
-          <span>This training was aborted on {formatDate(training.abortedAt)}.</span>
-          {isOwner && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void handleStartNewTraining()}
-              disabled={startingNewTraining}
-              className="ml-4 shrink-0 border-amber-600/40 text-amber-800 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/20"
-            >
-              {startingNewTraining ? 'Starting…' : 'Start new training'}
-            </Button>
-          )}
+        <div className="mb-6 flex items-start gap-3 rounded-md border border-amber-600/30 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950/20 dark:text-amber-400">
+          <Ban className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>This training was aborted on {formatDate(training.abortedAt)}.{isOwner && (<> To train this schedule again, <Link to="/app/training/new" className="underline underline-offset-2 hover:opacity-75">start a new training</Link>.</>)}</span>
         </div>
       )}
 

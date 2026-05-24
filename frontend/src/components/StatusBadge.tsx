@@ -16,7 +16,7 @@ type StatusConfig = {
 
 const STATUS_CONFIG: Record<StatusValue, StatusConfig> = {
   draft: {
-    label: 'Draft',
+    label: 'Not started',
     className: 'border text-foreground bg-transparent',
     icon: null,
   },
