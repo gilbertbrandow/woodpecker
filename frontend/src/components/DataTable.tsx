@@ -11,9 +11,8 @@ import {
   type SortingState,
   type ColumnFiltersState,
 } from '@tanstack/react-table'
-import { ArrowUp, ArrowDown, ArrowUpDown, Search, Loader2 } from 'lucide-react'
+import { ArrowUp, ArrowDown, ArrowUpDown, Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Input } from './ui/input'
-import { Button } from './ui/button'
 import {
   Table,
   TableHeader,
@@ -237,26 +236,28 @@ export function DataTable<T>({
               ? 'No results'
               : `Showing ${(serverPagination.page - 1) * serverPagination.pageSize + 1}–${Math.min(serverPagination.page * serverPagination.pageSize, serverPagination.totalRows)} of ${serverPagination.totalRows}`}
           </span>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
               onClick={() => serverPagination.onPageChange(serverPagination.page - 1)}
               disabled={serverPagination.page <= 1 || loading}
+              className="flex items-center gap-0.5 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
             >
-              ← Prev
-            </Button>
+              <ChevronLeft className="h-3 w-3" />
+              Prev
+            </button>
             <span className="tabular-nums">
               {serverPagination.page} / {Math.max(1, Math.ceil(serverPagination.totalRows / serverPagination.pageSize))}
             </span>
-            <Button
-              variant="outline"
-              size="sm"
+            <button
+              type="button"
               onClick={() => serverPagination.onPageChange(serverPagination.page + 1)}
               disabled={serverPagination.page * serverPagination.pageSize >= serverPagination.totalRows || loading}
+              className="flex items-center gap-0.5 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
             >
-              Next →
-            </Button>
+              Next
+              <ChevronRight className="h-3 w-3" />
+            </button>
           </div>
         </div>
       ) : (
@@ -266,26 +267,28 @@ export function DataTable<T>({
               ? 'No results'
               : `Showing ${start}–${end} of ${totalFiltered}`}
           </span>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
+              className="flex items-center gap-0.5 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
             >
-              ← Prev
-            </Button>
+              <ChevronLeft className="h-3 w-3" />
+              Prev
+            </button>
             <span className="tabular-nums">
               {pageIndex + 1} / {table.getPageCount() || 1}
             </span>
-            <Button
-              variant="outline"
-              size="sm"
+            <button
+              type="button"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
+              className="flex items-center gap-0.5 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
             >
-              Next →
-            </Button>
+              Next
+              <ChevronRight className="h-3 w-3" />
+            </button>
           </div>
         </div>
       )}
