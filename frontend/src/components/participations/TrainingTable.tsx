@@ -2,12 +2,13 @@ import * as React from 'react'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Timer, Clock, CheckCircle2, XCircle } from 'lucide-react'
 import { StatusBadge } from '../StatusBadge'
-import { DataTable, type FilterableColumn } from '../DataTable'
+import { DataTable } from '../DataTable'
 import { ProgressBar } from '../ProgressBar'
 import { UserAvatar } from '../UserAvatar'
 import { UserSelector } from '../UserSelector'
+import { MultiSelectFilter, type MultiSelectOption } from '../ui/multi-select-filter'
 import { Button } from '../ui/button'
 import { useAuth } from '../../context/auth'
 import { api, type AllTrainingSummary, type SelectableUser, type TrainingStatus } from '../../lib/api'
@@ -44,6 +45,11 @@ export function TrainingTable({
       ? [{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl }]
       : [],
   )
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([
+    'draft',
+    'in_progress',
+    'completed',
+  ])
   const userIds = useMemo(() => selectedUsers.map((u) => u.id), [selectedUsers])
 
   useEffect(() => {
@@ -52,6 +58,7 @@ export function TrainingTable({
       .listAll({
         scheduleId,
         userIds: userIds.length > 0 ? userIds : undefined,
+        statuses: selectedStatuses.length > 0 ? selectedStatuses : undefined,
         page,
         pageSize: PAGE_SIZE,
       })
@@ -61,26 +68,27 @@ export function TrainingTable({
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [scheduleId, userIds, page])
+  }, [scheduleId, userIds, selectedStatuses, page])
 
   const handleUsersChange = useCallback((users: SelectableUser[]) => {
     setSelectedUsers(users)
     setPage(1)
   }, [])
 
-  const statusOptions = useMemo(
+  const handleStatusesChange = useCallback((statuses: string[]) => {
+    setSelectedStatuses(statuses)
+    setPage(1)
+  }, [])
+
+  const statusOptions = useMemo<MultiSelectOption[]>(
     () => [
-      { label: 'Not started', value: 'draft' },
-      { label: 'In progress', value: 'in_progress' },
-      { label: 'Completed', value: 'completed' },
-      { label: 'Aborted', value: 'aborted' },
+      { value: 'draft', label: 'Not started', icon: <Timer className="h-3.5 w-3.5 text-muted-foreground" /> },
+      { value: 'in_progress', label: 'In progress', icon: <Clock className="h-3.5 w-3.5 text-blue-600" /> },
+      { value: 'completed', label: 'Completed', icon: <CheckCircle2 className="h-3.5 w-3.5 text-green-600" /> },
+      { value: 'aborted', label: 'Aborted', icon: <XCircle className="h-3.5 w-3.5 text-red-600" /> },
     ],
     [],
   )
-
-  const filterableColumns: FilterableColumn[] = [
-    { id: 'status', label: 'statuses', options: statusOptions },
-  ]
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
@@ -102,7 +110,6 @@ export function TrainingTable({
         cell: ({ row }) => (
           <StatusBadge status={row.original.trainingState?.state ?? (row.original.status as TrainingStatus)} />
         ),
-        filterFn: 'equals',
       },
       {
         id: 'progress',
@@ -174,9 +181,16 @@ export function TrainingTable({
           <DataTable
             columns={columns}
             data={trainings}
-            filterableColumns={filterableColumns}
             filtersSlot={
-              <UserSelector value={selectedUsers} onChange={handleUsersChange} />
+              <>
+                <UserSelector value={selectedUsers} onChange={handleUsersChange} />
+                <MultiSelectFilter
+                  label="Status"
+                  options={statusOptions}
+                  selected={selectedStatuses}
+                  onChange={handleStatusesChange}
+                />
+              </>
             }
             pageSize={PAGE_SIZE}
             onRowClick={(t) =>
