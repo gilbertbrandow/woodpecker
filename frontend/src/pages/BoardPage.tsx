@@ -304,26 +304,6 @@ export function BoardPage(): React.ReactElement | null {
       />
     ) : undefined
 
-  const mobileHeader =
-    ctrl.mode === 'overview' && overviewData !== null ? (
-      <BoardBreadcrumbs
-        runIndex={overviewData.runTrainingItem.runIndex}
-        position={overviewData.runTrainingItem.position}
-        trainingId={overviewData.runTrainingItem.trainingId}
-        scheduleName={overviewData.runTrainingItem.scheduleName}
-        runIdStr={runIdStr}
-      />
-    ) : ctrl.solvingView !== null ? (
-      <BoardBreadcrumbs
-        runIndex={ctrl.solvingView.runTrainingItem.runIndex}
-        position={ctrl.solvingView.runTrainingItem.position}
-        trainingId={ctrl.solvingView.runTrainingItem.trainingId}
-        scheduleName={ctrl.solvingView.runTrainingItem.scheduleName}
-        runIdStr={runIdStr}
-        linksDisabled={ctrl.mode === 'focus'}
-      />
-    ) : null
-
   const centerMobileHeader =
     ctrl.mode === 'overview' && overviewData !== null ? (
       <MobileOverviewMetaBar
@@ -542,7 +522,6 @@ export function BoardPage(): React.ReactElement | null {
       left={leftNode}
       center={centerNode}
       right={rightNode}
-      mobileHeader={mobileHeader}
       mobileExtras={mobileExtras}
       mobileDrawerContent={mobileDrawerContent}
     />

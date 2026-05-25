@@ -14,7 +14,7 @@ export function OverviewStatsSection({ runIndex, accuracy, averageSolveTime }: O
   return (
     <div className="flex flex-col gap-4 rounded-lg border bg-card p-4">
       <span>Run {runIndex + 1} stats</span>
-      <div className="flex gap-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="flex cursor-default flex-col gap-1.5">
