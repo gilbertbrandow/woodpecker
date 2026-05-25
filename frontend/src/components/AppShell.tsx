@@ -115,13 +115,13 @@ export function AppShell(): React.ReactElement {
     <BreadcrumbProvider>
       <SidebarProvider defaultOpen={true}>
         <AppSidebar activeRun={activeRun} />
-        <SidebarInset className="h-svh overflow-hidden">
+        <SidebarInset className="h-dvh overflow-hidden">
           <AppShellHeader activeRun={activeRun} />
           <div className="flex flex-1 flex-col overflow-y-auto">
             <div className="flex flex-1 flex-col">
               <Outlet />
             </div>
-            <Footer />
+            <Footer className="hidden sm:block" />
           </div>
         </SidebarInset>
       </SidebarProvider>
