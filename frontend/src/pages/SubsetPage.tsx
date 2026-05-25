@@ -11,7 +11,6 @@ import {
   type SubsetConfig,
   type SourceEntry,
   type SubsetStats as SubsetStatsType,
-  type ScheduleSummary,
 } from "../lib/api";
 import { SchedulesTable } from "../components/schedules/SchedulesTable";
 import { Button } from "../components/ui/button";
@@ -53,36 +52,9 @@ import {
 
 const MIN_LOCK_PUZZLES = 5;
 
-function UsedBySchedules({
-  subsetId,
-  currentUserId,
-}: {
-  subsetId: number;
-  currentUserId: number;
-}): React.ReactElement {
+function UsedBySchedules({ subsetId }: { subsetId: number }): React.ReactElement {
   const [open, setOpen] = useState(true);
-  const [schedules, setSchedules] = useState<ScheduleSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
-
-  useEffect(() => {
-    api.schedules
-      .list({ subsetId })
-      .then((data) => setSchedules(data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [subsetId]);
-
-  const handleDelete = (schedule: ScheduleSummary): void => {
-    setDeletingId(schedule.id);
-    api.schedules
-      .delete(schedule.id)
-      .then(() =>
-        setSchedules((prev) => prev.filter((s) => s.id !== schedule.id)),
-      )
-      .catch(() => {})
-      .finally(() => setDeletingId(null));
-  };
+  const [count, setCount] = useState<number | null>(null);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -96,7 +68,7 @@ function UsedBySchedules({
               className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
               style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
             />
-            Used by{schedules.length > 0 ? ` (${schedules.length})` : ""}
+            Used by{count !== null && count > 0 ? ` (${count})` : ""}
           </span>
           <span className="hidden text-xs text-muted-foreground sm:block">
             Schedules that use this subset
@@ -105,20 +77,10 @@ function UsedBySchedules({
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="pt-4">
-          {loading ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
-          ) : schedules.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No schedules use this subset yet.
-            </p>
-          ) : (
-            <SchedulesTable
-              schedules={schedules}
-              currentUserId={currentUserId}
-              deletingId={deletingId}
-              onDelete={handleDelete}
-            />
-          )}
+          <SchedulesTable
+            subsetId={subsetId}
+            onCountChange={setCount}
+          />
         </div>
       </CollapsibleContent>
     </Collapsible>
@@ -462,7 +424,7 @@ export function SubsetPage(): React.ReactElement | null {
                 No data yet — fill the subset first.
               </p>
             )}
-            <UsedBySchedules subsetId={id} currentUserId={user.id} />
+            <UsedBySchedules subsetId={id} />
           </div>
         </TabsContent>
       </Tabs>

@@ -33,7 +33,12 @@ export function MultiSelectFilter({
     }
   }
 
-  const isFiltered = selected.length > 0 && selected.length < options.length
+  const noneSelected = selected.length === 0
+  const isPartial = selected.length > 0 && selected.length < options.length
+
+  const selectedOptions = options.filter((o) => selected.includes(o.value))
+  const visibleOptions = selectedOptions.slice(0, 2)
+  const overflow = selectedOptions.length - visibleOptions.length
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -41,15 +46,36 @@ export function MultiSelectFilter({
         <button
           type="button"
           className={cn(
-            'flex h-8 items-center gap-2 rounded-md border border-input bg-background px-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
+            'flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
             open && 'border-ring ring-1 ring-ring',
           )}
         >
-          <span className={cn(isFiltered && 'text-foreground')}>{label}</span>
-          {isFiltered && (
-            <span className="rounded-sm bg-muted px-1 font-mono text-xs text-foreground">
-              {selected.length}
-            </span>
+          {noneSelected ? (
+            <span>{`Select ${label}…`}</span>
+          ) : isPartial ? (
+            <>
+              {visibleOptions.map((o) => (
+                <span
+                  key={o.value}
+                  className="inline-flex items-center gap-1 rounded-sm bg-muted px-1.5 py-0.5 text-xs text-foreground"
+                >
+                  {o.icon}
+                  {o.label}
+                </span>
+              ))}
+              {overflow > 0 && (
+                <span className="rounded-sm bg-muted px-1 font-mono text-xs text-foreground">
+                  +{overflow}
+                </span>
+              )}
+            </>
+          ) : (
+            <>
+              <span className="text-foreground">{`All ${label}`}</span>
+              <span className="rounded-sm bg-muted px-1 font-mono text-xs text-foreground">
+                {selected.length}
+              </span>
+            </>
           )}
           <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
         </button>

@@ -463,6 +463,7 @@ export function BoardPage(): React.ReactElement | null {
           source={sourceForMetaCard}
           pgnDisplay={pgnDisplay}
           trainingItemId={trainingItemIdForMetaCard}
+          runPosition={ctrl.solvingView?.runTrainingItem.position}
           focusMode={ctrl.mode !== 'overview'}
           selectedPly={ctrl.mode === 'overview' ? selectedPly : null}
           onPlyClick={ctrl.mode === 'overview' ? setSelectedPly : undefined}

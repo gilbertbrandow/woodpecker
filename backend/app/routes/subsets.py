@@ -29,8 +29,25 @@ def create_subset() -> tuple[Response, int]:
 @login_required
 def list_subsets() -> Response:
     locked_only = request.args.get("locked") == "true"
-    rows = subset_svc.list_subsets(session["user_id"], locked_only=locked_only)
-    return jsonify([subset_svc.subset_to_dict(s, owner) for s, owner in rows])
+    search = request.args.get("search") or None
+    page_raw = request.args.get("page")
+    page_size_raw = request.args.get("pageSize")
+    page = int(page_raw) if page_raw and page_raw.isdigit() else 1
+    page_size = int(page_size_raw) if page_size_raw and page_size_raw.isdigit() else 20
+    user_ids_raw = request.args.get("userIds")
+    user_ids = [int(x) for x in user_ids_raw.split(",") if x.strip().isdigit()] if user_ids_raw else None
+    statuses_raw = request.args.get("statuses")
+    statuses = [s.strip() for s in statuses_raw.split(",") if s.strip()] if statuses_raw else None
+    result = subset_svc.list_subsets(
+        session["user_id"],
+        locked_only=locked_only,
+        statuses=statuses,
+        search=search,
+        page=page,
+        page_size=page_size,
+        user_ids=user_ids,
+    )
+    return jsonify(result)
 
 
 @subsets_bp.get("/<int:subset_id>")

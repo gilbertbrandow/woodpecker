@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -11,9 +11,8 @@ import {
   type SortingState,
   type ColumnFiltersState,
 } from '@tanstack/react-table'
-import { ArrowUp, ArrowDown, ArrowUpDown, Search } from 'lucide-react'
+import { ArrowUp, ArrowDown, ArrowUpDown, Search, Loader2, ChevronLeft, ChevronRight, Undo2 } from 'lucide-react'
 import { Input } from './ui/input'
-import { Button } from './ui/button'
 import {
   Table,
   TableHeader,
@@ -22,12 +21,22 @@ import {
   TableHead,
   TableCell,
 } from './ui/table'
-import { FilterSelect } from './ui/filter-select'
+import { MultiSelectFilter } from './ui/multi-select-filter'
+import { cn } from '../lib/utils'
+
+type ColMeta = { className?: string }
 
 export type FilterableColumn = {
   id: string
   label: string
-  options: { label: string; value: string }[]
+  options: { label: string; value: string; icon?: React.ReactNode }[]
+}
+
+export type ServerPagination = {
+  totalRows: number
+  page: number
+  pageSize: number
+  onPageChange: (page: number) => void
 }
 
 type DataTableProps<T> = {
@@ -36,11 +45,17 @@ type DataTableProps<T> = {
   globalFilterPlaceholder?: string
   filterableColumns?: FilterableColumn[]
   filtersSlot?: React.ReactNode
+  hideSearch?: boolean
   pageSize?: number
   initialSorting?: SortingState
   onRowClick?: (row: T) => void
   getRowClassName?: (row: T) => string
   emptyMessage?: string
+  loading?: boolean
+  serverPagination?: ServerPagination
+  onFilterChange?: (id: string, values: string[]) => void
+  filtersActive?: boolean
+  onClearFilters?: () => void
 }
 
 export function DataTable<T>({
@@ -49,31 +64,22 @@ export function DataTable<T>({
   globalFilterPlaceholder = 'Search…',
   filterableColumns = [],
   filtersSlot,
+  hideSearch = false,
   pageSize = 10,
   initialSorting = [],
   onRowClick,
   getRowClassName,
   emptyMessage = 'No results.',
+  loading = false,
+  serverPagination,
+  onFilterChange,
+  filtersActive = false,
+  onClearFilters,
 }: DataTableProps<T>): React.ReactElement {
   const [sorting, setSorting] = useState<SortingState>(initialSorting)
   const [globalFilter, setGlobalFilter] = useState('')
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-
-  const filterValues = useMemo<Record<string, string>>(() => {
-    const result: Record<string, string> = {}
-    for (const f of columnFilters) {
-      if (typeof f.value === 'string') result[f.id] = f.value
-    }
-    return result
-  }, [columnFilters])
-
-  const setColumnFilter = (id: string, value: string): void => {
-    setColumnFilters((prev) => {
-      const without = prev.filter((f) => f.id !== id)
-      if (value === '') return without
-      return [...without, { id, value }]
-    })
-  }
+  const [filterSelections, setFilterSelections] = useState<Record<string, string[]>>({})
 
   const table = useReactTable({
     data,
@@ -98,6 +104,7 @@ export function DataTable<T>({
       table.setPageIndex(0)
     },
     globalFilterFn: 'includesString',
+    manualPagination: !!serverPagination,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -108,6 +115,34 @@ export function DataTable<T>({
     },
   })
 
+  const handleFilterableColumnChange = (id: string, values: string[]): void => {
+    setFilterSelections((prev) => ({ ...prev, [id]: values }))
+    onFilterChange?.(id, values)
+    if (!onFilterChange) {
+      setColumnFilters((prev) => {
+        const without = prev.filter((f) => f.id !== id)
+        if (values.length === 0) return without
+        return [...without, { id, value: values }]
+      })
+      table.setPageIndex(0)
+    }
+  }
+
+  const hasActiveFilters =
+    filtersActive ||
+    globalFilter !== '' ||
+    columnFilters.length > 0 ||
+    Object.values(filterSelections).some((v) => v.length > 0)
+
+  const clearFilters = (): void => {
+    setGlobalFilter('')
+    setColumnFilters([])
+    setFilterSelections({})
+    filterableColumns.forEach((fc) => onFilterChange?.(fc.id, []))
+    onClearFilters?.()
+    table.setPageIndex(0)
+  }
+
   const { pageIndex } = table.getState().pagination
   const totalFiltered = table.getFilteredRowModel().rows.length
   const pageRows = table.getRowModel().rows
@@ -116,31 +151,45 @@ export function DataTable<T>({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder={globalFilterPlaceholder}
-            value={globalFilter}
-            onChange={(e) => {
-              setGlobalFilter(e.target.value)
-              table.setPageIndex(0)
-            }}
-            className="h-8 pl-7 text-sm sm:w-56"
-          />
+      {(!hideSearch || filtersSlot || filterableColumns.length > 0 || loading) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {!hideSearch && (
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder={globalFilterPlaceholder}
+                value={globalFilter}
+                onChange={(e) => {
+                  setGlobalFilter(e.target.value)
+                  table.setPageIndex(0)
+                }}
+                className="h-8 pl-7 text-sm sm:w-56"
+              />
+            </div>
+          )}
+          {filtersSlot}
+          {filterableColumns.map((fc) => (
+            <MultiSelectFilter
+              key={fc.id}
+              label={fc.label}
+              options={fc.options}
+              selected={filterSelections[fc.id] ?? []}
+              onChange={(values) => handleFilterableColumnChange(fc.id, values)}
+            />
+          ))}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Undo2 className="h-3 w-3" />
+              Clear filters
+            </button>
+          )}
+          {loading && <Loader2 className="ml-auto h-4 w-4 animate-spin text-muted-foreground" />}
         </div>
-        {filtersSlot}
-        {filterableColumns.map((fc) => (
-          <FilterSelect
-            key={fc.id}
-            value={filterValues[fc.id] ?? ''}
-            onValueChange={(val) => setColumnFilter(fc.id, val)}
-            placeholder={`All ${fc.label}`}
-            options={fc.options}
-            className="sm:w-40"
-          />
-        ))}
-      </div>
+      )}
 
       <div className="overflow-x-auto rounded-md border">
         <Table className="min-w-max">
@@ -151,7 +200,7 @@ export function DataTable<T>({
                   const canSort = h.column.getCanSort()
                   const sorted = h.column.getIsSorted()
                   return (
-                    <TableHead key={h.id} className="whitespace-nowrap">
+                    <TableHead key={h.id} className={cn('whitespace-nowrap', (h.column.columnDef.meta as ColMeta | undefined)?.className)}>
                       {h.isPlaceholder ? null : canSort ? (
                         <button
                           type="button"
@@ -177,7 +226,7 @@ export function DataTable<T>({
             ))}
           </TableHeader>
           <TableBody>
-            {pageRows.length === 0 ? (
+            {pageRows.length === 0 && !loading ? (
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
@@ -197,7 +246,7 @@ export function DataTable<T>({
                   onClick={onRowClick ? () => onRowClick(row.original) : undefined}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="whitespace-nowrap">
+                    <TableCell key={cell.id} className={cn('whitespace-nowrap', (cell.column.columnDef.meta as ColMeta | undefined)?.className)}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -208,34 +257,69 @@ export function DataTable<T>({
         </Table>
       </div>
 
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>
-          {totalFiltered === 0
-            ? 'No results'
-            : `Showing ${start}–${end} of ${totalFiltered}`}
-        </span>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            ← Prev
-          </Button>
-          <span className="tabular-nums">
-            {pageIndex + 1} / {table.getPageCount() || 1}
+      {serverPagination ? (
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>
+            {serverPagination.totalRows === 0
+              ? 'No results'
+              : `Showing ${(serverPagination.page - 1) * serverPagination.pageSize + 1}–${Math.min(serverPagination.page * serverPagination.pageSize, serverPagination.totalRows)} of ${serverPagination.totalRows}`}
           </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            Next →
-          </Button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => serverPagination.onPageChange(serverPagination.page - 1)}
+              disabled={serverPagination.page <= 1 || loading}
+              className="flex items-center gap-0.5 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+            >
+              <ChevronLeft className="h-3 w-3" />
+              Prev
+            </button>
+            <span className="tabular-nums">
+              {serverPagination.page} / {Math.max(1, Math.ceil(serverPagination.totalRows / serverPagination.pageSize))}
+            </span>
+            <button
+              type="button"
+              onClick={() => serverPagination.onPageChange(serverPagination.page + 1)}
+              disabled={serverPagination.page * serverPagination.pageSize >= serverPagination.totalRows || loading}
+              className="flex items-center gap-0.5 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+            >
+              Next
+              <ChevronRight className="h-3 w-3" />
+            </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>
+            {totalFiltered === 0
+              ? 'No results'
+              : `Showing ${start}–${end} of ${totalFiltered}`}
+          </span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+              className="flex items-center gap-0.5 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+            >
+              <ChevronLeft className="h-3 w-3" />
+              Prev
+            </button>
+            <span className="tabular-nums">
+              {pageIndex + 1} / {table.getPageCount() || 1}
+            </span>
+            <button
+              type="button"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+              className="flex items-center gap-0.5 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+            >
+              Next
+              <ChevronRight className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

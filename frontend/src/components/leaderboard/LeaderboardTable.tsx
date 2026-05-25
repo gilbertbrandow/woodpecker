@@ -56,7 +56,7 @@ export function LeaderboardTable({ runs, hideSchedule = false }: LeaderboardTabl
     accessorFn: (row) => String(row.scheduleId),
     header: 'Schedule',
     enableSorting: false,
-    filterFn: 'equals',
+    filterFn: (row, id, val: string[]) => !val.length || val.includes(row.getValue(id) as string),
     cell: ({ row }) => (
       <Link
         to="/app/schedules/$scheduleId"
@@ -88,7 +88,7 @@ export function LeaderboardTable({ runs, hideSchedule = false }: LeaderboardTabl
       accessorFn: (row) => String(row.runIndex + 1),
       header: 'Run',
       enableSorting: false,
-      filterFn: 'equals',
+      filterFn: (row, id, val: string[]) => !val.length || val.includes(row.getValue(id) as string),
       cell: ({ row }) => (
         <span className="tabular-nums">#{row.original.runIndex + 1}</span>
       ),

@@ -133,17 +133,21 @@ function LichessTacticSection({
   source,
   trainingItemId,
   focusMode,
+  runPosition,
 }: {
   source: LichessTacticSourceMetadata
   trainingItemId: number | undefined
   focusMode: boolean
+  runPosition: number | undefined
 }): React.ReactElement {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-3">
         <div>
           <span className="text-xs text-muted-foreground">Puzzle </span>
-          <span className="text-sm font-mono">#{trainingItemId ?? source.displayId}</span>
+          <span className="text-sm font-mono">
+            #{focusMode && runPosition !== undefined ? runPosition + 1 : (trainingItemId ?? source.displayId)}
+          </span>
         </div>
         {!focusMode && <TrainingItemTypeBadge source="LICHESS_TACTIC" />}
         {!focusMode && (
@@ -170,17 +174,21 @@ function ScrapedPositionalSection({
   source,
   trainingItemId,
   focusMode,
+  runPosition,
 }: {
   source: ScrapedPositionalSourceMetadata
   trainingItemId: number | undefined
   focusMode: boolean
+  runPosition: number | undefined
 }): React.ReactElement {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-3">
         <div>
           <span className="text-xs text-muted-foreground">Puzzle </span>
-          <span className="text-sm font-mono">#{trainingItemId ?? source.internalId}</span>
+          <span className="text-sm font-mono">
+            #{focusMode && runPosition !== undefined ? runPosition + 1 : (trainingItemId ?? source.internalId)}
+          </span>
         </div>
         {!focusMode && <TrainingItemTypeBadge source="SCRAPED_POSITIONAL" />}
         {!focusMode && (
@@ -209,16 +217,18 @@ function SourceSection({
   source,
   trainingItemId,
   focusMode,
+  runPosition,
 }: {
   source: SourceMetadata
   trainingItemId: number | undefined
   focusMode: boolean
+  runPosition: number | undefined
 }): React.ReactElement | null {
   if (source.sourceType === 'LICHESS_TACTIC') {
-    return <LichessTacticSection source={source} trainingItemId={trainingItemId} focusMode={focusMode} />
+    return <LichessTacticSection source={source} trainingItemId={trainingItemId} focusMode={focusMode} runPosition={runPosition} />
   }
   if (source.sourceType === 'SCRAPED_POSITIONAL') {
-    return <ScrapedPositionalSection source={source} trainingItemId={trainingItemId} focusMode={focusMode} />
+    return <ScrapedPositionalSection source={source} trainingItemId={trainingItemId} focusMode={focusMode} runPosition={runPosition} />
   }
   return null
 }
@@ -227,6 +237,7 @@ type TrainingItemMetaCardProps = {
   source: SourceMetadata
   pgnDisplay: TrainingItemMetaPgnDisplayMin | null
   trainingItemId?: number
+  runPosition?: number
   focusMode?: boolean
   selectedPly?: PlySelection | null
   onPlyClick?: (ply: PlySelection) => void
@@ -342,6 +353,7 @@ export function TrainingItemMetaCard({
   source,
   pgnDisplay,
   trainingItemId,
+  runPosition,
   focusMode = false,
   selectedPly,
   onPlyClick,
@@ -368,8 +380,8 @@ export function TrainingItemMetaCard({
 
   return (
     <div className="flex flex-col gap-3 rounded-md border border-border px-3 py-3">
-      <SourceSection source={source} trainingItemId={trainingItemId} focusMode={focusMode} />
-      {opening !== null && (
+      <SourceSection source={source} trainingItemId={trainingItemId} focusMode={focusMode} runPosition={runPosition} />
+      {!focusMode && opening !== null && (
         <div className="flex items-center gap-1.5 border-t border-border pt-3 pb-1 overflow-hidden">
           <span className="font-mono text-xs font-semibold shrink-0">{opening.eco}</span>
           <span className="text-xs text-muted-foreground truncate">{opening.displayName}</span>

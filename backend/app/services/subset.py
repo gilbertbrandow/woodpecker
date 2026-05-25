@@ -831,22 +831,100 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
 
     return {"sources": sources_out, "totalActive": total}
 
-def list_subsets(user_id: int, locked_only: bool = False) -> list[tuple[Subset, User]]:
-    where_clause: sa.ColumnElement[bool]
+def list_subsets(
+    user_id: int,
+    locked_only: bool = False,
+    statuses: list[str] | None = None,
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+    user_ids: list[int] | None = None,
+) -> dict[str, object]:
     if locked_only:
-        where_clause = Subset.locked_at.isnot(None)
+        access_clause = "sub.locked_at IS NOT NULL"
     else:
-        where_clause = sa.or_(
-            Subset.user_id == user_id,
-            sa.and_(Subset.locked_at.isnot(None), Subset.user_id != user_id),
-        )
+        access_clause = "(sub.user_id = :uid OR (sub.locked_at IS NOT NULL AND sub.user_id != :uid))"
+
+    params: dict[str, object] = {"uid": user_id}
+    conditions: list[str] = [f"WHERE {access_clause}"]
+
+    if search:
+        conditions.append("AND sub.name ILIKE :search")
+        params["search"] = f"%{search}%"
+    if user_ids:
+        uid_list = ",".join(str(int(uid)) for uid in user_ids)
+        conditions.append(f"AND sub.user_id IN ({uid_list})")
+    if statuses and not locked_only:
+        status_parts: list[str] = []
+        if "locked" in statuses:
+            status_parts.append("sub.locked_at IS NOT NULL")
+        if "filled" in statuses:
+            status_parts.append(
+                "(sub.locked_at IS NULL AND EXISTS "
+                "(SELECT 1 FROM subset_training_items sti WHERE sti.subset_id = sub.id))"
+            )
+        if "draft" in statuses:
+            status_parts.append(
+                "(sub.locked_at IS NULL AND NOT EXISTS "
+                "(SELECT 1 FROM subset_training_items sti WHERE sti.subset_id = sub.id))"
+            )
+        if status_parts:
+            conditions.append(f"AND ({' OR '.join(status_parts)})")
+
+    where_sql = " ".join(conditions)
+    base_sql = f"""
+        FROM subsets sub
+        JOIN users u ON u.id = sub.user_id
+        {where_sql}
+    """
+
+    if locked_only:
+        total: int | None = None
+        limit_clause = ""
+    else:
+        total = int(db.session.execute(sa.text(f"SELECT COUNT(*) {base_sql}"), params).scalar_one())
+        offset = (page - 1) * page_size
+        limit_clause = f"LIMIT {page_size} OFFSET {offset}"
+
     rows = db.session.execute(
-        db.select(Subset, User)
-        .join(User, User.id == Subset.user_id)
-        .where(where_clause)
-        .order_by(Subset.created_at.desc())
+        sa.text(f"""
+            SELECT sub.id, sub.name, sub.config,
+                   COALESCE(sub.locked_puzzle_count, sub.puzzle_count) AS puzzle_count,
+                   sub.created_at, sub.locked_at,
+                   u.id AS owner_id, u.display_name, u.avatar_url,
+                   CASE
+                       WHEN sub.locked_at IS NOT NULL THEN 'locked'
+                       WHEN EXISTS (
+                           SELECT 1 FROM subset_training_items sti
+                           WHERE sti.subset_id = sub.id LIMIT 1
+                       ) THEN 'filled'
+                       ELSE 'draft'
+                   END AS status
+            {base_sql}
+            ORDER BY sub.created_at DESC
+            {limit_clause}
+        """),
+        params,
     ).all()
-    return [(row[0], row[1]) for row in rows]
+
+    items: list[dict[str, object]] = []
+    for row in rows:
+        items.append({
+            "id": row.id,
+            "name": row.name,
+            "status": row.status,
+            "puzzleCount": row.puzzle_count,
+            "config": row.config,
+            "createdAt": row.created_at.isoformat(),
+            "lockedAt": row.locked_at.isoformat() if row.locked_at else None,
+            "ownedBy": {
+                "id": row.owner_id,
+                "displayName": row.display_name,
+                "avatarUrl": row.avatar_url,
+            },
+        })
+
+    return {"items": items, "total": total if total is not None else len(items)}
 
 
 def get_subset(subset_id: int, user_id: int) -> tuple[Subset, User]:

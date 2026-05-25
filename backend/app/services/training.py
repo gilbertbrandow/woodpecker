@@ -326,6 +326,7 @@ def list_all_trainings(
     schedule_id: int | None = None,
     user_ids: list[int] | None = None,
     statuses: list[str] | None = None,
+    search: str | None = None,
     page: int = 1,
     page_size: int = 20,
 ) -> dict[str, object]:
@@ -346,6 +347,10 @@ def list_all_trainings(
     if valid_statuses:
         parts = " OR ".join(f"({_STATUS_SQL[s]})" for s in valid_statuses)
         conditions.append(f"({parts})")
+
+    if search:
+        conditions.append("s.name ILIKE :search")
+        params["search"] = f"%{search}%"
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
     offset = (page - 1) * page_size

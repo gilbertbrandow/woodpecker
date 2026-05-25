@@ -2,16 +2,17 @@ import * as React from 'react'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { ChevronLeft, ChevronRight, Timer, Clock, CheckCircle2, XCircle } from 'lucide-react'
+import { Timer, Clock, CheckCircle2, XCircle, Search } from 'lucide-react'
 import { StatusBadge } from '../StatusBadge'
 import { DataTable } from '../DataTable'
 import { ProgressBar } from '../ProgressBar'
 import { UserAvatar } from '../UserAvatar'
 import { UserSelector } from '../UserSelector'
 import { MultiSelectFilter, type MultiSelectOption } from '../ui/multi-select-filter'
-import { Button } from '../ui/button'
+import { Input } from '../ui/input'
 import { useAuth } from '../../context/auth'
 import { api, type AllTrainingSummary, type SelectableUser, type TrainingStatus } from '../../lib/api'
+import { useDebounce } from '../../hooks/useDebounce'
 
 const PAGE_SIZE = 20
 
@@ -39,6 +40,8 @@ export function TrainingTable({
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [searchInput, setSearchInput] = useState('')
+  const debouncedSearch = useDebounce(searchInput, 300)
 
   const [selectedUsers, setSelectedUsers] = useState<SelectableUser[]>(() =>
     user && user.status === 'active'
@@ -53,12 +56,18 @@ export function TrainingTable({
   const userIds = useMemo(() => selectedUsers.map((u) => u.id), [selectedUsers])
 
   useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch])
+
+  useEffect(() => {
+    if (!user) return
     setLoading(true)
     api.training
       .listAll({
         scheduleId,
         userIds: userIds.length > 0 ? userIds : undefined,
         statuses: selectedStatuses.length > 0 ? selectedStatuses : undefined,
+        search: debouncedSearch || undefined,
         page,
         pageSize: PAGE_SIZE,
       })
@@ -68,7 +77,11 @@ export function TrainingTable({
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [scheduleId, userIds, selectedStatuses, page])
+  }, [scheduleId, userIds, selectedStatuses, debouncedSearch, page, user])
+
+  const handleSearchChange = (value: string): void => {
+    setSearchInput(value)
+  }
 
   const handleUsersChange = useCallback((users: SelectableUser[]) => {
     setSelectedUsers(users)
@@ -90,7 +103,17 @@ export function TrainingTable({
     [],
   )
 
-  const totalPages = Math.ceil(total / PAGE_SIZE)
+  const filtersActive =
+    searchInput !== '' ||
+    selectedUsers.length > 0 ||
+    (selectedStatuses.length > 0 && selectedStatuses.length < statusOptions.length)
+
+  const handleClearFilters = useCallback(() => {
+    setSearchInput('')
+    setSelectedUsers([])
+    setSelectedStatuses([])
+    setPage(1)
+  }, [])
 
   const columns: ColumnDef<AllTrainingSummary>[] = useMemo(
     () => [
@@ -173,61 +196,42 @@ export function TrainingTable({
   )
 
   return (
-    <div className="flex flex-col gap-3">
-      {loading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : (
+    <DataTable
+      columns={columns}
+      data={trainings}
+      hideSearch={true}
+      loading={loading}
+      filtersSlot={
         <>
-          <DataTable
-            columns={columns}
-            data={trainings}
-            filtersSlot={
-              <>
-                <UserSelector value={selectedUsers} onChange={handleUsersChange} />
-                <MultiSelectFilter
-                  label="Status"
-                  options={statusOptions}
-                  selected={selectedStatuses}
-                  onChange={handleStatusesChange}
-                />
-              </>
-            }
-            pageSize={PAGE_SIZE}
-            onRowClick={(t) =>
-              void navigate({
-                to: '/app/training/$trainingId',
-                params: { trainingId: String(t.id) },
-              })
-            }
-            emptyMessage="No training sessions match your filters."
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by schedule…"
+              value={searchInput}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="h-8 pl-7 text-sm sm:w-56"
+            />
+          </div>
+          <UserSelector value={selectedUsers} onChange={handleUsersChange} />
+          <MultiSelectFilter
+            label="statuses"
+            options={statusOptions}
+            selected={selectedStatuses}
+            onChange={handleStatusesChange}
           />
-          {totalPages > 1 && (
-            <div className="flex items-center justify-end gap-2">
-              <span className="text-xs text-muted-foreground">
-                Page {page} of {totalPages}
-              </span>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 w-7 p-0"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 w-7 p-0"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
         </>
-      )}
-    </div>
+      }
+      filtersActive={filtersActive}
+      onClearFilters={handleClearFilters}
+      serverPagination={{ totalRows: total, page, pageSize: PAGE_SIZE, onPageChange: setPage }}
+      pageSize={PAGE_SIZE}
+      onRowClick={(t) =>
+        void navigate({
+          to: '/app/training/$trainingId',
+          params: { trainingId: String(t.id) },
+        })
+      }
+      emptyMessage="No training sessions match your filters."
+    />
   )
 }

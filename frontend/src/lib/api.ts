@@ -755,8 +755,24 @@ export const api = {
       request<AuthUser>('/settings', { method: 'PATCH', body: JSON.stringify(payload) }),
   },
   subsets: {
-    list: (opts?: { lockedOnly?: boolean }): Promise<Subset[]> =>
-      request(`/subsets${opts?.lockedOnly ? '?locked=true' : ''}`),
+    list: (opts?: {
+      lockedOnly?: boolean
+      statuses?: string[]
+      search?: string
+      page?: number
+      pageSize?: number
+      userIds?: number[]
+    }): Promise<{ items: Subset[]; total: number }> => {
+      const params = new URLSearchParams()
+      if (opts?.lockedOnly) params.set('locked', 'true')
+      if (opts?.statuses?.length) params.set('statuses', opts.statuses.join(','))
+      if (opts?.search) params.set('search', opts.search)
+      if (opts?.page !== undefined) params.set('page', String(opts.page))
+      if (opts?.pageSize !== undefined) params.set('pageSize', String(opts.pageSize))
+      if (opts?.userIds?.length) params.set('userIds', opts.userIds.join(','))
+      const qs = params.toString()
+      return request(`/subsets${qs ? `?${qs}` : ''}`)
+    },
     get: (id: number): Promise<Subset> => request(`/subsets/${id}`),
     create: (name: string, puzzleCount: number): Promise<Subset> =>
       request('/subsets', { method: 'POST', body: JSON.stringify({ name, puzzleCount }) }),
@@ -789,10 +805,23 @@ export const api = {
     getStats: (id: number): Promise<SubsetStats> => request(`/subsets/${id}/stats`),
   },
   schedules: {
-    list: (opts?: { subsetId?: number; lockedOnly?: boolean }): Promise<ScheduleSummary[]> => {
+    list: (opts?: {
+      subsetId?: number
+      lockedOnly?: boolean
+      statuses?: string[]
+      search?: string
+      page?: number
+      pageSize?: number
+      userIds?: number[]
+    }): Promise<{ items: ScheduleSummary[]; total: number }> => {
       const params = new URLSearchParams()
       if (opts?.subsetId !== undefined) params.set('subsetId', String(opts.subsetId))
       if (opts?.lockedOnly) params.set('locked', 'true')
+      if (opts?.statuses?.length) params.set('statuses', opts.statuses.join(','))
+      if (opts?.search) params.set('search', opts.search)
+      if (opts?.page !== undefined) params.set('page', String(opts.page))
+      if (opts?.pageSize !== undefined) params.set('pageSize', String(opts.pageSize))
+      if (opts?.userIds?.length) params.set('userIds', opts.userIds.join(','))
       const qs = params.toString()
       return request(`/schedules${qs ? `?${qs}` : ''}`)
     },
@@ -839,6 +868,7 @@ export const api = {
       scheduleId?: number
       userIds?: number[]
       statuses?: string[]
+      search?: string
       page?: number
       pageSize?: number
     }): Promise<TrainingPage> => {
@@ -846,6 +876,7 @@ export const api = {
       if (opts?.scheduleId !== undefined) p.set('scheduleId', String(opts.scheduleId))
       if (opts?.userIds?.length) opts.userIds.forEach((id) => p.append('userId', String(id)))
       if (opts?.statuses?.length) opts.statuses.forEach((s) => p.append('status', s))
+      if (opts?.search) p.set('search', opts.search)
       if (opts?.page !== undefined) p.set('page', String(opts.page))
       if (opts?.pageSize !== undefined) p.set('pageSize', String(opts.pageSize))
       const qs = p.toString()

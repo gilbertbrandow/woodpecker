@@ -21,9 +21,9 @@ export function OverviewStatsSection({ runIndex, accuracy, averageSolveTime }: O
               <span className="text-xs font-medium text-muted-foreground">Average accuracy</span>
               <div className="flex items-baseline gap-2">
                 <span className="tabular-nums text-2xl font-semibold">
-                  {accuracy.valuePct !== null ? `${accuracy.valuePct.toFixed(1)}%` : '—'}
+                  {accuracy.valuePct !== null ? `${accuracy.valuePct.toFixed(2)}%` : '—'}
                 </span>
-                <DeltaBadge delta={accuracy.deltaPct} goodWhenPositive={true} format={(n) => `${n.toFixed(1)}%`} />
+                <DeltaBadge delta={accuracy.deltaPct} goodWhenPositive={true} format={(n) => `${n.toFixed(2)}%`} />
               </div>
             </div>
           </TooltipTrigger>

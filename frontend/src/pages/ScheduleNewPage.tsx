@@ -29,7 +29,7 @@ export function ScheduleNewPage(): React.ReactElement | null {
     if (!user) return
     api.subsets
       .list({ lockedOnly: true })
-      .then(setSubsets)
+      .then((r) => setSubsets(r.items))
       .catch(() => toast.error('Failed to load subsets', { description: 'Could not fetch subsets.' }))
       .finally(() => setSubsetsLoading(false))
   }, [user])

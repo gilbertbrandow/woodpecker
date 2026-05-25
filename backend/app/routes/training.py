@@ -38,6 +38,7 @@ def list_all_trainings() -> Response:
     schedule_id = int(schedule_id_raw) if schedule_id_raw and schedule_id_raw.isdigit() else None
     user_ids = [int(v) for v in request.args.getlist("userId") if v.isdigit()]
     statuses = request.args.getlist("status") or None
+    search = request.args.get("search") or None
     page_raw = request.args.get("page", "1")
     page_size_raw = request.args.get("pageSize", "20")
     page = max(1, int(page_raw)) if page_raw.isdigit() else 1
@@ -46,6 +47,7 @@ def list_all_trainings() -> Response:
         schedule_id=schedule_id,
         user_ids=user_ids or None,
         statuses=statuses,
+        search=search,
         page=page,
         page_size=page_size,
     ))

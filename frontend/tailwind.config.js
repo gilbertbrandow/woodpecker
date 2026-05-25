@@ -52,6 +52,9 @@ export default {
           ring: 'hsl(var(--sidebar-ring))',
         },
       },
+      screens: {
+        '3xl': '1920px',
+      },
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
