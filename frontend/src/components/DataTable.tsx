@@ -152,7 +152,7 @@ export function DataTable<T>({
           {filterableColumns.map((fc) => (
             <MultiSelectFilter
               key={fc.id}
-              label={`All ${fc.label}`}
+              label={fc.label}
               options={fc.options}
               selected={filterSelections[fc.id] ?? []}
               onChange={(values) => handleFilterableColumnChange(fc.id, values)}

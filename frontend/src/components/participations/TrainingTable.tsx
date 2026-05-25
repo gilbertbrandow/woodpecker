@@ -202,7 +202,7 @@ export function TrainingTable({
           </div>
           <UserSelector value={selectedUsers} onChange={handleUsersChange} />
           <MultiSelectFilter
-            label="Status"
+            label="statuses"
             options={statusOptions}
             selected={selectedStatuses}
             onChange={handleStatusesChange}
