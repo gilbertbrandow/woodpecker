@@ -103,6 +103,18 @@ export function TrainingTable({
     [],
   )
 
+  const filtersActive =
+    searchInput !== '' ||
+    selectedUsers.length > 0 ||
+    (selectedStatuses.length > 0 && selectedStatuses.length < statusOptions.length)
+
+  const handleClearFilters = useCallback(() => {
+    setSearchInput('')
+    setSelectedUsers([])
+    setSelectedStatuses([])
+    setPage(1)
+  }, [])
+
   const columns: ColumnDef<AllTrainingSummary>[] = useMemo(
     () => [
       {
@@ -209,6 +221,8 @@ export function TrainingTable({
           />
         </>
       }
+      filtersActive={filtersActive}
+      onClearFilters={handleClearFilters}
       serverPagination={{ totalRows: total, page, pageSize: PAGE_SIZE, onPageChange: setPage }}
       pageSize={PAGE_SIZE}
       onRowClick={(t) =>

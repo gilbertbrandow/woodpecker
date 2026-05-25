@@ -11,7 +11,7 @@ import {
   type SortingState,
   type ColumnFiltersState,
 } from '@tanstack/react-table'
-import { ArrowUp, ArrowDown, ArrowUpDown, Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowUp, ArrowDown, ArrowUpDown, Search, Loader2, ChevronLeft, ChevronRight, Undo2 } from 'lucide-react'
 import { Input } from './ui/input'
 import {
   Table,
@@ -54,6 +54,8 @@ type DataTableProps<T> = {
   loading?: boolean
   serverPagination?: ServerPagination
   onFilterChange?: (id: string, values: string[]) => void
+  filtersActive?: boolean
+  onClearFilters?: () => void
 }
 
 export function DataTable<T>({
@@ -71,6 +73,8 @@ export function DataTable<T>({
   loading = false,
   serverPagination,
   onFilterChange,
+  filtersActive = false,
+  onClearFilters,
 }: DataTableProps<T>): React.ReactElement {
   const [sorting, setSorting] = useState<SortingState>(initialSorting)
   const [globalFilter, setGlobalFilter] = useState('')
@@ -124,6 +128,21 @@ export function DataTable<T>({
     }
   }
 
+  const hasActiveFilters =
+    filtersActive ||
+    globalFilter !== '' ||
+    columnFilters.length > 0 ||
+    Object.values(filterSelections).some((v) => v.length > 0)
+
+  const clearFilters = (): void => {
+    setGlobalFilter('')
+    setColumnFilters([])
+    setFilterSelections({})
+    filterableColumns.forEach((fc) => onFilterChange?.(fc.id, []))
+    onClearFilters?.()
+    table.setPageIndex(0)
+  }
+
   const { pageIndex } = table.getState().pagination
   const totalFiltered = table.getFilteredRowModel().rows.length
   const pageRows = table.getRowModel().rows
@@ -158,6 +177,16 @@ export function DataTable<T>({
               onChange={(values) => handleFilterableColumnChange(fc.id, values)}
             />
           ))}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Undo2 className="h-3 w-3" />
+              Clear filters
+            </button>
+          )}
           {loading && <Loader2 className="ml-auto h-4 w-4 animate-spin text-muted-foreground" />}
         </div>
       )}

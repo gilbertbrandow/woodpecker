@@ -220,6 +220,12 @@ export function SubsetsTable(): React.ReactElement {
       onFilterChange={(id, values) => {
         if (id === 'status') setSelectedStatuses(values)
       }}
+      filtersActive={search !== '' || selectedUsers.length > 0}
+      onClearFilters={() => {
+        setSearch('')
+        setSelectedUsers([])
+        setPage(1)
+      }}
       serverPagination={{ totalRows: total, page, pageSize: PAGE_SIZE, onPageChange: setPage }}
       pageSize={PAGE_SIZE}
       onRowClick={(subset) =>
