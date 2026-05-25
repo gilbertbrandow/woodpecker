@@ -77,7 +77,12 @@ function NavGroup({ items, pathname, onNavigate }: {
   )
 }
 
-export function AppSidebar({ activeRun }: { activeRun: ActiveRun | null }): React.ReactElement {
+type AppSidebarProps = {
+  activeRun: ActiveRun | null
+  collapsible?: 'icon' | 'offcanvas' | 'none'
+}
+
+export function AppSidebar({ activeRun, collapsible = 'icon' }: AppSidebarProps): React.ReactElement {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const { user, logout } = useAuth()
   const navigate = useNavigate()
@@ -114,7 +119,7 @@ export function AppSidebar({ activeRun }: { activeRun: ActiveRun | null }): Reac
   ) : null
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible={collapsible}>
       <SidebarHeader className="h-14 justify-center border-b border-transparent py-0">
         <SidebarMenu>
           <SidebarMenuItem>

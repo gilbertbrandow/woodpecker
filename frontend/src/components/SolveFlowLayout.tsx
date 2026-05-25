@@ -1,24 +1,27 @@
 import * as React from 'react'
-import { Outlet, useRouterState } from '@tanstack/react-router'
+import { Outlet } from '@tanstack/react-router'
 import { SolveSessionProvider } from '../context/solveSession'
 import { SolveHeader } from './SolveHeader'
 import { Footer } from './Footer'
-
-const BOARD_ROUTE_RE = /\/runs\/[^/]+\/(puzzles|solve)/
+import { SidebarProvider, SidebarInset } from './ui/sidebar'
+import { AppSidebar } from './AppSidebar'
+import { useActiveRun } from '../hooks/useActiveRun'
 
 export function SolveFlowLayout(): React.ReactElement {
-  const pathname = useRouterState({ select: (s) => s.location.pathname })
-  const isBoardRoute = BOARD_ROUTE_RE.test(pathname)
+  const { data: activeRun } = useActiveRun()
 
   return (
     <SolveSessionProvider>
-      <div className="flex min-h-dvh w-full flex-col">
-        <SolveHeader />
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <Outlet />
-        </div>
-        <Footer className={isBoardRoute ? 'hidden sm:block' : ''} />
-      </div>
+      <SidebarProvider defaultOpen={false}>
+        <AppSidebar activeRun={activeRun} collapsible="offcanvas" />
+        <SidebarInset className="flex min-h-dvh flex-col">
+          <SolveHeader />
+          <div className="flex flex-1 flex-col overflow-hidden">
+            <Outlet />
+          </div>
+          <Footer className="hidden sm:block" />
+        </SidebarInset>
+      </SidebarProvider>
     </SolveSessionProvider>
   )
 }
