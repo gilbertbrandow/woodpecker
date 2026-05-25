@@ -9,7 +9,7 @@ export function PageWrapper({
   className?: string
 }): React.ReactElement {
   return (
-    <div className={cn('mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 3xl:max-w-8xl', className)}>
+    <div className={cn('mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 3xl:max-w-screen-2xl', className)}>
       {children}
     </div>
   )
