@@ -7,7 +7,6 @@ type BoardPageShellProps = {
   left: React.ReactNode
   center: React.ReactNode
   right: React.ReactNode
-  mobileHeader: React.ReactNode
   mobileExtras?: React.ReactNode
   mobileDrawerContent?: React.ReactNode
 }
@@ -17,15 +16,11 @@ export function BoardPageShell({
   left,
   center,
   right,
-  mobileHeader,
   mobileExtras,
   mobileDrawerContent,
 }: BoardPageShellProps): React.ReactElement {
   return (
     <div className="flex flex-1 flex-col overflow-x-hidden pb-3 lg:pb-0 lg:px-0">
-      <div className="flex-none px-3 pt-3 pb-2 lg:hidden">
-        {mobileHeader}
-      </div>
       <div className="flex flex-1 items-start justify-center lg:items-center lg:overflow-hidden lg:px-6">
         <div className="flex w-full items-start justify-center gap-6 lg:justify-center">
           <aside className="hidden min-w-0 flex-1 flex-col gap-4 lg:flex" style={{ height: boardSize }}>
