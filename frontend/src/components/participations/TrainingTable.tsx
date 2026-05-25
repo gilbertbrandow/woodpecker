@@ -49,7 +49,7 @@ export function TrainingTable({
       : [],
   )
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([
-    'draft',
+    'not_started',
     'in_progress',
     'completed',
   ])
@@ -95,7 +95,7 @@ export function TrainingTable({
 
   const statusOptions = useMemo<MultiSelectOption[]>(
     () => [
-      { value: 'draft', label: 'Not started', icon: <Timer className="h-3.5 w-3.5 text-muted-foreground" /> },
+      { value: 'not_started', label: 'Not started', icon: <Timer className="h-3.5 w-3.5 text-muted-foreground" /> },
       { value: 'in_progress', label: 'In progress', icon: <Clock className="h-3.5 w-3.5 text-blue-600" /> },
       { value: 'completed', label: 'Completed', icon: <CheckCircle2 className="h-3.5 w-3.5 text-green-600" /> },
       { value: 'aborted', label: 'Aborted', icon: <XCircle className="h-3.5 w-3.5 text-red-600" /> },

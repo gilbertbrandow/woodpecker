@@ -175,7 +175,7 @@ def list_my_trainings(user_id: int, tz_str: str = "UTC") -> list[dict[str, objec
                      WHEN t.aborted_at IS NOT NULL THEN 'aborted'
                      WHEN t.completed_at IS NOT NULL THEN 'completed'
                      WHEN EXISTS (SELECT 1 FROM runs r WHERE r.training_id = t.id) THEN 'in_progress'
-                     ELSE 'draft'
+                     ELSE 'not_started'
                    END AS status,
                    (
                        SELECT COUNT(*)
@@ -309,7 +309,7 @@ def abort_training(training_id: int, user_id: int) -> Training:
 
 
 _STATUS_SQL: dict[str, str] = {
-    "draft": (
+    "not_started": (
         "t.aborted_at IS NULL AND t.completed_at IS NULL"
         " AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.training_id = t.id)"
     ),
@@ -367,7 +367,7 @@ def list_all_trainings(
                      WHEN t.aborted_at IS NOT NULL THEN 'aborted'
                      WHEN t.completed_at IS NOT NULL THEN 'completed'
                      WHEN EXISTS (SELECT 1 FROM runs r WHERE r.training_id = t.id) THEN 'in_progress'
-                     ELSE 'draft'
+                     ELSE 'not_started'
                    END AS status,
                    (
                        SELECT COUNT(*)
@@ -442,7 +442,7 @@ def training_status(training: Training) -> str:
     run_count = db.session.scalar(
         sa.select(sa.func.count()).where(Run.training_id == training.id)
     ) or 0
-    return "in_progress" if run_count > 0 else "draft"
+    return "in_progress" if run_count > 0 else "not_started"
 
 
 def get_my_training_for_schedule(
