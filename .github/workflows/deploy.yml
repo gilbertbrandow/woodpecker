@@ -54,6 +54,9 @@ jobs:
     name: Deploy to EC2
     needs: build-and-push
     runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://woodpeckerchess.com
     steps:
       - uses: actions/checkout@v6
 
