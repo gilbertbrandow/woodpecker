@@ -3,6 +3,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import urlsplit, urlunsplit
 
 import click
 import sqlalchemy as sa
@@ -19,6 +20,23 @@ from sources.scraped_positional.enrichment import OPENING_PLY_CUTOFF, enrich_bat
 from sources.scraped_positional.theme_seeder import THEME_COLUMN_NAMES
 
 PROGRESS_INTERVAL = 500
+
+
+def _player_oriented_game_url(game_url: str, fen: str) -> str:
+    fen_parts = fen.split(" ")
+    if len(fen_parts) < 2:
+        return game_url
+    side_to_move = fen_parts[1]
+    if side_to_move not in {"w", "b"}:
+        return game_url
+    parsed = urlsplit(game_url)
+    path_parts = [part for part in parsed.path.split("/") if part]
+    if not path_parts:
+        return game_url
+    game_id = path_parts[0]
+    wants_black = side_to_move == "w"
+    normalized_path = f"/{game_id}/black" if wants_black else f"/{game_id}"
+    return urlunsplit((parsed.scheme, parsed.netloc, normalized_path, parsed.query, parsed.fragment))
 
 
 @dataclass
@@ -133,7 +151,7 @@ def process_puzzle_batch(
         opening_id = _find_opening_id(opening_data, opening_by_display_name, opening_by_eco) if opening_data else None
         insertable.append({
             "internal_id": puzzle["internal_id"],
-            "lichess_url": puzzle["lichess_url"],
+            "lichess_url": _player_oriented_game_url(puzzle["lichess_url"], enriched_fen),
             "fen": enriched_fen,
             "moves": moves_str,
             "difficulty_id": difficulty_id,
