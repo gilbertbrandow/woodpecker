@@ -266,7 +266,7 @@ export type TrainingInsights = {
   runs: TrainingRunInsight[]
 }
 
-export type TrainingStatus = 'draft' | 'in_progress' | 'completed' | 'aborted'
+export type TrainingStatus = 'not_started' | 'in_progress' | 'completed' | 'aborted'
 
 export type TrainingScheduleSummary = {
   id: number

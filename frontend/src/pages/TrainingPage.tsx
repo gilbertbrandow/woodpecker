@@ -359,7 +359,7 @@ export function TrainingPage(): React.ReactElement | null {
     const sch = training.schedule
     const defs = sch.runs
     const isOwner = training.ownerId === user.id
-    const canManage = isOwner && (training.status === 'draft' || training.status === 'in_progress')
+    const canManage = isOwner && (training.status === 'not_started' || training.status === 'in_progress')
     const completedCount = runs.filter((r) => r.status === 'completed').length
     const hasActive = runs.some((r) => r.status === 'active')
     const startableIdx = (canManage && !hasActive && completedCount < sch.runCount) ? completedCount : null
@@ -388,7 +388,7 @@ export function TrainingPage(): React.ReactElement | null {
   }, [training, user, runs, startingIndex])
 
   const runColumns = useMemo<ColumnDef<RunSlotRow>[]>(() => {
-    const canManage = !!training && !!user && training.ownerId === user.id && (training.status === 'draft' || training.status === 'in_progress')
+    const canManage = !!training && !!user && training.ownerId === user.id && (training.status === 'not_started' || training.status === 'in_progress')
     return [
       {
         id: 'index',

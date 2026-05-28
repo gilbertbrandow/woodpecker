@@ -3,7 +3,7 @@ import { Check, CheckCheck, Lock, Layers, Clock, XCircle, CheckCircle2, PauseCir
 import { cn } from '../lib/utils'
 
 type SubsetStatus = 'draft' | 'filled' | 'locked'
-type TrainingStatus = 'draft' | 'in_progress' | 'on_break' | 'break_elapsed' | 'completed' | 'aborted'
+type TrainingStatus = 'not_started' | 'in_progress' | 'on_break' | 'break_elapsed' | 'completed' | 'aborted'
 type PositionStatus = 'not_started' | 'in_progress' | 'solved' | 'solved_with_retries' | 'failed'
 
 export type StatusValue = SubsetStatus | TrainingStatus | PositionStatus
