@@ -11,6 +11,7 @@ from app.models.run import MAX_PUZZLE_TIME_MS, TrainingAttempt, Run, RunTraining
 from app.models.schedule import Schedule
 from app.models.training import Training
 from app.models.subset import Subset, SubsetTrainingItem
+from app.exceptions import ConflictError
 from app.services.attempt_state import (
     attempt_type_fields,
     derive_attempt_outcome,
@@ -512,7 +513,7 @@ def start_run(training_id: int, user_id: int, expected_run_index: int | None = N
     if training.user_id != user_id:
         raise PermissionError("Access denied.")
     if training.completed_at is not None or training.aborted_at is not None:
-        raise ValueError("Training is already terminal.")
+        raise ConflictError("Training is already terminal.")
 
     cross_training_active = db.session.scalar(
         sa.select(Run)
@@ -525,7 +526,7 @@ def start_run(training_id: int, user_id: int, expected_run_index: int | None = N
         )
     )
     if cross_training_active is not None:
-        raise ValueError("You already have an active run in another training.")
+        raise ConflictError("You already have an active run in another training.")
 
     active_run = db.session.scalar(
         sa.select(Run).where(
@@ -535,7 +536,7 @@ def start_run(training_id: int, user_id: int, expected_run_index: int | None = N
         )
     )
     if active_run is not None:
-        raise ValueError("An active run already exists for this training.")
+        raise ConflictError("An active run already exists for this training.")
 
     schedule = db.session.get(Schedule, training.schedule_id)
     if schedule is None:
@@ -554,9 +555,9 @@ def start_run(training_id: int, user_id: int, expected_run_index: int | None = N
     ) or 0
 
     if run_index >= run_count:
-        raise ValueError("All run slots for this schedule are already completed.")
+        raise ConflictError("All run slots for this schedule are already completed.")
     if expected_run_index is not None and expected_run_index != run_index:
-        raise ValueError("Run slot is no longer startable.")
+        raise ConflictError("Run slot is no longer startable.")
 
     puzzle_ids: list[int] = list(
         db.session.scalars(
@@ -613,7 +614,7 @@ def get_run(run_id: int) -> Run:
 def continue_run(run_id: int, user_id: int) -> dict[str, object]:
     run = _get_owned_run(run_id, user_id)
     if run.completed_at is not None or run.aborted_at is not None:
-        raise ValueError("Run is not active.")
+        raise ConflictError("Run is not active.")
 
     _, config = _get_schedule_config(run)
     total_queue = config.total_queue
@@ -1285,7 +1286,7 @@ def complete_attempt(
         raise LookupError("Attempt not found.")
 
     if attempt.status != "in_progress":
-        raise ValueError("Attempt is already completed.")
+        raise ConflictError("Attempt is already completed.")
 
     _, config = _get_schedule_config(run)
     total_queue = config.total_queue

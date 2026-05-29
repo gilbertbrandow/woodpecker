@@ -18,7 +18,7 @@ def update_user_settings(
 ) -> User:
     user = db.session.get(User, user_id)
     if not user:
-        raise ValueError("User not found.")
+        raise LookupError("User not found.")
 
     if display_name is not None:
         user.display_name = validate_display_name(display_name)
