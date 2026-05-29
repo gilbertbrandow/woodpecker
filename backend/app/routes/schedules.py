@@ -27,12 +27,7 @@ def create_schedule() -> tuple[Response, int]:
         return jsonify({"error": "name must be a string"}), 400
     if not isinstance(subset_id_raw, int):
         return jsonify({"error": "subsetId must be an integer"}), 400
-    try:
-        schedule = schedule_svc.create_schedule(session["user_id"], name, subset_id_raw)
-    except LookupError as e:
-        return jsonify({"error": str(e)}), 404
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+    schedule = schedule_svc.create_schedule(session["user_id"], name, subset_id_raw)
     return jsonify(schedule_svc.schedule_to_dict(schedule, _load_creator(schedule))), 201
 
 
@@ -67,12 +62,7 @@ def list_schedules() -> Response:
 @schedules_bp.get("/<int:schedule_id>")
 @login_required
 def get_schedule(schedule_id: int) -> tuple[Response, int] | Response:
-    try:
-        schedule = schedule_svc.get_schedule(schedule_id, session["user_id"])
-    except LookupError as e:
-        return jsonify({"error": str(e)}), 404
-    except PermissionError as e:
-        return jsonify({"error": str(e)}), 403
+    schedule = schedule_svc.get_schedule(schedule_id, session["user_id"])
     return jsonify(schedule_svc.schedule_to_dict(schedule, _load_creator(schedule)))
 
 
@@ -80,38 +70,21 @@ def get_schedule(schedule_id: int) -> tuple[Response, int] | Response:
 @login_required
 def update_schedule(schedule_id: int) -> tuple[Response, int] | Response:
     updates: dict[str, object] = request.get_json(silent=True) or {}
-    try:
-        schedule = schedule_svc.update_schedule(schedule_id, session["user_id"], updates)
-    except LookupError as e:
-        return jsonify({"error": str(e)}), 404
-    except PermissionError as e:
-        return jsonify({"error": str(e)}), 403
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+    schedule = schedule_svc.update_schedule(schedule_id, session["user_id"], updates)
     return jsonify(schedule_svc.schedule_to_dict(schedule, _load_creator(schedule)))
 
 
 @schedules_bp.delete("/<int:schedule_id>")
 @login_required
 def delete_schedule(schedule_id: int) -> tuple[Response, int]:
-    try:
-        schedule_svc.delete_schedule(schedule_id, session["user_id"])
-    except LookupError as e:
-        return jsonify({"error": str(e)}), 404
-    except PermissionError as e:
-        return jsonify({"error": str(e)}), 403
+    schedule_svc.delete_schedule(schedule_id, session["user_id"])
     return jsonify({}), 204
 
 
 @schedules_bp.get("/<int:schedule_id>/insights")
 @login_required
 def get_schedule_insights(schedule_id: int) -> tuple[Response, int] | Response:
-    try:
-        data = schedule_svc.get_schedule_insights(schedule_id, session["user_id"])
-    except LookupError as e:
-        return jsonify({"error": str(e)}), 404
-    except PermissionError as e:
-        return jsonify({"error": str(e)}), 403
+    data = schedule_svc.get_schedule_insights(schedule_id, session["user_id"])
     return jsonify({"data": data})
 
 
@@ -136,10 +109,7 @@ def get_my_training_for_schedule(schedule_id: int) -> tuple[Response, int] | Res
 @schedules_bp.get("/<int:schedule_id>/training/participants")
 @login_required
 def get_schedule_participants(schedule_id: int) -> tuple[Response, int] | Response:
-    try:
-        result = training_svc.get_schedule_participants(schedule_id, session["user_id"])
-    except PermissionError as e:
-        return jsonify({"error": str(e)}), 403
+    result = training_svc.get_schedule_participants(schedule_id, session["user_id"])
     return jsonify(result)
 
 
@@ -157,27 +127,14 @@ def get_training_insights(schedule_id: int) -> tuple[Response, int] | Response:
         )
     except ValueError:
         return jsonify({"error": "Invalid runs or participants parameter."}), 400
-    try:
-        result = training_svc.get_training_insights(
-            schedule_id, session["user_id"], run_indices, participant_ids
-        )
-    except PermissionError as e:
-        return jsonify({"error": str(e)}), 403
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+    result = training_svc.get_training_insights(
+        schedule_id, session["user_id"], run_indices, participant_ids
+    )
     return jsonify(result)
 
 
 @schedules_bp.post("/<int:schedule_id>/lock")
 @login_required
 def lock_schedule(schedule_id: int) -> tuple[Response, int] | Response:
-    try:
-        schedule = schedule_svc.lock_schedule(schedule_id, session["user_id"])
-    except LookupError as e:
-        return jsonify({"error": str(e)}), 404
-    except PermissionError as e:
-        return jsonify({"error": str(e)}), 403
-    except ValueError as e:
-        status_code = 409 if "Already locked" in str(e) else 400
-        return jsonify({"error": str(e)}), status_code
+    schedule = schedule_svc.lock_schedule(schedule_id, session["user_id"])
     return jsonify(schedule_svc.schedule_to_dict(schedule, _load_creator(schedule)))
