@@ -16,7 +16,10 @@ CMD ["sh", "-lc", "npm run dev -- --host 0.0.0.0 --port 5173"]
 
 FROM deps AS build
 COPY . .
-RUN npm run build
+ARG VITE_SENTRY_DSN
+ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
+RUN --mount=type=secret,id=sentry_auth_token \
+    SENTRY_AUTH_TOKEN=$(cat /run/secrets/sentry_auth_token) npm run build
 
 FROM nginx:1.31-alpine AS prod
 COPY nginx.conf /etc/nginx/conf.d/default.conf
