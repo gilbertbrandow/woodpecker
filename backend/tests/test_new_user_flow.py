@@ -9,6 +9,7 @@ from flask import Flask
 from flask.testing import FlaskClient
 
 from app import auth_session
+from app.exceptions import ValidationError
 from app.models.user import User, WaitlistEntry, WhitelistEntry
 from app.services.validation import validate_display_name
 from app.services.auth_service import decide_access
@@ -55,30 +56,30 @@ class TestDisplayNameValidation:
         assert validate_display_name("ab") == "ab"
 
     def test_too_short(self) -> None:
-        with pytest.raises(ValueError, match="at least 2"):
+        with pytest.raises(ValidationError, match="at least 2"):
             validate_display_name("a")
 
     def test_empty(self) -> None:
-        with pytest.raises(ValueError, match="empty"):
+        with pytest.raises(ValidationError, match="empty"):
             validate_display_name("")
 
     def test_whitespace_only(self) -> None:
-        with pytest.raises(ValueError, match="empty"):
+        with pytest.raises(ValidationError, match="empty"):
             validate_display_name("   ")
 
     def test_too_long(self) -> None:
-        with pytest.raises(ValueError, match="32 characters"):
+        with pytest.raises(ValidationError, match="32 characters"):
             validate_display_name("a" * 33)
 
     def test_max_length_ok(self) -> None:
         assert validate_display_name("a" * 32) == "a" * 32
 
     def test_invalid_chars(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             validate_display_name("alice@domain")
 
     def test_invalid_chars_dot(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             validate_display_name("alice.smith")
 
 
@@ -285,7 +286,7 @@ class TestOnboardingEndpoint:
                 json={"displayName": "x"},
                 content_type="application/json",
             )
-            assert response.status_code == 400
+            assert response.status_code == 422
 
     def test_onboarding_requires_session(self, app: Flask, db_session) -> None:  # type: ignore[misc]
         with app.test_client() as client:
