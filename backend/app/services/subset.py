@@ -5,6 +5,7 @@ from typing import Any
 
 import sqlalchemy as sa
 
+from app.exceptions import ConflictError, ValidationError
 from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.subset import Subset, SubsetTrainingItem
@@ -53,22 +54,22 @@ def subset_to_dict(subset: Subset, owner: User | None = None) -> dict[str, objec
 def _validate_sources_config(config: dict[str, object]) -> None:
     sources = config.get("sources")
     if not isinstance(sources, list) or not sources:
-        raise ValueError("config.sources must be a non-empty array.")
+        raise ValidationError("config.sources must be a non-empty array.")
     total_pct = 0
     for entry in sources:
         if not isinstance(entry, dict):
-            raise ValueError("Each source entry must be an object.")
+            raise ValidationError("Each source entry must be an object.")
         source = entry.get("source")
         if source not in VALID_SOURCES:
-            raise ValueError(
+            raise ValidationError(
                 f"Invalid source '{source}'. Must be one of: {', '.join(sorted(VALID_SOURCES))}."
             )
         pct = entry.get("percentage")
         if not isinstance(pct, int) or pct < 1:
-            raise ValueError("Each source percentage must be an integer >= 1.")
+            raise ValidationError("Each source percentage must be an integer >= 1.")
         total_pct += pct
     if total_pct != 100:
-        raise ValueError(f"Source percentages must sum to 100 (got {total_pct}).")
+        raise ValidationError(f"Source percentages must sum to 100 (got {total_pct}).")
 
 
 def _distribute_counts(sources: list[dict], total: int) -> list[int]:
@@ -340,9 +341,9 @@ def _sample_and_insert(
 def create_subset(user_id: int, name: str, puzzle_count: int) -> Subset:
     name = name.strip()
     if not name:
-        raise ValueError("Name is required.")
+        raise ValidationError("Name is required.")
     if not (5 <= puzzle_count <= 1000):
-        raise ValueError("puzzle_count must be between 5 and 1000.")
+        raise ValidationError("puzzle_count must be between 5 and 1000.")
     subset = Subset(user_id=user_id, name=name, puzzle_count=puzzle_count)
     db.session.add(subset)
     db.session.commit()
@@ -357,9 +358,9 @@ def save_config(
 ) -> Subset:
     subset = _get_owned_subset(subset_id, user_id)
     if subset.locked_at is not None:
-        raise PermissionError("Subset is locked.")
+        raise ConflictError("Subset is locked.")
     if not (5 <= puzzle_count <= 1000):
-        raise ValueError("puzzle_count must be between 5 and 1000.")
+        raise ValidationError("puzzle_count must be between 5 and 1000.")
     _validate_sources_config(config)
 
     db.session.execute(
@@ -375,13 +376,13 @@ def save_config(
 def fill(subset_id: int, user_id: int) -> tuple[int, int]:
     subset = _get_owned_subset(subset_id, user_id)
     if subset.locked_at is not None:
-        raise PermissionError("Subset is locked.")
+        raise ConflictError("Subset is locked.")
     if subset.config is None or subset.puzzle_count is None:
-        raise ValueError("Configuration is not set.")
+        raise ValidationError("Configuration is not set.")
 
     sources: list[dict] = (subset.config or {}).get("sources", [])  # type: ignore[assignment]
     if not sources:
-        raise ValueError("Configuration is not set.")
+        raise ValidationError("Configuration is not set.")
 
     db.session.execute(
         sa.delete(SubsetTrainingItem).where(SubsetTrainingItem.subset_id == subset_id)
@@ -399,13 +400,13 @@ def fill(subset_id: int, user_id: int) -> tuple[int, int]:
 def refill(subset_id: int, user_id: int) -> tuple[int, int]:
     subset = _get_owned_subset(subset_id, user_id)
     if subset.locked_at is not None:
-        raise PermissionError("Subset is locked.")
+        raise ConflictError("Subset is locked.")
     if subset.config is None or subset.puzzle_count is None:
-        raise ValueError("Configuration is not set.")
+        raise ValidationError("Configuration is not set.")
 
     sources: list[dict] = (subset.config or {}).get("sources", [])  # type: ignore[assignment]
     if not sources:
-        raise ValueError("Configuration is not set.")
+        raise ValidationError("Configuration is not set.")
 
     active_count: int = db.session.execute(
         db.select(db.func.count()).where(SubsetTrainingItem.subset_id == subset_id)
@@ -427,7 +428,7 @@ def refill(subset_id: int, user_id: int) -> tuple[int, int]:
 def discard_puzzle(subset_id: int, training_item_id: int, user_id: int) -> None:
     subset = _get_owned_subset(subset_id, user_id)
     if subset.locked_at is not None:
-        raise PermissionError("Subset is locked.")
+        raise ConflictError("Subset is locked.")
 
     row = db.session.execute(
         db.select(SubsetTrainingItem).where(
@@ -445,13 +446,13 @@ def discard_puzzle(subset_id: int, training_item_id: int, user_id: int) -> None:
 def lock_subset(subset_id: int, user_id: int) -> Subset:
     subset = _get_owned_subset(subset_id, user_id)
     if subset.locked_at is not None:
-        raise ValueError("Already locked.")
+        raise ConflictError("Already locked.")
 
     active_count: int = db.session.execute(
         db.select(db.func.count()).where(SubsetTrainingItem.subset_id == subset_id)
     ).scalar_one()
     if active_count == 0:
-        raise ValueError("Cannot lock a subset with no active puzzles.")
+        raise ValidationError("Cannot lock a subset with no active puzzles.")
 
     subset.locked_at = datetime.now(timezone.utc)
     subset.locked_puzzle_count = active_count
@@ -941,7 +942,7 @@ def delete_subset(subset_id: int, user_id: int) -> None:
         sa.select(sa.literal(1)).where(Schedule.subset_id == subset_id).limit(1)
     ).first()
     if referenced is not None:
-        raise ValueError("Cannot delete a subset that is referenced by a schedule.")
+        raise ConflictError("Cannot delete a subset that is referenced by a schedule.")
     db.session.delete(subset)
     db.session.commit()
 

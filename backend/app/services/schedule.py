@@ -3,6 +3,7 @@ from typing import cast
 
 import sqlalchemy as sa
 
+from app.exceptions import ConflictError, ValidationError
 from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.subset import Subset
@@ -61,12 +62,12 @@ def _get_accessible_schedule(schedule_id: int, user_id: int) -> Schedule:
 def create_schedule(user_id: int, name: str, subset_id: int) -> Schedule:
     name = name.strip()
     if not name:
-        raise ValueError("Name is required.")
+        raise ValidationError("Name is required.")
     subset = db.session.get(Subset, subset_id)
     if subset is None:
         raise LookupError("Subset not found.")
     if subset.locked_at is None:
-        raise ValueError("Subset must be locked before creating a schedule.")
+        raise ValidationError("Subset must be locked before creating a schedule.")
     schedule = Schedule(user_id=user_id, subset_id=subset_id, name=name, config=DEFAULT_CONFIG)
     db.session.add(schedule)
     db.session.commit()
@@ -80,28 +81,28 @@ def update_schedule(
 ) -> Schedule:
     schedule = _get_owned_schedule(schedule_id, user_id)
     if schedule.locked_at is not None:
-        raise PermissionError("Locked schedules cannot be edited.")
+        raise ConflictError("Locked schedules cannot be edited.")
 
     if "name" in updates:
         name_raw = updates["name"]
         if not isinstance(name_raw, str):
-            raise ValueError("name must be a string.")
+            raise ValidationError("name must be a string.")
         name = name_raw.strip()
         if not name:
-            raise ValueError("name cannot be empty.")
+            raise ValidationError("name cannot be empty.")
         schedule.name = name
 
     if "description" in updates:
         desc_raw = updates["description"]
         if desc_raw is not None and not isinstance(desc_raw, str):
-            raise ValueError("description must be a string or null.")
+            raise ValidationError("description must be a string or null.")
         schedule.description = desc_raw if isinstance(desc_raw, str) else None
 
     if "config" in updates:
         config_raw = updates["config"]
         if config_raw is not None:
             if not isinstance(config_raw, dict):
-                raise ValueError("config must be an object.")
+                raise ValidationError("config must be an object.")
             ScheduleConfig.from_dict(cast(dict[str, object], config_raw))
             schedule.config = cast(dict[str, object], config_raw)
         else:
@@ -114,9 +115,9 @@ def update_schedule(
 def lock_schedule(schedule_id: int, user_id: int) -> Schedule:
     schedule = _get_owned_schedule(schedule_id, user_id)
     if schedule.locked_at is not None:
-        raise ValueError("Already locked.")
+        raise ConflictError("Already locked.")
     if schedule.config is None:
-        raise ValueError("Cannot lock a schedule without a config.")
+        raise ValidationError("Cannot lock a schedule without a config.")
     ScheduleConfig.from_dict(schedule.config)
     schedule.locked_at = datetime.now(timezone.utc)
     db.session.commit()

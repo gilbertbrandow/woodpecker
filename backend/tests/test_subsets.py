@@ -410,7 +410,7 @@ class TestPatchConfig:
             json={"puzzleCount": 10, "config": config},
         )
 
-        assert resp.status_code == 400
+        assert resp.status_code == 422
         assert "100" in resp.get_json()["error"]
 
     def test_rejects_missing_sources_key(self, client: FlaskClient, db_session) -> None:
@@ -423,7 +423,7 @@ class TestPatchConfig:
             json={"puzzleCount": 10, "config": {"rating": {"min": 0, "max": 9999}}},
         )
 
-        assert resp.status_code == 400
+        assert resp.status_code == 422
 
     def test_rejects_unknown_source_name(self, client: FlaskClient, db_session) -> None:
         user = _make_user(db_session, "pc_unknownsrc")
@@ -436,7 +436,7 @@ class TestPatchConfig:
             json={"puzzleCount": 10, "config": config},
         )
 
-        assert resp.status_code == 400
+        assert resp.status_code == 422
 
     def test_rejects_zero_percentage(self, client: FlaskClient, db_session) -> None:
         user = _make_user(db_session, "pc_zeropct")
@@ -454,7 +454,7 @@ class TestPatchConfig:
             json={"puzzleCount": 10, "config": config},
         )
 
-        assert resp.status_code == 400
+        assert resp.status_code == 422
 
     def test_clears_existing_training_items_on_save(self, client: FlaskClient, db_session) -> None:
         from app.models.subset import SubsetTrainingItem

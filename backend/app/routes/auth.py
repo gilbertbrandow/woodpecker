@@ -118,10 +118,7 @@ def onboarding() -> tuple[Response, int] | Response:
     if not isinstance(raw_display_name, str):
         return jsonify({"error": "displayName is required"}), 400
 
-    try:
-        display_name = validate_display_name(raw_display_name)
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+    display_name = validate_display_name(raw_display_name)
 
     user = create_user_from_onboarding(
         state["lichess_username"], display_name, state["avatar_url"]
@@ -142,14 +139,6 @@ def update_email() -> tuple[Response, int] | Response:
     if not isinstance(raw_email, str):
         return jsonify({"error": "invalid email address"}), 400
 
-    try:
-        email = validate_email(raw_email)
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-
-    try:
-        entry = update_waitlist_email(state["lichess_username"], email)
-    except LookupError as e:
-        return jsonify({"error": str(e)}), 404
-
+    email = validate_email(raw_email)
+    entry = update_waitlist_email(state["lichess_username"], email)
     return jsonify({"status": "waitlisted", "email": entry.email})

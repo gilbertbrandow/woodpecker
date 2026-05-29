@@ -8,6 +8,7 @@ from app.models.schedule import Schedule
 from app.models.training import Training
 from app.models.subset import Subset
 from app.models.user import User
+from app.exceptions import ConflictError, ValidationError
 from app.services.schedule_config import ScheduleConfig
 from app.services.training_state import compute_training_state
 
@@ -136,7 +137,7 @@ def create_training(user_id: int, schedule_id: int) -> Training:
     if schedule is None:
         raise LookupError("Schedule not found.")
     if schedule.locked_at is None:
-        raise ValueError("Schedule must be locked before enrolling.")
+        raise ValidationError("Schedule must be locked before enrolling.")
 
     existing = db.session.scalar(
         sa.select(Training).where(
@@ -147,7 +148,7 @@ def create_training(user_id: int, schedule_id: int) -> Training:
         )
     )
     if existing is not None:
-        raise ValueError("Already enrolled in this schedule.")
+        raise ConflictError("Already enrolled in this schedule.")
 
     training = Training(
         user_id=user_id,
@@ -271,9 +272,9 @@ def set_run_target(
     _get_owned_training(training_id, user_id)
 
     if target_accuracy is not None and not (0.0 <= target_accuracy <= 100.0):
-        raise ValueError("targetAccuracy must be between 0 and 100.")
+        raise ValidationError("targetAccuracy must be between 0 and 100.")
     if target_solve_seconds is not None and target_solve_seconds < 1:
-        raise ValueError("targetSolveSeconds must be at least 1.")
+        raise ValidationError("targetSolveSeconds must be at least 1.")
 
     run = db.session.scalar(
         sa.select(Run).where(
@@ -292,7 +293,7 @@ def set_run_target(
 def abort_training(training_id: int, user_id: int) -> Training:
     training = _get_owned_training(training_id, user_id)
     if training.completed_at is not None or training.aborted_at is not None:
-        raise ValueError("Training is already terminal.")
+        raise ConflictError("Training is already terminal.")
     now = datetime.now(timezone.utc)
     training.aborted_at = now
     active_run = db.session.scalar(
@@ -506,7 +507,7 @@ def get_training_insights(
             ).all()
         )
         if len(enrolled_ids) != len(set(participant_ids)):
-            raise ValueError("Some participant ids do not belong to this schedule.")
+            raise ValidationError("Some participant ids do not belong to this schedule.")
 
     return {"datapoints": []}
 

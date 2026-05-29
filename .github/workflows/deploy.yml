@@ -84,23 +84,44 @@ jobs:
         env:
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
           GHCR_ACTOR: ${{ github.actor }}
+          GHCR_OWNER: ${{ github.repository_owner }}
           IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          LICHESS_CLIENT_ID: ${{ secrets.LICHESS_CLIENT_ID }}
+          LICHESS_REDIRECT_URI: ${{ secrets.LICHESS_REDIRECT_URI }}
+          APP_ORIGIN: ${{ secrets.APP_ORIGIN }}
+          SESSION_COOKIE_SECURE: ${{ secrets.SESSION_COOKIE_SECURE }}
+          MAX_USERS: ${{ secrets.MAX_USERS }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           BACKUP_BUCKET: ${{ secrets.BACKUP_BUCKET }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: GHCR_TOKEN,GHCR_ACTOR,IMAGE_TAG,BACKUP_BUCKET
+          envs: GHCR_TOKEN,GHCR_ACTOR,GHCR_OWNER,IMAGE_TAG,POSTGRES_DB,POSTGRES_USER,POSTGRES_PASSWORD,SECRET_KEY,LICHESS_CLIENT_ID,LICHESS_REDIRECT_URI,APP_ORIGIN,SESSION_COOKIE_SECURE,MAX_USERS,SENTRY_DSN,BACKUP_BUCKET
           script: |
             set -e
 
-            # Inject BACKUP_BUCKET into .env (idempotent)
-            if grep -qxF "BACKUP_BUCKET=${BACKUP_BUCKET}" /opt/woodpecker/.env 2>/dev/null; then
-              echo "BACKUP_BUCKET already set correctly"
-            else
-              sed -i '/^BACKUP_BUCKET=/d' /opt/woodpecker/.env
-              echo "BACKUP_BUCKET=${BACKUP_BUCKET}" >> /opt/woodpecker/.env
-            fi
+            # Write full .env from GitHub environment secrets (authoritative on every deploy)
+            cat > /opt/woodpecker/.env.new << EOF
+            POSTGRES_DB=${POSTGRES_DB}
+            POSTGRES_USER=${POSTGRES_USER}
+            POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+            SECRET_KEY=${SECRET_KEY}
+            LICHESS_CLIENT_ID=${LICHESS_CLIENT_ID}
+            LICHESS_REDIRECT_URI=${LICHESS_REDIRECT_URI}
+            APP_ORIGIN=${APP_ORIGIN}
+            SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE}
+            MAX_USERS=${MAX_USERS}
+            SENTRY_DSN=${SENTRY_DSN}
+            BACKUP_BUCKET=${BACKUP_BUCKET}
+            GHCR_OWNER=${GHCR_OWNER}
+            EOF
+            chmod 600 /opt/woodpecker/.env.new
+            mv /opt/woodpecker/.env.new /opt/woodpecker/.env
 
             # Install AWS CLI if not present (idempotent)
             if ! command -v aws &>/dev/null; then

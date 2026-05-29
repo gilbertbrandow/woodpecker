@@ -1,5 +1,7 @@
 import os
-from flask import Flask
+import sentry_sdk
+from flask import Flask, session
+from sentry_sdk.integrations.flask import FlaskIntegration
 from app.extensions import db, cors, migrate
 from app.routes.health import health_bp
 from app.routes.auth import auth_bp
@@ -14,9 +16,25 @@ from app.routes.leaderboard import leaderboard_bp
 from app.routes.sources import sources_bp
 from app.routes.users import users_bp
 from app.cli import register_commands
+from app.errors import register_error_handlers
+
+
+def _init_sentry() -> None:
+    dsn = os.environ.get("SENTRY_DSN")
+    if not dsn:
+        return
+    sentry_sdk.init(
+        dsn=dsn,
+        integrations=[FlaskIntegration()],
+        environment=os.environ.get("FLASK_ENV", "production"),
+        traces_sample_rate=0.0,
+        send_default_pii=False,
+    )
 
 
 def create_app() -> Flask:
+    _init_sentry()
+
     app = Flask(__name__)
 
     app.config["SECRET_KEY"] = os.environ["SECRET_KEY"]
@@ -28,6 +46,12 @@ def create_app() -> Flask:
     db.init_app(app)
     cors.init_app(app, origins=[os.environ.get("APP_ORIGIN", "http://localhost:5173")], supports_credentials=True)
     migrate.init_app(app, db)
+
+    @app.before_request
+    def set_sentry_user() -> None:
+        user_id = session.get("user_id")
+        if user_id:
+            sentry_sdk.set_user({"id": str(user_id)})
 
     app.register_blueprint(health_bp)
     app.register_blueprint(auth_bp)
@@ -43,5 +67,6 @@ def create_app() -> Flask:
     app.register_blueprint(users_bp)
 
     register_commands(app)
+    register_error_handlers(app)
 
     return app
