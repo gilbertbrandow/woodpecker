@@ -40,11 +40,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
 
     toast.error(title, { description: detail })
-
-    if (response.status >= 500) {
-      Sentry.captureException(err)
-    }
-
     throw err
   }
 
