@@ -60,11 +60,11 @@ class TestDisplayNameValidation:
             validate_display_name("a")
 
     def test_empty(self) -> None:
-        with pytest.raises(ValidationError, match="empty"):
+        with pytest.raises(ValidationError, match="Display name required"):
             validate_display_name("")
 
     def test_whitespace_only(self) -> None:
-        with pytest.raises(ValidationError, match="empty"):
+        with pytest.raises(ValidationError, match="Display name required"):
             validate_display_name("   ")
 
     def test_too_long(self) -> None:

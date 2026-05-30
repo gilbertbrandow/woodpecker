@@ -8,7 +8,7 @@ from app.models.schedule import Schedule
 from app.models.training import Training
 from app.models.subset import Subset
 from app.models.user import User
-from app.exceptions import ConflictError, ValidationError
+from app.exceptions import ConflictError, ValidationError, NotFoundError, ForbiddenError
 from app.services.schedule_config import ScheduleConfig
 from app.services.training_state import compute_training_state
 
@@ -16,28 +16,28 @@ from app.services.training_state import compute_training_state
 def _get_owned_training(training_id: int, user_id: int) -> Training:
     training = db.session.get(Training, training_id)
     if training is None:
-        raise LookupError("Training not found.")
+        raise NotFoundError("Training not found", "The requested training does not exist.")
     if training.user_id != user_id:
-        raise PermissionError("Access denied.")
+        raise ForbiddenError("Access denied", "You do not have permission to perform this action.")
     return training
 
 
 def training_full_dict(training: Training) -> dict[str, object]:
     schedule = db.session.get(Schedule, training.schedule_id)
     if schedule is None:
-        raise LookupError("Schedule not found.")
+        raise NotFoundError("Schedule not found", "The requested schedule does not exist or has been deleted.")
     subset = db.session.get(Subset, schedule.subset_id)
     if subset is None:
-        raise LookupError("Subset not found.")
+        raise NotFoundError("Subset not found", "The requested subset does not exist or has been deleted.")
     creator = db.session.get(User, schedule.user_id)
     if creator is None:
-        raise LookupError("Schedule creator not found.")
+        raise NotFoundError("User not found", "The schedule creator's account could not be found.")
     owner = db.session.get(User, training.user_id)
     if owner is None:
-        raise LookupError("Training owner not found.")
+        raise NotFoundError("User not found", "The training owner's account could not be found.")
 
     if not isinstance(schedule.config, dict):
-        raise LookupError("Schedule has no config.")
+        raise NotFoundError("Schedule not configured", "This schedule does not have a configuration set.")
     schedule_cfg = ScheduleConfig.from_dict(schedule.config)
     run_count = len(schedule_cfg.runs)
     puzzle_order = schedule_cfg.puzzle_order
@@ -135,9 +135,9 @@ def get_cross_run_item_refs(
 def create_training(user_id: int, schedule_id: int) -> Training:
     schedule = db.session.get(Schedule, schedule_id)
     if schedule is None:
-        raise LookupError("Schedule not found.")
+        raise NotFoundError("Schedule not found", "The requested schedule does not exist or has been deleted.")
     if schedule.locked_at is None:
-        raise ValidationError("Schedule must be locked before enrolling.")
+        raise ValidationError("Schedule not ready", "The schedule must be locked before you can enrol in it.")
 
     existing = db.session.scalar(
         sa.select(Training).where(
@@ -148,7 +148,7 @@ def create_training(user_id: int, schedule_id: int) -> Training:
         )
     )
     if existing is not None:
-        raise ConflictError("Already enrolled in this schedule.")
+        raise ConflictError("Already enrolled", "You are already enrolled in this schedule.")
 
     training = Training(
         user_id=user_id,
@@ -162,7 +162,7 @@ def create_training(user_id: int, schedule_id: int) -> Training:
 def get_training(training_id: int) -> Training:
     training = db.session.get(Training, training_id)
     if training is None:
-        raise LookupError("Training not found.")
+        raise NotFoundError("Training not found", "The requested training does not exist.")
     return training
 
 
@@ -272,9 +272,9 @@ def set_run_target(
     _get_owned_training(training_id, user_id)
 
     if target_accuracy is not None and not (0.0 <= target_accuracy <= 100.0):
-        raise ValidationError("targetAccuracy must be between 0 and 100.")
+        raise ValidationError("Invalid target accuracy", "The target accuracy must be between 0 and 100.")
     if target_solve_seconds is not None and target_solve_seconds < 1:
-        raise ValidationError("targetSolveSeconds must be at least 1.")
+        raise ValidationError("Invalid solve time", "The target solve time must be at least 1 second.")
 
     run = db.session.scalar(
         sa.select(Run).where(
@@ -283,7 +283,7 @@ def set_run_target(
         )
     )
     if run is None:
-        raise LookupError("Run not found.")
+        raise NotFoundError("Run not found", "The requested run does not exist.")
     run.target_accuracy = target_accuracy
     run.target_solve_seconds = target_solve_seconds
     db.session.commit()
@@ -293,7 +293,7 @@ def set_run_target(
 def abort_training(training_id: int, user_id: int) -> Training:
     training = _get_owned_training(training_id, user_id)
     if training.completed_at is not None or training.aborted_at is not None:
-        raise ConflictError("Training is already terminal.")
+        raise ConflictError("Training already ended", "This training has already been completed or aborted.")
     now = datetime.now(timezone.utc)
     training.aborted_at = now
     active_run = db.session.scalar(
@@ -462,7 +462,7 @@ def get_schedule_participants(
 ) -> dict[str, object]:
     my_training = get_my_training_for_schedule(schedule_id, user_id)
     if my_training is None:
-        raise PermissionError("You are not enrolled in this schedule.")
+        raise ForbiddenError("Not enrolled", "You must be enrolled in this schedule to perform this action.")
 
     rows = db.session.execute(
         sa.text("""
@@ -495,7 +495,7 @@ def get_training_insights(
 ) -> dict[str, object]:
     my_training = get_my_training_for_schedule(schedule_id, user_id)
     if my_training is None:
-        raise PermissionError("You are not enrolled in this schedule.")
+        raise ForbiddenError("Not enrolled", "You must be enrolled in this schedule to perform this action.")
 
     if participant_ids:
         enrolled_ids = list(
@@ -507,7 +507,7 @@ def get_training_insights(
             ).all()
         )
         if len(enrolled_ids) != len(set(participant_ids)):
-            raise ValidationError("Some participant ids do not belong to this schedule.")
+            raise ValidationError("Invalid participants", "One or more of the selected participants are not enrolled in this schedule.")
 
     return {"datapoints": []}
 
@@ -515,7 +515,7 @@ def get_training_insights(
 def get_training_run_solve_times(training_id: int) -> list[dict[str, object]]:
     training = db.session.get(Training, training_id)
     if training is None:
-        raise LookupError("Training not found.")
+        raise NotFoundError("Training not found", "The requested training does not exist.")
 
     rows = db.session.execute(
         sa.text("""

@@ -1,3 +1,4 @@
+from app.exceptions import NotFoundError
 from app.extensions import db
 from app.models.user import User
 from app.services.validation import (
@@ -18,7 +19,7 @@ def update_user_settings(
 ) -> User:
     user = db.session.get(User, user_id)
     if not user:
-        raise LookupError("User not found.")
+        raise NotFoundError("User not found", "The requested user account could not be found.")
 
     if display_name is not None:
         user.display_name = validate_display_name(display_name)

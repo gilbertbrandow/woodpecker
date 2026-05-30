@@ -5,7 +5,7 @@ from typing import Any
 
 import sqlalchemy as sa
 
-from app.exceptions import ConflictError, ValidationError
+from app.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.subset import Subset, SubsetTrainingItem
@@ -54,22 +54,20 @@ def subset_to_dict(subset: Subset, owner: User | None = None) -> dict[str, objec
 def _validate_sources_config(config: dict[str, object]) -> None:
     sources = config.get("sources")
     if not isinstance(sources, list) or not sources:
-        raise ValidationError("config.sources must be a non-empty array.")
+        raise ValidationError("Sources required", "At least one source must be configured.")
     total_pct = 0
     for entry in sources:
         if not isinstance(entry, dict):
-            raise ValidationError("Each source entry must be an object.")
+            raise ValidationError("Invalid source", "Each source entry must be a valid object.")
         source = entry.get("source")
         if source not in VALID_SOURCES:
-            raise ValidationError(
-                f"Invalid source '{source}'. Must be one of: {', '.join(sorted(VALID_SOURCES))}."
-            )
+            raise ValidationError("Unknown source type", "The specified source type is not supported.")
         pct = entry.get("percentage")
         if not isinstance(pct, int) or pct < 1:
-            raise ValidationError("Each source percentage must be an integer >= 1.")
+            raise ValidationError("Invalid percentage", "Each source percentage must be a whole number of at least 1.")
         total_pct += pct
     if total_pct != 100:
-        raise ValidationError(f"Source percentages must sum to 100 (got {total_pct}).")
+        raise ValidationError("Invalid percentages", f"Source percentages must sum to 100, but they sum to {total_pct}.")
 
 
 def _distribute_counts(sources: list[dict], total: int) -> list[int]:
@@ -341,9 +339,9 @@ def _sample_and_insert(
 def create_subset(user_id: int, name: str, puzzle_count: int) -> Subset:
     name = name.strip()
     if not name:
-        raise ValidationError("Name is required.")
+        raise ValidationError("Name required", "Please provide a name for the subset.")
     if not (5 <= puzzle_count <= 1000):
-        raise ValidationError("puzzle_count must be between 5 and 1000.")
+        raise ValidationError("Invalid puzzle count", "The puzzle count must be between 5 and 1,000.")
     subset = Subset(user_id=user_id, name=name, puzzle_count=puzzle_count)
     db.session.add(subset)
     db.session.commit()
@@ -358,9 +356,9 @@ def save_config(
 ) -> Subset:
     subset = _get_owned_subset(subset_id, user_id)
     if subset.locked_at is not None:
-        raise ConflictError("Subset is locked.")
+        raise ConflictError("Subset is locked", "This subset has been locked and can no longer be modified.")
     if not (5 <= puzzle_count <= 1000):
-        raise ValidationError("puzzle_count must be between 5 and 1000.")
+        raise ValidationError("Invalid puzzle count", "The puzzle count must be between 5 and 1,000.")
     _validate_sources_config(config)
 
     db.session.execute(
@@ -376,13 +374,13 @@ def save_config(
 def fill(subset_id: int, user_id: int) -> tuple[int, int]:
     subset = _get_owned_subset(subset_id, user_id)
     if subset.locked_at is not None:
-        raise ConflictError("Subset is locked.")
+        raise ConflictError("Subset is locked", "This subset has been locked and can no longer be modified.")
     if subset.config is None or subset.puzzle_count is None:
-        raise ValidationError("Configuration is not set.")
+        raise ValidationError("Configuration required", "A configuration must be set before performing this action.")
 
     sources: list[dict] = (subset.config or {}).get("sources", [])  # type: ignore[assignment]
     if not sources:
-        raise ValidationError("Configuration is not set.")
+        raise ValidationError("Configuration required", "A configuration must be set before performing this action.")
 
     db.session.execute(
         sa.delete(SubsetTrainingItem).where(SubsetTrainingItem.subset_id == subset_id)
@@ -400,13 +398,13 @@ def fill(subset_id: int, user_id: int) -> tuple[int, int]:
 def refill(subset_id: int, user_id: int) -> tuple[int, int]:
     subset = _get_owned_subset(subset_id, user_id)
     if subset.locked_at is not None:
-        raise ConflictError("Subset is locked.")
+        raise ConflictError("Subset is locked", "This subset has been locked and can no longer be modified.")
     if subset.config is None or subset.puzzle_count is None:
-        raise ValidationError("Configuration is not set.")
+        raise ValidationError("Configuration required", "A configuration must be set before performing this action.")
 
     sources: list[dict] = (subset.config or {}).get("sources", [])  # type: ignore[assignment]
     if not sources:
-        raise ValidationError("Configuration is not set.")
+        raise ValidationError("Configuration required", "A configuration must be set before performing this action.")
 
     active_count: int = db.session.execute(
         db.select(db.func.count()).where(SubsetTrainingItem.subset_id == subset_id)
@@ -428,7 +426,7 @@ def refill(subset_id: int, user_id: int) -> tuple[int, int]:
 def discard_puzzle(subset_id: int, training_item_id: int, user_id: int) -> None:
     subset = _get_owned_subset(subset_id, user_id)
     if subset.locked_at is not None:
-        raise ConflictError("Subset is locked.")
+        raise ConflictError("Subset is locked", "This subset has been locked and can no longer be modified.")
 
     row = db.session.execute(
         db.select(SubsetTrainingItem).where(
@@ -437,7 +435,7 @@ def discard_puzzle(subset_id: int, training_item_id: int, user_id: int) -> None:
         )
     ).scalar_one_or_none()
     if row is None:
-        raise LookupError("Training item not found in this subset.")
+        raise NotFoundError("Puzzle not found", "The requested puzzle could not be found in this subset.")
 
     db.session.delete(row)
     db.session.commit()
@@ -446,13 +444,13 @@ def discard_puzzle(subset_id: int, training_item_id: int, user_id: int) -> None:
 def lock_subset(subset_id: int, user_id: int) -> Subset:
     subset = _get_owned_subset(subset_id, user_id)
     if subset.locked_at is not None:
-        raise ConflictError("Already locked.")
+        raise ConflictError("Already locked", "This subset is already locked.")
 
     active_count: int = db.session.execute(
         db.select(db.func.count()).where(SubsetTrainingItem.subset_id == subset_id)
     ).scalar_one()
     if active_count == 0:
-        raise ValidationError("Cannot lock a subset with no active puzzles.")
+        raise ValidationError("No puzzles", "A subset must have at least one puzzle before it can be locked.")
 
     subset.locked_at = datetime.now(timezone.utc)
     subset.locked_puzzle_count = active_count
@@ -932,7 +930,7 @@ def get_subset(subset_id: int, user_id: int) -> tuple[Subset, User]:
     subset = _get_viewable_subset(subset_id, user_id)
     owner = db.session.get(User, subset.user_id)
     if owner is None:
-        raise LookupError("Subset owner not found.")
+        raise NotFoundError("User not found", "The subset owner's account could not be found.")
     return subset, owner
 
 
@@ -942,7 +940,7 @@ def delete_subset(subset_id: int, user_id: int) -> None:
         sa.select(sa.literal(1)).where(Schedule.subset_id == subset_id).limit(1)
     ).first()
     if referenced is not None:
-        raise ConflictError("Cannot delete a subset that is referenced by a schedule.")
+        raise ConflictError("Subset in use", "This subset is referenced by one or more schedules and cannot be deleted.")
     db.session.delete(subset)
     db.session.commit()
 
@@ -950,16 +948,16 @@ def delete_subset(subset_id: int, user_id: int) -> None:
 def _get_owned_subset(subset_id: int, user_id: int) -> Subset:
     subset = db.session.get(Subset, subset_id)
     if subset is None:
-        raise LookupError("Subset not found.")
+        raise NotFoundError("Subset not found", "The requested subset does not exist or has been deleted.")
     if subset.user_id != user_id:
-        raise PermissionError("Access denied.")
+        raise ForbiddenError("Access denied", "You do not have permission to perform this action.")
     return subset
 
 
 def _get_viewable_subset(subset_id: int, user_id: int) -> Subset:
     subset = db.session.get(Subset, subset_id)
     if subset is None:
-        raise LookupError("Subset not found.")
+        raise NotFoundError("Subset not found", "The requested subset does not exist or has been deleted.")
     if subset.user_id != user_id and subset.locked_at is None:
-        raise PermissionError("Access denied.")
+        raise ForbiddenError("Access denied", "You do not have permission to perform this action.")
     return subset

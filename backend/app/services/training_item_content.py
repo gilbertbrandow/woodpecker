@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
+from app.exceptions import NotFoundError
 from app.extensions import db
 from app.models.lichess_tactic import LichessTactic
 from app.models.opening import Opening
@@ -82,7 +83,7 @@ def _register_handlers() -> None:
 def get_content(training_item_id: int) -> TrainingItemPayload:
     ti = db.session.get(TrainingItem, training_item_id)
     if ti is None:
-        raise LookupError(f"TrainingItem {training_item_id} not found.")
+        raise NotFoundError("Puzzle not found", f"Training item {training_item_id} could not be found.")
     return _dispatch(ti)
 
 

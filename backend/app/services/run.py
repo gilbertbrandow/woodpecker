@@ -11,7 +11,7 @@ from app.models.run import MAX_PUZZLE_TIME_MS, TrainingAttempt, Run, RunTraining
 from app.models.schedule import Schedule
 from app.models.training import Training
 from app.models.subset import Subset, SubsetTrainingItem
-from app.exceptions import ConflictError
+from app.exceptions import ConflictError, NotFoundError, ForbiddenError
 from app.services.attempt_state import (
     attempt_type_fields,
     derive_attempt_outcome,
@@ -33,7 +33,7 @@ from app.services.training_item_content import (
 def _get_run(run_id: int) -> Run:
     run = db.session.get(Run, run_id)
     if run is None:
-        raise LookupError("Run not found.")
+        raise NotFoundError("Run not found", "The requested run does not exist.")
     return run
 
 
@@ -41,7 +41,7 @@ def _get_owned_run(run_id: int, user_id: int) -> Run:
     run = _get_run(run_id)
     training = db.session.get(Training, run.training_id)
     if training is None or training.user_id != user_id:
-        raise PermissionError("Access denied.")
+        raise ForbiddenError("Access denied", "You do not have permission to perform this action.")
     return run
 
 
@@ -50,10 +50,10 @@ def _get_owned_attempt(
 ) -> tuple[TrainingAttempt, RunTrainingItem, Run]:
     attempt = db.session.get(TrainingAttempt, attempt_id)
     if attempt is None:
-        raise LookupError("Attempt not found.")
+        raise NotFoundError("Attempt not found", "The requested attempt does not exist.")
     run_puzzle = db.session.get(RunTrainingItem, attempt.run_training_item_id)
     if run_puzzle is None:
-        raise LookupError("Run puzzle not found.")
+        raise NotFoundError("Puzzle not found", "The requested puzzle could not be found in this run.")
     run = _get_owned_run(run_puzzle.run_id, user_id)
     return attempt, run_puzzle, run
 
@@ -61,12 +61,12 @@ def _get_owned_attempt(
 def _get_schedule_config(run: Run) -> tuple[Schedule, ScheduleConfig]:
     training = db.session.get(Training, run.training_id)
     if training is None:
-        raise LookupError("Training not found.")
+        raise NotFoundError("Training not found", "The requested training does not exist.")
     schedule = db.session.get(Schedule, training.schedule_id)
     if schedule is None:
-        raise LookupError("Schedule not found.")
+        raise NotFoundError("Schedule not found", "The requested schedule does not exist or has been deleted.")
     if not isinstance(schedule.config, dict):
-        raise LookupError("Schedule has no config.")
+        raise NotFoundError("Schedule not configured", "This schedule does not have a configuration set.")
     return schedule, ScheduleConfig.from_dict(schedule.config)
 
 
@@ -174,14 +174,14 @@ def _run_puzzle_attempt_view_dict(run_puzzle: RunTrainingItem) -> dict[str, obje
     payload = get_content(run_puzzle.training_item_id)
     run = db.session.get(Run, run_puzzle.run_id)
     if run is None:
-        raise LookupError("Run not found.")
+        raise NotFoundError("Run not found", "The requested run does not exist.")
     _, config = _get_schedule_config(run)
     total_queue = config.total_queue
 
     sorted_attempts = sorted(run_puzzle.attempts, key=lambda a: a.try_number)
     in_progress_attempt = next((a for a in sorted_attempts if a.status == "in_progress"), None)
     if in_progress_attempt is None:
-        raise LookupError("No in-progress attempt found.")
+        raise NotFoundError("No active attempt", "There is no in-progress attempt for this puzzle.")
 
     training = db.session.get(Training, run.training_id)
     schedule = db.session.get(Schedule, training.schedule_id) if training else None
@@ -246,7 +246,7 @@ def _run_puzzle_full_dict(run_puzzle: RunTrainingItem) -> dict[str, object]:
     payload = get_content(run_puzzle.training_item_id)
     run = db.session.get(Run, run_puzzle.run_id)
     if run is None:
-        raise LookupError("Run not found.")
+        raise NotFoundError("Run not found", "The requested run does not exist.")
     schedule, config = _get_schedule_config(run)
     total_queue = config.total_queue
 
@@ -509,11 +509,11 @@ def run_dict(run: Run) -> dict[str, object]:
 def start_run(training_id: int, user_id: int, expected_run_index: int | None = None) -> Run:
     training = db.session.get(Training, training_id)
     if training is None:
-        raise LookupError("Training not found.")
+        raise NotFoundError("Training not found", "The requested training does not exist.")
     if training.user_id != user_id:
-        raise PermissionError("Access denied.")
+        raise ForbiddenError("Access denied", "You do not have permission to perform this action.")
     if training.completed_at is not None or training.aborted_at is not None:
-        raise ConflictError("Training is already terminal.")
+        raise ConflictError("Training already ended", "This training has already been completed or aborted.")
 
     cross_training_active = db.session.scalar(
         sa.select(Run)
@@ -526,7 +526,7 @@ def start_run(training_id: int, user_id: int, expected_run_index: int | None = N
         )
     )
     if cross_training_active is not None:
-        raise ConflictError("You already have an active run in another training.")
+        raise ConflictError("Active run elsewhere", "You already have an active run in another training. Complete or abort it before starting a new one.")
 
     active_run = db.session.scalar(
         sa.select(Run).where(
@@ -536,13 +536,13 @@ def start_run(training_id: int, user_id: int, expected_run_index: int | None = N
         )
     )
     if active_run is not None:
-        raise ConflictError("An active run already exists for this training.")
+        raise ConflictError("Run already active", "This training already has an active run in progress.")
 
     schedule = db.session.get(Schedule, training.schedule_id)
     if schedule is None:
-        raise LookupError("Schedule not found.")
+        raise NotFoundError("Schedule not found", "The requested schedule does not exist or has been deleted.")
     if not isinstance(schedule.config, dict):
-        raise LookupError("Schedule has no config.")
+        raise NotFoundError("Schedule not configured", "This schedule does not have a configuration set.")
     schedule_cfg = ScheduleConfig.from_dict(schedule.config)
     run_count = len(schedule_cfg.runs)
     puzzle_order = schedule_cfg.puzzle_order
@@ -555,9 +555,9 @@ def start_run(training_id: int, user_id: int, expected_run_index: int | None = N
     ) or 0
 
     if run_index >= run_count:
-        raise ConflictError("All run slots for this schedule are already completed.")
+        raise ConflictError("All runs completed", "Every run in this schedule has already been completed.")
     if expected_run_index is not None and expected_run_index != run_index:
-        raise ConflictError("Run slot is no longer startable.")
+        raise ConflictError("Run unavailable", "This run slot can no longer be started.")
 
     puzzle_ids: list[int] = list(
         db.session.scalars(
@@ -597,7 +597,7 @@ def start_run(training_id: int, user_id: int, expected_run_index: int | None = N
 def list_runs(training_id: int) -> list[Run]:
     training = db.session.get(Training, training_id)
     if training is None:
-        raise LookupError("Training not found.")
+        raise NotFoundError("Training not found", "The requested training does not exist.")
     return list(
         db.session.scalars(
             sa.select(Run)
@@ -614,7 +614,7 @@ def get_run(run_id: int) -> Run:
 def continue_run(run_id: int, user_id: int) -> dict[str, object]:
     run = _get_owned_run(run_id, user_id)
     if run.completed_at is not None or run.aborted_at is not None:
-        raise ConflictError("Run is not active.")
+        raise ConflictError("Run not active", "This run is not currently active.")
 
     _, config = _get_schedule_config(run)
     total_queue = config.total_queue
@@ -630,7 +630,7 @@ def continue_run(run_id: int, user_id: int) -> dict[str, object]:
     if existing_attempt is not None:
         run_puzzle = db.session.get(RunTrainingItem, existing_attempt.run_training_item_id)
         if run_puzzle is None:
-            raise LookupError("Run puzzle not found.")
+            raise NotFoundError("Puzzle not found", "The requested puzzle could not be found in this run.")
         return {
             "runCompleted": False,
             "attemptView": _run_puzzle_attempt_view_dict(run_puzzle),
@@ -642,7 +642,7 @@ def continue_run(run_id: int, user_id: int) -> dict[str, object]:
 
     run_puzzle = db.session.get(RunTrainingItem, next_id)
     if run_puzzle is None:
-        raise LookupError("Run puzzle not found.")
+        raise NotFoundError("Puzzle not found", "The requested puzzle could not be found in this run.")
     _create_attempt_for_puzzle(run_puzzle)
     db.session.refresh(run_puzzle)
     return {
@@ -709,7 +709,7 @@ def get_run_puzzle(run_id: int, run_puzzle_id: int, user_id: int) -> dict[str, o
     run = _get_owned_run(run_id, user_id)
     run_puzzle = db.session.get(RunTrainingItem, run_puzzle_id)
     if run_puzzle is None or run_puzzle.run_id != run.id:
-        raise LookupError("Run puzzle not found.")
+        raise NotFoundError("Puzzle not found", "The requested puzzle could not be found in this run.")
     return _run_puzzle_full_dict(run_puzzle)
 
 
@@ -1241,7 +1241,7 @@ def get_run_puzzle_overview(
     run = _get_owned_run(run_id, user_id)
     run_puzzle = db.session.get(RunTrainingItem, run_puzzle_id)
     if run_puzzle is None or run_puzzle.run_id != run.id:
-        raise LookupError("Run puzzle not found.")
+        raise NotFoundError("Puzzle not found", "The requested puzzle could not be found in this run.")
     overview = _build_run_puzzle_overview(
         run, run_puzzle, selected_attempt_id, run.training_id
     )
@@ -1255,7 +1255,7 @@ def start_puzzle(run_id: int, run_puzzle_id: int, user_id: int) -> dict[str, obj
     run = _get_owned_run(run_id, user_id)
     run_puzzle = db.session.get(RunTrainingItem, run_puzzle_id)
     if run_puzzle is None or run_puzzle.run_id != run.id:
-        raise LookupError("Run puzzle not found.")
+        raise NotFoundError("Puzzle not found", "The requested puzzle could not be found in this run.")
 
     existing = db.session.scalar(
         sa.select(TrainingAttempt).where(
@@ -1283,10 +1283,10 @@ def complete_attempt(
     attempt, run_puzzle, run = _get_owned_attempt(attempt_id, user_id)
 
     if run.id != run_id or run_puzzle.id != run_puzzle_id:
-        raise LookupError("Attempt not found.")
+        raise NotFoundError("Attempt not found", "The requested attempt does not exist.")
 
     if attempt.status != "in_progress":
-        raise ConflictError("Attempt is already completed.")
+        raise ConflictError("Attempt already completed", "This attempt has already been submitted.")
 
     _, config = _get_schedule_config(run)
     total_queue = config.total_queue
@@ -1359,7 +1359,7 @@ def get_training_item_history(run_id: int, training_item_id: int, user_id: int) 
         ).all()
     )
     if not run_training_items:
-        raise LookupError("Training item not found in this run.")
+        raise NotFoundError("Puzzle not found", "The requested puzzle could not be found in this run.")
 
     positions: list[dict[str, object]] = []
     for rp in run_training_items:
@@ -1388,10 +1388,10 @@ def get_attempt(
     run = _get_owned_run(run_id, user_id)
     run_puzzle = db.session.get(RunTrainingItem, run_puzzle_id)
     if run_puzzle is None or run_puzzle.run_id != run.id:
-        raise LookupError("Run puzzle not found.")
+        raise NotFoundError("Puzzle not found", "The requested puzzle could not be found in this run.")
     attempt = db.session.get(TrainingAttempt, attempt_id)
     if attempt is None or attempt.run_training_item_id != run_puzzle.id:
-        raise LookupError("Attempt not found.")
+        raise NotFoundError("Attempt not found", "The requested attempt does not exist.")
 
     if attempt.status == "in_progress":
         return {
