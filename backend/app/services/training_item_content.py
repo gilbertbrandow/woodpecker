@@ -83,7 +83,7 @@ def _register_handlers() -> None:
 def get_content(training_item_id: int) -> TrainingItemPayload:
     ti = db.session.get(TrainingItem, training_item_id)
     if ti is None:
-        raise NotFoundError("Puzzle not found", f"Training item {training_item_id} could not be found.")
+        raise NotFoundError("Puzzle not found", "The requested puzzle could not be found.")
     return _dispatch(ti)
 
 

@@ -3,6 +3,11 @@ class AppError(Exception):
 
     status_code: int
 
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        super().__init_subclass__(**kwargs)
+        if "status_code" not in cls.__dict__:
+            raise TypeError(f"{cls.__name__} must define status_code")
+
     def __init__(self, title: str, detail: str) -> None:
         super().__init__(f"{title}: {detail}")
         self.title = title

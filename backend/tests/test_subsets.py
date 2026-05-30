@@ -411,7 +411,7 @@ class TestPatchConfig:
         )
 
         assert resp.status_code == 422
-        assert "100" in resp.get_json()["error"]
+        assert "100" in resp.get_json()["detail"]
 
     def test_rejects_missing_sources_key(self, client: FlaskClient, db_session) -> None:
         user = _make_user(db_session, "pc_nosrc")
