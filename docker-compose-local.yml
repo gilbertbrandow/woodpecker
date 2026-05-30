@@ -27,6 +27,7 @@ services:
       - "5173:5173"
     environment:
       VITE_BACKEND_URL: "http://backend:8000"
+      VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
     depends_on:
       - backend
 
