@@ -123,6 +123,16 @@ _Avoid_: allowed list, bypass list
 A separate table of Lichess users who authenticated but could not create an account because the User Cap was reached and they are not Whitelisted. Not part of the main users table. Waitlisted users may optionally provide an email address for future outreach. Insertion is idempotent by Lichess username.
 _Avoid_: pending users, blocked users, queue
 
+## Error envelope
+
+**AppError**:
+The base exception class for all domain errors that map to HTTP error responses. Carries `title` (required, user-facing heading) and `detail` (required, user-facing elaboration). The HTTP status code is a class-level attribute set by each subclass, not passed at the raise site. Subclasses: `ValidationError` (422), `ConflictError` (409), `NotFoundError` (404), `ForbiddenError` (403). Replaces bare Python builtins (`LookupError`, `PermissionError`) and the prior `ConflictError`/`ValidationError` which lacked `detail`.
+_Avoid_: HttpException (collides with Werkzeug), DomainError
+
+**Error envelope**:
+The JSON shape returned for all error responses: `{"title": "...", "detail": "..."}`. Both fields are always present and non-null — no optional fields. `title` is a short heading; `detail` elaborates for the user. The HTTP status code is carried in the response header only, not repeated in the body. 500 responses use the same envelope with safe generic copy hardcoded in the handler. `meta` is reserved for a future extension to carry structured Sentry context.
+_Avoid_: error body, error response (too generic)
+
 ## Flagged ambiguities
 
 - "puzzle" appears in the UI, old docs, and issue history — resolved: use **TrainingItem** for the stored record; "puzzle" is acceptable only in user-facing UI copy.
