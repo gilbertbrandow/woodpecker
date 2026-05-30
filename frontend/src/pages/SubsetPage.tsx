@@ -143,11 +143,7 @@ export function SubsetPage(): React.ReactElement | null {
           await loadStats(id);
         }
       })
-      .catch(() =>
-        toast.error("Failed to load subset", {
-          description: "Could not fetch subset data.",
-        }),
-      )
+      .catch(() => {})
       .finally(() => setPageLoading(false));
   }, [id, user, loadStats]);
 
@@ -166,9 +162,7 @@ export function SubsetPage(): React.ReactElement | null {
       toast("Configuration saved", {
         description: "Your settings have been saved.",
       });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Please try again.";
-      toast.error("Save failed", { description: msg });
+    } catch {
     } finally {
       setIsSaving(false);
     }
@@ -210,11 +204,7 @@ export function SubsetPage(): React.ReactElement | null {
               : `Added ${result.filled} puzzle${result.filled === 1 ? "" : "s"}.`,
         });
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Please try again.";
-      toast.error(total === 0 ? "Fill failed" : "Refill failed", {
-        description: msg,
-      });
+    } catch {
     } finally {
       setIsFilling(false);
     }
@@ -225,9 +215,7 @@ export function SubsetPage(): React.ReactElement | null {
       await api.subsets.delete(id);
       toast("Subset deleted", { description: "The subset has been removed." });
       void navigate({ to: "/app" });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Please try again.";
-      toast.error("Delete failed", { description: msg });
+    } catch {
     }
   };
 
@@ -238,9 +226,7 @@ export function SubsetPage(): React.ReactElement | null {
       toast("Subset locked", {
         description: "This subset is now frozen and ready for scheduling.",
       });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Please try again.";
-      toast.error("Lock failed", { description: msg });
+    } catch {
     }
   };
 

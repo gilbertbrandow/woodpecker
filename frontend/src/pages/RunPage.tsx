@@ -182,7 +182,6 @@ function ConfigureTab({
       })
       toast('Targets saved', { description: 'Your goals for this run have been updated.' })
     } catch {
-      toast.error('Failed to save targets', { description: 'Please try again.' })
     } finally {
       setSaving(false)
     }
@@ -291,9 +290,7 @@ export function RunPage(): React.ReactElement | null {
           .then(setParticipation)
           .catch(() => {})
       })
-      .catch(() =>
-        toast.error('Failed to load run', { description: 'Could not fetch run data.' }),
-      )
+      .catch(() => {})
       .finally(() => setPageLoading(false))
   }, [runId, user])
 

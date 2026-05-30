@@ -1,13 +1,13 @@
-import * as React from 'react'
-import { useState, useEffect, useMemo, useRef } from 'react'
-import { useNavigate, Link } from '@tanstack/react-router'
-import { Loader2, Search, Trash2, PencilLine, Lock } from 'lucide-react'
-import { type ColumnDef } from '@tanstack/react-table'
-import { UserAvatar } from '../UserAvatar'
-import { StatusBadge } from '../StatusBadge'
-import { DataTable } from '../DataTable'
-import { UserSelector } from '../UserSelector'
-import { Input } from '../ui/input'
+import * as React from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useNavigate, Link } from "@tanstack/react-router";
+import { Loader2, Search, Trash2, PencilLine, Lock } from "lucide-react";
+import { type ColumnDef } from "@tanstack/react-table";
+import { UserAvatar } from "../UserAvatar";
+import { StatusBadge } from "../StatusBadge";
+import { DataTable } from "../DataTable";
+import { UserSelector } from "../UserSelector";
+import { Input } from "../ui/input";
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -18,105 +18,125 @@ import {
   AlertDialogFooter,
   AlertDialogAction,
   AlertDialogCancel,
-} from '../ui/alert-dialog'
-import { useAuth } from '../../context/auth'
-import type { ScheduleSummary, SelectableUser } from '../../lib/api'
-import { api } from '../../lib/api'
-import { formatDuration } from './DurationInput'
-import { useDebounce } from '../../hooks/useDebounce'
-import { toast } from 'sonner'
+} from "../ui/alert-dialog";
+import { useAuth } from "../../context/auth";
+import type { ScheduleSummary, SelectableUser } from "../../lib/api";
+import { api } from "../../lib/api";
+import { formatDuration } from "./DurationInput";
+import { useDebounce } from "../../hooks/useDebounce";
+import { toast } from "sonner";
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 20;
 
 type SchedulesTableProps = {
-  subsetId?: number
-  onCountChange?: (count: number) => void
-}
+  subsetId?: number;
+  onCountChange?: (count: number) => void;
+};
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
-export function SchedulesTable({ subsetId, onCountChange }: SchedulesTableProps): React.ReactElement {
-  const navigate = useNavigate()
-  const { user } = useAuth()
+export function SchedulesTable({
+  subsetId,
+  onCountChange,
+}: SchedulesTableProps): React.ReactElement {
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
-  const [schedules, setSchedules] = useState<ScheduleSummary[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
-  const [deletingId, setDeletingId] = useState<number | null>(null)
-  const [refreshKey, setRefreshKey] = useState(0)
+  const [schedules, setSchedules] = useState<ScheduleSummary[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const [search, setSearch] = useState('')
-  const [selectedUsers, setSelectedUsers] = useState<SelectableUser[]>([])
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
+  const [search, setSearch] = useState("");
+  const [selectedUsers, setSelectedUsers] = useState<SelectableUser[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
 
-  const debouncedSearch = useDebounce(search, 300)
+  const debouncedSearch = useDebounce(search, 300);
 
   useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch, selectedUsers, selectedStatuses])
+    setPage(1);
+  }, [debouncedSearch, selectedUsers, selectedStatuses]);
 
   useEffect(() => {
-    if (!user) return
-    setLoading(true)
+    if (!user) return;
+    setLoading(true);
     api.schedules
       .list({
         subsetId,
         search: debouncedSearch || undefined,
         page,
         pageSize: PAGE_SIZE,
-        userIds: selectedUsers.length > 0 ? selectedUsers.map((u) => u.id) : undefined,
+        userIds:
+          selectedUsers.length > 0 ? selectedUsers.map((u) => u.id) : undefined,
         statuses: selectedStatuses.length > 0 ? selectedStatuses : undefined,
       })
       .then((r) => {
-        setSchedules(r.items)
-        setTotal(r.total)
-        onCountChange?.(r.total)
+        setSchedules(r.items);
+        setTotal(r.total);
+        onCountChange?.(r.total);
       })
-      .catch(() => toast.error('Failed to load schedules', { description: 'Could not fetch schedules.' }))
-      .finally(() => setLoading(false))
-  }, [user, subsetId, debouncedSearch, page, selectedUsers, selectedStatuses, onCountChange, refreshKey])
+      .finally(() => setLoading(false));
+  }, [
+    user,
+    subsetId,
+    debouncedSearch,
+    page,
+    selectedUsers,
+    selectedStatuses,
+    onCountChange,
+    refreshKey,
+  ]);
 
   const statusFilterColumn = {
-    id: 'status',
-    label: 'statuses',
+    id: "status",
+    label: "statuses",
     options: [
-      { label: 'Draft', value: 'draft', icon: <PencilLine className="h-3.5 w-3.5 text-muted-foreground" /> },
-      { label: 'Locked', value: 'locked', icon: <Lock className="h-3.5 w-3.5 text-violet-600" /> },
+      {
+        label: "Draft",
+        value: "draft",
+        icon: <PencilLine className="h-3.5 w-3.5 text-muted-foreground" />,
+      },
+      {
+        label: "Locked",
+        value: "locked",
+        icon: <Lock className="h-3.5 w-3.5 text-violet-600" />,
+      },
     ],
-  }
+  };
 
   // Refs keep cell renderers current without invalidating the columns memo
-  const deletingIdRef = useRef(deletingId)
-  deletingIdRef.current = deletingId
+  const deletingIdRef = useRef(deletingId);
+  deletingIdRef.current = deletingId;
 
   const handleDelete = async (item: ScheduleSummary): Promise<void> => {
-    setDeletingId(item.id)
+    setDeletingId(item.id);
     try {
-      await api.schedules.delete(item.id)
-      toast('Schedule deleted', { description: `"${item.name}" has been removed.` })
-      setRefreshKey((k) => k + 1)
-    } catch {
-      toast.error('Failed to delete schedule', { description: 'Please try again.' })
+      await api.schedules.delete(item.id);
+      toast("Schedule deleted", {
+        description: `"${item.name}" has been removed.`,
+      });
+      setRefreshKey((k) => k + 1);
     } finally {
-      setDeletingId(null)
+      setDeletingId(null);
     }
-  }
-  const handleDeleteRef = useRef(handleDelete)
-  handleDeleteRef.current = handleDelete
+  };
+  const handleDeleteRef = useRef(handleDelete);
+  handleDeleteRef.current = handleDelete;
 
   const columns = useMemo<ColumnDef<ScheduleSummary>[]>(
     () => [
       {
-        id: 'creator',
+        id: "creator",
         accessorFn: (row) => row.createdBy.displayName,
-        header: 'Creator',
+        header: "Creator",
         enableSorting: false,
         cell: ({ row }) => (
           <UserAvatar
@@ -126,14 +146,16 @@ export function SchedulesTable({ subsetId, onCountChange }: SchedulesTableProps)
         ),
       },
       {
-        accessorKey: 'name',
-        header: 'Name',
-        cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+        accessorKey: "name",
+        header: "Name",
+        cell: ({ row }) => (
+          <span className="font-medium">{row.original.name}</span>
+        ),
       },
       {
-        id: 'subset',
+        id: "subset",
         accessorFn: (row) => row.subsetName,
-        header: 'Subset',
+        header: "Subset",
         enableSorting: false,
         cell: ({ row }) => (
           <Link
@@ -148,34 +170,38 @@ export function SchedulesTable({ subsetId, onCountChange }: SchedulesTableProps)
         ),
       },
       {
-        accessorKey: 'status',
-        header: 'Status',
+        accessorKey: "status",
+        header: "Status",
         enableSorting: false,
         cell: ({ row }) => <StatusBadge status={row.original.status} />,
       },
       {
-        accessorKey: 'runCount',
-        header: 'Runs',
+        accessorKey: "runCount",
+        header: "Runs",
         cell: ({ row }) => (
           <span className="tabular-nums text-muted-foreground">
-            {row.original.runCount > 0 ? row.original.runCount : '—'}
+            {row.original.runCount > 0 ? row.original.runCount : "—"}
           </span>
         ),
       },
       {
-        accessorKey: 'totalHours',
-        header: 'Duration',
+        accessorKey: "totalHours",
+        header: "Duration",
         cell: ({ row }) => (
           <span className="tabular-nums text-muted-foreground">
-            {row.original.totalHours > 0 ? formatDuration(row.original.totalHours) : '—'}
+            {row.original.totalHours > 0
+              ? formatDuration(row.original.totalHours)
+              : "—"}
           </span>
         ),
       },
       {
-        id: 'date',
+        id: "date",
         accessorFn: (row) =>
-          row.lockedAt ? new Date(row.lockedAt).getTime() : new Date(row.createdAt).getTime(),
-        header: 'Date',
+          row.lockedAt
+            ? new Date(row.lockedAt).getTime()
+            : new Date(row.createdAt).getTime(),
+        header: "Date",
         cell: ({ row }) => (
           <span className="text-muted-foreground">
             {formatDate(row.original.lockedAt ?? row.original.createdAt)}
@@ -183,12 +209,12 @@ export function SchedulesTable({ subsetId, onCountChange }: SchedulesTableProps)
         ),
       },
       {
-        id: 'actions',
-        header: '',
+        id: "actions",
+        header: "",
         enableSorting: false,
         cell: ({ row }) => {
-          const isOwn = row.original.createdBy.id === user?.id
-          if (!isOwn) return null
+          const isOwn = row.original.createdBy.id === user?.id;
+          if (!isOwn) return null;
           return (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -210,24 +236,26 @@ export function SchedulesTable({ subsetId, onCountChange }: SchedulesTableProps)
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete schedule?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    &ldquo;{row.original.name}&rdquo; will be permanently removed. This cannot be
-                    undone.
+                    &ldquo;{row.original.name}&rdquo; will be permanently
+                    removed. This cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => void handleDeleteRef.current(row.original)}>
+                  <AlertDialogAction
+                    onClick={() => void handleDeleteRef.current(row.original)}
+                  >
                     Delete
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          )
+          );
         },
       },
     ],
     [user],
-  )
+  );
 
   return (
     <DataTable
@@ -251,23 +279,28 @@ export function SchedulesTable({ subsetId, onCountChange }: SchedulesTableProps)
       }
       filterableColumns={[statusFilterColumn]}
       onFilterChange={(id, values) => {
-        if (id === 'status') setSelectedStatuses(values)
+        if (id === "status") setSelectedStatuses(values);
       }}
-      filtersActive={search !== '' || selectedUsers.length > 0}
+      filtersActive={search !== "" || selectedUsers.length > 0}
       onClearFilters={() => {
-        setSearch('')
-        setSelectedUsers([])
-        setPage(1)
+        setSearch("");
+        setSelectedUsers([]);
+        setPage(1);
       }}
-      serverPagination={{ totalRows: total, page, pageSize: PAGE_SIZE, onPageChange: setPage }}
+      serverPagination={{
+        totalRows: total,
+        page,
+        pageSize: PAGE_SIZE,
+        onPageChange: setPage,
+      }}
       pageSize={PAGE_SIZE}
       onRowClick={(schedule) =>
         void navigate({
-          to: '/app/schedules/$scheduleId',
+          to: "/app/schedules/$scheduleId",
           params: { scheduleId: String(schedule.id) },
         })
       }
       emptyMessage="No schedules match your filters."
     />
-  )
+  );
 }

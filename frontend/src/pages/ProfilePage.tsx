@@ -90,7 +90,6 @@ export function ProfilePage(): React.ReactElement | null {
       updateUser(updated)
       toast('Profile updated', { description: 'Your profile has been saved.' })
     } catch {
-      toast.error('Something went wrong', { description: 'Please try again.' })
     } finally {
       setSaving(false)
     }

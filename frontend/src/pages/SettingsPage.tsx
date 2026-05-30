@@ -3,7 +3,6 @@ import * as React from 'react'
 import { useEffect } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
-import { toast } from 'sonner'
 import { useAuth } from '../context/auth'
 import { api } from '../lib/api'
 import { BOARD_THEMES, PIECE_SETS, resolvePieceSet, resolveBoardTheme } from '../lib/themes'
@@ -31,7 +30,6 @@ export function SettingsPage(): React.ReactElement | null {
       const updated = await api.settings.update({ boardTheme: themeId })
       updateUser(updated)
     } catch {
-      toast.error('Something went wrong', { description: 'Please try again.' })
     } finally {
       setSavingBoard(false)
     }
@@ -44,7 +42,6 @@ export function SettingsPage(): React.ReactElement | null {
       const updated = await api.settings.update({ pieceTheme: setId })
       updateUser(updated)
     } catch {
-      toast.error('Something went wrong', { description: 'Please try again.' })
     } finally {
       setSavingPiece(false)
     }
@@ -57,7 +54,6 @@ export function SettingsPage(): React.ReactElement | null {
       const updated = await api.settings.update({ showTimerTenths: checked })
       updateUser(updated)
     } catch {
-      toast.error('Something went wrong', { description: 'Please try again.' })
     } finally {
       setSavingTimerTenths(false)
     }

@@ -1,7 +1,6 @@
 import * as React from 'react'
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { toast } from 'sonner'
 import { type ColumnDef } from '@tanstack/react-table'
 import { useAuth } from '../context/auth'
 import { api, type Subset } from '../lib/api'
@@ -30,7 +29,7 @@ export function ScheduleNewPage(): React.ReactElement | null {
     api.subsets
       .list({ lockedOnly: true })
       .then((r) => setSubsets(r.items))
-      .catch(() => toast.error('Failed to load subsets', { description: 'Could not fetch subsets.' }))
+      .catch(() => {})
       .finally(() => setSubsetsLoading(false))
   }, [user])
 
@@ -45,7 +44,6 @@ export function ScheduleNewPage(): React.ReactElement | null {
       const schedule = await api.schedules.create(name.trim(), selectedSubset.id)
       void navigate({ to: '/app/schedules/$scheduleId', params: { scheduleId: String(schedule.id) } })
     } catch {
-      toast.error('Failed to create schedule', { description: 'Please try again.' })
       setSubmitting(false)
     }
   }

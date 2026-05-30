@@ -1,6 +1,7 @@
 from flask import Blueprint, Response, jsonify, request, session
 
 from app.decorators import login_required
+from app.exceptions import NotFoundError
 from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.user import User
@@ -13,7 +14,7 @@ schedules_bp = Blueprint("schedules", __name__, url_prefix="/schedules")
 def _load_creator(schedule: Schedule) -> User:
     creator = db.session.get(User, schedule.user_id)
     if creator is None:
-        raise LookupError("Schedule creator not found.")
+        raise NotFoundError("User not found", "The schedule creator's account could not be found.")
     return creator
 
 
@@ -95,15 +96,15 @@ def get_my_training_for_schedule(schedule_id: int) -> tuple[Response, int] | Res
         schedule_id, session["user_id"]
     )
     if training is None:
-        return jsonify({"error": "Not enrolled."}), 404
-    return jsonify({
+        return jsonify({"training": None})
+    return jsonify({"training": {
         "id": training.id,
         "scheduleId": training.schedule_id,
         "status": training_svc.training_status(training),
         "startedAt": training.started_at.isoformat(),
         "completedAt": training.completed_at.isoformat() if training.completed_at else None,
         "abortedAt": training.aborted_at.isoformat() if training.aborted_at else None,
-    })
+    }})
 
 
 @schedules_bp.get("/<int:schedule_id>/training/participants")

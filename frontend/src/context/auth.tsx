@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { flushSync } from 'react-dom'
+import * as Sentry from '@sentry/react'
 import { api, type AuthUser, type OnboardingState, type WaitlistedState } from '../lib/api'
 
 export type AuthContextValue = {
@@ -26,6 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .then((state) => {
         if (state.status === 'active') {
           setUser(state)
+          Sentry.setUser({ id: state.id })
         } else if (state.status === 'onboarding') {
           setOnboarding(state)
         } else if (state.status === 'waitlisted') {
@@ -42,6 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async (): Promise<void> => {
     await api.auth.logout()
+    Sentry.setUser(null)
     flushSync(() => {
       setUser(null)
       setOnboarding(null)
@@ -51,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const updateUser = (updated: AuthUser): void => {
     setUser(updated)
+    Sentry.setUser({ id: updated.id })
     setOnboarding(null)
     setWaitlisted(null)
   }

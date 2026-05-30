@@ -71,7 +71,7 @@ export function SubsetsTable(): React.ReactElement {
         setSubsets(r.items)
         setTotal(r.total)
       })
-      .catch(() => toast.error('Failed to load subsets', { description: 'Could not fetch subsets.' }))
+      .catch(() => {})
       .finally(() => setLoading(false))
   }, [user, debouncedSearch, page, selectedUsers, selectedStatuses, refreshKey])
 
@@ -96,7 +96,6 @@ export function SubsetsTable(): React.ReactElement {
       toast('Subset deleted', { description: `"${item.name}" has been removed.` })
       setRefreshKey((k) => k + 1)
     } catch {
-      toast.error('Failed to delete subset', { description: 'Please try again.' })
     } finally {
       setDeletingId(null)
     }

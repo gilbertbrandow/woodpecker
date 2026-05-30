@@ -46,6 +46,10 @@ jobs:
           context: frontend
           target: prod
           push: true
+          build-args: |
+            VITE_SENTRY_DSN=${{ secrets.VITE_SENTRY_DSN }}
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           tags: |
             ghcr.io/${{ github.repository_owner }}/woodpecker-frontend:${{ steps.tag.outputs.value }}
             ghcr.io/${{ github.repository_owner }}/woodpecker-frontend:latest

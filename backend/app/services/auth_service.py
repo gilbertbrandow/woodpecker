@@ -8,6 +8,7 @@ import berserk
 import requests as http
 import sqlalchemy as sa
 
+from app.exceptions import NotFoundError
 from app.extensions import db
 from app.models.user import User, WaitlistEntry
 from app.services import whitelist_service
@@ -129,7 +130,7 @@ def update_waitlist_email(lichess_username: str, email: str) -> WaitlistEntry:
     ).scalar_one_or_none()
 
     if not entry:
-        raise LookupError("Waitlist entry not found.")
+        raise NotFoundError("Not found", "Your waitlist entry could not be found.")
 
     entry.email = email
     entry.updated_at = datetime.now(timezone.utc)

@@ -3,7 +3,7 @@ from typing import cast
 
 import sqlalchemy as sa
 
-from app.exceptions import ConflictError, ValidationError
+from app.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.subset import Subset
@@ -44,30 +44,30 @@ def schedule_to_dict(schedule: Schedule, creator: User) -> dict[str, object]:
 def _get_owned_schedule(schedule_id: int, user_id: int) -> Schedule:
     schedule = db.session.get(Schedule, schedule_id)
     if schedule is None:
-        raise LookupError("Schedule not found.")
+        raise NotFoundError("Schedule not found", "The requested schedule does not exist or has been deleted.")
     if schedule.user_id != user_id:
-        raise PermissionError("Access denied.")
+        raise ForbiddenError("Access denied", "You do not have permission to perform this action.")
     return schedule
 
 
 def _get_accessible_schedule(schedule_id: int, user_id: int) -> Schedule:
     schedule = db.session.get(Schedule, schedule_id)
     if schedule is None:
-        raise LookupError("Schedule not found.")
+        raise NotFoundError("Schedule not found", "The requested schedule does not exist or has been deleted.")
     if schedule.locked_at is None and schedule.user_id != user_id:
-        raise PermissionError("Access denied.")
+        raise ForbiddenError("Access denied", "You do not have permission to perform this action.")
     return schedule
 
 
 def create_schedule(user_id: int, name: str, subset_id: int) -> Schedule:
     name = name.strip()
     if not name:
-        raise ValidationError("Name is required.")
+        raise ValidationError("Name required", "Please provide a name for the schedule.")
     subset = db.session.get(Subset, subset_id)
     if subset is None:
-        raise LookupError("Subset not found.")
+        raise NotFoundError("Subset not found", "The requested subset does not exist or has been deleted.")
     if subset.locked_at is None:
-        raise ValidationError("Subset must be locked before creating a schedule.")
+        raise ValidationError("Subset not ready", "The subset must be locked before you can create a schedule from it.")
     schedule = Schedule(user_id=user_id, subset_id=subset_id, name=name, config=DEFAULT_CONFIG)
     db.session.add(schedule)
     db.session.commit()
@@ -81,28 +81,28 @@ def update_schedule(
 ) -> Schedule:
     schedule = _get_owned_schedule(schedule_id, user_id)
     if schedule.locked_at is not None:
-        raise ConflictError("Locked schedules cannot be edited.")
+        raise ConflictError("Schedule is locked", "This schedule has been locked and can no longer be edited.")
 
     if "name" in updates:
         name_raw = updates["name"]
         if not isinstance(name_raw, str):
-            raise ValidationError("name must be a string.")
+            raise ValidationError("Invalid name", "The name must be a text value.")
         name = name_raw.strip()
         if not name:
-            raise ValidationError("name cannot be empty.")
+            raise ValidationError("Name required", "The name cannot be blank.")
         schedule.name = name
 
     if "description" in updates:
         desc_raw = updates["description"]
         if desc_raw is not None and not isinstance(desc_raw, str):
-            raise ValidationError("description must be a string or null.")
+            raise ValidationError("Invalid description", "The description must be a text value or left empty.")
         schedule.description = desc_raw if isinstance(desc_raw, str) else None
 
     if "config" in updates:
         config_raw = updates["config"]
         if config_raw is not None:
             if not isinstance(config_raw, dict):
-                raise ValidationError("config must be an object.")
+                raise ValidationError("Invalid configuration", "The configuration must be a valid object.")
             ScheduleConfig.from_dict(cast(dict[str, object], config_raw))
             schedule.config = cast(dict[str, object], config_raw)
         else:
@@ -115,9 +115,9 @@ def update_schedule(
 def lock_schedule(schedule_id: int, user_id: int) -> Schedule:
     schedule = _get_owned_schedule(schedule_id, user_id)
     if schedule.locked_at is not None:
-        raise ConflictError("Already locked.")
+        raise ConflictError("Already locked", "This schedule is already locked.")
     if schedule.config is None:
-        raise ValidationError("Cannot lock a schedule without a config.")
+        raise ValidationError("Configuration required", "A schedule must have a configuration set before it can be locked.")
     ScheduleConfig.from_dict(schedule.config)
     schedule.locked_at = datetime.now(timezone.utc)
     db.session.commit()
