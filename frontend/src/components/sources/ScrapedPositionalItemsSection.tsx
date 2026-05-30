@@ -1,7 +1,6 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { ExternalLink, X } from 'lucide-react'
-import { toast } from 'sonner'
 import {
   api,
   type ScrapedPositionalPage,
@@ -79,7 +78,7 @@ export function ScrapedPositionalItemsSection({ difficulties, themes }: Props): 
         opening: selectedOpening?.name,
       })
       .then(setResult)
-      .catch(() => toast.error('Failed to load puzzles', { description: 'Please try again.' }))
+      .catch(() => {})
       .finally(() => setLoading(false))
   }, [page, difficultyFilter, themeFilter, selectedOpening])
 

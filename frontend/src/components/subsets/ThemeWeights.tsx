@@ -1,6 +1,5 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
-import { toast } from 'sonner'
 import { api, type Theme } from '../../lib/api'
 import { Input } from '../ui/input'
 import { ThemeSlider } from './ThemeSlider'
@@ -54,7 +53,7 @@ export function ThemeWeights({ value, onChange, disabled = false }: ThemeWeights
     api.themes
       .list()
       .then(setThemes)
-      .catch(() => toast.error('Failed to load themes', { description: 'Could not fetch theme list.' }))
+      .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 

@@ -1,7 +1,6 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { toast } from 'sonner'
 import { useAuth } from '../context/auth'
 import { api } from '../lib/api'
 import { Button } from '../components/ui/button'
@@ -37,7 +36,6 @@ export function SubsetNewPage(): React.ReactElement | null {
       const subset = await api.subsets.create(name.trim(), countValue)
       void navigate({ to: '/app/subsets/$subsetId', params: { subsetId: String(subset.id) } })
     } catch {
-      toast.error('Failed to create subset', { description: 'Please try again.' })
       setSubmitting(false)
     }
   }

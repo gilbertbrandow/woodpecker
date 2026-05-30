@@ -272,7 +272,7 @@ export function TrainingPage(): React.ReactElement | null {
     api.training
       .getInsights(training.id)
       .then(setInsights)
-      .catch(() => toast.error('Failed to load insights', { description: 'Could not fetch chart data.' }))
+      .catch(() => {})
       .finally(() => setInsightsLoading(false))
   }, [activeTab, insights, user, training])
 
@@ -285,11 +285,7 @@ export function TrainingPage(): React.ReactElement | null {
         const match = myTrainings.find((mt) => mt.id === id)
         if (match) setTrainingState(match.trainingState)
       })
-      .catch(() =>
-        toast.error('Failed to load training', {
-          description: 'Could not fetch training data.',
-        }),
-      )
+      .catch(() => {})
       .finally(() => setPageLoading(false))
   }, [id, user])
 
@@ -309,7 +305,6 @@ export function TrainingPage(): React.ReactElement | null {
         params: { runId: String(newRun.id) },
       })
     } catch {
-      toast.error('Failed to start run', { description: 'Please try again.' })
       setStartingIndex(null)
     }
   }
@@ -322,7 +317,6 @@ export function TrainingPage(): React.ReactElement | null {
       setTraining(updated)
       toast('Training aborted', { description: 'Your progress has been saved.' })
     } catch {
-      toast.error('Failed to abort', { description: 'Please try again.' })
     } finally {
       setAborting(false)
       setShowAbortDialog(false)

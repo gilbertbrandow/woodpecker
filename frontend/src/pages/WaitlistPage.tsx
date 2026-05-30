@@ -44,7 +44,6 @@ export function WaitlistPage(): React.ReactElement | null {
       setEmail('')
       toast('Email saved', { description: "We'll notify you when a spot opens up." })
     } catch {
-      toast.error('Something went wrong', { description: 'Please try again.' })
     } finally {
       setSaving(false)
     }

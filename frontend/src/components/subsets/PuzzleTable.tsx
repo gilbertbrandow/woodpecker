@@ -10,7 +10,6 @@ import {
   type RowSelectionState,
 } from '@tanstack/react-table'
 import { ChevronUp, ChevronDown, ChevronsUpDown, Trash2, Loader2, ExternalLink } from 'lucide-react'
-import { toast } from 'sonner'
 import { api, type TrainingItemRow, type SortColumn, type SortOrder } from '../../lib/api'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '../ui/tooltip'
 import { Button } from '../ui/button'
@@ -144,7 +143,6 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
         setTotal(result.total)
         onTotalChange(result.total)
       } catch {
-        toast.error('Failed to load puzzles', { description: 'Please try again.' })
       } finally {
         setInitialLoading(false)
         setFetching(false)
@@ -170,7 +168,6 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
         await fetchPage(pageIndex, sorting, true)
       }
     } catch {
-      toast.error('Failed to remove puzzle', { description: 'Please try again.' })
     } finally {
       setDiscarding(null)
     }
@@ -191,7 +188,6 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
         await fetchPage(pageIndex, sorting, true)
       }
     } catch {
-      toast.error('Failed to remove puzzles', { description: 'Please try again.' })
     } finally {
       setDiscardingSelected(false)
     }

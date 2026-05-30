@@ -1,6 +1,5 @@
 import * as React from 'react'
 import { useEffect, useState } from 'react'
-import { toast } from 'sonner'
 import { api, type ScrapedPositionalSourceRunMetadata } from '../../lib/api'
 import { ScrapedPositionalDashboard } from './ScrapedPositionalDashboard'
 import { ScrapedPositionalItemsSection } from './ScrapedPositionalItemsSection'
@@ -14,10 +13,7 @@ export function ScrapedPositionalExplore(): React.ReactElement {
     api.sources.scrapedPositional
       .sourceRunMetadata()
       .then((res) => setMetadata(res.metadata))
-      .catch(() => {
-        toast.error('Failed to load source data', { description: 'Please try again.' })
-        setMetadata(null)
-      })
+      .catch(() => setMetadata(null))
   }, [])
 
   if (metadata === undefined) {

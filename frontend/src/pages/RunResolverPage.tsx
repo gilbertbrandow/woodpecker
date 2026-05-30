@@ -31,7 +31,6 @@ export function RunResolverPage(): React.ReactElement {
         })
       })
       .catch(() => {
-        toast.error('Failed to load next puzzle', { description: 'Please try again.' })
         void navigate({ to: '/app/runs/$runId', params: { runId: runIdStr }, replace: true })
       })
   }, [runId])

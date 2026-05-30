@@ -1,6 +1,5 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
-import { toast } from 'sonner'
 import { ChevronDown } from 'lucide-react'
 import { api } from '../../lib/api'
 import type {
@@ -38,7 +37,7 @@ export function ScrapedPositionalConfig({
           setThemes(metadata.themes)
         }
       })
-      .catch(() => toast.error('Failed to load positional source data'))
+      .catch(() => {})
       .finally(() => setMetaLoading(false))
   }, [])
 

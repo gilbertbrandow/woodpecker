@@ -2,7 +2,6 @@ import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { useEffect } from 'react'
 import { useNavigate, useParams } from '@tanstack/react-router'
-import { toast } from 'sonner'
 import { api } from '../lib/api'
 
 const TERMINAL_STATUSES = new Set(['solved', 'solved_with_retries', 'failed'])
@@ -50,7 +49,6 @@ export function TrainingItemResolverPage(): React.ReactElement {
         })
       })
       .catch(() => {
-        toast.error('Failed to load puzzle', { description: 'Please try again.' })
         void navigate({ to: '/app/runs/$runId', params: { runId: runIdStr }, replace: true })
       })
   }, [runId, runTrainingItemId])

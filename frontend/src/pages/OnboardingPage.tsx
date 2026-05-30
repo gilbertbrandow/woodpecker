@@ -1,7 +1,6 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { toast } from 'sonner'
 import { useAuth } from '../context/auth'
 import { api } from '../lib/api'
 import { Button } from '../components/ui/button'
@@ -49,7 +48,6 @@ export function OnboardingPage(): React.ReactElement | null {
       updateUser(user)
       void navigate({ to: '/app' })
     } catch {
-      toast.error('Something went wrong', { description: 'Please try again.' })
     } finally {
       setSaving(false)
     }

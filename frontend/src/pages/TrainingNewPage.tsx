@@ -2,7 +2,6 @@ import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { toast } from 'sonner'
 import { type ColumnDef } from '@tanstack/react-table'
 import { useAuth } from '../context/auth'
 import { api, type ScheduleSummary } from '../lib/api'
@@ -30,7 +29,7 @@ export function TrainingNewPage(): React.ReactElement | null {
     api.schedules
       .list({ lockedOnly: true })
       .then((r) => setSchedules(r.items))
-      .catch(() => toast.error('Failed to load schedules', { description: 'Could not fetch schedules.' }))
+      .catch(() => {})
       .finally(() => setSchedulesLoading(false))
   }, [user])
 
@@ -42,9 +41,7 @@ export function TrainingNewPage(): React.ReactElement | null {
     try {
       const training = await api.training.create(selectedSchedule.id)
       void navigate({ to: '/app/training/$trainingId', params: { trainingId: String(training.id) } })
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Please try again.'
-      toast.error('Failed to start training', { description: msg })
+    } catch {
       setEnrolling(false)
     }
   }

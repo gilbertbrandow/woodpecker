@@ -7,6 +7,7 @@ import { ChevronDown, Lock, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "../context/auth";
 import {
   api,
+  ApiError,
   type Schedule,
   type ScheduleConfig,
   type ScheduleRunDef,
@@ -203,11 +204,7 @@ export function SchedulePage(): React.ReactElement | null {
         return api.subsets.get(s.subsetId);
       })
       .then((sub) => setSubset(sub))
-      .catch(() =>
-        toast.error("Failed to load schedule", {
-          description: "Could not fetch schedule data.",
-        }),
-      )
+      .catch(() => {})
       .finally(() => setPageLoading(false));
   }, [id, user]);
 
@@ -221,11 +218,7 @@ export function SchedulePage(): React.ReactElement | null {
     api.schedules
       .insights(id)
       .then((data) => setInsightsData(data))
-      .catch(() =>
-        toast.error("Failed to load insights", {
-          description: "Could not fetch chart data.",
-        }),
-      )
+      .catch(() => {})
       .finally(() => setInsightsLoading(false));
   }, [activeTab, id, user, insightsData]);
 
@@ -282,12 +275,9 @@ export function SchedulePage(): React.ReactElement | null {
         params: { trainingId: String(participation.id) },
       });
     } catch (err) {
-      if (err instanceof Error && err.message.includes("409")) {
+      if (err instanceof ApiError && err.status === 409) {
         const list = await api.training.listMine();
         setMyTraining(list.find((t) => t.scheduleId === id) ?? null);
-      } else {
-        const msg = err instanceof Error ? err.message : "Please try again.";
-        toast.error("Enroll failed", { description: msg });
       }
     } finally {
       setEnrolling(false);
@@ -301,10 +291,7 @@ export function SchedulePage(): React.ReactElement | null {
         description: "The schedule has been removed.",
       });
       void navigate({ to: "/app" });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Please try again.";
-      toast.error("Delete failed", { description: msg });
-    }
+    } catch { }
   };
 
   const handleSave = async (): Promise<void> => {
@@ -317,9 +304,7 @@ export function SchedulePage(): React.ReactElement | null {
       toast("Configuration saved", {
         description: "Your settings have been saved.",
       });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Please try again.";
-      toast.error("Save failed", { description: msg });
+    } catch {
     } finally {
       setIsSaving(false);
     }
@@ -342,10 +327,8 @@ export function SchedulePage(): React.ReactElement | null {
       toast("Schedule locked", {
         description: "This schedule is now ready for use.",
       });
-    } catch (err) {
+    } catch {
       setIsSaving(false);
-      const msg = err instanceof Error ? err.message : "Please try again.";
-      toast.error("Lock failed", { description: msg });
     }
   };
 

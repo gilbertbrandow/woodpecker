@@ -514,7 +514,6 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
         enterFailed()
       }
     } catch {
-      toast.error('Failed to submit attempt', { description: 'Please try again.' })
     } finally {
       concludingRef.current = false
     }
@@ -767,7 +766,6 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
         },
       })
     } catch {
-      toast.error('Failed to load next puzzle', { description: 'Please try again.' })
     } finally {
       setIsLoadingNextPuzzle(false)
     }
@@ -797,7 +795,6 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
         },
       })
     } catch {
-      toast.error('Failed to start puzzle', { description: 'Please try again.' })
     } finally {
       setIsLoadingNextPuzzle(false)
     }
