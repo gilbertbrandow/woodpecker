@@ -2,6 +2,7 @@ import os
 import sentry_sdk
 from flask import Flask, session
 from sentry_sdk.integrations.flask import FlaskIntegration
+from app.exceptions import AppError
 from app.extensions import db, cors, migrate
 from app.routes.health import health_bp
 from app.routes.auth import auth_bp
@@ -29,6 +30,7 @@ def _init_sentry() -> None:
         environment=os.environ.get("FLASK_ENV", "production"),
         traces_sample_rate=0.0,
         send_default_pii=False,
+        ignore_errors=[AppError],
     )
 
 
