@@ -89,6 +89,50 @@
   }
 }
 
+/* Sonner: soft tinted backgrounds per variant, neutral text preserved */
+[data-sonner-toast][data-type='success'] {
+  background: hsl(142 60% 96%) !important;
+  border-color: hsl(142 50% 86%) !important;
+}
+[data-sonner-toast][data-type='error'] {
+  background: hsl(0 80% 97%) !important;
+  border-color: hsl(0 70% 88%) !important;
+}
+[data-sonner-toast][data-type='warning'] {
+  background: hsl(38 90% 96%) !important;
+  border-color: hsl(38 80% 86%) !important;
+}
+[data-sonner-toast][data-type='info'] {
+  background: hsl(210 80% 97%) !important;
+  border-color: hsl(210 70% 88%) !important;
+}
+
+.dark [data-sonner-toast][data-type='success'] {
+  background: hsl(142 40% 12%) !important;
+  border-color: hsl(142 40% 20%) !important;
+}
+.dark [data-sonner-toast][data-type='error'] {
+  background: hsl(0 50% 12%) !important;
+  border-color: hsl(0 50% 22%) !important;
+}
+.dark [data-sonner-toast][data-type='warning'] {
+  background: hsl(38 60% 12%) !important;
+  border-color: hsl(38 55% 22%) !important;
+}
+.dark [data-sonner-toast][data-type='info'] {
+  background: hsl(210 50% 12%) !important;
+  border-color: hsl(210 50% 22%) !important;
+}
+
+/* Sonner hardcodes description to #3f3f3f and title to --gray12 — override to theme foreground */
+[data-sonner-toast][data-type] [data-title] {
+  color: hsl(var(--foreground)) !important;
+}
+[data-sonner-toast][data-type] [data-description] {
+  color: hsl(var(--muted-foreground)) !important;
+  font-size: 0.8rem !important;
+}
+
 .chess-board-container {
   border-radius: 4px;
   overflow: hidden;
