@@ -2,7 +2,7 @@ import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { useEffect } from 'react'
 import { useNavigate, useParams } from '@tanstack/react-router'
-import { toast } from 'sonner'
+import { toast } from '../lib/toast'
 import { api } from '../lib/api'
 
 export function RunResolverPage(): React.ReactElement {

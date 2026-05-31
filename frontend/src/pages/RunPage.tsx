@@ -2,7 +2,7 @@ import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams } from '@tanstack/react-router'
-import { toast } from 'sonner'
+import { toast } from '../lib/toast'
 import { ChevronDown } from 'lucide-react'
 import { useAuth } from '../context/auth'
 import {
@@ -180,7 +180,7 @@ function ConfigureTab({
         targetAccuracy: accuracyVal,
         targetSolveSeconds: solveSecondsVal,
       })
-      toast('Targets saved', { description: 'Your goals for this run have been updated.' })
+      toast.success('Targets saved', { description: 'Your goals for this run have been updated.' })
     } catch {
     } finally {
       setSaving(false)

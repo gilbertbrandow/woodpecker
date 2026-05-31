@@ -23,7 +23,7 @@ import { useAuth } from '../../context/auth'
 import type { Subset, SelectableUser } from '../../lib/api'
 import { api } from '../../lib/api'
 import { useDebounce } from '../../hooks/useDebounce'
-import { toast } from 'sonner'
+import { toast } from '../../lib/toast'
 
 const PAGE_SIZE = 20
 
@@ -93,7 +93,7 @@ export function SubsetsTable(): React.ReactElement {
     setDeletingId(item.id)
     try {
       await api.subsets.delete(item.id)
-      toast('Subset deleted', { description: `"${item.name}" has been removed.` })
+      toast.success('Subset deleted', { description: `"${item.name}" has been removed.` })
       setRefreshKey((k) => k + 1)
     } catch {
     } finally {

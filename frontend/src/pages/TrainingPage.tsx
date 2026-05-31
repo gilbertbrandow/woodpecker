@@ -2,7 +2,7 @@ import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams, Link } from '@tanstack/react-router'
-import { toast } from 'sonner'
+import { toast } from '../lib/toast'
 import { Ban, ChevronDown, Play } from 'lucide-react'
 import { type ColumnDef } from '@tanstack/react-table'
 import {
@@ -315,7 +315,7 @@ export function TrainingPage(): React.ReactElement | null {
     try {
       const updated = await api.training.abort(training.id)
       setTraining(updated)
-      toast('Training aborted', { description: 'Your progress has been saved.' })
+      toast.success('Training aborted', { description: 'Your progress has been saved.' })
     } catch {
     } finally {
       setAborting(false)
