@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { CheckCircle2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '../lib/toast'
 import { useNavigate } from '@tanstack/react-router'
 import { useAuth } from '../context/auth'
 import { api } from '../lib/api'
@@ -42,7 +42,7 @@ export function WaitlistPage(): React.ReactElement | null {
       setWaitlisted(updated)
       setEditing(false)
       setEmail('')
-      toast('Email saved', { description: "We'll notify you when a spot opens up." })
+      toast.success('Email saved', { description: "We'll notify you when a spot opens up." })
     } catch {
     } finally {
       setSaving(false)

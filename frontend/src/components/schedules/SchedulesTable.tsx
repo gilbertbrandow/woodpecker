@@ -24,7 +24,7 @@ import type { ScheduleSummary, SelectableUser } from "../../lib/api";
 import { api } from "../../lib/api";
 import { formatDuration } from "./DurationInput";
 import { useDebounce } from "../../hooks/useDebounce";
-import { toast } from "sonner";
+import { toast } from "../../lib/toast";
 
 const PAGE_SIZE = 20;
 
@@ -120,7 +120,7 @@ export function SchedulesTable({
     setDeletingId(item.id);
     try {
       await api.schedules.delete(item.id);
-      toast("Schedule deleted", {
+      toast.success("Schedule deleted", {
         description: `"${item.name}" has been removed.`,
       });
       setRefreshKey((k) => k + 1);

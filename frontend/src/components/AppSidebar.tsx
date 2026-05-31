@@ -2,7 +2,7 @@ import * as React from 'react'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useSidebar } from './ui/sidebar'
 import { ChevronsUpDown, LayoutDashboard, Library, Database, CalendarDays, Puzzle, CircleHelp, Settings, LogOut, Play, User } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '../lib/toast'
 import { useAuth } from '../context/auth'
 import { parseAvatarValue } from '../lib/avatar'
 import { displayName } from '../lib/utils'
@@ -91,7 +91,7 @@ export function AppSidebar({ activeRun, collapsible = 'icon' }: AppSidebarProps)
 
   const handleSignOut = async (): Promise<void> => {
     await logout()
-    toast('Signed out', { description: 'See you next time.' })
+    toast.success('Signed out', { description: 'See you next time.' })
     void navigate({ to: '/' })
   }
 

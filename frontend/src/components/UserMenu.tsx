@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { toast } from 'sonner'
+import { toast } from '../lib/toast'
 import { useAuth } from '../context/auth'
 import { parseAvatarValue } from '../lib/avatar'
 import { Button } from './ui/button'
@@ -22,7 +22,7 @@ export function UserMenu(): React.ReactElement | null {
 
   const handleSignOut = async (): Promise<void> => {
     await logout()
-    toast('Signed out', { description: 'See you next time.' })
+    toast.success('Signed out', { description: 'See you next time.' })
     void navigate({ to: '/' })
   }
 

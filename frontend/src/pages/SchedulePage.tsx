@@ -2,7 +2,7 @@ import { PageWrapper } from '../components/PageWrapper'
 import * as React from "react";
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { toast } from "sonner";
+import { toast } from "../lib/toast";
 import { ChevronDown, Lock, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "../context/auth";
 import {
@@ -287,7 +287,7 @@ export function SchedulePage(): React.ReactElement | null {
   const handleDelete = async (): Promise<void> => {
     try {
       await api.schedules.delete(id);
-      toast("Schedule deleted", {
+      toast.success("Schedule deleted", {
         description: "The schedule has been removed.",
       });
       void navigate({ to: "/app" });
@@ -301,7 +301,7 @@ export function SchedulePage(): React.ReactElement | null {
       const updated = await api.schedules.update(id, { config });
       setSchedule(updated);
       setIsDirty(false);
-      toast("Configuration saved", {
+      toast.success("Configuration saved", {
         description: "Your settings have been saved.",
       });
     } catch {
@@ -324,7 +324,7 @@ export function SchedulePage(): React.ReactElement | null {
       setRunsOpen(false);
       setOrderOpen(false);
       setRepetitionOpen(false);
-      toast("Schedule locked", {
+      toast.success("Schedule locked", {
         description: "This schedule is now ready for use.",
       });
     } catch {

@@ -2,7 +2,7 @@ import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { toast } from 'sonner'
+import { toast } from '../lib/toast'
 import { useAuth } from '../context/auth'
 import { api } from '../lib/api'
 import {
@@ -88,7 +88,7 @@ export function ProfilePage(): React.ReactElement | null {
           : `default:${selectedPiece}:${selectedColor}:${selectedStyle}`
       const updated = await api.settings.update({ displayName, avatarUrl: avatarUrlValue })
       updateUser(updated)
-      toast('Profile updated', { description: 'Your profile has been saved.' })
+      toast.success('Profile updated', { description: 'Your profile has been saved.' })
     } catch {
     } finally {
       setSaving(false)

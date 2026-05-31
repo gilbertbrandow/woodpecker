@@ -2,7 +2,7 @@ import { PageWrapper } from '../components/PageWrapper'
 import * as React from "react";
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { toast } from "sonner";
+import { toast } from "../lib/toast";
 import { ChevronDown, Lock, Trash2 } from "lucide-react";
 import { useAuth } from "../context/auth";
 import {
@@ -159,7 +159,7 @@ export function SubsetPage(): React.ReactElement | null {
         setStats(null);
         setTotal(0);
       }
-      toast("Configuration saved", {
+      toast.success("Configuration saved", {
         description: "Your settings have been saved.",
       });
     } catch {
@@ -186,18 +186,18 @@ export function SubsetPage(): React.ReactElement | null {
         setSubset(updated);
         await loadStats(id);
         if (result.filled < result.requested) {
-          toast("Fill complete", {
+          toast.success("Fill complete", {
             description: `Filled ${result.filled} of ${result.requested} requested puzzles.`,
           });
         } else {
-          toast("Fill complete", {
+          toast.success("Fill complete", {
             description: `${result.filled} puzzles added.`,
           });
         }
       } else {
         const result = await api.subsets.refill(id);
         await loadStats(id);
-        toast("Refill complete", {
+        toast.success("Refill complete", {
           description:
             result.filled === 0
               ? "Subset is already full."
@@ -213,7 +213,7 @@ export function SubsetPage(): React.ReactElement | null {
   const handleDelete = async (): Promise<void> => {
     try {
       await api.subsets.delete(id);
-      toast("Subset deleted", { description: "The subset has been removed." });
+      toast.success("Subset deleted", { description: "The subset has been removed." });
       void navigate({ to: "/app" });
     } catch {
     }
@@ -223,7 +223,7 @@ export function SubsetPage(): React.ReactElement | null {
     try {
       const updated = await api.subsets.lock(id);
       setSubset(updated);
-      toast("Subset locked", {
+      toast.success("Subset locked", {
         description: "This subset is now frozen and ready for scheduling.",
       });
     } catch {

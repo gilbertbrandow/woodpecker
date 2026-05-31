@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Chess, type Square } from 'chess.js'
-import { toast } from 'sonner'
+import { toast } from '../../lib/toast'
 import { api, type RunTrainingItemAttemptView, type RunTrainingItemOverview } from '../../lib/api'
 import { useAuth } from '../../context/auth'
 import { useChessTheme } from '../../hooks/useChessTheme'
