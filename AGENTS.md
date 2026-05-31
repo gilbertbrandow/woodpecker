@@ -15,10 +15,7 @@ See `CONTEXT.md` for the domain glossary. See `pipeline/AGENTS.md` for pipeline-
 - **Routes only do HTTP.** Parse the request, call a service function, return JSON. No business logic or DB queries in route handlers.
 - **Services own business logic.** All validation, DB reads/writes, and error raising happen in `backend/app/services/`.
 - **Models are plain ORM.** No business logic in `backend/app/models/`.
-- **Raise typed exceptions from services.** Routes map them to HTTP codes:
-  - `LookupError` → 404
-  - `PermissionError` → 403
-  - `ValueError` → 400 (use 409 for specific conflict messages)
+- **Raise typed exceptions from services.** Use `AppError` subclasses from `backend/app/exceptions.py` — never raw Python builtins. See `backend/AGENTS.md` for the full hierarchy.
 - **Import/ingestion logic belongs in `pipeline/`, not the Flask backend.**
 
 ### Schema changes
@@ -41,7 +38,7 @@ See `CONTEXT.md` for the domain glossary. See `pipeline/AGENTS.md` for pipeline-
 - Routing via TanStack Router (`@tanstack/react-router`). All routes defined in `frontend/src/router.tsx`.
 - UI primitives from Radix UI (`@radix-ui/*`), wrapped in `frontend/src/components/ui/`.
 - Styling with Tailwind CSS. No inline styles. Use the `cn()` helper from `src/lib/utils` for conditional classes.
-- API calls use plain `fetch` with `credentials: 'include'`. No external HTTP client.
+- API calls go through `src/lib/request.ts` which wraps `fetch` with `credentials: 'same-origin'`. No external HTTP client. See `frontend/AGENTS.md` for error handling conventions.
 
 ### Testing
 
@@ -69,6 +66,23 @@ Use `make` targets at the repo root — run `make` or inspect the `Makefile` for
 - **Migrations** — `make migrate msg="..."` to generate, `make migrate-upgrade` to apply.
 - **Lint** — `make lint`.
 - **Pipeline** — see `pipeline/AGENTS.md` and `pipeline/Makefile`.
+
+### Error handling and Sentry
+
+Error handling is a cross-cutting concern with a deliberate contract. The backend returns `{"title": "...", "detail": "..."}` on every error; the frontend's `request()` intercepts every API error and owns all side effects. Neither side should re-surface errors that the other already handles.
+
+Platform-specific rules live in the sub-guides:
+- [`backend/AGENTS.md`](backend/AGENTS.md) — exception hierarchy, what to raise, what Sentry captures
+- [`frontend/AGENTS.md`](frontend/AGENTS.md) — toast import, call-site patterns, what not to do
+
+**Sentry environments:**
+
+| Side | DSN variable | Environment tag |
+|------|-------------|-----------------|
+| Backend | `SENTRY_DSN` | `FLASK_ENV` (defaults to `"production"`) |
+| Frontend | `VITE_SENTRY_DSN` | Vite `import.meta.env.MODE` |
+
+Both sides are disabled when the DSN is unset — local development has no DSN by default.
 
 ### What to avoid
 

@@ -4,4 +4,6 @@ The backend uses a strict mapping between failure category and HTTP status code.
 
 The 400/422 split was a deliberate choice over collapsing both into `400`. The distinction lets the frontend apply a clear rule: show the backend message for `422` and `409`, never for `400`. Without the split, every call site would need its own judgement about whether the `400` message is user-safe.
 
-All routes must be audited to respect this mapping. The exception-to-code convention is: structural parse/missing-field errors → `400`; `ValueError` from user input validation → `422`; `LookupError` for a resource the user requested → `404`; `PermissionError` → `403`; explicit conflict raises → `409`.
+superseded by: ADR-0016
+
+The exception-to-code convention has since moved to a typed `AppError` hierarchy (`ValidationError`, `NotFoundError`, `ConflictError`, `ForbiddenError`) defined in `backend/app/exceptions.py`. Raw Python builtins (`ValueError`, `LookupError`, `PermissionError`) and `BadRequestError` (400) are no longer used. See ADR-0016 for the current contract.
