@@ -33,17 +33,17 @@ createRoot(rootElement).render(
         <TooltipProvider>
           <AuthProvider>
             <InnerApp />
-            <Toaster
-              position="bottom-center"
-              toastOptions={{
-                style: {
-                  fontSize: "0.95rem",
-                  padding: "14px 18px",
-                  boxShadow: "var(--toast-shadow)",
-                },
-              }}
-            />
           </AuthProvider>
+          <Toaster
+            position="bottom-center"
+            toastOptions={{
+              style: {
+                fontSize: "0.95rem",
+                padding: "14px 18px",
+                boxShadow: "var(--toast-shadow)",
+              },
+            }}
+          />
         </TooltipProvider>
       </ThemeProvider>
     </Sentry.ErrorBoundary>
