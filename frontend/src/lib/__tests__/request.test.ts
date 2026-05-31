@@ -62,7 +62,7 @@ describe('request', () => {
     })
 
     it('throws ApiError with status 0', async () => {
-      const err = await request('/test').catch((e) => e)
+      const err = await request('/test').catch((e: unknown) => e) as ApiError
       expect(err).toBeInstanceOf(ApiError)
       expect(err.status).toBe(0)
     })
@@ -90,7 +90,7 @@ describe('request', () => {
     })
 
     it('throws ApiError with status 401', async () => {
-      const err = await request('/test').catch((e) => e)
+      const err = await request('/test').catch((e: unknown) => e) as ApiError
       expect(err).toBeInstanceOf(ApiError)
       expect(err.status).toBe(401)
     })
@@ -112,7 +112,7 @@ describe('request', () => {
 
     it('throws ApiError carrying the status, title, and detail', async () => {
       stubFetch({ status: 409, body: { title: 'Already enrolled', detail: 'You are already enrolled in this schedule.' } })
-      const err = await request('/test').catch((e) => e)
+      const err = await request('/test').catch((e: unknown) => e) as ApiError
       expect(err).toBeInstanceOf(ApiError)
       expect(err.status).toBe(409)
       expect(err.title).toBe('Already enrolled')
@@ -121,7 +121,7 @@ describe('request', () => {
 
     it('sets the error message to "title: detail" for Sentry grouping', async () => {
       stubFetch({ status: 422, body: { title: 'Name required', detail: 'Please provide a name.' } })
-      const err = await request('/test').catch((e) => e)
+      const err = await request('/test').catch((e: unknown) => e) as ApiError
       expect(err.message).toBe('Name required: Please provide a name.')
     })
 
@@ -230,7 +230,7 @@ describe('request', () => {
     })
 
     it('throws ApiError', async () => {
-      const err = await request('/test').catch((e) => e)
+      const err = await request('/test').catch((e: unknown) => e) as ApiError
       expect(err).toBeInstanceOf(ApiError)
       expect(err.title).toBe('Something went wrong')
     })
