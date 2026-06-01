@@ -82,16 +82,16 @@ ssh ubuntu@54.216.71.166 "cd /opt/woodpecker && docker compose -f docker-compose
 
 ## Backups
 
-A systemd timer (`woodpecker-backup.timer`) fires daily at 02:00 UTC. It runs `/opt/woodpecker/scripts/backup-db.sh` as the `ubuntu` user, which streams `pg_dump` from the `db` container through gzip and uploads to S3 under `YYYY/MM/woodpecker_TIMESTAMP.sql.gz`. Backups are kept for 30 days via an S3 lifecycle rule.
+A systemd timer (`woodpecker-backup.timer`) fires daily at 02:00 UTC. It runs `docker compose run --rm backup` as the `ubuntu` user, which starts the `woodpecker-backup` container. The container connects to `db:5432` over the Docker network, streams `pg_dump` through gzip, uploads to S3 under `YYYY/MM/woodpecker_TIMESTAMP.sql.gz`, and re-downloads the file to verify gzip integrity. Backups are kept for 30 days via an S3 lifecycle rule.
 
 The EC2 instance has an IAM instance profile that grants write access to the backup bucket — no credentials in `.env` are needed.
+
+The backup container reports check-ins to Sentry Cron Monitors (`woodpecker-backup` monitor in the `woodpecker-backend` project). A missed or failed check-in triggers a Sentry alert. The monitor is created automatically on first successful run.
 
 ### Files on the server
 
 | Path | Purpose |
 | ---- | ------- |
-| `/opt/woodpecker/scripts/backup-db.sh` | Backup script (deployed by CI) |
-| `/opt/woodpecker/scripts/verify-backup-upload.sh` | Post-backup upload verification (called by backup-db.sh) |
 | `/etc/systemd/system/woodpecker-backup.service` | oneshot service unit |
 | `/etc/systemd/system/woodpecker-backup.timer` | daily timer unit |
 
