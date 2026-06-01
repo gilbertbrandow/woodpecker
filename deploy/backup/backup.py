@@ -7,7 +7,7 @@ import tempfile
 import uuid
 from datetime import datetime, timezone
 
-import boto3
+import boto3  # type: ignore[import-not-found]
 import sentry_sdk
 from sentry_sdk.crons import capture_checkin
 from sentry_sdk.crons.consts import MonitorStatus
@@ -56,6 +56,7 @@ def _run_backup() -> None:
             env={**os.environ, "PGPASSWORD": postgres_password},
         )
         try:
+            assert pg_dump.stdout is not None
             with open(tmp_path, "wb") as f:
                 with gzip.GzipFile(fileobj=f, mode="wb") as gz:
                     shutil.copyfileobj(pg_dump.stdout, gz)
@@ -97,7 +98,7 @@ def main() -> None:
     check_in_id = capture_checkin(
         monitor_slug=MONITOR_SLUG,
         status=MonitorStatus.IN_PROGRESS,
-        monitor_config=MONITOR_CONFIG,
+        monitor_config=MONITOR_CONFIG,  # type: ignore[arg-type]
     ) or str(uuid.uuid4())
 
     try:
