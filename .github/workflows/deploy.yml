@@ -54,6 +54,15 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/woodpecker-frontend:${{ steps.tag.outputs.value }}
             ghcr.io/${{ github.repository_owner }}/woodpecker-frontend:latest
 
+      - name: Build and push backup
+        uses: docker/build-push-action@v7
+        with:
+          context: deploy/backup
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/woodpecker-backup:${{ steps.tag.outputs.value }}
+            ghcr.io/${{ github.repository_owner }}/woodpecker-backup:latest
+
   deploy:
     name: Deploy to EC2
     needs: build-and-push
@@ -79,7 +88,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "deploy/scripts/backup-db.sh,deploy/scripts/verify-backup-upload.sh,deploy/scripts/woodpecker-backup.service,deploy/scripts/woodpecker-backup.timer"
+          source: "deploy/scripts/woodpecker-backup.service,deploy/scripts/woodpecker-backup.timer"
           target: /opt/woodpecker/scripts/
           strip_components: 2
 
@@ -127,7 +136,7 @@ jobs:
             chmod 600 /opt/woodpecker/.env.new
             mv /opt/woodpecker/.env.new /opt/woodpecker/.env
 
-            # Install AWS CLI if not present (idempotent)
+            # Install AWS CLI if not present — needed for operator restore commands on the EC2 host
             if ! command -v aws &>/dev/null; then
               echo "Installing AWS CLI..."
               curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
@@ -137,7 +146,6 @@ jobs:
             fi
 
             # Install / refresh systemd backup units
-            chmod +x /opt/woodpecker/scripts/backup-db.sh /opt/woodpecker/scripts/verify-backup-upload.sh
             sudo cp /opt/woodpecker/scripts/woodpecker-backup.service /etc/systemd/system/
             sudo cp /opt/woodpecker/scripts/woodpecker-backup.timer   /etc/systemd/system/
             sudo systemctl daemon-reload
@@ -146,6 +154,7 @@ jobs:
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
             cd /opt/woodpecker
             docker compose -f docker-compose.yml -f docker-compose-prod.yml pull
+            docker pull ghcr.io/${GHCR_OWNER}/woodpecker-backup:${IMAGE_TAG}
             docker compose -f docker-compose.yml -f docker-compose-prod.yml up -d --remove-orphans
             docker compose -f docker-compose.yml -f docker-compose-prod.yml restart nginx
             echo "Waiting for backend..."

@@ -24,7 +24,7 @@ Route 53 hosts `woodpeckerchess.com` (A record → EIP) and `www` (CNAME → ape
 
 ## Services
 
-Four Docker containers managed by Docker Compose at `/opt/woodpecker`:
+Four long-running Docker containers managed by Docker Compose at `/opt/woodpecker`, plus one ephemeral backup container launched by systemd:
 
 | Container | Role |
 | --------- | ---- |
@@ -32,6 +32,7 @@ Four Docker containers managed by Docker Compose at `/opt/woodpecker`:
 | frontend | nginx serving static React build |
 | backend | Gunicorn · Flask · 1 worker · 4 threads |
 | db | Postgres 16 · named volume `pgdata` |
+| backup | Ephemeral — runs daily at 02:00 UTC via systemd, exits when done |
 
 `/api/*` → backend:8000. Everything else → frontend:80. Postgres is internal only.
 
@@ -41,7 +42,7 @@ Four Docker containers managed by Docker Compose at `/opt/woodpecker`:
 
 1. PR → CI runs lint, typecheck, tests. Merge blocked until all pass.
 2. Maintainer publishes a GitHub Release → `deploy.yml` triggers.
-3. Builds `backend` and `frontend` Docker images, tags `<version>` + `latest`, pushes to GHCR.
+3. Builds `backend`, `frontend`, and `backup` Docker images, tags `<version>` + `latest`, pushes to GHCR.
 4. SSHes into EC2, pulls images, restarts containers, waits for backend health, runs `flask db upgrade`.
 
 Migrations run on every deploy via Alembic. Idempotent.
@@ -82,16 +83,16 @@ ssh ubuntu@54.216.71.166 "cd /opt/woodpecker && docker compose -f docker-compose
 
 ## Backups
 
-A systemd timer (`woodpecker-backup.timer`) fires daily at 02:00 UTC. It runs `/opt/woodpecker/scripts/backup-db.sh` as the `ubuntu` user, which streams `pg_dump` from the `db` container through gzip and uploads to S3 under `YYYY/MM/woodpecker_TIMESTAMP.sql.gz`. Backups are kept for 30 days via an S3 lifecycle rule.
+A systemd timer (`woodpecker-backup.timer`) fires daily at 02:00 UTC. It runs `docker compose run --rm backup` as the `ubuntu` user, which starts the `woodpecker-backup` container. The container connects to `db:5432` over the Docker network, streams `pg_dump` through gzip, uploads to S3 under `YYYY/MM/woodpecker_TIMESTAMP.sql.gz`, and re-downloads the file to verify gzip integrity. Backups are kept for 30 days via an S3 lifecycle rule.
 
 The EC2 instance has an IAM instance profile that grants write access to the backup bucket — no credentials in `.env` are needed.
+
+The backup container reports check-ins to Sentry Cron Monitors (`woodpecker-backup` monitor in the `woodpecker-backend` project). A missed or failed check-in triggers a Sentry alert. The monitor is created automatically on first successful run.
 
 ### Files on the server
 
 | Path | Purpose |
 | ---- | ------- |
-| `/opt/woodpecker/scripts/backup-db.sh` | Backup script (deployed by CI) |
-| `/opt/woodpecker/scripts/verify-backup-upload.sh` | Post-backup upload verification (called by backup-db.sh) |
 | `/etc/systemd/system/woodpecker-backup.service` | oneshot service unit |
 | `/etc/systemd/system/woodpecker-backup.timer` | daily timer unit |
 
