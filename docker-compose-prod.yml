@@ -20,6 +20,20 @@ services:
       - "80"
     restart: unless-stopped
 
+  backup:
+    image: ghcr.io/${GHCR_OWNER}/woodpecker-backup:${IMAGE_TAG:-latest}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-woodpecker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-woodpecker}
+      POSTGRES_DB: ${POSTGRES_DB:-woodpecker}
+      BACKUP_BUCKET: ${BACKUP_BUCKET:?set BACKUP_BUCKET}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - backup
+
   nginx:
     image: nginx:1.27-alpine
     ports:
