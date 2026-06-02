@@ -118,6 +118,7 @@ export function LichessTacticsItemsSection(): React.ReactElement {
             : undefined,
       })
       .then(setResult)
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [page, committedMin, committedMax, themeFilter, selectedOpenings]);
 

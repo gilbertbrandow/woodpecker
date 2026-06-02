@@ -83,6 +83,7 @@ export function SchedulesTable({
         setTotal(r.total);
         onCountChange?.(r.total);
       })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [
     user,
