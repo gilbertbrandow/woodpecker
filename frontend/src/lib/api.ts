@@ -237,6 +237,52 @@ export type TrainingInsights = {
   runs: TrainingRunInsight[]
 }
 
+export type TrainingProgressPoint = {
+  timeMs: number
+  actual: number | null
+  originalExpected: number | null
+  updatedExpected: number | null
+}
+
+export type TrainingProgressData = {
+  points: TrainingProgressPoint[]
+  totalExpectedPuzzles: number
+  nowMs: number
+}
+
+export type TrainingDetailState =
+  | 'not_started'
+  | 'active_run_ahead'
+  | 'active_run_on_track'
+  | 'active_run_behind'
+  | 'active_run_overdue'
+  | 'scheduled_break'
+  | 'overdue_to_start_next_run'
+  | 'completed'
+  | 'aborted'
+
+export type TrainingDetailStatus = {
+  state: TrainingDetailState
+  runIndex?: number
+  runId?: number
+  runStartedAt?: string
+  runDeadlineAt?: string
+  resolvedCount?: number
+  totalItems?: number
+  expectedResolvedByNow?: number
+  expectedResolvedByTomorrow?: number
+  puzzlesToSolveBeforeTomorrow?: number
+  nextRunIndex?: number
+  breakStartedAt?: string
+  breakEndsAt?: string
+  breakRemainingMs?: number
+  elapsedSinceBreakEndMs?: number
+  totalRuns?: number
+  originalExpectedResolvedByNow: number
+  actualResolved: number
+  deltaPuzzlesVsOriginal: number
+}
+
 export type TrainingStatus = 'not_started' | 'in_progress' | 'completed' | 'aborted'
 
 export type TrainingScheduleSummary = {
@@ -268,9 +314,10 @@ export type Training = {
 
 export type TrainingState =
   | { state: 'not_started'; nextRunIndex: number; totalRuns: number }
-  | { state: 'in_progress'; runIndex: number; totalTrainingItems: number; resolvedCount: number; runStartedAt: string; runDeadlineAt: string; isOverdue: boolean; trainingItemsNeededToday: number }
-  | { state: 'on_break'; nextRunIndex: number; breakStartedAt: string; breakEndsAt: string; breakRemainingMs: number }
-  | { state: 'break_elapsed'; nextRunIndex: number; breakEndedAt: string; elapsedSinceBreakEndMs: number }
+  | { state: 'active_run_ahead' | 'active_run_on_track' | 'active_run_behind'; runIndex: number; runId: number; runStartedAt: string; runDeadlineAt: string; resolvedCount: number; totalItems: number; expectedResolvedByNow: number; expectedResolvedByTomorrow: number; puzzlesToSolveBeforeTomorrow: number }
+  | { state: 'active_run_overdue'; runIndex: number; runId: number; runStartedAt: string; runDeadlineAt: string; resolvedCount: number; totalItems: number }
+  | { state: 'scheduled_break'; nextRunIndex: number; breakStartedAt: string; breakEndsAt: string; breakRemainingMs: number }
+  | { state: 'overdue_to_start_next_run'; nextRunIndex: number; breakEndsAt: string; elapsedSinceBreakEndMs: number }
   | { state: 'completed' }
   | { state: 'aborted' }
 
@@ -840,6 +887,7 @@ export const api = {
       pageSize?: number
     }): Promise<TrainingPage> => {
       const p = new URLSearchParams()
+      p.set('tz', Intl.DateTimeFormat().resolvedOptions().timeZone)
       if (opts?.scheduleId !== undefined) p.set('scheduleId', String(opts.scheduleId))
       if (opts?.userIds?.length) opts.userIds.forEach((id) => p.append('userId', String(id)))
       if (opts?.statuses?.length) opts.statuses.forEach((s) => p.append('status', s))
@@ -862,6 +910,10 @@ export const api = {
       request(`/training/${trainingId}/cross-run-item/${trainingItemId}`),
     getInsights: (trainingId: number): Promise<TrainingInsights> =>
       request(`/training/${trainingId}/insights`),
+    getProgress: (trainingId: number): Promise<TrainingProgressData> =>
+      request(`/training/${trainingId}/progress`),
+    getDetailStatus: (trainingId: number, tz?: string): Promise<TrainingDetailStatus> =>
+      request(`/training/${trainingId}/status${tz ? `?tz=${encodeURIComponent(tz)}` : ''}`),
     abort: (trainingId: number): Promise<Training> =>
       request(`/training/${trainingId}/abort`, { method: 'POST' }),
   },

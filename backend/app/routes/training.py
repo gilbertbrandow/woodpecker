@@ -37,6 +37,7 @@ def list_all_trainings() -> Response:
     page_size_raw = request.args.get("pageSize", "20")
     page = max(1, int(page_raw)) if page_raw.isdigit() else 1
     page_size = min(100, max(1, int(page_size_raw))) if page_size_raw.isdigit() else 20
+    tz_str = request.args.get("tz", "UTC")
     return jsonify(training_svc.list_all_trainings(
         schedule_id=schedule_id,
         user_ids=user_ids or None,
@@ -44,6 +45,7 @@ def list_all_trainings() -> Response:
         search=search,
         page=page,
         page_size=page_size,
+        tz_str=tz_str,
     ))
 
 
@@ -110,6 +112,19 @@ def get_cross_run_item(training_id: int, training_item_id: int) -> tuple[Respons
         training_id, training_item_id, session["user_id"]
     )
     return jsonify(result)
+
+
+@training_bp.get("/<int:training_id>/progress")
+@login_required
+def get_training_progress(training_id: int) -> tuple[Response, int] | Response:
+    return jsonify(training_svc.get_training_progress(training_id, session["user_id"]))
+
+
+@training_bp.get("/<int:training_id>/status")
+@login_required
+def get_training_detail_status(training_id: int) -> tuple[Response, int] | Response:
+    tz_str = request.args.get("tz", "UTC")
+    return jsonify(training_svc.get_training_detail_status(training_id, session["user_id"], tz_str))
 
 
 @training_bp.get("/<int:training_id>/insights")
