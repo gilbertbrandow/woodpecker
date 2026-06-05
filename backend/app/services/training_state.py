@@ -5,13 +5,12 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import sqlalchemy as sa
 
 from app.extensions import db
-from app.models.run import Run, RunTrainingItem
+from app.models.run import Run, RunTrainingItem, TrainingAttempt
 from app.models.training import Training
-from app.services.attempt_state import derive_position_status
 from app.services.schedule_config import ScheduleConfig
 
 
-def _end_of_today_utc(tz_str: str) -> datetime:
+def end_of_today_utc(tz_str: str) -> datetime:
     tz: ZoneInfo | timezone
     try:
         tz = ZoneInfo(tz_str)
@@ -29,6 +28,8 @@ def compute_training_state(
     training: Training,
     now: datetime,
     tz_str: str,
+    active_resolved: int | None = None,
+    active_total_items: int | None = None,
 ) -> dict[str, object]:
     if training.aborted_at is not None:
         return {"state": "aborted"}
@@ -38,53 +39,80 @@ def compute_training_state(
 
     if active_run is not None:
         run_index = active_run.run_index
-        if run_index < len(schedule_cfg.runs):
-            target_hours = schedule_cfg.runs[run_index].target_hours
-        else:
-            target_hours = 0
+        run_def = schedule_cfg.runs[run_index] if run_index < len(schedule_cfg.runs) else None
+        target_hours = run_def.target_hours if run_def else 0
 
-        total_items: int = db.session.scalar(
-            sa.select(sa.func.count()).where(RunTrainingItem.run_id == active_run.id)
-        ) or 0
+        if active_total_items is None:
+            active_total_items = db.session.scalar(
+                sa.select(sa.func.count()).where(RunTrainingItem.run_id == active_run.id)
+            ) or 0
 
-        total_queue = schedule_cfg.total_queue
+        if active_resolved is None:
+            active_resolved = db.session.scalar(
+                sa.select(sa.func.count())
+                .select_from(RunTrainingItem)
+                .where(
+                    RunTrainingItem.run_id == active_run.id,
+                    sa.exists(
+                        sa.select(sa.literal(1))
+                        .where(
+                            TrainingAttempt.run_training_item_id == RunTrainingItem.id,
+                            TrainingAttempt.status != "in_progress",
+                        )
+                    ),
+                    ~sa.exists(
+                        sa.select(sa.literal(1))
+                        .where(
+                            TrainingAttempt.run_training_item_id == RunTrainingItem.id,
+                            TrainingAttempt.status == "in_progress",
+                        )
+                    ),
+                )
+            ) or 0
 
-        run_items = list(
-            db.session.scalars(
-                sa.select(RunTrainingItem).where(RunTrainingItem.run_id == active_run.id)
-            ).all()
-        )
-
-        resolved_count = sum(
-            1 for rp in run_items
-            if derive_position_status(rp.attempts, total_queue) in ("solved", "solved_with_retries", "failed")
-        )
-
-        run_started_at = active_run.started_at
-        deadline = run_started_at + timedelta(hours=target_hours)
+        deadline = active_run.started_at + timedelta(hours=target_hours)
         is_overdue = now > deadline
 
         if is_overdue:
-            training_items_needed_today = max(0, total_items - resolved_count)
+            return {
+                "state": "active_run_overdue",
+                "runIndex": run_index,
+                "runId": active_run.id,
+                "runStartedAt": active_run.started_at.isoformat(),
+                "runDeadlineAt": deadline.isoformat(),
+                "resolvedCount": active_resolved,
+                "totalItems": active_total_items,
+            }
+
+        window_secs = target_hours * 3600.0
+        elapsed_secs = (now - active_run.started_at).total_seconds()
+        fraction = elapsed_secs / window_secs if window_secs > 0 else 1.0
+        expected_now = math.floor(fraction * active_total_items)
+        daily_rate = active_total_items / (target_hours / 24.0) if target_hours > 0 else float(active_total_items)
+
+        if active_resolved > expected_now:
+            state = "active_run_ahead"
+        elif active_resolved >= expected_now - daily_rate:
+            state = "active_run_on_track"
         else:
-            eod_utc = _end_of_today_utc(tz_str)
-            window_total = timedelta(hours=target_hours).total_seconds()
-            if window_total > 0:
-                fraction = min(1.0, (eod_utc - run_started_at).total_seconds() / window_total)
-            else:
-                fraction = 1.0
-            expected_by_eod = math.ceil(fraction * total_items)
-            training_items_needed_today = max(0, expected_by_eod - resolved_count)
+            state = "active_run_behind"
+
+        eod_utc = end_of_today_utc(tz_str)
+        frac_tomorrow = min(1.0, (eod_utc - active_run.started_at).total_seconds() / window_secs) if window_secs > 0 else 1.0
+        expected_by_tomorrow = math.ceil(frac_tomorrow * active_total_items)
+        puzzles_to_solve_before_tomorrow = max(0, expected_by_tomorrow - active_resolved)
 
         return {
-            "state": "in_progress",
+            "state": state,
             "runIndex": run_index,
-            "totalTrainingItems": total_items,
-            "resolvedCount": resolved_count,
-            "runStartedAt": run_started_at.isoformat(),
+            "runId": active_run.id,
+            "runStartedAt": active_run.started_at.isoformat(),
             "runDeadlineAt": deadline.isoformat(),
-            "isOverdue": is_overdue,
-            "trainingItemsNeededToday": training_items_needed_today,
+            "resolvedCount": active_resolved,
+            "totalItems": active_total_items,
+            "expectedResolvedByNow": expected_now,
+            "expectedResolvedByTomorrow": expected_by_tomorrow,
+            "puzzlesToSolveBeforeTomorrow": puzzles_to_solve_before_tomorrow,
         }
 
     if len(completed_runs) >= len(schedule_cfg.runs) and len(schedule_cfg.runs) > 0:
@@ -94,30 +122,29 @@ def compute_training_state(
         last_run = max(completed_runs, key=lambda r: r.completed_at or datetime.min)
         assert last_run.completed_at is not None
         run_idx = last_run.run_index
-        if run_idx < len(schedule_cfg.runs):
-            break_after_hours = schedule_cfg.runs[run_idx].break_after_hours
-        else:
-            break_after_hours = 0
+        run_def = schedule_cfg.runs[run_idx] if run_idx < len(schedule_cfg.runs) else None
+        break_after_hours = run_def.break_after_hours if run_def else 0
 
         break_ends_at = last_run.completed_at + timedelta(hours=break_after_hours)
+        next_run_index = run_idx + 1
 
-        if now < break_ends_at:
+        if break_after_hours > 0 and now < break_ends_at:
             remaining_ms = int((break_ends_at - now).total_seconds() * 1000)
             return {
-                "state": "on_break",
-                "nextRunIndex": run_idx + 1,
+                "state": "scheduled_break",
+                "nextRunIndex": next_run_index,
                 "breakStartedAt": last_run.completed_at.isoformat(),
                 "breakEndsAt": break_ends_at.isoformat(),
                 "breakRemainingMs": remaining_ms,
             }
-        else:
-            elapsed_ms = int((now - break_ends_at).total_seconds() * 1000)
-            return {
-                "state": "break_elapsed",
-                "nextRunIndex": run_idx + 1,
-                "breakEndedAt": break_ends_at.isoformat(),
-                "elapsedSinceBreakEndMs": elapsed_ms,
-            }
+
+        elapsed_ms = max(0, int((now - break_ends_at).total_seconds() * 1000))
+        return {
+            "state": "overdue_to_start_next_run",
+            "nextRunIndex": next_run_index,
+            "breakEndsAt": break_ends_at.isoformat(),
+            "elapsedSinceBreakEndMs": elapsed_ms,
+        }
 
     return {
         "state": "not_started",
