@@ -5,6 +5,7 @@ from typing import cast
 
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
 
 from app.extensions import db
 from app.models.run import MAX_PUZZLE_TIME_MS, TrainingAttempt, Run, RunTrainingItem
@@ -477,7 +478,11 @@ def run_dict(run: Run) -> dict[str, object]:
     total_queue = config.total_queue
 
     run_puzzles = list(
-        db.session.scalars(sa.select(RunTrainingItem).where(RunTrainingItem.run_id == run.id)).all()
+        db.session.scalars(
+            sa.select(RunTrainingItem)
+            .options(selectinload(RunTrainingItem.attempts))
+            .where(RunTrainingItem.run_id == run.id)
+        ).all()
     )
 
     counts: dict[str, int] = {}
@@ -896,6 +901,7 @@ def _same_puzzle_run_overview_items(
     other_run_puzzles = list(
         db.session.scalars(
             sa.select(RunTrainingItem)
+            .options(selectinload(RunTrainingItem.attempts))
             .join(Run, RunTrainingItem.run_id == Run.id)
             .where(
                 Run.training_id == training_id,
@@ -917,7 +923,9 @@ def _same_puzzle_run_overview_items(
 
         other_run_puzzles_for_run = list(
             db.session.scalars(
-                sa.select(RunTrainingItem).where(RunTrainingItem.run_id == other_run.id)
+                sa.select(RunTrainingItem)
+                .options(selectinload(RunTrainingItem.attempts))
+                .where(RunTrainingItem.run_id == other_run.id)
             ).all()
         )
 
@@ -997,7 +1005,11 @@ def _compute_progress_card(
     training_resolved = 0
     for r in all_runs:
         all_rps = list(
-            db.session.scalars(sa.select(RunTrainingItem).where(RunTrainingItem.run_id == r.id)).all()
+            db.session.scalars(
+                sa.select(RunTrainingItem)
+                .options(selectinload(RunTrainingItem.attempts))
+                .where(RunTrainingItem.run_id == r.id)
+            ).all()
         )
         for rp in all_rps:
             if derive_position_status(rp.attempts, total_queue) in (
@@ -1128,7 +1140,11 @@ def _build_run_puzzle_overview(
     break_duration = _format_break_duration(break_hours)
 
     all_run_puzzles = list(
-        db.session.scalars(sa.select(RunTrainingItem).where(RunTrainingItem.run_id == run.id)).all()
+        db.session.scalars(
+            sa.select(RunTrainingItem)
+            .options(selectinload(RunTrainingItem.attempts))
+            .where(RunTrainingItem.run_id == run.id)
+        ).all()
     )
 
     sorted_attempts = sorted(
@@ -1351,6 +1367,7 @@ def get_training_item_history(run_id: int, training_item_id: int, user_id: int) 
     run_training_items = list(
         db.session.scalars(
             sa.select(RunTrainingItem)
+            .options(selectinload(RunTrainingItem.attempts))
             .where(
                 RunTrainingItem.run_id == run_id,
                 RunTrainingItem.training_item_id == training_item_id,
