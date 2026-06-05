@@ -8,6 +8,21 @@ SCRIPTS_DIR := $(DEPLOY_DIR)/scripts
 
 PROD_DB_URL = postgresql://woodpecker:$(PROD_DB_PASSWORD)@localhost:5433/woodpecker
 
+PROD_DB_DOCKER_URL = postgresql://woodpecker:$(PROD_DB_PASSWORD)@host.docker.internal:5433/woodpecker
+
+# ── Local dev against prod DB ───────────────────────────────────────────────────
+
+up-local-prod-db:
+	@printf "[PRODUCTION] WARNING: The local backend will connect to the production database.\nType 'yes' to continue: "; \
+	read confirm; \
+	[ "$$confirm" = "yes" ] || { echo "Aborted."; exit 1; }
+	@$(MAKE) -s db-tunnel-start
+	@PROD_DB_PASSWORD=$(PROD_DB_PASSWORD) \
+	  $(COMPOSE) -f $(DEPLOY_DIR)/../docker-compose.yml \
+	  -f $(DEPLOY_DIR)/../docker-compose-local.yml \
+	  -f $(DEPLOY_DIR)/docker-compose-prod-db.yml \
+	  up
+
 # ── Tunnel ─────────────────────────────────────────────────────────────────────
 
 db-tunnel-start:
@@ -67,7 +82,8 @@ db-backup-validate-clean:
 whitelist-add:
 	ssh -t ubuntu@$(EC2_HOST) "cd /opt/woodpecker && docker compose -f docker-compose.yml -f docker-compose-prod.yml exec backend flask whitelist-add --username $(LICHESS_USERNAME)"
 
-.PHONY: db-tunnel-start db-tunnel-stop db-shell db-shell-ec2 db-query \
+.PHONY: up-local-prod-db \
+        db-tunnel-start db-tunnel-stop db-shell db-shell-ec2 db-query \
         _confirm-prod-mutation \
         prod-lichess-tactics-validate prod-lichess-tactics-import \
         prod-lichess-tactics-themes-import prod-openings-import \
