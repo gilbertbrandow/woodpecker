@@ -12,15 +12,15 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  ReferenceLine,
 } from 'recharts'
 import { useAuth } from '../context/auth'
 import {
   api,
   type Run,
   type Training,
-  type TrainingState,
   type TrainingInsights,
+  type TrainingProgressData,
+  type TrainingDetailStatus,
 } from '../lib/api'
 import {
   ChartContainer,
@@ -47,16 +47,13 @@ import {
 import { Button } from '../components/ui/button'
 import { UserAvatar } from '../components/UserAvatar'
 import { Badge } from '../components/ui/badge'
-import { StatusBadge } from '../components/StatusBadge'
+import { StatusBadge, trainingStateToStatusValue } from '../components/StatusBadge'
 import { ProgressBar } from '../components/ProgressBar'
 import { DataTable } from '../components/DataTable'
 import { formatDuration } from '../components/schedules/DurationInput'
 import { formatStartedAt } from '../lib/utils'
-
-const PROGRESS_CONFIG: ChartConfig = {
-  expected: { label: 'Expected', color: 'hsl(var(--muted-foreground))' },
-  actual: { label: 'Actual', color: 'hsl(var(--chart-1))' },
-}
+import { TrainingProgressCard } from '../components/TrainingProgressCard'
+import { CurrentTrainingStatus } from '../components/CurrentTrainingStatus'
 
 const ACCURACY_CONFIG: ChartConfig = {
   bar: { label: 'Accuracy %', color: 'hsl(var(--chart-1))' },
@@ -68,91 +65,7 @@ const SOLVE_TIME_CONFIG: ChartConfig = {
   trend: { label: 'Trend', color: 'hsl(var(--chart-2))' },
 }
 
-type ProgressPoint = { timeMs: number; expected: number | null; actual: number | null }
 type RunStatPoint = { label: string; value: number; trend: number | null; completed: boolean; inProgress: boolean }
-
-type Anchor = { timeMs: number; value: number }
-
-function interpolateAnchors(anchors: Anchor[], timeMs: number): number | null {
-  if (anchors.length === 0) return null
-  if (timeMs <= anchors[0]!.timeMs) return anchors[0]!.value
-  if (timeMs >= anchors[anchors.length - 1]!.timeMs) return anchors[anchors.length - 1]!.value
-  for (let i = 0; i < anchors.length - 1; i++) {
-    const a = anchors[i]!
-    const b = anchors[i + 1]!
-    if (timeMs >= a.timeMs && timeMs <= b.timeMs) {
-      const ratio = (timeMs - a.timeMs) / (b.timeMs - a.timeMs)
-      return a.value + ratio * (b.value - a.value)
-    }
-  }
-  return null
-}
-
-function buildProgressData(training: Training, runs: Run[]): ProgressPoint[] {
-  const puzzleCount = training.schedule.subset.puzzleCount
-  const startMs = new Date(training.startedAt).getTime()
-
-  const expectedAnchors: Anchor[] = [{ timeMs: startMs, value: 0 }]
-  let cursor = startMs
-  for (const runDef of training.schedule.runs) {
-    const runEndMs = cursor + runDef.target_hours * 3_600_000
-    const prevValue = expectedAnchors[expectedAnchors.length - 1]!.value
-    expectedAnchors.push({ timeMs: runEndMs, value: prevValue + puzzleCount })
-    if (runDef.break_after_hours > 0) {
-      const breakEndMs = runEndMs + runDef.break_after_hours * 3_600_000
-      expectedAnchors.push({ timeMs: breakEndMs, value: prevValue + puzzleCount })
-      cursor = breakEndMs
-    } else {
-      cursor = runEndMs
-    }
-  }
-
-  const actualAnchors: Anchor[] = [{ timeMs: startMs, value: 0 }]
-  let cumulative = 0
-  let lastActualMs = startMs
-  const sortedRuns = [...runs].sort((a, b) => a.startedAt.localeCompare(b.startedAt))
-  for (const run of sortedRuns) {
-    const runStartMs = new Date(run.startedAt).getTime()
-    if (run.status === 'completed' && run.completedAt !== null) {
-      actualAnchors.push({ timeMs: runStartMs, value: cumulative })
-      cumulative += run.totalItems
-      const runEndMs = new Date(run.completedAt).getTime()
-      actualAnchors.push({ timeMs: runEndMs, value: cumulative })
-      lastActualMs = runEndMs
-    } else if (run.status === 'active') {
-      actualAnchors.push({ timeMs: runStartMs, value: cumulative })
-      const resolved = run.solvedCount + run.solvedWithRetriesCount + run.failedCount
-      const nowMs = Date.now()
-      actualAnchors.push({ timeMs: nowMs, value: cumulative + resolved })
-      lastActualMs = nowMs
-    }
-  }
-
-  const allTimes = Array.from(
-    new Set([...expectedAnchors.map((a) => a.timeMs), ...actualAnchors.map((a) => a.timeMs)]),
-  ).sort((a, b) => a - b)
-
-  return allTimes.map((timeMs) => ({
-    timeMs,
-    expected: interpolateAnchors(expectedAnchors, timeMs),
-    actual: timeMs <= lastActualMs ? interpolateAnchors(actualAnchors, timeMs) : null,
-  }))
-}
-
-function buildProgressTicks(startMs: number, endMs: number): number[] {
-  const totalMs = endMs - startMs
-  const DAY_MS = 86_400_000
-  const WEEK_MS = 7 * DAY_MS
-  const interval = totalMs <= 14 * DAY_MS ? DAY_MS : totalMs <= 60 * DAY_MS ? WEEK_MS : 4 * WEEK_MS
-  const ticks: number[] = []
-  let t = startMs
-  while (t <= endMs) {
-    ticks.push(t)
-    t += interval
-  }
-  if (ticks[ticks.length - 1] !== endMs) ticks.push(endMs)
-  return ticks
-}
 
 function buildAccuracyData(runs: Run[], runCount: number): RunStatPoint[] {
   return Array.from({ length: runCount }, (_, i) => {
@@ -180,10 +93,6 @@ function buildSolveTimeData(insights: TrainingInsights | null, runs: Run[], runC
     }
     return { label: `Run ${i + 1}`, value: secs, trend: secs, completed: true, inProgress: false }
   })
-}
-
-function formatTickDate(ms: number): string {
-  return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
 function formatSolveSeconds(secs: number): string {
@@ -219,13 +128,6 @@ function formatDate(iso: string): string {
   })
 }
 
-function formatMs(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000)
-  const days = Math.floor(totalSeconds / 86400)
-  const hours = Math.floor((totalSeconds % 86400) / 3600)
-  if (days >= 1) return `${days} day${days !== 1 ? 's' : ''}${hours > 0 ? ` ${hours}h` : ''}`
-  return `${hours} hour${hours !== 1 ? 's' : ''}`
-}
 
 function getRunForSlot(runs: Run[], slotIndex: number): Run | null {
   const slotRuns = runs.filter((r) => r.runIndex === slotIndex)
@@ -243,7 +145,6 @@ export function TrainingPage(): React.ReactElement | null {
 
   const [training, setTraining] = useState<Training | null>(null)
   const [runs, setRuns] = useState<Run[]>([])
-  const [trainingState, setTrainingState] = useState<TrainingState | null>(null)
   const [pageLoading, setPageLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('configure')
   const [runsOpen, setRunsOpen] = useState(true)
@@ -254,6 +155,8 @@ export function TrainingPage(): React.ReactElement | null {
   const [startingIndex, setStartingIndex] = useState<number | null>(null)
   const [insights, setInsights] = useState<TrainingInsights | null>(null)
   const [insightsLoading, setInsightsLoading] = useState(false)
+  const [progress, setProgress] = useState<TrainingProgressData | null>(null)
+  const [detailStatus, setDetailStatus] = useState<TrainingDetailStatus | null>(null)
   const [chartsReady, setChartsReady] = useState(false)
 
   useSetBreadcrumbTitle(training?.schedule?.name)
@@ -267,23 +170,32 @@ export function TrainingPage(): React.ReactElement | null {
   useEffect(() => { setChartsReady(true) }, [])
 
   useEffect(() => {
-    if (activeTab !== 'insights' || insights !== null || !user || !training) return
-    setInsightsLoading(true)
-    api.training
-      .getInsights(training.id)
-      .then(setInsights)
-      .catch(() => {})
-      .finally(() => setInsightsLoading(false))
-  }, [activeTab, insights, user, training])
+    if (!user || !training) return
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    api.training.getDetailStatus(training.id, tz).then(setDetailStatus).catch(() => {})
+  }, [user, training])
+
+  useEffect(() => {
+    if (activeTab !== 'insights' || !user || !training) return
+    if (insights === null) {
+      setInsightsLoading(true)
+      api.training
+        .getInsights(training.id)
+        .then(setInsights)
+        .catch(() => {})
+        .finally(() => setInsightsLoading(false))
+    }
+    if (progress === null) {
+      api.training.getProgress(training.id).then(setProgress).catch(() => {})
+    }
+  }, [activeTab, insights, progress, user, training])
 
   useEffect(() => {
     if (!user) return
-    Promise.all([api.training.get(id), api.runs.list(id), api.training.listMine()])
-      .then(([t, fetchedRuns, myTrainings]) => {
+    Promise.all([api.training.get(id), api.runs.list(id)])
+      .then(([t, fetchedRuns]) => {
         setTraining(t)
         setRuns(fetchedRuns)
-        const match = myTrainings.find((mt) => mt.id === id)
-        if (match) setTrainingState(match.trainingState)
       })
       .catch(() => {})
       .finally(() => setPageLoading(false))
@@ -324,19 +236,6 @@ export function TrainingPage(): React.ReactElement | null {
   }
 
   const runCount = training?.schedule.runCount ?? 0
-  const puzzleCount = training?.schedule.subset.puzzleCount ?? 0
-
-  const progressData = useMemo(
-    () => (training ? buildProgressData(training, runs) : []),
-    [training, runs],
-  )
-  const progressEndMs = progressData.length > 0 ? (progressData[progressData.length - 1]?.timeMs ?? Date.now()) : Date.now()
-  const progressStartMs = progressData.length > 0 ? (progressData[0]?.timeMs ?? Date.now()) : Date.now()
-  const progressTicks = useMemo(
-    () => buildProgressTicks(progressStartMs, progressEndMs),
-    [progressStartMs, progressEndMs],
-  )
-  const totalExpectedPuzzles = runCount * puzzleCount
 
   const accuracyData = useMemo(
     () => buildAccuracyData(runs, runCount),
@@ -524,7 +423,7 @@ export function TrainingPage(): React.ReactElement | null {
         <div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h1 className="text-xl font-semibold">{schedule.name}</h1>
-            <StatusBadge status={trainingState?.state ?? training.status} />
+            <StatusBadge status={trainingStateToStatusValue(detailStatus?.state ?? training.status)} />
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
             <UserAvatar displayName={training.ownerDisplayName} avatarUrl={training.ownerAvatarUrl} className="h-4 w-4" />
@@ -553,17 +452,7 @@ export function TrainingPage(): React.ReactElement | null {
         </div>
       )}
 
-      {trainingState?.state === 'on_break' && (
-        <div className="mb-6 rounded-md border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
-          Suggested break · {formatMs(trainingState.breakRemainingMs)} remaining
-        </div>
-      )}
-
-      {trainingState?.state === 'break_elapsed' && (
-        <div className="mb-6 rounded-md border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-          Suggested break ended {formatMs(trainingState.elapsedSinceBreakEndMs)} ago · Ready for Run #{trainingState.nextRunIndex + 1}?
-        </div>
-      )}
+      {detailStatus && <CurrentTrainingStatus status={detailStatus} />}
 
       <div className="mb-6 rounded-lg border bg-card">
         <div className="border-b px-4 py-2.5">
@@ -659,84 +548,10 @@ export function TrainingPage(): React.ReactElement | null {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="pt-4">
-                  {chartsReady && (
-                    <div className="rounded-md border p-4">
-                      <div className="mb-4">
-                        <p className="text-sm font-semibold">Training progress</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Cumulative puzzles completed vs schedule target
-                        </p>
-                      </div>
-                      <ChartContainer config={PROGRESS_CONFIG} className="h-64 min-w-0 w-full">
-                        <ComposedChart
-                          data={progressData}
-                          margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
-                        >
-                          <CartesianGrid
-                            vertical={false}
-                            stroke="hsl(var(--border))"
-                            strokeOpacity={1}
-                          />
-                          <XAxis
-                            dataKey="timeMs"
-                            type="number"
-                            scale="linear"
-                            domain={[progressStartMs, progressEndMs]}
-                            ticks={progressTicks}
-                            tickLine={false}
-                            axisLine={false}
-                            tick={{ fontSize: 10 }}
-                            tickFormatter={formatTickDate}
-                          />
-                          <YAxis hide domain={[0, totalExpectedPuzzles]} />
-                          <ChartTooltip
-                            content={({ active, payload }) => {
-                              if (!active || !payload?.length) return null
-                              const point = payload[0]?.payload as ProgressPoint
-                              return (
-                                <div className="rounded-md border bg-background px-3 py-2 text-xs shadow-md">
-                                  <p className="font-medium">{formatTickDate(point.timeMs)}</p>
-                                  {point.expected !== null && (
-                                    <p className="text-muted-foreground">
-                                      Expected: {Math.round(point.expected)}
-                                    </p>
-                                  )}
-                                  {point.actual !== null && (
-                                    <p className="text-muted-foreground">
-                                      Actual: {point.actual}
-                                    </p>
-                                  )}
-                                </div>
-                              )
-                            }}
-                          />
-                          <Line
-                            dataKey="expected"
-                            stroke="var(--color-expected)"
-                            strokeWidth={1.5}
-                            dot={false}
-                            connectNulls
-                            isAnimationActive={false}
-                          />
-                          <Line
-                            dataKey="actual"
-                            stroke="var(--color-actual)"
-                            strokeWidth={2}
-                            dot={false}
-                            connectNulls={false}
-                            isAnimationActive={false}
-                          />
-                          {training.status === 'in_progress' && (
-                            <ReferenceLine
-                              x={Date.now()}
-                              stroke="hsl(var(--muted-foreground))"
-                              strokeDasharray="4 4"
-                              strokeOpacity={0.5}
-                            />
-                          )}
-                        </ComposedChart>
-                      </ChartContainer>
-                    </div>
+                  {progress ? (
+                    <TrainingProgressCard progress={progress} />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Loading…</p>
                   )}
                 </div>
               </CollapsibleContent>

@@ -1,67 +1,98 @@
-import * as React from 'react'
-import { useState, useEffect, useMemo, useCallback } from 'react'
-import { useNavigate, Link } from '@tanstack/react-router'
-import { type ColumnDef } from '@tanstack/react-table'
-import { Timer, Clock, CheckCircle2, XCircle, Search } from 'lucide-react'
-import { StatusBadge } from '../StatusBadge'
-import { DataTable } from '../DataTable'
-import { ProgressBar } from '../ProgressBar'
-import { UserAvatar } from '../UserAvatar'
-import { UserSelector } from '../UserSelector'
-import { MultiSelectFilter, type MultiSelectOption } from '../ui/multi-select-filter'
-import { Input } from '../ui/input'
-import { useAuth } from '../../context/auth'
-import { api, type AllTrainingSummary, type SelectableUser, type TrainingStatus } from '../../lib/api'
-import { useDebounce } from '../../hooks/useDebounce'
+import * as React from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate, Link } from "@tanstack/react-router";
+import { type ColumnDef } from "@tanstack/react-table";
+import {
+  Timer,
+  TrendingUp,
+  CalendarClock,
+  TrendingDown,
+  Clock,
+  Coffee,
+  CheckCircle2,
+  XCircle,
+  Search,
+} from "lucide-react";
+import { StatusBadge, trainingStateToStatusValue } from "../StatusBadge";
+import { DataTable } from "../DataTable";
+import { ProgressBar } from "../ProgressBar";
+import { UserAvatar } from "../UserAvatar";
+import { UserSelector } from "../UserSelector";
+import {
+  MultiSelectFilter,
+  type MultiSelectOption,
+} from "../ui/multi-select-filter";
+import { Input } from "../ui/input";
+import { useAuth } from "../../context/auth";
+import {
+  api,
+  type AllTrainingSummary,
+  type SelectableUser,
+} from "../../lib/api";
+import { useDebounce } from "../../hooks/useDebounce";
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 20;
 
 type TrainingTableProps = {
-  scheduleId?: number
-  hideSchedule?: boolean
-}
+  scheduleId?: number;
+  hideSchedule?: boolean;
+};
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export function TrainingTable({
   scheduleId,
   hideSchedule = false,
 }: TrainingTableProps): React.ReactElement {
-  const navigate = useNavigate()
-  const { user } = useAuth()
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
-  const [trainings, setTrainings] = useState<AllTrainingSummary[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
-  const [searchInput, setSearchInput] = useState('')
-  const debouncedSearch = useDebounce(searchInput, 300)
+  const [trainings, setTrainings] = useState<AllTrainingSummary[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [searchInput, setSearchInput] = useState("");
+  const debouncedSearch = useDebounce(searchInput, 300);
 
   const [selectedUsers, setSelectedUsers] = useState<SelectableUser[]>(() =>
-    user && user.status === 'active'
-      ? [{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl }]
+    user && user.status === "active"
+      ? [
+          {
+            id: user.id,
+            displayName: user.displayName,
+            avatarUrl: user.avatarUrl,
+          },
+        ]
       : [],
-  )
+  );
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([
-    'not_started',
-    'in_progress',
-    'completed',
-  ])
-  const userIds = useMemo(() => selectedUsers.map((u) => u.id), [selectedUsers])
+    "not_started",
+    "active_run_ahead",
+    "active_run_on_track",
+    "active_run_behind",
+    "active_run_overdue",
+    "scheduled_break",
+    "overdue_to_start_next_run",
+    "completed",
+  ]);
+  const userIds = useMemo(
+    () => selectedUsers.map((u) => u.id),
+    [selectedUsers],
+  );
 
   useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch])
+    setPage(1);
+  }, [debouncedSearch]);
 
   useEffect(() => {
-    if (!user) return
-    setLoading(true)
+    if (!user) return;
+    setLoading(true);
     api.training
       .listAll({
         scheduleId,
@@ -72,93 +103,145 @@ export function TrainingTable({
         pageSize: PAGE_SIZE,
       })
       .then(({ items, total: t }) => {
-        setTrainings(items)
-        setTotal(t)
+        setTrainings(items);
+        setTotal(t);
       })
       .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [scheduleId, userIds, selectedStatuses, debouncedSearch, page, user])
+      .finally(() => setLoading(false));
+  }, [scheduleId, userIds, selectedStatuses, debouncedSearch, page, user]);
 
   const handleSearchChange = (value: string): void => {
-    setSearchInput(value)
-  }
+    setSearchInput(value);
+  };
 
   const handleUsersChange = useCallback((users: SelectableUser[]) => {
-    setSelectedUsers(users)
-    setPage(1)
-  }, [])
+    setSelectedUsers(users);
+    setPage(1);
+  }, []);
 
   const handleStatusesChange = useCallback((statuses: string[]) => {
-    setSelectedStatuses(statuses)
-    setPage(1)
-  }, [])
+    setSelectedStatuses(statuses);
+    setPage(1);
+  }, []);
 
   const statusOptions = useMemo<MultiSelectOption[]>(
     () => [
-      { value: 'not_started', label: 'Not started', icon: <Timer className="h-3.5 w-3.5 text-muted-foreground" /> },
-      { value: 'in_progress', label: 'In progress', icon: <Clock className="h-3.5 w-3.5 text-blue-600" /> },
-      { value: 'completed', label: 'Completed', icon: <CheckCircle2 className="h-3.5 w-3.5 text-green-600" /> },
-      { value: 'aborted', label: 'Aborted', icon: <XCircle className="h-3.5 w-3.5 text-red-600" /> },
+      {
+        value: "not_started",
+        label: "Not started",
+        icon: <Timer className="h-3.5 w-3.5 text-gray-400" />,
+      },
+      {
+        value: "active_run_on_track",
+        label: "On schedule",
+        icon: <CalendarClock className="h-3.5 w-3.5 text-blue-600" />,
+      },
+      {
+        value: "active_run_ahead",
+        label: "Ahead",
+        icon: <TrendingUp className="h-3.5 w-3.5 text-green-600" />,
+      },
+      {
+        value: "active_run_behind",
+        label: "Behind",
+        icon: <TrendingDown className="h-3.5 w-3.5 text-yellow-600" />,
+      },
+      {
+        value: "active_run_overdue",
+        label: "Run overdue",
+        icon: <Clock className="h-3.5 w-3.5 text-red-600" />,
+      },
+      {
+        value: "scheduled_break",
+        label: "On break",
+        icon: <Coffee className="h-3.5 w-3.5 text-green-600" />,
+      },
+      {
+        value: "overdue_to_start_next_run",
+        label: "Break overdue",
+        icon: <Clock className="h-3.5 w-3.5 text-orange-500" />,
+      },
+      {
+        value: "completed",
+        label: "Completed",
+        icon: <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />,
+      },
+      {
+        value: "aborted",
+        label: "Aborted",
+        icon: <XCircle className="h-3.5 w-3.5 text-red-600" />,
+      },
     ],
     [],
-  )
+  );
 
   const filtersActive =
-    searchInput !== '' ||
+    searchInput !== "" ||
     selectedUsers.length > 0 ||
-    (selectedStatuses.length > 0 && selectedStatuses.length < statusOptions.length)
+    (selectedStatuses.length > 0 &&
+      selectedStatuses.length < statusOptions.length);
 
   const handleClearFilters = useCallback(() => {
-    setSearchInput('')
-    setSelectedUsers([])
-    setSelectedStatuses([])
-    setPage(1)
-  }, [])
+    setSearchInput("");
+    setSelectedUsers([]);
+    setSelectedStatuses([]);
+    setPage(1);
+  }, []);
 
   const columns: ColumnDef<AllTrainingSummary>[] = useMemo(
     () => [
       {
-        id: 'user',
+        id: "user",
         accessorFn: (row) => row.user.displayName,
-        header: 'User',
+        header: "User",
         enableSorting: false,
         cell: ({ row }) => (
-          <UserAvatar displayName={row.original.user.displayName} avatarUrl={row.original.user.avatarUrl} />
+          <UserAvatar
+            displayName={row.original.user.displayName}
+            avatarUrl={row.original.user.avatarUrl}
+          />
         ),
       },
       {
-        accessorKey: 'status',
-        header: 'Status',
+        accessorKey: "status",
+        header: "Status",
         enableSorting: false,
         cell: ({ row }) => (
-          <StatusBadge status={row.original.trainingState?.state ?? (row.original.status as TrainingStatus)} />
+          <StatusBadge
+            status={trainingStateToStatusValue(
+              row.original.trainingState?.state ?? row.original.status,
+            )}
+          />
         ),
       },
       {
-        id: 'progress',
+        id: "progress",
         accessorFn: (row) =>
           row.totalPuzzles > 0 ? row.completedPuzzles / row.totalPuzzles : 0,
-        header: 'Progress',
+        header: "Progress",
         cell: ({ row }) => {
           const pct =
             row.original.totalPuzzles > 0
-              ? Math.round((row.original.completedPuzzles / row.original.totalPuzzles) * 100)
-              : 0
+              ? Math.round(
+                  (row.original.completedPuzzles / row.original.totalPuzzles) *
+                    100,
+                )
+              : 0;
           return (
             <ProgressBar
               value={pct}
               tooltipLabel={`${row.original.completedPuzzles}/${row.original.totalPuzzles} puzzles`}
               className="w-28"
             />
-          )
+          );
         },
       },
       ...(!hideSchedule
         ? ([
             {
-              id: 'schedule',
+              id: "schedule",
               accessorFn: (row: AllTrainingSummary) => row.scheduleName,
-              header: 'Schedule',
+              header: "Schedule",
               cell: ({ row }: { row: { original: AllTrainingSummary } }) => (
                 <Link
                   to="/app/schedules/$scheduleId"
@@ -174,26 +257,31 @@ export function TrainingTable({
           ] as ColumnDef<AllTrainingSummary>[])
         : []),
       {
-        id: 'startedAt',
+        id: "startedAt",
         accessorFn: (row) => new Date(row.startedAt).getTime(),
-        header: 'Started',
+        header: "Started",
         cell: ({ row }) => (
-          <span className="text-muted-foreground">{formatDate(row.original.startedAt)}</span>
+          <span className="text-muted-foreground">
+            {formatDate(row.original.startedAt)}
+          </span>
         ),
       },
       {
-        id: 'completedAt',
-        accessorFn: (row) => (row.completedAt ? new Date(row.completedAt).getTime() : 0),
-        header: 'Finished',
+        id: "completedAt",
+        accessorFn: (row) =>
+          row.completedAt ? new Date(row.completedAt).getTime() : 0,
+        header: "Finished",
         cell: ({ row }) => (
           <span className="text-muted-foreground">
-            {row.original.completedAt ? formatDate(row.original.completedAt) : '—'}
+            {row.original.completedAt
+              ? formatDate(row.original.completedAt)
+              : "—"}
           </span>
         ),
       },
     ],
     [hideSchedule],
-  )
+  );
 
   return (
     <DataTable
@@ -223,15 +311,20 @@ export function TrainingTable({
       }
       filtersActive={filtersActive}
       onClearFilters={handleClearFilters}
-      serverPagination={{ totalRows: total, page, pageSize: PAGE_SIZE, onPageChange: setPage }}
+      serverPagination={{
+        totalRows: total,
+        page,
+        pageSize: PAGE_SIZE,
+        onPageChange: setPage,
+      }}
       pageSize={PAGE_SIZE}
       onRowClick={(t) =>
         void navigate({
-          to: '/app/training/$trainingId',
+          to: "/app/training/$trainingId",
           params: { trainingId: String(t.id) },
         })
       }
       emptyMessage="No training sessions match your filters."
     />
-  )
+  );
 }
