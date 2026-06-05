@@ -1,0 +1,5 @@
+services:
+  backend:
+    environment:
+      DATABASE_URL: postgresql://woodpecker:${PROD_DB_PASSWORD}@host.docker.internal:5433/woodpecker
+      MIGRATIONS_DISABLED: "1"

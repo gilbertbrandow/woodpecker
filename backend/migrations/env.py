@@ -1,4 +1,5 @@
 import logging
+import os
 from logging.config import fileConfig
 
 from flask import current_app
@@ -69,12 +70,11 @@ def run_migrations_offline():
 
 
 def run_migrations_online():
-    """Run migrations in 'online' mode.
-
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-
-    """
+    if os.getenv("MIGRATIONS_DISABLED"):
+        raise RuntimeError(
+            "Migrations are disabled: DATABASE_URL points to production. "
+            "Unset MIGRATIONS_DISABLED to override explicitly."
+        )
 
     # this callback is used to prevent an auto-migration from being generated
     # when there are no changes to the schema
