@@ -7,15 +7,9 @@ import { api, type DashboardData, type DashboardStatusCard, type DashboardPrimar
 import { PageWrapper } from '../components/PageWrapper'
 import { TrainingProgressCard } from '../components/TrainingProgressCard'
 import { DashboardLeaderboard } from '../components/dashboard/DashboardLeaderboard'
+import { TrainingRunPicker } from '../components/dashboard/TrainingRunPicker'
 import { StatusBadge, trainingStateToStatusValue } from '../components/StatusBadge'
 import { Button } from '../components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../components/ui/select'
 import { ChartContainer, ChartTooltip, type ChartConfig } from '../components/ui/chart'
 import { cn } from '../lib/utils'
 import { formatSolveTimeMs } from '../lib/utils'
@@ -74,7 +68,7 @@ function statusCardTitle(card: DashboardStatusCard): string {
     case 'active_run_on_track':
     case 'active_run_behind':
     case 'active_run_overdue':          return `Run #${(card.runIndex ?? 0) + 1}`
-    case 'scheduled_break':             return 'Scheduled break'
+    case 'scheduled_break':             return 'Break'
     case 'overdue_to_start_next_run':   return `Ready for Run #${(card.nextRunIndex ?? 0) + 1}`
   }
 }
@@ -101,7 +95,7 @@ function statusCardSubtitle(card: DashboardStatusCard): string | null {
       return `${resolved} / ${total} puzzles resolved`
     }
     case 'scheduled_break':
-      return `${formatMs(card.breakRemainingMs ?? 0)} remaining before Run #${(card.nextRunIndex ?? 0) + 1}`
+      return `${formatMs(card.breakRemainingMs ?? 0)} remaining`
     case 'overdue_to_start_next_run':
       return `Break ended ${formatMs(card.elapsedSinceBreakEndMs ?? 0)} ago`
     default:
@@ -338,15 +332,6 @@ export function DashboardPage(): React.ReactElement {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleTrainingChange = (trainingIdStr: string): void => {
-    fetchDashboard(parseInt(trainingIdStr, 10), undefined)
-  }
-
-  const handleRunChange = (runIndexStr: string): void => {
-    if (!data?.selectedTrainingId) return
-    fetchDashboard(data.selectedTrainingId, parseInt(runIndexStr, 10))
-  }
-
   const handleStartRun = async (trainingId: number, runIndex: number): Promise<void> => {
     if (startingRun) return
     setStartingRun(true)
@@ -403,51 +388,17 @@ export function DashboardPage(): React.ReactElement {
       {/* Header row: title + selectors */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-base font-semibold">Dashboard</h1>
-        <div className="flex flex-wrap items-center gap-3">
-        <Select
-          value={selectedTrainingId !== null ? String(selectedTrainingId) : undefined}
-          onValueChange={handleTrainingChange}
-        >
-          <SelectTrigger size="sm" className="w-auto">
-            <SelectValue placeholder="Select training…" />
-          </SelectTrigger>
-          <SelectContent>
-            {trainings.map((t) => (
-              <SelectItem key={t.id} value={String(t.id)}>
-                <span className="flex items-center gap-2">
-                  <span>{t.scheduleName.length > 25 ? t.scheduleName.slice(0, 25) + '…' : t.scheduleName}</span>
-                  <StatusBadge status={t.status === 'in_progress' ? 'in_progress' : t.status as 'completed' | 'aborted' | 'not_started'} className="shrink-0" />
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={selectedRunIndex !== null ? String(selectedRunIndex) : undefined}
-          onValueChange={handleRunChange}
-        >
-          <SelectTrigger size="sm" className="w-36">
-            <SelectValue placeholder="Select run…" />
-          </SelectTrigger>
-          <SelectContent>
-            {runSlots.map((slot) => (
-              <SelectItem
-                key={slot.runIndex}
-                value={String(slot.runIndex)}
-                disabled={!slot.selectable}
-              >
-                Run {slot.runIndex + 1}
-                {slot.status === 'active' ? ' (active)' : ''}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        </div>
+        <TrainingRunPicker
+          trainings={trainings}
+          runSlots={runSlots}
+          selectedTrainingId={selectedTrainingId}
+          selectedRunIndex={selectedRunIndex}
+          onSelect={(trainingId, runIndex) => fetchDashboard(trainingId, runIndex)}
+        />
       </div>
 
       {/* Main layout: content + leaderboard rail */}
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch lg:gap-8 flex-1 min-h-0">
+      <div className="flex flex-col gap-6 xl:flex-row xl:items-stretch xl:gap-8 flex-1 min-h-0">
         {/* Left: cards */}
         <div className="flex flex-col gap-4 min-w-0 flex-1">
           {/* Top row: status + metric cards */}
@@ -482,7 +433,7 @@ export function DashboardPage(): React.ReactElement {
 
         {/* Right rail: leaderboard + accuracy chart */}
         {selectedTrainingId !== null && selectedRunIndex !== null && (
-          <div className="w-full lg:w-[40rem] shrink-0 flex flex-col">
+          <div className="w-full xl:w-[40rem] shrink-0 flex flex-col">
             <DashboardLeaderboard
               trainingId={selectedTrainingId}
               runIndex={selectedRunIndex}
