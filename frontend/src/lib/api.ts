@@ -733,6 +733,7 @@ export type DashboardTrainingItem = {
   id: number
   scheduleName: string
   status: TrainingStatus
+  runCount: number
 }
 
 export type DashboardRunSlot = {

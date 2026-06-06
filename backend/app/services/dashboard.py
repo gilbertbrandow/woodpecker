@@ -100,19 +100,26 @@ def _load_user_trainings_sorted(user_id: int) -> list[dict]:
         {"uid": user_id},
     ).all()
 
-    return [
-        {
+    result = []
+    for row in rows:
+        run_count = 0
+        if isinstance(row.config, dict):
+            try:
+                run_count = len(ScheduleConfig.from_dict(row.config).runs)
+            except Exception:
+                pass
+        result.append({
             "id": int(row.id),
             "scheduleId": int(row.schedule_id),
             "scheduleName": row.schedule_name,
             "config": row.config,
             "status": row.status,
+            "runCount": run_count,
             "startedAt": row.started_at,
             "completedAt": row.completed_at,
             "abortedAt": row.aborted_at,
-        }
-        for row in rows
-    ]
+        })
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -470,4 +477,5 @@ def _training_selector_item(t: dict) -> dict:
         "id": t["id"],
         "scheduleName": t["scheduleName"],
         "status": t["status"],
+        "runCount": t["runCount"],
     }
