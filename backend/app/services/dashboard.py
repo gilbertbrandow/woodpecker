@@ -9,7 +9,7 @@ from app.models.schedule import Schedule
 from app.models.training import Training
 from app.services.schedule_config import ScheduleConfig
 from app.services.training import get_training_progress
-from app.services.training_state import compute_training_state, end_of_today_utc
+from app.services.training_state import end_of_today_utc
 
 
 # ---------------------------------------------------------------------------

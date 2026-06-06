@@ -3,7 +3,6 @@ import sqlalchemy as sa
 from app.extensions import db
 from app.exceptions import ForbiddenError, NotFoundError
 from app.models.training import Training
-from app.models.schedule import Schedule
 
 
 def get_leaderboard_runs(schedule_id: int | None = None) -> list[dict[str, object]]:
