@@ -38,10 +38,12 @@ function buildTicks(startMs: number, endMs: number): number[] {
 
 interface TrainingProgressCardProps {
   progress: TrainingProgressData
+  grow?: boolean
 }
 
 export function TrainingProgressCard({
   progress,
+  grow = false,
 }: TrainingProgressCardProps): React.ReactElement {
   const { points, totalExpectedPuzzles } = progress
 
@@ -55,14 +57,14 @@ export function TrainingProgressCard({
   )
 
   return (
-    <div className="rounded-md border p-4">
+    <div className={grow ? 'rounded-md border p-4 flex-1 min-h-0 flex flex-col' : 'rounded-md border p-4'}>
       <div className="mb-4">
         <p className="text-sm font-semibold">Training progress</p>
         <p className="mt-1 text-xs text-muted-foreground">
           Cumulative puzzles completed vs schedule targets
         </p>
       </div>
-      <ChartContainer config={PROGRESS_CONFIG} className="h-64 min-w-0 w-full">
+      <ChartContainer config={PROGRESS_CONFIG} className={grow ? 'flex-1 min-h-0 min-w-0 w-full' : 'h-64 min-w-0 w-full'}>
         <ComposedChart data={points} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeOpacity={1} />
           <XAxis
