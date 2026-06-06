@@ -57,7 +57,7 @@ export function TrainingProgressCard({
   )
 
   return (
-    <div className={grow ? 'rounded-md border p-4 flex-1 min-h-0 flex flex-col' : 'rounded-md border p-4'}>
+    <div className={grow ? 'rounded-md border p-4 flex-1 min-h-72 flex flex-col' : 'rounded-md border p-4'}>
       <div className="mb-4">
         <p className="text-sm font-semibold">Training progress</p>
         <p className="mt-1 text-xs text-muted-foreground">
