@@ -1,11 +1,13 @@
 import * as React from 'react'
 import { useState, useEffect, useMemo } from 'react'
+import { Loader2 } from 'lucide-react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { api, type DashboardLeaderboardRow } from '../../lib/api'
 import { DataTable } from '../DataTable'
 import { UserAvatar } from '../UserAvatar'
 import { StatusBadge } from '../StatusBadge'
 import { formatSolveTimeMs } from '../../lib/utils'
+import { useAuth } from '../../context/auth'
 
 function formatAccuracyDelta(delta: number | null): React.ReactElement | null {
   if (delta === null) return null
@@ -35,6 +37,7 @@ type Props = {
 }
 
 export function DashboardLeaderboard({ trainingId, runIndex }: Props): React.ReactElement | null {
+  const { user } = useAuth()
   const [rows, setRows] = useState<DashboardLeaderboardRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -53,6 +56,14 @@ export function DashboardLeaderboard({ trainingId, runIndex }: Props): React.Rea
 
   const columns = useMemo<ColumnDef<DashboardLeaderboardRow>[]>(() => [
     {
+      id: 'position',
+      header: '#',
+      enableSorting: false,
+      cell: ({ row }) => (
+        <span className="tabular-nums text-sm text-muted-foreground">{row.index + 1}</span>
+      ),
+    },
+    {
       id: 'user',
       accessorFn: (r) => r.displayName,
       header: 'User',
@@ -61,16 +72,10 @@ export function DashboardLeaderboard({ trainingId, runIndex }: Props): React.Rea
         <span className="flex items-center gap-2">
           <UserAvatar displayName={row.original.displayName} avatarUrl={row.original.avatarUrl} />
           <span className="font-medium">{row.original.displayName}</span>
+          {user?.displayName === row.original.displayName && (
+            <span className="text-xs text-muted-foreground font-normal">you</span>
+          )}
         </span>
-      ),
-    },
-    {
-      id: 'status',
-      accessorKey: 'status',
-      header: 'Status',
-      enableSorting: false,
-      cell: ({ row }) => (
-        <StatusBadge status={runStatusToTrainingStatus(row.original.status)} />
       ),
     },
     {
@@ -109,27 +114,27 @@ export function DashboardLeaderboard({ trainingId, runIndex }: Props): React.Rea
           <span className="text-muted-foreground">—</span>
         ),
     },
-  ], [hasDelta])
+    {
+      id: 'status',
+      accessorKey: 'status',
+      header: 'Status',
+      enableSorting: false,
+      cell: ({ row }) => (
+        <StatusBadge status={runStatusToTrainingStatus(row.original.status)} />
+      ),
+    },
+  ], [hasDelta, user])
 
-  if (loading) {
-    return (
-      <div>
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div>
-        <p className="text-sm text-muted-foreground">Failed to load leaderboard.</p>
-      </div>
-    )
-  }
-
-  if (rows.length === 0) {
-    return null
-  }
+  const emptyMessage = loading ? (
+    <span className="flex items-center justify-center gap-2 text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin" />
+      Loading…
+    </span>
+  ) : error ? (
+    <span className="text-muted-foreground">Failed to load leaderboard.</span>
+  ) : (
+    <span className="text-muted-foreground">No runs found.</span>
+  )
 
   return (
     <div>
@@ -139,6 +144,10 @@ export function DashboardLeaderboard({ trainingId, runIndex }: Props): React.Rea
         hideSearch
         pageSize={5}
         initialSorting={[{ id: 'accuracyPct', desc: true }]}
+        emptyMessage={emptyMessage}
+        getRowClassName={(row) =>
+          user?.displayName === row.displayName ? 'bg-muted/50' : ''
+        }
       />
     </div>
   )
