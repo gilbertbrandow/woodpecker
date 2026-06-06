@@ -688,6 +688,96 @@ export type TrainingItemRunReference = {
   hasAttempts: boolean
 }
 
+export type DashboardStatusCardState =
+  | 'training_completed'
+  | 'training_aborted'
+  | 'run_completed'
+  | 'active_run_ahead'
+  | 'active_run_on_track'
+  | 'active_run_behind'
+  | 'active_run_overdue'
+  | 'scheduled_break'
+  | 'overdue_to_start_next_run'
+  | 'not_started'
+
+export type DashboardPrimaryAction =
+  | { type: 'continue_run'; runId: number }
+  | { type: 'start_run'; trainingId: number; runIndex: number }
+
+export type DashboardStatusCard = {
+  state: DashboardStatusCardState
+  primaryAction: DashboardPrimaryAction | null
+  completedAt?: string
+  runIndex?: number
+  runId?: number
+  runStartedAt?: string
+  runDeadlineAt?: string
+  resolvedCount?: number
+  totalItems?: number
+  expectedResolvedByNow?: number
+  expectedResolvedByTomorrow?: number
+  puzzlesToSolveBeforeTomorrow?: number
+  nextRunIndex?: number
+  breakEndsAt?: string
+  breakRemainingMs?: number
+  elapsedSinceBreakEndMs?: number
+  totalRuns?: number
+}
+
+export type DashboardMetricCards = {
+  accuracy: { valuePct: number | null; deltaPct: number | null }
+  avgSolveTime: { valueMs: number | null; deltaMs: number | null }
+}
+
+export type DashboardTrainingItem = {
+  id: number
+  scheduleName: string
+  status: TrainingStatus
+}
+
+export type DashboardRunSlot = {
+  runIndex: number
+  selectable: boolean
+  runId: number | null
+  status: RunStatus | null
+}
+
+export type DashboardRunAccuracy = {
+  runIndex: number
+  accuracyPct: number | null
+  inProgress: boolean
+  completed: boolean
+}
+
+export type DashboardData = {
+  selectedTrainingId: number | null
+  selectedRunIndex: number | null
+  trainings: DashboardTrainingItem[]
+  runSlots: DashboardRunSlot[]
+  statusCard: DashboardStatusCard | null
+  metricCards: DashboardMetricCards | null
+  runsAccuracy: DashboardRunAccuracy[]
+  progressCard: TrainingProgressData | null
+}
+
+export type DashboardLeaderboardRow = {
+  runId: number
+  trainingId: number
+  runIndex: number
+  startedAt: string
+  completedAt: string | null
+  abortedAt: string | null
+  status: RunStatus
+  displayName: string
+  avatarUrl: string | null
+  firstSolvedCount: number
+  resolvedCount: number
+  totalPuzzles: number
+  accuracyPct: number | null
+  deltaAccuracyPct: number | null
+  avgSolveTimeMs: number | null
+}
+
 export type LichessTacticsThemeDetail = {
   name: string
   displayName: string
@@ -957,10 +1047,23 @@ export const api = {
     continue: (runId: number): Promise<ContinueRunResult> =>
       request(`/runs/${runId}/continue`, { method: 'POST' }),
   },
+  dashboard: {
+    get: (opts?: { trainingId?: number; runIndex?: number }): Promise<DashboardData> => {
+      const p = new URLSearchParams()
+      p.set('tz', Intl.DateTimeFormat().resolvedOptions().timeZone)
+      if (opts?.trainingId !== undefined) p.set('trainingId', String(opts.trainingId))
+      if (opts?.runIndex !== undefined) p.set('runIndex', String(opts.runIndex))
+      return request(`/dashboard?${p.toString()}`)
+    },
+  },
   leaderboard: {
     list: (scheduleId?: number): Promise<LeaderboardRun[]> =>
       request<{ runs: LeaderboardRun[] }>(
         `/leaderboard${scheduleId !== undefined ? `?scheduleId=${scheduleId}` : ''}`,
+      ).then((r) => r.runs),
+    getRunLeaderboard: (trainingId: number, runIndex: number): Promise<DashboardLeaderboardRow[]> =>
+      request<{ runs: DashboardLeaderboardRow[] }>(
+        `/leaderboard?trainingId=${trainingId}&runIndex=${runIndex}`,
       ).then((r) => r.runs),
   },
   sources: {
