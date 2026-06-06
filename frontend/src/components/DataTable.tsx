@@ -50,7 +50,7 @@ type DataTableProps<T> = {
   initialSorting?: SortingState
   onRowClick?: (row: T) => void
   getRowClassName?: (row: T) => string
-  emptyMessage?: string
+  emptyMessage?: React.ReactNode
   loading?: boolean
   serverPagination?: ServerPagination
   onFilterChange?: (id: string, values: string[]) => void
@@ -69,7 +69,7 @@ export function DataTable<T>({
   initialSorting = [],
   onRowClick,
   getRowClassName,
-  emptyMessage = 'No results.',
+  emptyMessage = <span className="text-muted-foreground">No results.</span>,
   loading = false,
   serverPagination,
   onFilterChange,

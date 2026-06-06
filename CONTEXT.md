@@ -133,6 +133,36 @@ _Avoid_: HttpException (collides with Werkzeug), DomainError
 The JSON shape returned for all error responses: `{"title": "...", "detail": "..."}`. Both fields are always present and non-null — no optional fields. `title` is a short heading; `detail` elaborates for the user. The HTTP status code is carried in the response header only, not repeated in the body. 500 responses use the same envelope with safe generic copy hardcoded in the handler. `meta` is reserved for a future extension to carry structured Sentry context.
 _Avoid_: error body, error response (too generic)
 
+## Dashboard
+
+**Dashboard**:
+The `/app` page, scoped to a selected Training and selected Run. Replaced the previous global leaderboard-centered page as of issue #8. The selected Training and Run are encoded as `trainingId` and `runIndex` query params. The backend resolves missing or invalid params to defaults and the frontend replaces the URL after resolution.
+_Avoid_: home page, overview page
+
+**Virtual Run**:
+A placeholder Run slot shown in the dashboard run selector when the selected Training has zero Runs. Only Virtual Run 1 exists (runIndex 0); there is no backing Run record. Shows N/A for all metrics and a Start Run 1 CTA. Future not-yet-created slots beyond Run 1 are visible in the selector but disabled — they are not virtual runs.
+_Avoid_: placeholder run, fake run, empty run
+
+**Latest Touched**:
+A computed sort key for a Training in the dashboard training selector. Equals the latest `Run.started_at` across all of the Training's Runs if any exist, otherwise falls back to `Training.started_at`. Used to order trainings so the most recently active one is selected by default.
+_Avoid_: last active, most recent
+
+**Run Slot**:
+A position in the dashboard run selector, from index 0 to `schedule.runCount − 1`. A Run Slot backed by an existing Run is selectable; a Run Slot with no backing Run is visible but disabled. Virtual Run 1 (runIndex 0) is the one exception: when no Runs exist it is treated as selectable even though no Run record exists yet.
+_Avoid_: run position, run entry
+
+**Primary Action**:
+A structured CTA descriptor returned inside the dashboard status card payload. One of `{ type: "continue_run", runId }`, `{ type: "start_run", trainingId, runIndex }`, or `null`. The backend owns the action type and its parameters; the frontend owns all button copy and styling.
+_Avoid_: CTA, action button
+
+**Status Card**:
+The run-scoped card at the top of the dashboard main content area. Carries a `state` field (one of the run-scoped state values enumerated below) and an optional `primaryAction`. Distinct from `TrainingDetailStatus`, which is training-scoped and used on the Training page.
+
+Run-scoped state values (consistent with existing `TrainingDetailState` naming where overlap exists):
+`training_completed` · `training_aborted` · `run_completed` · `active_run_ahead` · `active_run_on_track` · `active_run_behind` · `active_run_overdue` · `scheduled_break` · `overdue_to_start_next_run` · `not_started`
+
+_Avoid_: status banner, current status (ambiguous with TrainingDetailStatus)
+
 ## Flagged ambiguities
 
 - "puzzle" appears in the UI, old docs, and issue history — resolved: use **TrainingItem** for the stored record; "puzzle" is acceptable only in user-facing UI copy.

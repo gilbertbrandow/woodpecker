@@ -796,6 +796,14 @@ def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
             actual_anchors.append({"timeMs": float(now_ms), "value": float(cum_actual + active_resolved)})
             last_actual_ms = now_ms
 
+    # Guarantee the dotted updated-expected line starts exactly at today, not at
+    # the next future anchor (which could be tomorrow or later for non-active runs).
+    if not any(int(a["timeMs"]) == now_ms for a in updated_anchors):
+        val_at_now = _interpolate_anchors(updated_anchors, now_ms)
+        if val_at_now is not None:
+            updated_anchors.append({"timeMs": float(now_ms), "value": val_at_now})
+            updated_anchors.sort(key=lambda a: a["timeMs"])
+
     all_times = sorted(set(
         int(a["timeMs"]) for a in original_anchors + updated_anchors + actual_anchors
     ))

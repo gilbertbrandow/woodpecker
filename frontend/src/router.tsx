@@ -31,6 +31,26 @@ type RouterContext = {
   auth: AuthContextValue
 }
 
+export type DashboardSearch = {
+  trainingId?: number
+  runIndex?: number
+}
+
+function validateDashboardSearch(search: Record<string, unknown>): DashboardSearch {
+  const out: DashboardSearch = {}
+  const rawTid = search.trainingId
+  if (rawTid !== undefined && rawTid !== null && rawTid !== '') {
+    const n = typeof rawTid === 'number' ? rawTid : Number.parseInt(String(rawTid), 10)
+    if (Number.isInteger(n) && n > 0) out.trainingId = n
+  }
+  const rawRi = search.runIndex
+  if (rawRi !== undefined && rawRi !== null && rawRi !== '') {
+    const n = typeof rawRi === 'number' ? rawRi : Number.parseInt(String(rawRi), 10)
+    if (Number.isInteger(n) && n >= 0) out.runIndex = n
+  }
+  return out
+}
+
 export type RunTrainingItemOverviewSearch = {
   attempt?: number
 }
@@ -107,10 +127,11 @@ const appShellRoute = createRoute({
   component: AppShell,
 })
 
-const dashboardRoute = createRoute({
+export const dashboardRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/',
   staticData: { crumb: { group: 'Activity', leaf: 'Dashboard' } },
+  validateSearch: validateDashboardSearch,
   component: DashboardPage,
 })
 
