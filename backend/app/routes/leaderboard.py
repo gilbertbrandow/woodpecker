@@ -22,7 +22,9 @@ def get_leaderboard() -> Response | tuple[Response, int]:
     if raw_tid is not None and raw_ri is not None:
         if not raw_tid.isdigit():
             return jsonify({"error": "trainingId must be a positive integer"}), 400
-        if not raw_ri.lstrip("-").isdigit():
+        try:
+            run_index = int(raw_ri)
+        except ValueError:
             return jsonify({"error": "runIndex must be an integer"}), 400
         training = db.session.get(Training, int(raw_tid))
         if training is None:
@@ -30,7 +32,6 @@ def get_leaderboard() -> Response | tuple[Response, int]:
         if training.user_id != session["user_id"]:
             raise ForbiddenError("Access denied", "You do not have permission to view this leaderboard.")
         schedule_id = training.schedule_id
-        run_index = int(raw_ri)
     elif raw_sid is not None:
         if not raw_sid.isdigit():
             return jsonify({"error": "scheduleId must be a positive integer"}), 400

@@ -166,9 +166,9 @@ def get_weekly_board(schedule_id: int | None = None) -> list[dict[str, object]]:
             WITH weekly_stats AS (
                 SELECT
                     t.user_id,
-                    COUNT(pa.id) FILTER (WHERE pa.status = 'solved' AND pa.try_number = 1)
+                    COUNT(DISTINCT rp.id) FILTER (WHERE pa.status = 'solved' AND pa.try_number = 1)
                                                 AS puzzles_solved,
-                    COUNT(pa.id)                AS resolved_count,
+                    COUNT(DISTINCT rp.id)       AS resolved_count,
                     AVG(lt.rating)              AS avg_rating,
                     AVG(pa.time_spent_ms)       AS avg_solve_time_ms
                 FROM training_attempts pa
@@ -184,7 +184,7 @@ def get_weekly_board(schedule_id: int | None = None) -> list[dict[str, object]]:
             active_users AS (
                 SELECT DISTINCT t.user_id
                 FROM trainings t
-                JOIN runs r ON r.training_id = t.id
+                JOIN runs r ON r.training_id = t.id AND r.aborted_at IS NULL
                 {active_schedule_where}
             )
             SELECT
