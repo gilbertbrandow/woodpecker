@@ -18,6 +18,7 @@ import { TrainingListPage } from './pages/TrainingListPage'
 import { TrainingPage } from './pages/TrainingPage'
 import { TrainingNewPage } from './pages/TrainingNewPage'
 import { AboutPage } from './pages/AboutPage'
+import { LeaderboardPage } from './pages/LeaderboardPage'
 import { SourcesListPage } from './pages/SourcesListPage'
 import { LichessTacticsSourcePage } from './pages/LichessTacticsSourcePage'
 import { ScrapedPositionalSourcePage } from './pages/ScrapedPositionalSourcePage'
@@ -212,6 +213,13 @@ const trainingRoute = createRoute({
   component: TrainingPage,
 })
 
+const leaderboardRoute = createRoute({
+  getParentRoute: () => appShellRoute,
+  path: '/leaderboards',
+  staticData: { crumb: { group: 'Activity', leaf: 'Leaderboards' } },
+  component: LeaderboardPage,
+})
+
 const aboutRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/about',
@@ -296,6 +304,7 @@ const routeTree = rootRoute.addChildren([
       trainingListRoute,
       trainingNewRoute,
       trainingRoute,
+      leaderboardRoute,
       aboutRoute,
       runRoute,
       sourcesListRoute,
