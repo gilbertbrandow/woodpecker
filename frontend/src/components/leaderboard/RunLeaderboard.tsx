@@ -1,12 +1,13 @@
 import * as React from 'react'
 import { useMemo } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
-import { type ColumnDef, type Table } from '@tanstack/react-table'
+import { type ColumnDef } from '@tanstack/react-table'
 import { DataTable, type FilterableColumn } from '../DataTable'
 import { UserAvatar } from '../UserAvatar'
 import { StatusBadge } from '../StatusBadge'
 import { formatNumber, formatSolveTimeMs } from '../../lib/utils'
 import type { LeaderboardRun, RunStatus, TrainingStatus } from '../../lib/api'
+import { PositionBadge, getGlobalPosition } from './PositionBadge'
 
 type Props = {
   rows: LeaderboardRun[]
@@ -48,38 +49,6 @@ function formatDelta(delta: number | null): React.ReactElement {
   )
 }
 
-function PositionBadge({ position }: { position: number }): React.ReactElement {
-  if (position === 1) {
-    return (
-      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-yellow-100 text-yellow-700 text-xs font-bold dark:bg-yellow-900/40 dark:text-yellow-400">
-        1
-      </span>
-    )
-  }
-  if (position === 2) {
-    return (
-      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-600 text-xs font-bold dark:bg-slate-800 dark:text-slate-300">
-        2
-      </span>
-    )
-  }
-  if (position === 3) {
-    return (
-      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-orange-100 text-orange-700 text-xs font-bold dark:bg-orange-900/40 dark:text-orange-400">
-        3
-      </span>
-    )
-  }
-  return (
-    <span className="inline-flex h-6 w-6 items-center justify-center tabular-nums text-sm text-muted-foreground">
-      {position}
-    </span>
-  )
-}
-
-function getGlobalPosition(row: { id: string }, table: Table<LeaderboardRun>): number {
-  return table.getSortedRowModel().rows.findIndex((r) => r.id === row.id) + 1
-}
 
 export function RunLeaderboard({
   rows,
@@ -126,7 +95,7 @@ export function RunLeaderboard({
       enableSorting: false,
       header: '',
       cell: ({ row, table }) => (
-        <PositionBadge position={getGlobalPosition(row, table as Table<LeaderboardRun>)} />
+        <PositionBadge position={getGlobalPosition(row, table)} />
       ),
     }
 
@@ -196,18 +165,25 @@ export function RunLeaderboard({
       cell: ({ row }) => formatDelta(row.original.deltaAccuracyPct),
     }
 
-    const avgSolveTimeColumn: ColumnDef<LeaderboardRun> = {
-      id: 'avgSolveTimeMs',
-      accessorFn: (r) => r.avgSolveTimeMs ?? Infinity,
-      header: 'Avg time',
-      enableSorting: true,
-      cell: ({ row }) =>
-        row.original.avgSolveTimeMs !== null ? (
-          <span className="tabular-nums">{formatSolveTimeMs(row.original.avgSolveTimeMs)}</span>
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        ),
+    function makeTimeColumn(
+      id: 'avgSolveTimeMs' | 'avgTimeSolvedMs' | 'avgTimeFailedMs',
+      header: string,
+    ): ColumnDef<LeaderboardRun> {
+      return {
+        id,
+        accessorFn: (r) => r[id] ?? Infinity,
+        header,
+        enableSorting: true,
+        cell: ({ row }) => {
+          const v = row.original[id]
+          return v !== null
+            ? <span className="tabular-nums">{formatSolveTimeMs(v)}</span>
+            : <span className="text-muted-foreground">—</span>
+        },
+      }
     }
+
+    const avgSolveTimeColumn = makeTimeColumn('avgSolveTimeMs', 'Avg time')
 
     if (compact) {
       return [positionColumn, userColumn, accuracyColumn, deltaColumn, avgSolveTimeColumn]
@@ -233,31 +209,8 @@ export function RunLeaderboard({
       ),
     }
 
-    const avgTimeSolvedColumn: ColumnDef<LeaderboardRun> = {
-      id: 'avgTimeSolvedMs',
-      accessorFn: (r) => r.avgTimeSolvedMs ?? Infinity,
-      header: 'Avg time (solved)',
-      enableSorting: true,
-      cell: ({ row }) =>
-        row.original.avgTimeSolvedMs !== null ? (
-          <span className="tabular-nums">{formatSolveTimeMs(row.original.avgTimeSolvedMs)}</span>
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        ),
-    }
-
-    const avgTimeFailedColumn: ColumnDef<LeaderboardRun> = {
-      id: 'avgTimeFailedMs',
-      accessorFn: (r) => r.avgTimeFailedMs ?? Infinity,
-      header: 'Avg time (failed)',
-      enableSorting: true,
-      cell: ({ row }) =>
-        row.original.avgTimeFailedMs !== null ? (
-          <span className="tabular-nums">{formatSolveTimeMs(row.original.avgTimeFailedMs)}</span>
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        ),
-    }
+    const avgTimeSolvedColumn = makeTimeColumn('avgTimeSolvedMs', 'Avg time (solved)')
+    const avgTimeFailedColumn = makeTimeColumn('avgTimeFailedMs', 'Avg time (failed)')
 
     const resolvedColumn: ColumnDef<LeaderboardRun> = {
       id: 'resolvedCount',
