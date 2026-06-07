@@ -1,7 +1,6 @@
 import sqlalchemy as sa
 
 from app.extensions import db
-from app.models.training import Training
 
 
 def get_run_board(
