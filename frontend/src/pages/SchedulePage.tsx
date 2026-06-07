@@ -15,8 +15,8 @@ import {
   type Subset,
   type ScheduleInsightPoint,
   type MyTrainingSummary,
-  type LeaderboardRun,
 } from "../lib/api";
+import { useRunLeaderboard } from "../hooks/useRunLeaderboard";
 import { AreaChart, Area, XAxis, YAxis } from "recharts";
 import {
   ChartContainer,
@@ -168,7 +168,6 @@ export function SchedulePage(): React.ReactElement | null {
   const [statsOpen, setStatsOpen] = useState(true);
   const [usedByOpen, setUsedByOpen] = useState(true);
   const [leaderboardOpen, setLeaderboardOpen] = useState(true);
-  const [leaderboardRuns, setLeaderboardRuns] = useState<LeaderboardRun[] | null>(null);
 
   useSetBreadcrumbTitle(schedule?.name)
 
@@ -222,10 +221,10 @@ export function SchedulePage(): React.ReactElement | null {
       .finally(() => setInsightsLoading(false));
   }, [activeTab, id, user, insightsData]);
 
-  useEffect(() => {
-    if (activeTab !== "insights" || leaderboardRuns !== null || !user) return;
-    api.leaderboard.list(id).then(setLeaderboardRuns).catch(() => {});
-  }, [activeTab, id, user, leaderboardRuns]);
+  const { rows: leaderboardRuns, loading: leaderboardLoading } = useRunLeaderboard({
+    scheduleId: id,
+    enabled: activeTab === "insights" && !!user,
+  });
 
   if (authLoading || !user) return null;
 
@@ -784,15 +783,13 @@ export function SchedulePage(): React.ReactElement | null {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="pt-4">
-                  {leaderboardRuns === null ? (
-                    <p className="text-sm text-muted-foreground">Loading…</p>
-                  ) : (
-                    <RunLeaderboard
-                      rows={leaderboardRuns}
-                      scheduleId={id}
-                      allowFiltering
-                    />
-                  )}
+                  <RunLeaderboard
+                    rows={leaderboardRuns}
+                    scheduleId={id}
+                    allowFiltering
+                    loading={leaderboardLoading}
+                    currentUserDisplayName={user?.displayName}
+                  />
                 </div>
               </CollapsibleContent>
             </Collapsible>
