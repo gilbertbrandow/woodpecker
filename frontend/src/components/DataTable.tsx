@@ -151,7 +151,7 @@ export function DataTable<T>({
 
   return (
     <div className="flex flex-col gap-3">
-      {(!hideSearch || filtersSlot || filterableColumns.length > 0 || loading) && (
+      {(!hideSearch || filtersSlot || filterableColumns.length > 0) && (
         <div className="flex flex-wrap items-center gap-2">
           {!hideSearch && (
             <div className="relative">
@@ -226,7 +226,13 @@ export function DataTable<T>({
             ))}
           </TableHeader>
           <TableBody>
-            {pageRows.length === 0 && !loading ? (
+            {loading && pageRows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="py-12 text-center">
+                  <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
+                </TableCell>
+              </TableRow>
+            ) : pageRows.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={columns.length}

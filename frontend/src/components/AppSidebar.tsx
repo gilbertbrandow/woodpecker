@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useSidebar } from './ui/sidebar'
-import { ChevronsUpDown, LayoutDashboard, Library, Database, CalendarDays, Puzzle, CircleHelp, Settings, LogOut, Play, User } from 'lucide-react'
+import { ChevronsUpDown, LayoutDashboard, Library, Database, CalendarDays, Puzzle, CircleHelp, Settings, LogOut, Play, User, Trophy } from 'lucide-react'
 import { toast } from '../lib/toast'
 import { useAuth } from '../context/auth'
 import { parseAvatarValue } from '../lib/avatar'
@@ -40,6 +40,7 @@ type NavItem = {
 
 const ACTIVITY_ITEMS: NavItem[] = [
   { label: 'Dashboard', to: '/app', icon: LayoutDashboard },
+  { label: 'Leaderboards', to: '/app/leaderboards', icon: Trophy },
   { label: 'Training', to: '/app/training', icon: Puzzle },
 ]
 

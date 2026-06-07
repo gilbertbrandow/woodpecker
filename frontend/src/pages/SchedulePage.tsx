@@ -41,7 +41,7 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui/table";
-import { LeaderboardTable } from "../components/leaderboard/LeaderboardTable";
+import { RunLeaderboard } from "../components/leaderboard/RunLeaderboard";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
@@ -787,7 +787,11 @@ export function SchedulePage(): React.ReactElement | null {
                   {leaderboardRuns === null ? (
                     <p className="text-sm text-muted-foreground">Loading…</p>
                   ) : (
-                    <LeaderboardTable runs={leaderboardRuns} hideSchedule />
+                    <RunLeaderboard
+                      rows={leaderboardRuns}
+                      scheduleId={id}
+                      allowFiltering
+                    />
                   )}
                 </div>
               </CollapsibleContent>

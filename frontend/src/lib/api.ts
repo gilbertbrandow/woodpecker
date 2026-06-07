@@ -394,6 +394,19 @@ export type LeaderboardRun = {
   totalPuzzles: number
   accuracyPct: number | null
   avgSolveTimeMs: number | null
+  avgTimeSolvedMs: number | null
+  avgTimeFailedMs: number | null
+  deltaAccuracyPct: number | null
+}
+
+export type WeeklyLeaderboardRow = {
+  userId: number
+  displayName: string
+  avatarUrl: string | null
+  puzzlesSolved: number
+  avgRating: number | null
+  avgAccuracyPct: number | null
+  avgSolveTimeMs: number | null
 }
 
 export type PositionStatus =
@@ -761,23 +774,7 @@ export type DashboardData = {
   progressCard: TrainingProgressData | null
 }
 
-export type DashboardLeaderboardRow = {
-  runId: number
-  trainingId: number
-  runIndex: number
-  startedAt: string
-  completedAt: string | null
-  abortedAt: string | null
-  status: RunStatus
-  displayName: string
-  avatarUrl: string | null
-  firstSolvedCount: number
-  resolvedCount: number
-  totalPuzzles: number
-  accuracyPct: number | null
-  deltaAccuracyPct: number | null
-  avgSolveTimeMs: number | null
-}
+export type DashboardLeaderboardRow = LeaderboardRun
 
 export type LichessTacticsThemeDetail = {
   name: string
@@ -1062,10 +1059,14 @@ export const api = {
       request<{ runs: LeaderboardRun[] }>(
         `/leaderboard${scheduleId !== undefined ? `?scheduleId=${scheduleId}` : ''}`,
       ).then((r) => r.runs),
-    getRunLeaderboard: (trainingId: number, runIndex: number): Promise<DashboardLeaderboardRow[]> =>
-      request<{ runs: DashboardLeaderboardRow[] }>(
+    getRunLeaderboard: (trainingId: number, runIndex: number): Promise<LeaderboardRun[]> =>
+      request<{ runs: LeaderboardRun[] }>(
         `/leaderboard?trainingId=${trainingId}&runIndex=${runIndex}`,
       ).then((r) => r.runs),
+    getWeekly: (scheduleId?: number): Promise<WeeklyLeaderboardRow[]> =>
+      request<{ rows: WeeklyLeaderboardRow[] }>(
+        `/leaderboard/weekly${scheduleId !== undefined ? `?scheduleId=${scheduleId}` : ''}`,
+      ).then((r) => r.rows),
   },
   sources: {
     lichessTactics: {
