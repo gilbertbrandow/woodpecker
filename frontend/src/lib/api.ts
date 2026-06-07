@@ -394,6 +394,19 @@ export type LeaderboardRun = {
   totalPuzzles: number
   accuracyPct: number | null
   avgSolveTimeMs: number | null
+  avgTimeSolvedMs: number | null
+  avgTimeFailedMs: number | null
+  deltaAccuracyPct: number | null
+}
+
+export type WeeklyLeaderboardRow = {
+  userId: number
+  displayName: string
+  avatarUrl: string | null
+  puzzlesSolved: number
+  avgRating: number | null
+  avgAccuracyPct: number | null
+  avgSolveTimeMs: number | null
 }
 
 export type PositionStatus =
@@ -761,24 +774,6 @@ export type DashboardData = {
   progressCard: TrainingProgressData | null
 }
 
-export type DashboardLeaderboardRow = {
-  runId: number
-  trainingId: number
-  runIndex: number
-  startedAt: string
-  completedAt: string | null
-  abortedAt: string | null
-  status: RunStatus
-  displayName: string
-  avatarUrl: string | null
-  firstSolvedCount: number
-  resolvedCount: number
-  totalPuzzles: number
-  accuracyPct: number | null
-  deltaAccuracyPct: number | null
-  avgSolveTimeMs: number | null
-}
-
 export type LichessTacticsThemeDetail = {
   name: string
   displayName: string
@@ -1058,14 +1053,21 @@ export const api = {
     },
   },
   leaderboard: {
-    list: (scheduleId?: number): Promise<LeaderboardRun[]> =>
-      request<{ runs: LeaderboardRun[] }>(
-        `/leaderboard${scheduleId !== undefined ? `?scheduleId=${scheduleId}` : ''}`,
-      ).then((r) => r.runs),
-    getRunLeaderboard: (trainingId: number, runIndex: number): Promise<DashboardLeaderboardRow[]> =>
-      request<{ runs: DashboardLeaderboardRow[] }>(
-        `/leaderboard?trainingId=${trainingId}&runIndex=${runIndex}`,
-      ).then((r) => r.runs),
+    getRuns: (opts?: { scheduleId?: number; trainingId?: number; runIndex?: number }): Promise<LeaderboardRun[]> => {
+      const p = new URLSearchParams()
+      if (opts?.trainingId !== undefined && opts?.runIndex !== undefined) {
+        p.set('trainingId', String(opts.trainingId))
+        p.set('runIndex', String(opts.runIndex))
+      } else if (opts?.scheduleId !== undefined) {
+        p.set('scheduleId', String(opts.scheduleId))
+      }
+      const qs = p.toString()
+      return request<{ runs: LeaderboardRun[] }>(`/leaderboard${qs ? `?${qs}` : ''}`).then((r) => r.runs)
+    },
+    getWeekly: (scheduleId?: number): Promise<WeeklyLeaderboardRow[]> =>
+      request<{ rows: WeeklyLeaderboardRow[] }>(
+        `/leaderboard/weekly${scheduleId !== undefined ? `?scheduleId=${scheduleId}` : ''}`,
+      ).then((r) => r.rows),
   },
   sources: {
     lichessTactics: {
