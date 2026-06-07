@@ -163,6 +163,24 @@ Run-scoped state values (consistent with existing `TrainingDetailState` naming w
 
 _Avoid_: status banner, current status (ambiguous with TrainingDetailStatus)
 
+## Leaderboards
+
+**Leaderboard Page**:
+The dedicated `/app/leaderboards` page. Contains two boards — the Run Board and the Weekly Board — both scoped by an optional Schedule filter carried as a `scheduleId` query param. Visiting without a `scheduleId` shows all Schedules. The same Schedule filter applies to both boards simultaneously.
+_Avoid_: leaderboard hub, stats page
+
+**Run Board**:
+A leaderboard table on the Leaderboard Page where each row represents one completed Run. Columns: position (medal icon for top 3, plain number otherwise), user, schedule (when unscoped), run index, status, start date, accuracy, avg solve time (all attempts), avg solve time when first-solved, avg solve time when failed, delta accuracy vs the previous Run in the same Training. Medal assignment tracks the active sort column — sorting by any column reassigns gold/silver/bronze. Reused on SchedulePage with a fixed `scheduleId` prop, which hides the schedule column and filter.
+_Avoid_: run leaderboard, runs table
+
+**Weekly Board**:
+A leaderboard table on the Leaderboard Page where each row represents one User's aggregated performance over a rolling 7-day window ending now. Columns: position (medal icon for top 3), user, puzzles solved (default sort), avg puzzle rating (shown only for items with a numeric rating; "—" for sources without one), avg accuracy, avg solve time. Respects the same Schedule filter as the Run Board.
+_Avoid_: weekly leaderboard, weekly stats
+
+**Delta Accuracy**:
+The change in accuracy percentage between a Run and the immediately preceding non-aborted Run in the same Training. Computed as `current_accuracy − previous_accuracy`, expressed in percentage points. Null when no previous Run exists. Shown on the Run Board as a signed value (e.g. +4.2% or −1.8%).
+_Avoid_: accuracy improvement, accuracy change
+
 ## Flagged ambiguities
 
 - "puzzle" appears in the UI, old docs, and issue history — resolved: use **TrainingItem** for the stored record; "puzzle" is acceptable only in user-facing UI copy.
