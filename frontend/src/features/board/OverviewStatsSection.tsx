@@ -13,17 +13,17 @@ type OverviewStatsSectionProps = {
 export function OverviewStatsSection({ runIndex, accuracy, averageSolveTime }: OverviewStatsSectionProps): React.ReactElement {
   return (
     <div className="flex flex-col gap-4 rounded-lg border bg-card p-4">
-      <span>Run {runIndex + 1} stats</span>
-      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
+      <span>Averages</span>
+      <div className="flex flex-row justify-between">
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="flex cursor-default flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Average accuracy</span>
+              <span className="text-xs font-medium text-muted-foreground">Accuracy (%)</span>
               <div className="flex items-baseline gap-2">
                 <span className="tabular-nums text-2xl font-semibold">
-                  {accuracy.valuePct !== null ? `${accuracy.valuePct.toFixed(2)}%` : '—'}
+                  {accuracy.valuePct !== null ? `${accuracy.valuePct.toFixed(2)}` : '—'}
                 </span>
-                <DeltaBadge delta={accuracy.deltaPct} goodWhenPositive={true} format={(n) => `${n.toFixed(2)}%`} />
+                <DeltaBadge delta={accuracy.deltaPct} goodWhenPositive={true} format={(n) => `${n.toFixed(2)}`} />
               </div>
             </div>
           </TooltipTrigger>
@@ -36,7 +36,7 @@ export function OverviewStatsSection({ runIndex, accuracy, averageSolveTime }: O
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="flex cursor-default flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Average solve time</span>
+              <span className="text-xs font-medium text-muted-foreground">Solve time (mm:ss)</span>
               <div className="flex items-baseline gap-2">
                 <span className="tabular-nums text-2xl font-semibold">
                   {averageSolveTime.valueMs !== null ? formatSolveTimeMs(averageSolveTime.valueMs) : '—'}

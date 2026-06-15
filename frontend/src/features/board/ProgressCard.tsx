@@ -31,7 +31,7 @@ function ProgressRow({ label, value, tooltipLabel, delta }: ProgressRowProps): R
 export function ProgressCard({ runProgress, trainingProgress }: ProgressCardProps): React.ReactElement {
   return (
     <div className="flex flex-col gap-4 rounded-lg border bg-card p-4">
-        <span>Your progress</span>
+        <span>Progress</span>
       <ProgressRow {...runProgress} />
       {trainingProgress !== null && <ProgressRow {...trainingProgress} />}
     </div>
