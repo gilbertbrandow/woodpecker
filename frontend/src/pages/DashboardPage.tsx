@@ -11,8 +11,8 @@ import { TrainingRunPicker } from '../components/dashboard/TrainingRunPicker'
 import { StatusBadge, trainingStateToStatusValue } from '../components/StatusBadge'
 import { Button } from '../components/ui/button'
 import { ChartContainer, ChartTooltip, type ChartConfig } from '../components/ui/chart'
-import { cn } from '../lib/utils'
-import { formatSolveTimeMs } from '../lib/utils'
+import { cn, formatSolveTimeMs } from '../lib/utils'
+import { Loader2 } from 'lucide-react'
 
 const ACCURACY_CONFIG: ChartConfig = {
   value: { label: 'Accuracy %', color: 'hsl(var(--chart-1))' },
@@ -346,7 +346,9 @@ export function DashboardPage(): React.ReactElement {
   if (loading && !data) {
     return (
       <PageWrapper>
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
       </PageWrapper>
     )
   }
