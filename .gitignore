@@ -16,6 +16,7 @@ deploy/terraform/*.tfstate
 deploy/terraform/*.tfstate.backup
 deploy/terraform/.terraform.lock.hcl
 deploy/.db-tunnel.pid
+.claude/projects/
 
 pipeline/data/raw/*
 !pipeline/data/raw/.gitkeep
