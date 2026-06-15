@@ -6,7 +6,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/toolti
 import { Button } from '../components/ui/button'
 import { useBoardPageController } from '../features/board/useBoardPageController'
 import { BoardPageShell } from '../features/board/BoardPageShell'
-import { BoardBreadcrumbs } from '../features/board/BoardBreadcrumbs'
 import { BoardCenterColumn } from '../features/board/BoardCenterColumn'
 import { TimerCard } from '../features/board/TimerCard'
 import { TrainingItemMetaCard, MobileOverviewMetaBar } from '../features/board/TrainingItemMetaCard'
@@ -402,32 +401,13 @@ export function BoardPage(): React.ReactElement | null {
             ? { ...overviewData.progress.trainingProgress, delta: selectedTrainingProgressDelta }
             : null
         }
-        breadcrumbs={
-          <BoardBreadcrumbs
-            runIndex={overviewData.runTrainingItem.runIndex}
-            position={overviewData.runTrainingItem.position}
-            trainingId={overviewData.runTrainingItem.trainingId}
-            scheduleName={overviewData.runTrainingItem.scheduleName}
-            runIdStr={runIdStr}
-          />
-        }
       />
     ) : ctrl.solvingView !== null ? (
-      <>
-        <BoardBreadcrumbs
-          runIndex={ctrl.solvingView.runTrainingItem.runIndex}
-          position={ctrl.solvingView.runTrainingItem.position}
-          trainingId={ctrl.solvingView.runTrainingItem.trainingId}
-          scheduleName={ctrl.solvingView.runTrainingItem.scheduleName}
-          runIdStr={runIdStr}
-          linksDisabled={ctrl.mode === 'focus'}
-        />
-        <AttemptTypeCard
-          isPractice={ctrl.solvingView.attempt.attemptType === 'practice'}
-          currentTryNumber={ctrl.solvingView.runTrainingItem.currentTryNumber}
-          maxTriesPerPuzzle={ctrl.solvingView.runTrainingItem.maxTriesPerItem}
-        />
-      </>
+      <AttemptTypeCard
+        isPractice={ctrl.solvingView.attempt.attemptType === 'practice'}
+        currentTryNumber={ctrl.solvingView.runTrainingItem.currentTryNumber}
+        maxTriesPerPuzzle={ctrl.solvingView.runTrainingItem.maxTriesPerItem}
+      />
     ) : null
 
   const rightNode = (

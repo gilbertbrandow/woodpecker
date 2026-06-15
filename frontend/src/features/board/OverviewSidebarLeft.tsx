@@ -12,7 +12,6 @@ type OverviewSidebarLeftProps = {
   averageSolveTime: RunTrainingItemOverview['stats']['averageSolveTime']
   runProgress: RunTrainingItemOverview['progress']['runProgress']
   trainingProgress: RunTrainingItemOverview['progress']['trainingProgress']
-  breadcrumbs: React.ReactNode
 }
 
 export function OverviewSidebarLeft({
@@ -23,11 +22,9 @@ export function OverviewSidebarLeft({
   averageSolveTime,
   runProgress,
   trainingProgress,
-  breadcrumbs,
 }: OverviewSidebarLeftProps): React.ReactElement {
   return (
     <>
-      {breadcrumbs}
       {paceChart !== null && <RunPaceCard chartData={paceChart} isRunActive={isRunActive} stretch />}
       <OverviewStatsSection
         runIndex={runIndex}
