@@ -765,9 +765,10 @@ def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
             else:
                 cursor_ms = run_end_ms
         else:
-            if not updated_anchors or updated_anchors[-1]["timeMs"] != float(cursor_ms):
-                updated_anchors.append({"timeMs": float(cursor_ms), "value": cumulative})
-            run_end_ms = cursor_ms + int(run_def.target_hours * 3_600_000)
+            run_start_ms = max(cursor_ms, now_ms)
+            if not updated_anchors or updated_anchors[-1]["timeMs"] != float(run_start_ms):
+                updated_anchors.append({"timeMs": float(run_start_ms), "value": cumulative})
+            run_end_ms = run_start_ms + int(run_def.target_hours * 3_600_000)
             cumulative += puzzle_count
             updated_anchors.append({"timeMs": float(run_end_ms), "value": cumulative})
             if run_def.break_after_hours > 0:
@@ -795,6 +796,10 @@ def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
         else:
             actual_anchors.append({"timeMs": float(now_ms), "value": float(cum_actual + active_resolved)})
             last_actual_ms = now_ms
+
+    if last_actual_ms < now_ms:
+        actual_anchors.append({"timeMs": float(now_ms), "value": cum_actual})
+        last_actual_ms = now_ms
 
     # Guarantee the dotted updated-expected line starts exactly at today, not at
     # the next future anchor (which could be tomorrow or later for non-active runs).
