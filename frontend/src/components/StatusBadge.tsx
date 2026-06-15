@@ -116,7 +116,7 @@ const STATUS_CONFIG: Record<StatusValue, StatusConfig> = {
   scheduled_break: {
     label: "On break",
     className:
-      "border-green-600/30 bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400",
+      "border-green-400/30 bg-green-50/60 text-green-600 dark:bg-green-900/10 dark:text-green-300",
     icon: <Coffee className="h-3 w-3" />,
   },
   break_elapsed: {
