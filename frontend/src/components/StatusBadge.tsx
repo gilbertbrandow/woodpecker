@@ -16,6 +16,7 @@ import {
   CalendarClock,
 } from "lucide-react";
 import { cn } from "../lib/utils";
+import type { RunStatus } from "../lib/api";
 
 type SubsetStatus = "draft" | "filled" | "locked";
 type TrainingStatus =
@@ -155,6 +156,11 @@ const STATUS_CONFIG: Record<StatusValue, StatusConfig> = {
     icon: <TrendingUp className="h-3 w-3" />,
   },
 };
+
+export function runStatusToStatusValue(status: RunStatus): StatusValue {
+  if (status === 'active') return 'in_progress'
+  return status
+}
 
 export function trainingStateToStatusValue(state: string): StatusValue {
   switch (state) {

@@ -4,9 +4,9 @@ import { useNavigate, Link } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
 import { DataTable, type FilterableColumn } from '../DataTable'
 import { UserAvatar } from '../UserAvatar'
-import { StatusBadge } from '../StatusBadge'
+import { StatusBadge, runStatusToStatusValue } from '../StatusBadge'
 import { formatNumber, formatSolveTimeMs } from '../../lib/utils'
-import type { LeaderboardRun, RunStatus, TrainingStatus } from '../../lib/api'
+import type { LeaderboardRun } from '../../lib/api'
 import { PositionBadge, getGlobalPosition } from './PositionBadge'
 
 type Props = {
@@ -17,12 +17,6 @@ type Props = {
   compact?: boolean
   currentUserDisplayName?: string
   loading?: boolean
-}
-
-function runStatusToTrainingStatus(status: RunStatus): TrainingStatus {
-  if (status === 'active') return 'in_progress'
-  if (status === 'completed') return 'completed'
-  return 'aborted'
 }
 
 function formatDate(iso: string): string {
@@ -195,7 +189,7 @@ export function RunLeaderboard({
       header: 'Status',
       enableSorting: false,
       cell: ({ row }) => (
-        <StatusBadge status={runStatusToTrainingStatus(row.original.status)} />
+        <StatusBadge status={runStatusToStatusValue(row.original.status)} />
       ),
     }
 
