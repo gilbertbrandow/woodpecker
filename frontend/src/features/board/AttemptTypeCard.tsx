@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { CircleOff, CheckCircle2 } from 'lucide-react'
+import { CircleOff, Lightbulb } from 'lucide-react'
 
 type AttemptTypeCardProps = {
   isPractice: boolean
@@ -22,12 +22,12 @@ export function AttemptTypeCard({ isPractice, currentTryNumber, maxTriesPerPuzzl
   }
 
   return (
-    <div className={`rounded-lg border bg-card ${compact ? 'px-3 py-2' : 'p-4'}`}>
+    <div className={`rounded-lg border border-slate-600/30 bg-slate-50 text-slate-800 dark:bg-slate-900/20 dark:text-slate-400 ${compact ? 'px-3 py-2' : 'p-4'}`}>
       <div className="flex items-center gap-2">
-        <CheckCircle2 className={`shrink-0 text-muted-foreground ${compact ? 'h-3 w-3' : 'h-4 w-4'}`} />
+        <Lightbulb className={`shrink-0 ${compact ? 'h-3 w-3' : 'h-4 w-4'}`} />
         <span className={`font-medium ${compact ? 'text-xs' : 'text-sm'}`}>Scored attempt</span>
       </div>
-      <p className={`text-muted-foreground ${compact ? 'mt-1 text-[10px]' : 'mt-1.5 text-xs'}`}>
+      <p className={`opacity-75 ${compact ? 'mt-1 text-[10px]' : 'mt-1.5 text-xs'}`}>
         {maxTriesPerPuzzle > 1
           ? `Attempt ${currentTryNumber} of ${maxTriesPerPuzzle}`
           : 'This attempt will count towards your score.'}
