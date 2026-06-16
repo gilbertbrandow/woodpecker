@@ -11,6 +11,7 @@ import {
   type AvatarPiece, type AvatarColor, type AvatarStyle,
 } from '../lib/avatar'
 import { resolvePieceSet } from '../lib/themes'
+import { Undo2 } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar'
@@ -159,7 +160,7 @@ export function ProfilePage(): React.ReactElement | null {
 
               <TabsContent value="build" className="mt-4 flex flex-col gap-4">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-2">Color</p>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Color</p>
                   <div className="flex flex-wrap gap-2">
                     {AVATAR_COLORS.map((color) => (
                       <button
@@ -181,7 +182,7 @@ export function ProfilePage(): React.ReactElement | null {
                 </div>
 
                 <div>
-                  <p className="text-xs text-muted-foreground mb-2">Style</p>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Style</p>
                   <div className="flex flex-wrap gap-2">
                     {AVATAR_STYLES.map((s) => (
                       <button
@@ -208,7 +209,7 @@ export function ProfilePage(): React.ReactElement | null {
                 </div>
 
                 <div>
-                  <p className="text-xs text-muted-foreground mb-2">Piece</p>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Piece</p>
                   <div className="flex flex-wrap gap-2">
                     {AVATAR_PIECES.map((p) => (
                       <button
@@ -234,8 +235,9 @@ export function ProfilePage(): React.ReactElement | null {
                 <button
                   type="button"
                   onClick={handleResetToAuto}
-                  className="self-start text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+                  className="self-start inline-flex items-center gap-1 text-xs text-primary underline-offset-2 hover:underline"
                 >
+                  <Undo2 className="h-3 w-3" />
                   Reset to auto
                 </button>
               </TabsContent>

@@ -134,7 +134,7 @@ const STATUS_CONFIG: Record<StatusValue, StatusConfig> = {
   run_overdue: {
     label: "Overdue",
     className:
-      "border-red-600/30 bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400",
+      "border-red-400/30 bg-red-50/60 text-red-600 dark:bg-red-900/10 dark:text-red-300",
     icon: <Clock className="h-3 w-3" />,
   },
   behind: {
