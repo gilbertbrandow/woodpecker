@@ -21,7 +21,7 @@ function renderStats(
   }
   return render(
     <TooltipProvider>
-      <OverviewStatsSection runIndex={0} accuracy={accuracy} averageSolveTime={averageSolveTime} />
+      <OverviewStatsSection accuracy={accuracy} averageSolveTime={averageSolveTime} />
     </TooltipProvider>,
   )
 }

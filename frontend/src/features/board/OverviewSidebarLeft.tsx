@@ -5,7 +5,6 @@ import { OverviewStatsSection } from './OverviewStatsSection'
 import { RunPaceCard } from './RunPaceCard'
 
 type OverviewSidebarLeftProps = {
-  runIndex: number
   paceChart: PaceChartData | null
   isRunActive: boolean
   accuracy: RunTrainingItemOverview['stats']['accuracy']
@@ -15,7 +14,6 @@ type OverviewSidebarLeftProps = {
 }
 
 export function OverviewSidebarLeft({
-  runIndex,
   paceChart,
   isRunActive,
   accuracy,
@@ -27,7 +25,6 @@ export function OverviewSidebarLeft({
     <>
       {paceChart !== null && <RunPaceCard chartData={paceChart} isRunActive={isRunActive} stretch />}
       <OverviewStatsSection
-        runIndex={runIndex}
         accuracy={accuracy}
         averageSolveTime={averageSolveTime}
       />

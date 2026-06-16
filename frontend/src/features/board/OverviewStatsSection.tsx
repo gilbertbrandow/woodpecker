@@ -5,12 +5,11 @@ import { formatSolveTimeMs } from '../../lib/utils'
 import type { RunTrainingItemOverview } from '../../lib/api'
 
 type OverviewStatsSectionProps = {
-  runIndex: number
   accuracy: RunTrainingItemOverview['stats']['accuracy']
   averageSolveTime: RunTrainingItemOverview['stats']['averageSolveTime']
 }
 
-export function OverviewStatsSection({ runIndex, accuracy, averageSolveTime }: OverviewStatsSectionProps): React.ReactElement {
+export function OverviewStatsSection({ accuracy, averageSolveTime }: OverviewStatsSectionProps): React.ReactElement {
   return (
     <div className="flex flex-col gap-4 rounded-lg border bg-card p-4">
       <span>Averages</span>

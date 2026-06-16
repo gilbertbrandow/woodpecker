@@ -360,7 +360,6 @@ export function BoardPage(): React.ReactElement | null {
     ctrl.mode === 'overview' && overviewData !== null ? (
       <div className="flex flex-col gap-5">
         <OverviewStatsSection
-          runIndex={overviewData.stats.runIndex}
           accuracy={{ ...overviewData.stats.accuracy, deltaPct: selectedAccuracyDelta }}
           averageSolveTime={{ ...overviewData.stats.averageSolveTime, deltaMs: selectedSolveTimeDelta }}
         />
@@ -390,7 +389,6 @@ export function BoardPage(): React.ReactElement | null {
   const leftNode =
     ctrl.mode === 'overview' && overviewData !== null ? (
       <OverviewSidebarLeft
-        runIndex={overviewData.stats.runIndex}
         paceChart={overviewData.runPace.chartData}
         isRunActive={overviewData.runPace.isRunActive}
         accuracy={{ ...overviewData.stats.accuracy, deltaPct: selectedAccuracyDelta }}
