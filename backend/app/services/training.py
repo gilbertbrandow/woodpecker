@@ -14,10 +14,15 @@ from app.services.schedule_config import ScheduleConfig, RunDefinition
 from app.services.training_state import compute_training_state
 
 
-def _get_owned_training(training_id: int, user_id: int) -> Training:
+def _get_training(training_id: int) -> Training:
     training = db.session.get(Training, training_id)
     if training is None:
         raise NotFoundError("Training not found", "The requested training does not exist.")
+    return training
+
+
+def _get_owned_training(training_id: int, user_id: int) -> Training:
+    training = _get_training(training_id)
     if training.user_id != user_id:
         raise ForbiddenError("Access denied", "You do not have permission to perform this action.")
     return training
@@ -657,8 +662,9 @@ def _build_expected_anchors_from(
 def _load_training_context(
     training_id: int,
     user_id: int,
+    require_owner: bool = True,
 ) -> tuple[Training, ScheduleConfig, int]:
-    training = _get_owned_training(training_id, user_id)
+    training = _get_owned_training(training_id, user_id) if require_owner else _get_training(training_id)
     schedule = db.session.get(Schedule, training.schedule_id)
     if schedule is None or not isinstance(schedule.config, dict):
         raise NotFoundError("Schedule not found", "The requested schedule does not exist.")
@@ -701,7 +707,7 @@ def _get_active_run_resolved(active_run: Run) -> tuple[int, int]:
 
 
 def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
-    training, schedule_cfg, puzzle_count = _load_training_context(training_id, user_id)
+    training, schedule_cfg, puzzle_count = _load_training_context(training_id, user_id, require_owner=False)
 
     now = datetime.now(timezone.utc)
     now_ms = _ms(now)
@@ -832,7 +838,7 @@ def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
 
 
 def get_training_detail_status(training_id: int, user_id: int, tz_str: str = "UTC") -> dict[str, object]:
-    training, schedule_cfg, puzzle_count = _load_training_context(training_id, user_id)
+    training, schedule_cfg, puzzle_count = _load_training_context(training_id, user_id, require_owner=False)
 
     now = datetime.now(timezone.utc)
     now_ms = _ms(now)
