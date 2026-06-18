@@ -758,7 +758,10 @@ def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
                 cursor_ms = run_end_ms
         elif is_active:
             assert active_run is not None
-            run_end_ms = _ms(active_run.started_at) + int(run_def.target_hours * 3_600_000)
+            target_ms = int(run_def.target_hours * 3_600_000)
+            remaining_puzzles = puzzle_count - active_resolved
+            run_end_ms = now_ms + int(remaining_puzzles * target_ms / puzzle_count) if puzzle_count > 0 else now_ms + target_ms
+            run_end_ms = max(run_end_ms, now_ms + 1)
             # Anchor at the actual current position so the dotted line starts where the
             # actual area ends, then slope to completing all run puzzles by the deadline.
             updated_anchors.append({"timeMs": float(now_ms), "value": float(actual_at_now)})
