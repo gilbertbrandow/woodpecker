@@ -66,6 +66,7 @@ export function LeaderboardPage(): React.ReactElement | null {
           </span>
         </div>
         <WeeklyLeaderboard
+          tableId="weekly"
           rows={weeklyRows}
           currentUserDisplayName={user.displayName}
           loading={weeklyLoading}
@@ -76,10 +77,11 @@ export function LeaderboardPage(): React.ReactElement | null {
         <div className="flex items-center justify-between border-b pb-2.5">
           <span className="text-sm font-medium">Run board</span>
           <span className="hidden text-xs text-muted-foreground sm:block">
-            One row per run — sort by Δ accuracy to find best improvers
+            One row per run
           </span>
         </div>
         <RunLeaderboard
+          tableId="run"
           rows={runRows}
           scheduleId={selectedScheduleId}
           allowFiltering

@@ -20,17 +20,20 @@ import {
   AlertDialogCancel,
 } from "../ui/alert-dialog";
 import { useAuth } from "../../context/auth";
-import type { ScheduleSummary, SelectableUser } from "../../lib/api";
+import type { ScheduleSummary } from "../../lib/api";
 import { api } from "../../lib/api";
 import { formatDuration } from "./DurationInput";
 import { useDebounce } from "../../hooks/useDebounce";
 import { toast } from "../../lib/toast";
+import { useTableUrlSync } from "../../hooks/useTableUrlSync";
+import { useUrlHydratedFilter } from "../../hooks/useUrlHydratedFilter";
 
 const PAGE_SIZE = 20;
 
 type SchedulesTableProps = {
   subsetId?: number;
   onCountChange?: (count: number) => void;
+  tableId?: string;
 };
 
 function formatDate(iso: string): string {
@@ -44,29 +47,57 @@ function formatDate(iso: string): string {
 export function SchedulesTable({
   subsetId,
   onCountChange,
+  tableId,
 }: SchedulesTableProps): React.ReactElement {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { getParam, getMultiParam, setParams } = useTableUrlSync(tableId);
+
+  const {
+    value: selectedUsers,
+    setValue: setSelectedUsers,
+    isHydrating: usersHydrating,
+    syncedFilter: userSyncedFilter,
+  } = useUrlHydratedFilter({
+    urlKey: 'userIds',
+    tableId,
+    fetchByIds: (ids) => api.users.getByIds(ids.map(Number)),
+    getIdFromItem: (u) => String(u.id),
+    resolveInstant: user ? (id) => String(user.id) === id
+      ? { id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl }
+      : null : undefined,
+  });
 
   const [schedules, setSchedules] = useState<ScheduleSummary[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => {
+    const p = getParam("page");
+    return p ? Math.max(1, parseInt(p, 10)) : 1;
+  });
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const [search, setSearch] = useState("");
-  const [selectedUsers, setSelectedUsers] = useState<SelectableUser[]>([]);
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [search, setSearch] = useState(() => getParam("q") ?? "");
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(() =>
+    getMultiParam("statuses"),
+  );
 
   const debouncedSearch = useDebounce(search, 300);
 
+  // Sync debounced search to URL; skip first render to preserve URL-restored page
+  const searchMountedRef = useRef(false);
   useEffect(() => {
+    if (!searchMountedRef.current) {
+      searchMountedRef.current = true;
+      return;
+    }
     setPage(1);
-  }, [debouncedSearch, selectedUsers, selectedStatuses]);
+    setParams({ q: debouncedSearch || null, page: null });
+  }, [debouncedSearch, setParams]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || usersHydrating) return;
     setLoading(true);
     api.schedules
       .list({
@@ -87,6 +118,7 @@ export function SchedulesTable({
       .finally(() => setLoading(false));
   }, [
     user,
+    usersHydrating,
     subsetId,
     debouncedSearch,
     page,
@@ -97,7 +129,7 @@ export function SchedulesTable({
   ]);
 
   const statusFilterColumn = {
-    id: "status",
+    id: "statuses",
     label: "statuses",
     options: [
       {
@@ -113,7 +145,6 @@ export function SchedulesTable({
     ],
   };
 
-  // Refs keep cell renderers current without invalidating the columns memo
   const deletingIdRef = useRef(deletingId);
   deletingIdRef.current = deletingId;
 
@@ -260,6 +291,7 @@ export function SchedulesTable({
 
   return (
     <DataTable
+      tableId={tableId}
       columns={columns}
       data={schedules}
       loading={loading}
@@ -275,14 +307,21 @@ export function SchedulesTable({
               className="h-8 pl-7 text-sm sm:w-56"
             />
           </div>
-          <UserSelector value={selectedUsers} onChange={setSelectedUsers} />
+          <UserSelector
+            value={selectedUsers}
+            onChange={(users) => { setSelectedUsers(users); setPage(1); }}
+          />
         </>
       }
       filterableColumns={[statusFilterColumn]}
       onFilterChange={(id, values) => {
-        if (id === "status") setSelectedStatuses(values);
+        if (id === "statuses") {
+          setSelectedStatuses(values);
+          setPage(1);
+        }
       }}
-      filtersActive={search !== "" || selectedUsers.length > 0}
+      syncedFilters={[userSyncedFilter]}
+      filtersActive={search !== ""}
       onClearFilters={() => {
         setSearch("");
         setSelectedUsers([]);

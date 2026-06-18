@@ -14,10 +14,15 @@ from app.services.schedule_config import ScheduleConfig, RunDefinition
 from app.services.training_state import compute_training_state
 
 
-def _get_owned_training(training_id: int, user_id: int) -> Training:
+def _get_training(training_id: int) -> Training:
     training = db.session.get(Training, training_id)
     if training is None:
         raise NotFoundError("Training not found", "The requested training does not exist.")
+    return training
+
+
+def _get_owned_training(training_id: int, user_id: int) -> Training:
+    training = _get_training(training_id)
     if training.user_id != user_id:
         raise ForbiddenError("Access denied", "You do not have permission to perform this action.")
     return training
@@ -657,8 +662,9 @@ def _build_expected_anchors_from(
 def _load_training_context(
     training_id: int,
     user_id: int,
+    require_owner: bool = True,
 ) -> tuple[Training, ScheduleConfig, int]:
-    training = _get_owned_training(training_id, user_id)
+    training = _get_owned_training(training_id, user_id) if require_owner else _get_training(training_id)
     schedule = db.session.get(Schedule, training.schedule_id)
     if schedule is None or not isinstance(schedule.config, dict):
         raise NotFoundError("Schedule not found", "The requested schedule does not exist.")
@@ -701,7 +707,7 @@ def _get_active_run_resolved(active_run: Run) -> tuple[int, int]:
 
 
 def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
-    training, schedule_cfg, puzzle_count = _load_training_context(training_id, user_id)
+    training, schedule_cfg, puzzle_count = _load_training_context(training_id, user_id, require_owner=False)
 
     now = datetime.now(timezone.utc)
     now_ms = _ms(now)
@@ -752,7 +758,10 @@ def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
                 cursor_ms = run_end_ms
         elif is_active:
             assert active_run is not None
-            run_end_ms = _ms(active_run.started_at) + int(run_def.target_hours * 3_600_000)
+            target_ms = int(run_def.target_hours * 3_600_000)
+            remaining_puzzles = puzzle_count - active_resolved
+            run_end_ms = now_ms + int(remaining_puzzles * target_ms / puzzle_count) if puzzle_count > 0 else now_ms + target_ms
+            run_end_ms = max(run_end_ms, now_ms + 1)
             # Anchor at the actual current position so the dotted line starts where the
             # actual area ends, then slope to completing all run puzzles by the deadline.
             updated_anchors.append({"timeMs": float(now_ms), "value": float(actual_at_now)})
@@ -765,9 +774,10 @@ def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
             else:
                 cursor_ms = run_end_ms
         else:
-            if not updated_anchors or updated_anchors[-1]["timeMs"] != float(cursor_ms):
-                updated_anchors.append({"timeMs": float(cursor_ms), "value": cumulative})
-            run_end_ms = cursor_ms + int(run_def.target_hours * 3_600_000)
+            run_start_ms = max(cursor_ms, now_ms)
+            if not updated_anchors or updated_anchors[-1]["timeMs"] != float(run_start_ms):
+                updated_anchors.append({"timeMs": float(run_start_ms), "value": cumulative})
+            run_end_ms = run_start_ms + int(run_def.target_hours * 3_600_000)
             cumulative += puzzle_count
             updated_anchors.append({"timeMs": float(run_end_ms), "value": cumulative})
             if run_def.break_after_hours > 0:
@@ -795,6 +805,10 @@ def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
         else:
             actual_anchors.append({"timeMs": float(now_ms), "value": float(cum_actual + active_resolved)})
             last_actual_ms = now_ms
+
+    if last_actual_ms < now_ms:
+        actual_anchors.append({"timeMs": float(now_ms), "value": cum_actual})
+        last_actual_ms = now_ms
 
     # Guarantee the dotted updated-expected line starts exactly at today, not at
     # the next future anchor (which could be tomorrow or later for non-active runs).
@@ -827,7 +841,7 @@ def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
 
 
 def get_training_detail_status(training_id: int, user_id: int, tz_str: str = "UTC") -> dict[str, object]:
-    training, schedule_cfg, puzzle_count = _load_training_context(training_id, user_id)
+    training, schedule_cfg, puzzle_count = _load_training_context(training_id, user_id, require_owner=False)
 
     now = datetime.now(timezone.utc)
     now_ms = _ms(now)

@@ -11,10 +11,11 @@ type Props = {
   rows: WeeklyLeaderboardRow[]
   currentUserDisplayName?: string
   loading?: boolean
+  tableId?: string
 }
 
 
-export function WeeklyLeaderboard({ rows, currentUserDisplayName, loading = false }: Props): React.ReactElement {
+export function WeeklyLeaderboard({ rows, currentUserDisplayName, loading = false, tableId }: Props): React.ReactElement {
   const columns = useMemo<ColumnDef<WeeklyLeaderboardRow>[]>(
     () => [
       {
@@ -91,6 +92,7 @@ export function WeeklyLeaderboard({ rows, currentUserDisplayName, loading = fals
 
   return (
     <DataTable
+      tableId={tableId}
       columns={columns}
       data={rows}
       hideSearch

@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -23,6 +23,7 @@ import {
 } from './ui/table'
 import { MultiSelectFilter } from './ui/multi-select-filter'
 import { cn } from '../lib/utils'
+import { useTableUrlSync } from '../hooks/useTableUrlSync'
 
 type ColMeta = { className?: string }
 
@@ -32,11 +33,32 @@ export type FilterableColumn = {
   options: { label: string; value: string; icon?: React.ReactNode }[]
 }
 
+export type SyncedFilter = {
+  key: string
+  value: string[]
+  onChange: (values: string[]) => void
+}
+
 export type ServerPagination = {
   totalRows: number
   page: number
   pageSize: number
   onPageChange: (page: number) => void
+}
+
+function parseSortParam(sortParam: string | undefined): SortingState {
+  if (!sortParam) return []
+  const colonIdx = sortParam.lastIndexOf(':')
+  if (colonIdx <= 0) return []
+  const col = sortParam.slice(0, colonIdx)
+  const dir = sortParam.slice(colonIdx + 1)
+  if (!col || (dir !== 'asc' && dir !== 'desc')) return []
+  return [{ id: col, desc: dir === 'desc' }]
+}
+
+function encodeSortParam(sorting: SortingState): string | null {
+  if (!sorting[0]) return null
+  return `${sorting[0].id}:${sorting[0].desc ? 'desc' : 'asc'}`
 }
 
 type DataTableProps<T> = {
@@ -56,6 +78,8 @@ type DataTableProps<T> = {
   onFilterChange?: (id: string, values: string[]) => void
   filtersActive?: boolean
   onClearFilters?: () => void
+  tableId?: string | false
+  syncedFilters?: SyncedFilter[]
 }
 
 export function DataTable<T>({
@@ -75,11 +99,42 @@ export function DataTable<T>({
   onFilterChange,
   filtersActive = false,
   onClearFilters,
+  tableId,
+  syncedFilters,
 }: DataTableProps<T>): React.ReactElement {
-  const [sorting, setSorting] = useState<SortingState>(initialSorting)
-  const [globalFilter, setGlobalFilter] = useState('')
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [filterSelections, setFilterSelections] = useState<Record<string, string[]>>({})
+  const { getParam, getMultiParam, setParams } = useTableUrlSync(tableId)
+
+  const [sorting, setSorting] = useState<SortingState>(() => {
+    const fromUrl = parseSortParam(getParam('sort'))
+    return fromUrl.length > 0 ? fromUrl : initialSorting
+  })
+
+  const [globalFilter, setGlobalFilter] = useState<string>(() => getParam('q') ?? '')
+
+  const [filterSelections, setFilterSelections] = useState<Record<string, string[]>>(() => {
+    const init: Record<string, string[]> = {}
+    filterableColumns.forEach((fc) => {
+      const vals = getMultiParam(fc.id)
+      if (vals.length > 0) init[fc.id] = vals
+    })
+    return init
+  })
+
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(() => {
+    const init: ColumnFiltersState = []
+    filterableColumns.forEach((fc) => {
+      const vals = getMultiParam(fc.id)
+      if (vals.length > 0) init.push({ id: fc.id, value: vals })
+    })
+    return init
+  })
+
+  const [urlPageIndex] = useState(() => {
+    const p = getParam('page')
+    if (!p) return 0
+    const n = parseInt(p, 10)
+    return Number.isInteger(n) && n >= 1 ? n - 1 : 0
+  })
 
   const table = useReactTable({
     data,
@@ -93,6 +148,7 @@ export function DataTable<T>({
       const next = typeof updater === 'function' ? updater(sorting) : updater
       setSorting(next)
       table.setPageIndex(0)
+      setParams({ sort: encodeSortParam(next), page: null })
     },
     onGlobalFilterChange: (value: string) => {
       setGlobalFilter(value)
@@ -110,7 +166,7 @@ export function DataTable<T>({
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     initialState: {
-      pagination: { pageIndex: 0, pageSize },
+      pagination: { pageIndex: serverPagination ? 0 : urlPageIndex, pageSize },
       sorting: initialSorting,
     },
   })
@@ -126,21 +182,53 @@ export function DataTable<T>({
       })
       table.setPageIndex(0)
     }
+    setParams({ [id]: values.length > 0 ? values : null, page: null })
   }
+
+  // Serialize synced filter values into a stable string so the effect below can use it as a
+  // dependency. We intentionally avoid depending on the syncedFilters array reference (which is
+  // a new object every render) and instead trigger only when the actual values change.
+  const syncedFilterValues = syncedFilters?.map((f) => f.value.join(',')).join('|') ?? ''
+  const syncedFiltersInitializedRef = useRef(false)
+  useEffect(() => {
+    if (!syncedFilters?.length) return
+    const updates: Record<string, string | string[] | null> = {}
+    // syncedFilters is captured via closure — always reflects the current render's values
+    // because this effect only runs when syncedFilterValues (the serialised snapshot) changes.
+    syncedFilters.forEach((f) => {
+      updates[f.key] = f.value.length > 0 ? f.value : null
+    })
+    if (syncedFiltersInitializedRef.current) {
+      updates.page = null
+    }
+    syncedFiltersInitializedRef.current = true
+    setParams(updates)
+  // syncedFilters is intentionally omitted — see comment above
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncedFilterValues])
 
   const hasActiveFilters =
     filtersActive ||
     globalFilter !== '' ||
     columnFilters.length > 0 ||
-    Object.values(filterSelections).some((v) => v.length > 0)
+    Object.values(filterSelections).some((v) => v.length > 0) ||
+    (syncedFilters?.some((f) => f.value.length > 0) ?? false)
 
   const clearFilters = (): void => {
     setGlobalFilter('')
     setColumnFilters([])
     setFilterSelections({})
+    setSorting(initialSorting)
     filterableColumns.forEach((fc) => onFilterChange?.(fc.id, []))
-    onClearFilters?.()
+    syncedFilters?.forEach((f) => f.onChange([]))
     table.setPageIndex(0)
+
+    const toClear: Record<string, null> = { q: null, sort: null, page: null }
+    filterableColumns.forEach((fc) => { toClear[fc.id] = null })
+    syncedFilters?.forEach((f) => { toClear[f.key] = null })
+    setParams(toClear)  // Clear URL first so onClearFilters can write back defaults
+
+    onClearFilters?.()
   }
 
   const { pageIndex } = table.getState().pagination
@@ -160,8 +248,10 @@ export function DataTable<T>({
                 placeholder={globalFilterPlaceholder}
                 value={globalFilter}
                 onChange={(e) => {
-                  setGlobalFilter(e.target.value)
+                  const val = e.target.value
+                  setGlobalFilter(val)
                   table.setPageIndex(0)
+                  setParams({ q: val || null, page: null })
                 }}
                 className="h-8 pl-7 text-sm sm:w-56"
               />
@@ -187,11 +277,10 @@ export function DataTable<T>({
               Clear filters
             </button>
           )}
-          {loading && <Loader2 className="ml-auto h-4 w-4 animate-spin text-muted-foreground" />}
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-md border">
+      <div className="relative overflow-x-auto rounded-md border">
         <Table className="min-w-max">
           <TableHeader>
             {table.getHeaderGroups().map((hg) => (
@@ -228,8 +317,8 @@ export function DataTable<T>({
           <TableBody>
             {loading && pageRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="py-12 text-center">
-                  <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
+                <TableCell colSpan={columns.length} className="h-10 text-center">
+                  <Loader2 className="mx-auto h-4 w-4 animate-spin text-muted-foreground" />
                 </TableCell>
               </TableRow>
             ) : pageRows.length === 0 ? (
@@ -261,6 +350,11 @@ export function DataTable<T>({
             )}
           </TableBody>
         </Table>
+        {loading && pageRows.length > 0 && (
+          <div className="absolute inset-0 flex items-center justify-center rounded-md backdrop-blur-[2px] bg-background/40">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        )}
       </div>
 
       {serverPagination ? (
@@ -273,7 +367,11 @@ export function DataTable<T>({
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => serverPagination.onPageChange(serverPagination.page - 1)}
+              onClick={() => {
+                const newPage = serverPagination.page - 1
+                serverPagination.onPageChange(newPage)
+                setParams({ page: newPage <= 1 ? null : String(newPage) })
+              }}
               disabled={serverPagination.page <= 1 || loading}
               className="flex items-center gap-0.5 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
             >
@@ -285,7 +383,11 @@ export function DataTable<T>({
             </span>
             <button
               type="button"
-              onClick={() => serverPagination.onPageChange(serverPagination.page + 1)}
+              onClick={() => {
+                const newPage = serverPagination.page + 1
+                serverPagination.onPageChange(newPage)
+                setParams({ page: String(newPage) })
+              }}
               disabled={serverPagination.page * serverPagination.pageSize >= serverPagination.totalRows || loading}
               className="flex items-center gap-0.5 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
             >
@@ -304,7 +406,10 @@ export function DataTable<T>({
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => table.previousPage()}
+              onClick={() => {
+                table.previousPage()
+                setParams({ page: pageIndex <= 1 ? null : String(pageIndex) })
+              }}
               disabled={!table.getCanPreviousPage()}
               className="flex items-center gap-0.5 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
             >
@@ -316,7 +421,10 @@ export function DataTable<T>({
             </span>
             <button
               type="button"
-              onClick={() => table.nextPage()}
+              onClick={() => {
+                table.nextPage()
+                setParams({ page: String(pageIndex + 2) })
+              }}
               disabled={!table.getCanNextPage()}
               className="flex items-center gap-0.5 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
             >

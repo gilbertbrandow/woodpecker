@@ -3,7 +3,7 @@ import * as React from 'react'
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams, Link } from '@tanstack/react-router'
 import { toast } from '../lib/toast'
-import { Ban, ChevronDown, Play } from 'lucide-react'
+import { Ban, ChevronDown, Loader2, Play } from 'lucide-react'
 import { type ColumnDef } from '@tanstack/react-table'
 import {
   ComposedChart,
@@ -46,8 +46,7 @@ import {
 } from '../components/ui/alert-dialog'
 import { Button } from '../components/ui/button'
 import { UserAvatar } from '../components/UserAvatar'
-import { Badge } from '../components/ui/badge'
-import { StatusBadge, trainingStateToStatusValue } from '../components/StatusBadge'
+import { StatusBadge, runStatusToStatusValue, trainingStateToStatusValue, type StatusValue } from '../components/StatusBadge'
 import { ProgressBar } from '../components/ProgressBar'
 import { DataTable } from '../components/DataTable'
 import { formatDuration } from '../components/schedules/DurationInput'
@@ -99,13 +98,6 @@ function formatSolveSeconds(secs: number): string {
   const m = Math.floor(secs / 60)
   const s = secs % 60
   return `${m}:${String(s).padStart(2, '0')}`
-}
-
-const SLOT_STATUS_LABELS: Record<'not_started' | 'active' | 'completed' | 'aborted', string> = {
-  not_started: 'Not started',
-  active: 'In progress',
-  completed: 'Completed',
-  aborted: 'Aborted',
 }
 
 type RunSlotRow = {
@@ -297,13 +289,10 @@ export function TrainingPage(): React.ReactElement | null {
         enableSorting: false,
         cell: ({ row }) => {
           const { slotStatus } = row.original
-          return slotStatus === 'active' ? (
-            <Badge variant="outline" className="text-xs border-blue-500/30 bg-blue-500/10 text-blue-600 dark:border-blue-400/30 dark:bg-blue-400/10 dark:text-blue-400">
-              {SLOT_STATUS_LABELS[slotStatus]}
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="text-xs">{SLOT_STATUS_LABELS[slotStatus]}</Badge>
-          )
+          const statusValue: StatusValue = slotStatus === 'not_started'
+            ? 'not_started'
+            : runStatusToStatusValue(slotStatus)
+          return <StatusBadge status={statusValue} />
         },
       },
       {
@@ -399,7 +388,9 @@ export function TrainingPage(): React.ReactElement | null {
   if (pageLoading) {
     return (
       <PageWrapper>
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
       </PageWrapper>
     )
   }
@@ -551,7 +542,9 @@ export function TrainingPage(): React.ReactElement | null {
                   {progress ? (
                     <TrainingProgressCard progress={progress} />
                   ) : (
-                    <p className="text-sm text-muted-foreground">Loading…</p>
+                    <div className="flex justify-center py-6">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
                   )}
                 </div>
               </CollapsibleContent>
@@ -647,7 +640,9 @@ export function TrainingPage(): React.ReactElement | null {
                           </p>
                         </div>
                         {insightsLoading ? (
-                          <p className="text-sm text-muted-foreground">Loading…</p>
+                          <div className="flex justify-center py-6">
+                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                          </div>
                         ) : (
                           <ChartContainer config={SOLVE_TIME_CONFIG} className="h-56 min-w-0 w-full">
                             <ComposedChart

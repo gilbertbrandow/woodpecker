@@ -56,6 +56,14 @@ export type RunTrainingItemOverviewSearch = {
   attempt?: number
 }
 
+function validateTableSearch(search: Record<string, unknown>): Record<string, string | undefined> {
+  const result: Record<string, string | undefined> = {}
+  for (const [k, v] of Object.entries(search)) {
+    if (typeof v === 'string') result[k] = v
+  }
+  return result
+}
+
 function validateRunPuzzleOverviewSearch(search: Record<string, unknown>): RunTrainingItemOverviewSearch {
   const rawAttempt = search.attempt
   if (rawAttempt === undefined || rawAttempt === null || rawAttempt === '') {
@@ -154,6 +162,7 @@ const subsetsListRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/subsets',
   staticData: { crumb: { group: 'Setup', leaf: 'Subsets' } },
+  validateSearch: validateTableSearch,
   component: SubsetsListPage,
 })
 
@@ -168,6 +177,7 @@ const subsetRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/subsets/$subsetId',
   staticData: { crumb: { group: 'Setup', parents: [{ label: 'Subsets', to: '/app/subsets' }], leaf: null } },
+  validateSearch: validateTableSearch,
   component: SubsetPage,
 })
 
@@ -175,6 +185,7 @@ const schedulesListRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/schedules',
   staticData: { crumb: { group: 'Setup', leaf: 'Schedules' } },
+  validateSearch: validateTableSearch,
   component: SchedulesListPage,
 })
 
@@ -189,6 +200,7 @@ const scheduleRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/schedules/$scheduleId',
   staticData: { crumb: { group: 'Setup', parents: [{ label: 'Schedules', to: '/app/schedules' }], leaf: null } },
+  validateSearch: validateTableSearch,
   component: SchedulePage,
 })
 
@@ -196,6 +208,7 @@ const trainingListRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/training',
   staticData: { crumb: { group: 'Activity', leaf: 'Training' } },
+  validateSearch: validateTableSearch,
   component: TrainingListPage,
 })
 
@@ -210,6 +223,7 @@ const trainingRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/training/$trainingId',
   staticData: { crumb: { group: 'Activity', parents: [{ label: 'Training', to: '/app/training' }], leaf: null } },
+  validateSearch: validateTableSearch,
   component: TrainingPage,
 })
 
@@ -217,6 +231,7 @@ const leaderboardRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/leaderboards',
   staticData: { crumb: { group: 'Activity', leaf: 'Leaderboards' } },
+  validateSearch: validateTableSearch,
   component: LeaderboardPage,
 })
 
@@ -252,6 +267,7 @@ const runRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/runs/$runId',
   staticData: { crumb: { group: 'Activity', parents: [{ label: 'Training', to: '/app/training' }], leaf: null } },
+  validateSearch: validateTableSearch,
   component: RunPage,
 })
 

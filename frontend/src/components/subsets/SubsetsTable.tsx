@@ -24,6 +24,8 @@ import type { Subset, SelectableUser } from '../../lib/api'
 import { api } from '../../lib/api'
 import { useDebounce } from '../../hooks/useDebounce'
 import { toast } from '../../lib/toast'
+import { useTableUrlSync } from '../../hooks/useTableUrlSync'
+import { useUrlHydratedFilter } from '../../hooks/useUrlHydratedFilter'
 
 const PAGE_SIZE = 20
 
@@ -38,26 +40,53 @@ function formatDate(iso: string): string {
 export function SubsetsTable(): React.ReactElement {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { getParam, getMultiParam, setParams } = useTableUrlSync(undefined)
+
+  const {
+    value: selectedUsers,
+    setValue: setSelectedUsers,
+    isHydrating: usersHydrating,
+    syncedFilter: userSyncedFilter,
+  } = useUrlHydratedFilter<SelectableUser>({
+    urlKey: 'userIds',
+    tableId: undefined,
+    fetchByIds: (ids) => api.users.getByIds(ids.map(Number)),
+    getIdFromItem: (u) => String(u.id),
+    resolveInstant: user ? (id) => String(user.id) === id
+      ? { id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl }
+      : null : undefined,
+  })
 
   const [subsets, setSubsets] = useState<Subset[]>([])
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useState(() => {
+    const p = getParam('page')
+    return p ? Math.max(1, parseInt(p, 10)) : 1
+  })
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
 
-  const [search, setSearch] = useState('')
-  const [selectedUsers, setSelectedUsers] = useState<SelectableUser[]>([])
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
+  const [search, setSearch] = useState(() => getParam('q') ?? '')
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(() =>
+    getMultiParam('statuses'),
+  )
 
   const debouncedSearch = useDebounce(search, 300)
 
+  // Sync debounced search to URL; skip first render to preserve URL-restored page
+  const searchMountedRef = useRef(false)
   useEffect(() => {
+    if (!searchMountedRef.current) {
+      searchMountedRef.current = true
+      return
+    }
     setPage(1)
-  }, [debouncedSearch, selectedUsers, selectedStatuses])
+    setParams({ q: debouncedSearch || null, page: null })
+  }, [debouncedSearch, setParams])
 
   useEffect(() => {
-    if (!user) return
+    if (!user || usersHydrating) return
     setLoading(true)
     api.subsets
       .list({
@@ -73,10 +102,10 @@ export function SubsetsTable(): React.ReactElement {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [user, debouncedSearch, page, selectedUsers, selectedStatuses, refreshKey])
+  }, [user, usersHydrating, debouncedSearch, page, selectedUsers, selectedStatuses, refreshKey])
 
   const statusFilterColumn = {
-    id: 'status',
+    id: 'statuses',
     label: 'statuses',
     options: [
       { label: 'Draft', value: 'draft', icon: <PencilLine className="h-3.5 w-3.5 text-muted-foreground" /> },
@@ -85,7 +114,6 @@ export function SubsetsTable(): React.ReactElement {
     ],
   }
 
-  // Refs keep cell renderers current without invalidating the columns memo
   const deletingIdRef = useRef(deletingId)
   deletingIdRef.current = deletingId
 
@@ -212,14 +240,21 @@ export function SubsetsTable(): React.ReactElement {
               className="h-8 pl-7 text-sm sm:w-56"
             />
           </div>
-          <UserSelector value={selectedUsers} onChange={setSelectedUsers} />
+          <UserSelector
+            value={selectedUsers}
+            onChange={(users) => { setSelectedUsers(users); setPage(1) }}
+          />
         </>
       }
       filterableColumns={[statusFilterColumn]}
       onFilterChange={(id, values) => {
-        if (id === 'status') setSelectedStatuses(values)
+        if (id === 'statuses') {
+          setSelectedStatuses(values)
+          setPage(1)
+        }
       }}
-      filtersActive={search !== '' || selectedUsers.length > 0}
+      syncedFilters={[userSyncedFilter]}
+      filtersActive={search !== ''}
       onClearFilters={() => {
         setSearch('')
         setSelectedUsers([])

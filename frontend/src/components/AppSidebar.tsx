@@ -36,12 +36,18 @@ type NavItem = {
   label: string
   to: string
   icon: React.ComponentType<{ className?: string }>
+  search?: Record<string, string>
 }
 
 const ACTIVITY_ITEMS: NavItem[] = [
   { label: 'Dashboard', to: '/app', icon: LayoutDashboard },
   { label: 'Leaderboards', to: '/app/leaderboards', icon: Trophy },
-  { label: 'Training', to: '/app/training', icon: Puzzle },
+  {
+    label: 'Training',
+    to: '/app/training',
+    icon: Puzzle,
+    search: { status: 'not_started,active_run_ahead,active_run_on_track,active_run_behind,active_run_overdue,scheduled_break,overdue_to_start_next_run,completed' },
+  },
 ]
 
 const SETUP_ITEMS: NavItem[] = [
@@ -162,12 +168,12 @@ export function AppSidebar({ activeRun, collapsible = 'icon' }: AppSidebarProps)
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )}
-            {ACTIVITY_ITEMS.map(({ label, to, icon: Icon }) => {
+            {ACTIVITY_ITEMS.map(({ label, to, icon: Icon, search }) => {
               const isActive = to === '/app' ? pathname === '/app' : pathname.startsWith(to)
               return (
                 <SidebarMenuItem key={to}>
                   <SidebarMenuButton asChild isActive={isActive} tooltip={label}>
-                    <Link to={to} onClick={closeMobile}>
+                    <Link to={to} search={search} onClick={closeMobile}>
                       <Icon className="h-4 w-4" />
                       <span>{label}</span>
                     </Link>

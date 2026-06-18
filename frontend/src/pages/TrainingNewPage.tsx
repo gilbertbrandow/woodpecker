@@ -127,6 +127,7 @@ export function TrainingNewPage(): React.ReactElement | null {
       ) : (
         <div className="flex flex-col gap-6">
           <DataTable
+            tableId={false}
             columns={columns}
             data={schedules}
             globalFilterPlaceholder="Search schedules…"

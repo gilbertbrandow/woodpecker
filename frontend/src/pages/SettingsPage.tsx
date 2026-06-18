@@ -64,7 +64,7 @@ export function SettingsPage(): React.ReactElement | null {
 <section className="py-10 border-b border-border">
         <h2 className="text-base font-semibold mb-6">Solve Settings</h2>
 
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Board theme</h3>
+        <h3 className="text-sm font-semibold mb-3">Board theme</h3>
         <div className="flex flex-wrap gap-2">
           {BOARD_THEMES.map((theme) => {
             const isActive = resolveBoardTheme(user.boardTheme ?? '').id === theme.id
@@ -97,7 +97,7 @@ export function SettingsPage(): React.ReactElement | null {
           })}
         </div>
 
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3 mt-6">Piece set</h3>
+        <h3 className="text-sm font-semibold mb-3 mt-6">Piece set</h3>
         <div className="flex flex-wrap gap-2">
           {PIECE_SETS.map((set) => {
             const isActive = resolvePieceSet(user.pieceTheme ?? '').id === set.id

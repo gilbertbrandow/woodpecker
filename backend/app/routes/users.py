@@ -6,6 +6,14 @@ from app.services import user as user_svc
 users_bp = Blueprint("users", __name__, url_prefix="/users")
 
 
+@users_bp.get("/by-ids")
+@login_required
+def get_users_by_ids() -> Response:
+    ids_raw = request.args.get("ids", "")
+    ids = [int(x) for x in ids_raw.split(",") if x.strip().isdigit()]
+    return jsonify(user_svc.get_users_by_ids(ids))
+
+
 @users_bp.get("/search")
 @login_required
 def search_users() -> Response:
