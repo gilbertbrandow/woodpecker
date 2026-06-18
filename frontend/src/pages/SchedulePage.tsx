@@ -784,6 +784,7 @@ export function SchedulePage(): React.ReactElement | null {
               <CollapsibleContent>
                 <div className="pt-4">
                   <RunLeaderboard
+                    tableId="leaderboard"
                     rows={leaderboardRuns}
                     scheduleId={id}
                     allowFiltering
@@ -968,7 +969,7 @@ export function SchedulePage(): React.ReactElement | null {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="pt-4">
-                  <TrainingTable scheduleId={id} hideSchedule />
+                  <TrainingTable tableId="trainings" scheduleId={id} hideSchedule />
                 </div>
               </CollapsibleContent>
             </Collapsible>

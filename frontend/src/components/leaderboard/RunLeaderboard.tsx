@@ -17,6 +17,7 @@ type Props = {
   compact?: boolean
   currentUserDisplayName?: string
   loading?: boolean
+  tableId?: string
 }
 
 function formatDate(iso: string): string {
@@ -52,6 +53,7 @@ export function RunLeaderboard({
   compact = false,
   currentUserDisplayName,
   loading = false,
+  tableId,
 }: Props): React.ReactElement {
   const navigate = useNavigate()
 
@@ -236,6 +238,7 @@ export function RunLeaderboard({
 
   return (
     <DataTable
+      tableId={tableId}
       columns={columns}
       data={rows}
       globalFilterPlaceholder="Search leaderboard…"

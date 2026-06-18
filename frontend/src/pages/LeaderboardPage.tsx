@@ -66,6 +66,7 @@ export function LeaderboardPage(): React.ReactElement | null {
           </span>
         </div>
         <WeeklyLeaderboard
+          tableId="weekly"
           rows={weeklyRows}
           currentUserDisplayName={user.displayName}
           loading={weeklyLoading}
@@ -80,6 +81,7 @@ export function LeaderboardPage(): React.ReactElement | null {
           </span>
         </div>
         <RunLeaderboard
+          tableId="run"
           rows={runRows}
           scheduleId={selectedScheduleId}
           allowFiltering

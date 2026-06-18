@@ -140,6 +140,7 @@ export function ScheduleNewPage(): React.ReactElement | null {
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : (
               <DataTable
+                tableId={false}
                 columns={columns}
                 data={subsets}
                 globalFilterPlaceholder="Search subsets…"
