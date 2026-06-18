@@ -351,6 +351,12 @@ export type SelectableUser = {
   avatarUrl: string | null
 }
 
+export type SelectableSchedule = {
+  id: number
+  name: string
+  status: string
+}
+
 export type ParticipantInfo = {
   id: number
   displayName: string
@@ -1112,6 +1118,12 @@ export const api = {
   users: {
     search: (q: string, limit = 10): Promise<SelectableUser[]> =>
       request(`/users/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+    getByIds: (ids: number[]): Promise<SelectableUser[]> =>
+      ids.length === 0 ? Promise.resolve([]) : request(`/users/by-ids?ids=${ids.join(',')}`),
+  },
+  selectableSchedules: {
+    getByIds: (ids: number[]): Promise<SelectableSchedule[]> =>
+      ids.length === 0 ? Promise.resolve([]) : request(`/schedules/by-ids?ids=${ids.join(',')}`),
   },
   attempts: {
     complete: (

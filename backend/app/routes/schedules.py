@@ -1,3 +1,5 @@
+import sqlalchemy as sa
+
 from flask import Blueprint, Response, jsonify, request, session
 
 from app.decorators import login_required
@@ -16,6 +18,17 @@ def _load_creator(schedule: Schedule) -> User:
     if creator is None:
         raise NotFoundError("User not found", "The schedule creator's account could not be found.")
     return creator
+
+
+@schedules_bp.get("/by-ids")
+@login_required
+def get_schedules_by_ids() -> Response:
+    ids_raw = request.args.get("ids", "")
+    ids = [int(x) for x in ids_raw.split(",") if x.strip().isdigit()]
+    if not ids:
+        return jsonify([])
+    rows = db.session.scalars(sa.select(Schedule).where(Schedule.id.in_(ids))).all()
+    return jsonify([{"id": s.id, "name": s.name, "status": s.status} for s in rows])
 
 
 @schedules_bp.post("")

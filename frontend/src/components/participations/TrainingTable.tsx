@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate, Link } from "@tanstack/react-router";
 import { type ColumnDef } from "@tanstack/react-table";
 import {
@@ -30,12 +30,15 @@ import {
   type SelectableUser,
 } from "../../lib/api";
 import { useDebounce } from "../../hooks/useDebounce";
+import { useTableUrlSync } from "../../hooks/useTableUrlSync";
+import { useUrlHydratedFilter } from "../../hooks/useUrlHydratedFilter";
 
 const PAGE_SIZE = 20;
 
 type TrainingTableProps = {
   scheduleId?: number;
   hideSchedule?: boolean;
+  tableId?: string;
 };
 
 function formatDate(iso: string): string {
@@ -49,80 +52,49 @@ function formatDate(iso: string): string {
 export function TrainingTable({
   scheduleId,
   hideSchedule = false,
+  tableId,
 }: TrainingTableProps): React.ReactElement {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { getParam, getMultiParam, setParams } = useTableUrlSync(tableId);
 
   const [trainings, setTrainings] = useState<AllTrainingSummary[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => {
+    const p = getParam("page");
+    return p ? Math.max(1, parseInt(p, 10)) : 1;
+  });
   const [loading, setLoading] = useState(true);
-  const [searchInput, setSearchInput] = useState("");
+  const [searchInput, setSearchInput] = useState(() => getParam("q") ?? "");
   const debouncedSearch = useDebounce(searchInput, 300);
 
-  const [selectedUsers, setSelectedUsers] = useState<SelectableUser[]>(() =>
-    user && user.status === "active"
-      ? [
-          {
-            id: user.id,
-            displayName: user.displayName,
-            avatarUrl: user.avatarUrl,
-          },
-        ]
-      : [],
-  );
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([
-    "not_started",
-    "active_run_ahead",
-    "active_run_on_track",
-    "active_run_behind",
-    "active_run_overdue",
-    "scheduled_break",
-    "overdue_to_start_next_run",
-    "completed",
-  ]);
-  const userIds = useMemo(
-    () => selectedUsers.map((u) => u.id),
-    [selectedUsers],
-  );
+  const {
+    value: selectedUsers,
+    setValue: setSelectedUsers,
+    isHydrating: usersHydrating,
+    hadInitialIds: hadUrlUserIds,
+    syncedFilter: userSyncedFilter,
+  } = useUrlHydratedFilter<SelectableUser>({
+    urlKey: 'userId',
+    tableId,
+    fetchByIds: (ids) => api.users.getByIds(ids.map(Number)),
+    getIdFromItem: (u) => String(u.id),
+    resolveInstant: user ? (id) => String(user.id) === id
+      ? { id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl }
+      : null : undefined,
+  });
 
+  // When URL had no userId, default to the current user so the table isn't overwhelming on
+  // first load. DataTable's syncedFilters effect will write this to the URL.
+  const defaultUserAppliedRef = useRef(false);
   useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch]);
-
-  useEffect(() => {
-    if (!user) return;
-    setLoading(true);
-    api.training
-      .listAll({
-        scheduleId,
-        userIds: userIds.length > 0 ? userIds : undefined,
-        statuses: selectedStatuses.length > 0 ? selectedStatuses : undefined,
-        search: debouncedSearch || undefined,
-        page,
-        pageSize: PAGE_SIZE,
-      })
-      .then(({ items, total: t }) => {
-        setTrainings(items);
-        setTotal(t);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [scheduleId, userIds, selectedStatuses, debouncedSearch, page, user]);
-
-  const handleSearchChange = (value: string): void => {
-    setSearchInput(value);
-  };
-
-  const handleUsersChange = useCallback((users: SelectableUser[]) => {
-    setSelectedUsers(users);
-    setPage(1);
-  }, []);
-
-  const handleStatusesChange = useCallback((statuses: string[]) => {
-    setSelectedStatuses(statuses);
-    setPage(1);
-  }, []);
+    if (!user || defaultUserAppliedRef.current || hadUrlUserIds) return;
+    defaultUserAppliedRef.current = true;
+    if (user.status === "active") {
+      setSelectedUsers([{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl }]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const statusOptions = useMemo<MultiSelectOption[]>(
     () => [
@@ -175,13 +147,65 @@ export function TrainingTable({
     [],
   );
 
-  const filtersActive =
-    searchInput !== "" ||
-    selectedUsers.length > 0 ||
-    (selectedStatuses.length > 0 &&
-      selectedStatuses.length < statusOptions.length);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(() =>
+    getMultiParam("status"),
+  );
+
+  const userIds = useMemo(
+    () => selectedUsers.map((u) => u.id),
+    [selectedUsers],
+  );
+
+  // Sync debounced search to URL; skip first render to preserve URL-restored page
+  const searchMountedRef = useRef(false);
+  useEffect(() => {
+    if (!searchMountedRef.current) {
+      searchMountedRef.current = true;
+      return;
+    }
+    setPage(1);
+    setParams({ q: debouncedSearch || null, page: null });
+  }, [debouncedSearch, setParams]);
+
+  useEffect(() => {
+    if (!user || usersHydrating) return;
+    setLoading(true);
+    api.training
+      .listAll({
+        scheduleId,
+        userIds: userIds.length > 0 ? userIds : undefined,
+        statuses: selectedStatuses.length > 0 ? selectedStatuses : undefined,
+        search: debouncedSearch || undefined,
+        page,
+        pageSize: PAGE_SIZE,
+      })
+      .then(({ items, total: t }) => {
+        setTrainings(items);
+        setTotal(t);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [scheduleId, usersHydrating, userIds, selectedStatuses, debouncedSearch, page, user]);
+
+  const handleSearchChange = (value: string): void => {
+    setSearchInput(value);
+  };
+
+  const handleUsersChange = useCallback((users: SelectableUser[]) => {
+    setSelectedUsers(users);
+    setPage(1);
+  }, []);
+
+  const handleStatusesChange = useCallback((statuses: string[]) => {
+    setSelectedStatuses(statuses);
+    setPage(1);
+  }, []);
+
+  const filtersActive = searchInput !== "";
 
   const handleClearFilters = useCallback(() => {
+    // Reset to empty — URL params already cleared by DataTable before this runs.
+    // filtersActive becomes false so the Clear button disappears.
     setSearchInput("");
     setSelectedUsers([]);
     setSelectedStatuses([]);
@@ -285,6 +309,7 @@ export function TrainingTable({
 
   return (
     <DataTable
+      tableId={tableId}
       columns={columns}
       data={trainings}
       hideSearch={true}
@@ -309,6 +334,10 @@ export function TrainingTable({
           />
         </>
       }
+      syncedFilters={[
+        userSyncedFilter,
+        { key: 'status', value: selectedStatuses, onChange: setSelectedStatuses },
+      ]}
       filtersActive={filtersActive}
       onClearFilters={handleClearFilters}
       serverPagination={{
