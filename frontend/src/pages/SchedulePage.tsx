@@ -67,18 +67,9 @@ import {
   DurationInput,
   formatDuration,
 } from "../components/schedules/DurationInput";
-import { formatNumber } from "../lib/utils";
+import { formatDate, formatNumber } from "../lib/utils";
 
 const MAX_RUNS = 20;
-
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
 
 const INSIGHTS_CONFIG: ChartConfig = {
   puzzlesPerDay: { label: "Puzzles / day", color: "hsl(var(--chart-1))" },

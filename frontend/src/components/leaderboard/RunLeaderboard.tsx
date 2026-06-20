@@ -5,7 +5,7 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { DataTable, type FilterableColumn } from '../DataTable'
 import { UserAvatar } from '../UserAvatar'
 import { StatusBadge, runStatusToStatusValue } from '../StatusBadge'
-import { formatNumber, formatSolveTimeMs } from '../../lib/utils'
+import { formatDate, formatNumber, formatSolveTimeMs } from '../../lib/utils'
 import type { LeaderboardRun } from '../../lib/api'
 import { PositionBadge, getGlobalPosition } from './PositionBadge'
 
@@ -18,14 +18,6 @@ type Props = {
   currentUserDisplayName?: string
   loading?: boolean
   tableId?: string
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
 }
 
 function formatDelta(delta: number | null): React.ReactElement {

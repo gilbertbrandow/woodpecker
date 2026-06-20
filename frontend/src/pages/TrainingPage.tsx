@@ -50,7 +50,7 @@ import { StatusBadge, runStatusToStatusValue, trainingStateToStatusValue, type S
 import { ProgressBar } from '../components/ProgressBar'
 import { DataTable } from '../components/DataTable'
 import { formatDuration } from '../components/schedules/DurationInput'
-import { formatStartedAt } from '../lib/utils'
+import { formatDate, formatStartedAt } from '../lib/utils'
 import { TrainingProgressCard } from '../components/TrainingProgressCard'
 import { CurrentTrainingStatus } from '../components/CurrentTrainingStatus'
 
@@ -110,14 +110,6 @@ type RunSlotRow = {
   progressTooltip: string
   canStart: boolean
   isStarting: boolean
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
 }
 
 

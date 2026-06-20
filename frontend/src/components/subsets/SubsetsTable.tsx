@@ -1,13 +1,12 @@
 import * as React from 'react'
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Loader2, Search, Trash2, PencilLine, Layers, Lock } from 'lucide-react'
+import { Loader2, Trash2, PencilLine, Layers, Lock } from 'lucide-react'
+import { formatDate } from '../../lib/utils'
 import { type ColumnDef } from '@tanstack/react-table'
 import { UserAvatar } from '../UserAvatar'
 import { StatusBadge } from '../StatusBadge'
-import { DataTable } from '../DataTable'
-import { UserSelector } from '../UserSelector'
-import { Input } from '../ui/input'
+import { ServerDataTable } from '../ServerDataTable'
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -20,99 +19,26 @@ import {
   AlertDialogCancel,
 } from '../ui/alert-dialog'
 import { useAuth } from '../../context/auth'
-import type { Subset, SelectableUser } from '../../lib/api'
+import type { Subset } from '../../lib/api'
 import { api } from '../../lib/api'
-import { useDebounce } from '../../hooks/useDebounce'
 import { toast } from '../../lib/toast'
-import { useTableUrlSync } from '../../hooks/useTableUrlSync'
-import { useUrlHydratedFilter } from '../../hooks/useUrlHydratedFilter'
+import { useUserFilterSpec } from '../../hooks/useUserFilterSpec'
 
 const PAGE_SIZE = 20
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
+const STATUS_OPTIONS = [
+  { label: 'Draft',  value: 'draft',  icon: <PencilLine className="h-3.5 w-3.5 text-muted-foreground" /> },
+  { label: 'Filled', value: 'filled', icon: <Layers className="h-3.5 w-3.5 text-blue-600" /> },
+  { label: 'Locked', value: 'locked', icon: <Lock className="h-3.5 w-3.5 text-violet-600" /> },
+]
 
 export function SubsetsTable(): React.ReactElement {
-  const navigate = useNavigate()
   const { user } = useAuth()
-  const { getParam, getMultiParam, setParams } = useTableUrlSync(undefined)
+  const navigate = useNavigate()
+  const userFilterSpec = useUserFilterSpec('userIds')
 
-  const {
-    value: selectedUsers,
-    setValue: setSelectedUsers,
-    isHydrating: usersHydrating,
-    syncedFilter: userSyncedFilter,
-  } = useUrlHydratedFilter<SelectableUser>({
-    urlKey: 'userIds',
-    tableId: undefined,
-    fetchByIds: (ids) => api.users.getByIds(ids.map(Number)),
-    getIdFromItem: (u) => String(u.id),
-    resolveInstant: user ? (id) => String(user.id) === id
-      ? { id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl }
-      : null : undefined,
-  })
-
-  const [subsets, setSubsets] = useState<Subset[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(() => {
-    const p = getParam('page')
-    return p ? Math.max(1, parseInt(p, 10)) : 1
-  })
-  const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
-
-  const [search, setSearch] = useState(() => getParam('q') ?? '')
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(() =>
-    getMultiParam('statuses'),
-  )
-
-  const debouncedSearch = useDebounce(search, 300)
-
-  // Sync debounced search to URL; skip first render to preserve URL-restored page
-  const searchMountedRef = useRef(false)
-  useEffect(() => {
-    if (!searchMountedRef.current) {
-      searchMountedRef.current = true
-      return
-    }
-    setPage(1)
-    setParams({ q: debouncedSearch || null, page: null })
-  }, [debouncedSearch, setParams])
-
-  useEffect(() => {
-    if (!user || usersHydrating) return
-    setLoading(true)
-    api.subsets
-      .list({
-        search: debouncedSearch || undefined,
-        page,
-        pageSize: PAGE_SIZE,
-        userIds: selectedUsers.length > 0 ? selectedUsers.map((u) => u.id) : undefined,
-        statuses: selectedStatuses.length > 0 ? selectedStatuses : undefined,
-      })
-      .then((r) => {
-        setSubsets(r.items)
-        setTotal(r.total)
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [user, usersHydrating, debouncedSearch, page, selectedUsers, selectedStatuses, refreshKey])
-
-  const statusFilterColumn = {
-    id: 'statuses',
-    label: 'statuses',
-    options: [
-      { label: 'Draft', value: 'draft', icon: <PencilLine className="h-3.5 w-3.5 text-muted-foreground" /> },
-      { label: 'Filled', value: 'filled', icon: <Layers className="h-3.5 w-3.5 text-blue-600" /> },
-      { label: 'Locked', value: 'locked', icon: <Lock className="h-3.5 w-3.5 text-violet-600" /> },
-    ],
-  }
 
   const deletingIdRef = useRef(deletingId)
   deletingIdRef.current = deletingId
@@ -131,7 +57,7 @@ export function SubsetsTable(): React.ReactElement {
   const handleDeleteRef = useRef(handleDelete)
   handleDeleteRef.current = handleDelete
 
-  const columns = useMemo<ColumnDef<Subset>[]>(
+  const columns = React.useMemo<ColumnDef<Subset>[]>(
     () => [
       {
         id: 'creator',
@@ -170,9 +96,7 @@ export function SubsetsTable(): React.ReactElement {
         header: 'Date',
         cell: ({ row }) => (
           <span className="text-muted-foreground">
-            {row.original.lockedAt
-              ? formatDate(row.original.lockedAt)
-              : formatDate(row.original.createdAt)}
+            {formatDate(row.original.lockedAt ?? row.original.createdAt)}
           </span>
         ),
       },
@@ -224,44 +148,24 @@ export function SubsetsTable(): React.ReactElement {
   )
 
   return (
-    <DataTable
+    <ServerDataTable
       columns={columns}
-      data={subsets}
-      loading={loading}
-      hideSearch
-      filtersSlot={
-        <>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search subsets…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-8 pl-7 text-sm sm:w-56"
-            />
-          </div>
-          <UserSelector
-            value={selectedUsers}
-            onChange={(users) => { setSelectedUsers(users); setPage(1) }}
-          />
-        </>
-      }
-      filterableColumns={[statusFilterColumn]}
-      onFilterChange={(id, values) => {
-        if (id === 'statuses') {
-          setSelectedStatuses(values)
-          setPage(1)
-        }
-      }}
-      syncedFilters={[userSyncedFilter]}
-      filtersActive={search !== ''}
-      onClearFilters={() => {
-        setSearch('')
-        setSelectedUsers([])
-        setPage(1)
-      }}
-      serverPagination={{ totalRows: total, page, pageSize: PAGE_SIZE, onPageChange: setPage }}
       pageSize={PAGE_SIZE}
+      refreshKey={refreshKey}
+      filters={[
+        userFilterSpec,
+        { type: 'multi', key: 'statuses', label: 'statuses', options: STATUS_OPTIONS },
+        { type: 'search', key: 'q', placeholder: 'Search subsets…' },
+      ]}
+      fetchData={({ filters, page }) =>
+        api.subsets.list({
+          search: filters.q?.[0] || undefined,
+          page,
+          pageSize: PAGE_SIZE,
+          userIds: filters.userIds?.map(Number),
+          statuses: filters.statuses?.length ? filters.statuses : undefined,
+        })
+      }
       onRowClick={(subset) =>
         void navigate({
           to: '/app/subsets/$subsetId',
