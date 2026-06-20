@@ -586,7 +586,6 @@ def _pace_chart_data(
         domain_start_ms, domain_end_ms, start_ms, deadline_ms, run_status, projected_finish_ms, tz
     )
     label_tick_times: set[int] = {cast(int, t["timeMs"]) for t in label_ticks}
-
     # Build in ascending priority order so that later (more specific) kinds win
     # when two timestamps collide (e.g. domain_end_ms == deadline_ms).
     special_times: dict[int, str] = {

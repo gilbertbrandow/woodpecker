@@ -1,6 +1,6 @@
-import math
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -22,7 +22,7 @@ def _make_run(
     run_index: int = 0,
     completed_at: datetime | None = None,
     aborted_at: datetime | None = None,
-) -> object:
+) -> SimpleNamespace:
     return SimpleNamespace(
         run_index=run_index,
         started_at=START,
@@ -55,7 +55,7 @@ def _call(
     completed_offset_ms: int | None = None,
     aborted_offset_ms: int | None = None,
     tz: str = TZ,
-) -> dict[str, object] | None:
+) -> dict[str, Any] | None:
     if solved_offsets_ms is None:
         solved_offsets_ms = []
     run = _make_run(
@@ -249,14 +249,14 @@ class TestProjection:
         result = _call(completed_offset_ms=MS_PER_WEEK - MS_PER_HOUR)
         assert result is not None
         assert result["projectedFinishMs"] is None
-        for point in result["series"]:  # type: ignore[union-attr]
+        for point in result["series"]:
             assert point["projection"] is None
 
     def test_aborted_has_no_projection(self) -> None:
         result = _call(aborted_offset_ms=MS_PER_DAY * 2)
         assert result is not None
         assert result["projectedFinishMs"] is None
-        for point in result["series"]:  # type: ignore[union-attr]
+        for point in result["series"]:
             assert point["projection"] is None
 
     def test_active_all_resolved_no_projection(self) -> None:
@@ -271,7 +271,7 @@ class TestProjection:
         assert result is not None
         series = result["series"]
         now_ms = START_MS + now_offset
-        as_of_point = next((p for p in series if p["timeMs"] == now_ms), None)  # type: ignore[union-attr]
+        as_of_point = next((p for p in series if p["timeMs"] == now_ms), None)
         assert as_of_point is not None
         assert as_of_point["projection"] is not None
         assert as_of_point["actual"] is not None
@@ -283,7 +283,7 @@ class TestProjection:
         pfms = result["projectedFinishMs"]
         assert pfms is not None
         series = result["series"]
-        pf_point = next((p for p in series if p["timeMs"] == pfms), None)  # type: ignore[union-attr]
+        pf_point = next((p for p in series if p["timeMs"] == pfms), None)
         assert pf_point is not None
         assert pf_point["projection"] == pytest.approx(100.0)
 
@@ -291,7 +291,7 @@ class TestProjection:
         result = _call(now_offset_ms=MS_PER_DAY, total_puzzles=100)
         assert result is not None
         now_ms = START_MS + MS_PER_DAY
-        past = [p for p in result["series"] if p["timeMs"] < now_ms]  # type: ignore[union-attr]
+        past = [p for p in result["series"] if p["timeMs"] < now_ms]
         assert len(past) > 0
         for p in past:
             assert p["projection"] is None
@@ -304,7 +304,7 @@ class TestActualValues:
         result = _call(now_offset_ms=MS_PER_DAY, total_puzzles=10)
         assert result is not None
         now_ms = START_MS + MS_PER_DAY
-        future = [p for p in result["series"] if p["timeMs"] > now_ms]  # type: ignore[union-attr]
+        future = [p for p in result["series"] if p["timeMs"] > now_ms]
         assert len(future) > 0
         for p in future:
             assert p["actual"] is None
@@ -314,13 +314,13 @@ class TestActualValues:
         result = _call(solved_offsets_ms=solved, now_offset_ms=MS_PER_DAY, total_puzzles=20)
         assert result is not None
         now_ms = START_MS + MS_PER_DAY
-        now_point = next(p for p in result["series"] if p["timeMs"] == now_ms)  # type: ignore[union-attr]
+        now_point = next(p for p in result["series"] if p["timeMs"] == now_ms)
         assert now_point["actual"] == 3
 
     def test_actual_is_integer(self) -> None:
         result = _call(solved_offsets_ms=[MS_PER_HOUR], now_offset_ms=MS_PER_DAY, total_puzzles=10)
         assert result is not None
-        for p in result["series"]:  # type: ignore[union-attr]
+        for p in result["series"]:
             if p["actual"] is not None:
                 assert isinstance(p["actual"], int)
 
@@ -336,7 +336,7 @@ class TestActualValues:
         )
         assert result is not None
         as_of = result["asOfMs"]
-        for p in result["series"]:  # type: ignore[union-attr]
+        for p in result["series"]:
             if p["timeMs"] > as_of:
                 assert p["actual"] is None
 
@@ -347,7 +347,7 @@ class TestRequiredLine:
     def test_required_zero_at_start(self) -> None:
         result = _call()
         assert result is not None
-        start_pt = next(p for p in result["series"] if p["timeMs"] == START_MS)  # type: ignore[union-attr]
+        start_pt = next(p for p in result["series"] if p["timeMs"] == START_MS)
         assert start_pt["required"] == pytest.approx(0.0)
 
     def test_required_total_at_deadline(self) -> None:
@@ -355,7 +355,7 @@ class TestRequiredLine:
         deadline_ms = START_MS + int(168 * MS_PER_HOUR)
         result = _call(total_puzzles=total)
         assert result is not None
-        dl_pt = next(p for p in result["series"] if p["timeMs"] == deadline_ms)  # type: ignore[union-attr]
+        dl_pt = next(p for p in result["series"] if p["timeMs"] == deadline_ms)
         assert dl_pt["required"] == pytest.approx(float(total))
 
     def test_required_flat_after_deadline(self) -> None:
@@ -368,7 +368,7 @@ class TestRequiredLine:
             total_puzzles=total,
         )
         assert result is not None
-        post_dl = [p for p in result["series"] if p["timeMs"] > deadline_ms]  # type: ignore[union-attr]
+        post_dl = [p for p in result["series"] if p["timeMs"] > deadline_ms]
         assert len(post_dl) > 0
         for p in post_dl:
             assert p["required"] == pytest.approx(float(total))
@@ -379,7 +379,7 @@ class TestRequiredLine:
         mid_ms = START_MS + int(84 * MS_PER_HOUR)
         series = result["series"]
         # Find series point closest to mid
-        mid_pt = min(series, key=lambda p: abs(p["timeMs"] - mid_ms))  # type: ignore[union-attr]
+        mid_pt = min(series, key=lambda p: abs(p["timeMs"] - mid_ms))
         assert isinstance(mid_pt["required"], float)
         assert 0.0 < mid_pt["required"] < 7.0
 
@@ -513,7 +513,7 @@ class TestLabelTicks:
     def test_start_tick_present(self) -> None:
         result = _call()
         assert result is not None
-        times = [t["timeMs"] for t in result["labelTicks"]]  # type: ignore[union-attr]
+        times = [t["timeMs"] for t in result["labelTicks"]]
         assert START_MS in times
 
     def test_deadline_is_last_tick_when_domain_ends_at_deadline(self) -> None:
@@ -521,20 +521,20 @@ class TestLabelTicks:
         result = _call(target_hours=168, now_offset_ms=0, total_puzzles=100)
         assert result is not None
         deadline_ms = START_MS + int(168 * MS_PER_HOUR)
-        last_tick = result["labelTicks"][-1]  # type: ignore[index]
+        last_tick = result["labelTicks"][-1]
         assert last_tick["timeMs"] == deadline_ms
 
     def test_start_tick_kind(self) -> None:
         result = _call()
         assert result is not None
-        start_tick = next(t for t in result["labelTicks"] if t["timeMs"] == START_MS)  # type: ignore[union-attr]
+        start_tick = next(t for t in result["labelTicks"] if t["timeMs"] == START_MS)
         assert start_tick["kind"] == "start"
 
     def test_deadline_tick_kind_when_last(self) -> None:
         # On-pace at start: domain ends at deadline, last tick has kind 'deadline'
         result = _call(target_hours=168, now_offset_ms=0, total_puzzles=100)
         assert result is not None
-        last_tick = result["labelTicks"][-1]  # type: ignore[index]
+        last_tick = result["labelTicks"][-1]
         assert last_tick["kind"] == "deadline"
 
     def test_projected_finish_tick_when_behind_active(self) -> None:
@@ -545,7 +545,7 @@ class TestLabelTicks:
         pfms = result["projectedFinishMs"]
         assert pfms is not None
         assert pfms > START_MS + int(24 * MS_PER_HOUR)
-        kinds = [t["kind"] for t in result["labelTicks"]]  # type: ignore[union-attr]
+        kinds = [t["kind"] for t in result["labelTicks"]]
         assert "projected_finish" in kinds
 
     def test_no_projected_finish_tick_when_ahead(self) -> None:
@@ -561,25 +561,25 @@ class TestLabelTicks:
         pfms = result["projectedFinishMs"]
         deadline_ms = START_MS + int(168 * MS_PER_HOUR)
         if pfms is not None and pfms < deadline_ms:
-            kinds = [t["kind"] for t in result["labelTicks"]]  # type: ignore[union-attr]
+            kinds = [t["kind"] for t in result["labelTicks"]]
             assert "projected_finish" not in kinds
 
     def test_7_day_domain_has_8_ticks_total(self) -> None:
         result = _call(target_hours=168, now_offset_ms=0, total_puzzles=100, tz="UTC")
         assert result is not None
-        assert len(result["labelTicks"]) == 8  # type: ignore[arg-type]
+        assert len(result["labelTicks"]) == 8
 
     def test_7_day_domain_has_6_calendar_ticks(self) -> None:
         result = _call(target_hours=168, now_offset_ms=0, total_puzzles=100, tz="UTC")
         assert result is not None
-        calendar_ticks = [t for t in result["labelTicks"] if t["kind"] == "calendar"]  # type: ignore[union-attr]
+        calendar_ticks = [t for t in result["labelTicks"] if t["kind"] == "calendar"]
         assert len(calendar_ticks) == 6  # 8 total − 1 start − 1 deadline
 
     def test_7_day_calendar_ticks_use_weekday_short_labels(self) -> None:
         # Ticks are 1 day apart so each falls on a distinct weekday
         result = _call(target_hours=168, now_offset_ms=0, total_puzzles=100, tz="UTC")
         assert result is not None
-        calendar_ticks = [t for t in result["labelTicks"] if t["kind"] == "calendar"]  # type: ignore[union-attr]
+        calendar_ticks = [t for t in result["labelTicks"] if t["kind"] == "calendar"]
         days = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
         for tick in calendar_ticks:
             assert tick["shortLabel"] in days
@@ -588,12 +588,12 @@ class TestLabelTicks:
         # Behind run: projected finish extends domain beyond 7 days → n=7 ticks
         result = _call(target_hours=168, solved_offsets_ms=[], now_offset_ms=MS_PER_DAY, total_puzzles=100)
         assert result is not None
-        assert len(result["labelTicks"]) == 7  # type: ignore[arg-type]
+        assert len(result["labelTicks"]) == 7
 
     def test_ticks_are_uniformly_spaced(self) -> None:
         result = _call(target_hours=168, now_offset_ms=0, total_puzzles=100, tz="UTC")
         assert result is not None
-        times = [t["timeMs"] for t in result["labelTicks"]]  # type: ignore[union-attr]
+        times = [t["timeMs"] for t in result["labelTicks"]]
         gaps = [times[i + 1] - times[i] for i in range(len(times) - 1)]
         # All gaps should be equal (uniform spacing)
         assert all(g == gaps[0] for g in gaps)
@@ -603,20 +603,20 @@ class TestLabelTicks:
         result = _call(target_hours=168, now_offset_ms=0, total_puzzles=100, tz="UTC")
         assert result is not None
         days = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
-        for tick in result["labelTicks"]:  # type: ignore[union-attr]
+        for tick in result["labelTicks"]:
             assert tick["shortLabel"] in days, f"Mixed format: {tick['shortLabel']}"
 
     def test_sub_day_labels_are_time_format(self) -> None:
         result = _call(target_hours=6, now_offset_ms=MS_PER_HOUR, tz="UTC")
         assert result is not None
-        for tick in result["labelTicks"]:  # type: ignore[union-attr]
+        for tick in result["labelTicks"]:
             label = tick["shortLabel"]
             assert ":" in label, f"Expected HH:MM format, got: {label}"
 
     def test_label_ticks_are_sorted_ascending(self) -> None:
         result = _call()
         assert result is not None
-        times = [t["timeMs"] for t in result["labelTicks"]]  # type: ignore[union-attr]
+        times = [t["timeMs"] for t in result["labelTicks"]]
         assert times == sorted(times)
 
 
@@ -626,33 +626,33 @@ class TestSeries:
     def test_series_contains_start(self) -> None:
         result = _call()
         assert result is not None
-        times = [p["timeMs"] for p in result["series"]]  # type: ignore[union-attr]
+        times = [p["timeMs"] for p in result["series"]]
         assert START_MS in times
 
     def test_series_contains_deadline(self) -> None:
         result = _call(target_hours=168)
         assert result is not None
         deadline_ms = START_MS + int(168 * MS_PER_HOUR)
-        times = [p["timeMs"] for p in result["series"]]  # type: ignore[union-attr]
+        times = [p["timeMs"] for p in result["series"]]
         assert deadline_ms in times
 
     def test_series_contains_all_label_tick_times(self) -> None:
         result = _call()
         assert result is not None
-        series_times = {p["timeMs"] for p in result["series"]}  # type: ignore[union-attr]
-        for tick in result["labelTicks"]:  # type: ignore[union-attr]
+        series_times = {p["timeMs"] for p in result["series"]}
+        for tick in result["labelTicks"]:
             assert tick["timeMs"] in series_times
 
     def test_start_point_has_start_kind(self) -> None:
         result = _call()
         assert result is not None
-        start_pt = next(p for p in result["series"] if p["timeMs"] == START_MS)  # type: ignore[union-attr]
+        start_pt = next(p for p in result["series"] if p["timeMs"] == START_MS)
         assert start_pt.get("kind") == "start"
 
     def test_no_duplicate_times_in_series(self) -> None:
         result = _call()
         assert result is not None
-        times = [p["timeMs"] for p in result["series"]]  # type: ignore[union-attr]
+        times = [p["timeMs"] for p in result["series"]]
         assert len(times) == len(set(times))
 
     def test_series_points_not_one_per_puzzle(self) -> None:
@@ -662,12 +662,12 @@ class TestSeries:
             target_hours=168, solved_offsets_ms=offsets, total_puzzles=1000, now_offset_ms=MS_PER_WEEK
         )
         assert result is not None
-        assert len(result["series"]) < 100  # type: ignore[arg-type]
+        assert len(result["series"]) < 100
 
     def test_required_and_projection_are_decimal(self) -> None:
         result = _call(total_puzzles=7, target_hours=168)
         assert result is not None
-        for p in result["series"]:  # type: ignore[union-attr]
+        for p in result["series"]:
             assert isinstance(p["required"], float)
             if p["projection"] is not None:
                 assert isinstance(p["projection"], float)
