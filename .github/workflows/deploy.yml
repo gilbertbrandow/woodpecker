@@ -17,7 +17,7 @@ jobs:
     outputs:
       image_tag: ${{ steps.tag.outputs.value }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -71,7 +71,7 @@ jobs:
       name: production
       url: https://woodpeckerchess.com
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Copy compose files to EC2
         uses: appleboy/scp-action@v1.0.0
