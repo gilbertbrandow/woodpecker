@@ -22,6 +22,7 @@ import { LeaderboardPage } from './pages/LeaderboardPage'
 import { SourcesListPage } from './pages/SourcesListPage'
 import { LichessTacticsSourcePage } from './pages/LichessTacticsSourcePage'
 import { ScrapedPositionalSourcePage } from './pages/ScrapedPositionalSourcePage'
+import { PaceChartDemoPage } from './pages/PaceChartDemoPage'
 import { RunPage } from './pages/RunPage'
 import { RunResolverPage } from './pages/RunResolverPage'
 import { TrainingItemResolverPage } from './pages/TrainingItemResolverPage'
@@ -83,6 +84,12 @@ function validateRunPuzzleOverviewSearch(search: Record<string, unknown>): RunTr
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
   component: Layout,
+})
+
+const paceChartDemoRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dev/pace',
+  component: PaceChartDemoPage,
 })
 
 const loginRoute = createRoute({
@@ -306,6 +313,7 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   onboardingRoute,
   waitlistRoute,
+  paceChartDemoRoute,
   appRoute.addChildren([
     appShellRoute.addChildren([
       dashboardRoute,
