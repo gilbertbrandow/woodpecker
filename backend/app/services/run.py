@@ -1,7 +1,6 @@
 import bisect
-import math
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -586,7 +585,7 @@ def _pace_chart_data(
     label_ticks = _generate_label_ticks(
         domain_start_ms, domain_end_ms, start_ms, deadline_ms, run_status, projected_finish_ms, tz
     )
-    label_tick_times: set[int] = {int(t["timeMs"]) for t in label_ticks}  # type: ignore[arg-type]
+    label_tick_times: set[int] = {cast(int, t["timeMs"]) for t in label_ticks}
 
     # Build in ascending priority order so that later (more specific) kinds win
     # when two timestamps collide (e.g. domain_end_ms == deadline_ms).
