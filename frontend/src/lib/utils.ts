@@ -27,6 +27,14 @@ export function formatSolveTimeMs(ms: number): string {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 }
 
+export function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
 export function formatStartedAt(iso: string): string {
   const date = new Date(iso)
   const now = new Date()
