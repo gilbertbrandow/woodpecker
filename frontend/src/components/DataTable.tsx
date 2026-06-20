@@ -368,9 +368,7 @@ export function DataTable<T>({
             <button
               type="button"
               onClick={() => {
-                const newPage = serverPagination.page - 1
-                serverPagination.onPageChange(newPage)
-                setParams({ page: newPage <= 1 ? null : String(newPage) })
+                serverPagination.onPageChange(serverPagination.page - 1)
               }}
               disabled={serverPagination.page <= 1 || loading}
               className="flex items-center gap-0.5 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
@@ -384,9 +382,7 @@ export function DataTable<T>({
             <button
               type="button"
               onClick={() => {
-                const newPage = serverPagination.page + 1
-                serverPagination.onPageChange(newPage)
-                setParams({ page: String(newPage) })
+                serverPagination.onPageChange(serverPagination.page + 1)
               }}
               disabled={serverPagination.page * serverPagination.pageSize >= serverPagination.totalRows || loading}
               className="flex items-center gap-0.5 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-40"

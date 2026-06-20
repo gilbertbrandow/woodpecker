@@ -36,18 +36,14 @@ type NavItem = {
   label: string
   to: string
   icon: React.ComponentType<{ className?: string }>
-  search?: Record<string, string>
+  // Plain object replaces all search params; function form merges with existing params.
+  search?: Record<string, string> | ((prev: Record<string, string | undefined>) => Record<string, string>)
 }
 
 const ACTIVITY_ITEMS: NavItem[] = [
   { label: 'Dashboard', to: '/app', icon: LayoutDashboard },
   { label: 'Leaderboards', to: '/app/leaderboards', icon: Trophy },
-  {
-    label: 'Training',
-    to: '/app/training',
-    icon: Puzzle,
-    search: { status: 'not_started,active_run_ahead,active_run_on_track,active_run_behind,active_run_overdue,scheduled_break,overdue_to_start_next_run,completed' },
-  },
+  { label: 'Training', to: '/app/training', icon: Puzzle, search: (prev) => ({ ...prev, userId: 'me' }) },
 ]
 
 const SETUP_ITEMS: NavItem[] = [
@@ -67,12 +63,12 @@ function NavGroup({ items, pathname, onNavigate }: {
 }): React.ReactElement {
   return (
     <SidebarMenu className="gap-1">
-      {items.map(({ label, to, icon: Icon }) => {
+      {items.map(({ label, to, icon: Icon, search }) => {
         const isActive = to === '/app' ? pathname === '/app' : pathname.startsWith(to)
         return (
           <SidebarMenuItem key={to}>
             <SidebarMenuButton asChild isActive={isActive} tooltip={label}>
-              <Link to={to} onClick={onNavigate}>
+              <Link to={to} search={search} onClick={onNavigate}>
                 <Icon className="h-4 w-4" />
                 <span>{label}</span>
               </Link>
