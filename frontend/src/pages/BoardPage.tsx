@@ -364,10 +364,7 @@ export function BoardPage(): React.ReactElement | null {
           averageSolveTime={{ ...overviewData.stats.averageSolveTime, deltaMs: selectedSolveTimeDelta }}
         />
         {overviewData.runPace.chartData !== null && (
-          <RunPaceCard
-            chartData={overviewData.runPace.chartData}
-            isRunActive={overviewData.runPace.isRunActive}
-          />
+          <RunPaceCard chartData={overviewData.runPace.chartData} />
         )}
         <ProgressCard
           runProgress={{ ...overviewData.progress.runProgress, delta: selectedRunProgressDelta }}
@@ -390,7 +387,6 @@ export function BoardPage(): React.ReactElement | null {
     ctrl.mode === 'overview' && overviewData !== null ? (
       <OverviewSidebarLeft
         paceChart={overviewData.runPace.chartData}
-        isRunActive={overviewData.runPace.isRunActive}
         accuracy={{ ...overviewData.stats.accuracy, deltaPct: selectedAccuracyDelta }}
         averageSolveTime={{ ...overviewData.stats.averageSolveTime, deltaMs: selectedSolveTimeDelta }}
         runProgress={{ ...overviewData.progress.runProgress, delta: selectedRunProgressDelta }}
