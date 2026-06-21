@@ -9,31 +9,12 @@ import {
 } from 'recharts'
 import { type TrainingProgressData, type TrainingProgressPoint } from '../lib/api'
 import { ChartContainer, ChartTooltip, type ChartConfig } from './ui/chart'
+import { buildCalendarTicks } from '../lib/chartUtils'
 
 const PROGRESS_CONFIG: ChartConfig = {
   actual: { label: 'Actual', color: 'hsl(var(--chart-1))' },
   updatedExpected: { label: 'Updated target', color: 'hsl(var(--chart-1))' },
   originalExpected: { label: 'Original target', color: 'hsl(var(--muted-foreground))' },
-}
-
-function formatTickDate(ms: number): string {
-  return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
-
-function buildTicks(startMs: number, endMs: number): number[] {
-  const totalMs = endMs - startMs
-  const DAY_MS = 86_400_000
-  const WEEK_MS = 7 * DAY_MS
-  const interval =
-    totalMs <= 14 * DAY_MS ? DAY_MS : totalMs <= 60 * DAY_MS ? WEEK_MS : 4 * WEEK_MS
-  const ticks: number[] = []
-  let t = startMs
-  while (t <= endMs) {
-    ticks.push(t)
-    t += interval
-  }
-  if (ticks[ticks.length - 1] !== endMs) ticks.push(endMs)
-  return ticks
 }
 
 interface TrainingProgressCardProps {
@@ -49,7 +30,11 @@ export function TrainingProgressCard({
 
   const startMs = points[0]?.timeMs ?? Date.now()
   const endMs = points[points.length - 1]?.timeMs ?? Date.now()
-  const ticks = React.useMemo(() => buildTicks(startMs, endMs), [startMs, endMs])
+  const calendarTicks = React.useMemo(() => buildCalendarTicks(startMs, endMs), [startMs, endMs])
+  const tickLabelMap = React.useMemo(
+    () => new Map(calendarTicks.map((t) => [t.timeMs, t.shortLabel])),
+    [calendarTicks],
+  )
 
   const showUpdated = React.useMemo(
     () => points.some((p) => p.updatedExpected !== p.originalExpected),
@@ -72,11 +57,11 @@ export function TrainingProgressCard({
             type="number"
             scale="linear"
             domain={[startMs, endMs]}
-            ticks={ticks}
+            ticks={calendarTicks.map((t) => t.timeMs)}
             tickLine={false}
             axisLine={false}
             tick={{ fontSize: 10 }}
-            tickFormatter={formatTickDate}
+            tickFormatter={(v: number) => tickLabelMap.get(v) ?? ''}
           />
           <YAxis hide domain={[0, totalExpectedPuzzles]} />
           <ChartTooltip
@@ -85,7 +70,7 @@ export function TrainingProgressCard({
               const point = payload[0]?.payload as TrainingProgressPoint
               return (
                 <div className="rounded-md border bg-background px-3 py-2 text-xs shadow-md">
-                  <p className="font-medium">{formatTickDate(point.timeMs)}</p>
+                  <p className="font-medium">{new Date(point.timeMs).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</p>
                   {point.actual !== null && (
                     <p className="text-muted-foreground">Actual: {Math.round(point.actual)}</p>
                   )}

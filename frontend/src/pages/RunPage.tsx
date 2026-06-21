@@ -142,7 +142,7 @@ function InsightsTab({ run, puzzleList }: { run: Run; puzzleList: RunTrainingIte
           </CollapsibleTrigger>
           <CollapsibleContent>
             <div className="pt-4">
-              <RunPaceCard chartData={run.paceChart} isRunActive={run.status === 'active'} />
+              <RunPaceCard chartData={run.paceChart} />
             </div>
           </CollapsibleContent>
         </Collapsible>

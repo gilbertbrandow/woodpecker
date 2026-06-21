@@ -1,7 +1,8 @@
-import math
+import bisect
 import random
 from datetime import datetime, timezone
 from typing import cast
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
@@ -342,40 +343,19 @@ def _create_attempt_for_puzzle(run_puzzle: RunTrainingItem) -> TrainingAttempt:
         raise
 
 
-_NICE_INTERVAL_HOURS: list[float] = [0.25, 0.5, 1.0, 2.0, 3.0, 4.0, 6.0, 8.0, 12.0, 24.0, 48.0, 72.0, 120.0, 168.0, 336.0]
-_MAX_INTRADAY_INTERVALS = 7
-_MAX_MULTIDAY_INTERVALS = 14
+_HOUR_MS = 3_600_000
+_DAY_MS = 24 * _HOUR_MS
 
 
-def _tick_interval_ms(target_hours: float) -> int:
-    if target_hours > 24.0:
-        intervals = [h for h in _NICE_INTERVAL_HOURS if h >= 24.0]
-        max_count = _MAX_MULTIDAY_INTERVALS
-    else:
-        intervals = _NICE_INTERVAL_HOURS
-        max_count = _MAX_INTRADAY_INTERVALS
-    for interval_h in intervals:
-        if math.ceil(target_hours / interval_h) <= max_count:
-            return int(interval_h * 3_600_000)
-    return int(intervals[-1] * 3_600_000)
+def _parse_tz(tz_str: str) -> ZoneInfo:
+    try:
+        return ZoneInfo(tz_str)
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("UTC")
 
 
-def _pace_chart_data(
-    run: Run,
-    run_puzzles: list[RunTrainingItem],
-    schedule_cfg: ScheduleConfig,
-) -> dict[str, object] | None:
-    if run.run_index >= len(schedule_cfg.runs):
-        return None
-    target_hours = float(schedule_cfg.runs[run.run_index].target_hours)
-    total_queue = schedule_cfg.total_queue
-
-    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-    start_ms = int(run.started_at.timestamp() * 1000)
-    deadline_ms = start_ms + int(target_hours * 3_600_000)
-    total_puzzles = len(run_puzzles)
-
-    terminal_timestamps: list[int] = []
+def _compute_terminal_timestamps(run_puzzles: list[RunTrainingItem], total_queue: int) -> list[int]:
+    result: list[int] = []
     for rp in run_puzzles:
         queue_attempts = sorted(
             [a for a in rp.attempts if a.status != "in_progress" and a.try_number <= total_queue],
@@ -383,74 +363,270 @@ def _pace_chart_data(
         )
         solved = next((a for a in queue_attempts if a.status == "solved"), None)
         if solved is not None and solved.completed_at is not None:
-            terminal_timestamps.append(int(solved.completed_at.timestamp() * 1000))
+            result.append(int(solved.completed_at.timestamp() * 1000))
             continue
         if len(queue_attempts) >= total_queue:
             last = queue_attempts[-1]
             if last.status == "failed" and last.completed_at is not None:
-                terminal_timestamps.append(int(last.completed_at.timestamp() * 1000))
-    terminal_timestamps.sort()
+                result.append(int(last.completed_at.timestamp() * 1000))
+    result.sort()
+    return result
 
-    interval_ms = _tick_interval_ms(target_hours)
-    num_intervals = math.ceil(target_hours * 3_600_000 / interval_ms)
-    label_ticks = [start_ms + i * interval_ms for i in range(num_intervals + 1)]
-    domain_start_ms = start_ms - interval_ms // 8
 
-    last_actual_resolved = 0
-    for t in terminal_timestamps:
-        if t <= now_ms:
-            last_actual_resolved += 1
-        else:
-            break
+def _resolved_count_at(terminal_timestamps: list[int], t_ms: int) -> int:
+    return bisect.bisect_right(terminal_timestamps, t_ms)
 
-    target_rate = total_puzzles / (deadline_ms - start_ms) if deadline_ms > start_ms else 0.0
-    expected_at_now = (
-        (min(now_ms, deadline_ms) - start_ms) / (deadline_ms - start_ms) * total_puzzles
-        if deadline_ms > start_ms
-        else float(total_puzzles)
-    )
-    raw_delta = last_actual_resolved - expected_at_now
-    puzzle_delta = abs(round(raw_delta))
-    status = "on_pace" if puzzle_delta <= 1 else ("ahead" if raw_delta > 0 else "behind")
 
-    projection_cross_ms: int | None = None
-    if target_rate > 0 and last_actual_resolved < total_puzzles:
-        projection_cross_ms = int(now_ms + (total_puzzles - last_actual_resolved) / target_rate)
+def _required_at(t_ms: int, start_ms: int, deadline_ms: int, total_puzzles: int) -> float:
+    if t_ms <= start_ms:
+        return 0.0
+    if t_ms >= deadline_ms:
+        return float(total_puzzles)
+    return (t_ms - start_ms) / (deadline_ms - start_ms) * total_puzzles
 
-    all_timestamps = sorted(
-        {*label_ticks, now_ms, deadline_ms, *([] if projection_cross_ms is None else [projection_cross_ms])}
-    )
 
+def _compute_projected_finish(
+    as_of_ms: int,
+    resolved_at_as_of: int,
+    total_puzzles: int,
+    schedule_rate: float,
+) -> int | None:
+    if schedule_rate <= 0 or resolved_at_as_of >= total_puzzles:
+        return None
+    return int(as_of_ms + (total_puzzles - resolved_at_as_of) / schedule_rate)
+
+
+def _compute_domain_end(
+    run_status: str,
+    deadline_ms: int,
+    projected_finish_ms: int | None,
+    completed_at_ms: int | None,
+    aborted_at_ms: int | None,
+) -> int:
+    if run_status == "active":
+        return max(deadline_ms, projected_finish_ms or deadline_ms)
+    if run_status == "completed":
+        return max(deadline_ms, completed_at_ms or deadline_ms)
+    return max(deadline_ms, aborted_at_ms or deadline_ms)
+
+
+def _short_label(t_ms: int, kind: str, domain_len_ms: int, tz: ZoneInfo) -> str:
+    dt = datetime.fromtimestamp(t_ms / 1000, tz=tz)
+    if domain_len_ms <= 48 * _HOUR_MS:
+        return f"{dt.hour:02d}:{dt.minute:02d}"
+    if domain_len_ms <= 7 * _DAY_MS:
+        return dt.strftime("%a")
+    if domain_len_ms <= 30 * _DAY_MS:
+        return f"{dt.day} {dt.strftime('%b')}"
+    return dt.strftime("%b")
+
+
+def _generate_label_ticks(
+    domain_start_ms: int,
+    domain_end_ms: int,
+    start_ms: int,
+    deadline_ms: int,
+    run_status: str,
+    projected_finish_ms: int | None,
+    tz: ZoneInfo,
+) -> list[dict[str, object]]:
+    domain_len_ms = domain_end_ms - domain_start_ms
+    # Ticks per domain length: 8 for ≤7d (one per day for a typical 1-week run), 7 elsewhere.
+    n = 8 if domain_len_ms <= 7 * _DAY_MS else 7
+
+    # Uniformly space n ticks from domain start to domain end.
+    tick_times = [
+        domain_start_ms + round(i * domain_len_ms / (n - 1))
+        for i in range(n)
+    ]
+
+    def _kind(i: int) -> str:
+        if i == 0:
+            return "start"
+        if i == n - 1:
+            if run_status == "active" and projected_finish_ms is not None and domain_end_ms > deadline_ms:
+                return "projected_finish"
+            if run_status == "completed" and domain_end_ms > deadline_ms:
+                return "completed"
+            if run_status == "aborted" and domain_end_ms > deadline_ms:
+                return "aborted"
+            return "deadline"
+        return "calendar"
+
+    result = []
+    for i, t in enumerate(tick_times):
+        k = _kind(i)
+        result.append({"timeMs": t, "kind": k, "shortLabel": _short_label(t, k, domain_len_ms, tz)})
+    return result
+
+
+def _generate_series(
+    label_tick_times: set[int],
+    special_times: dict[int, str],
+    as_of_ms: int,
+    terminal_timestamps: list[int],
+    total_puzzles: int,
+    start_ms: int,
+    deadline_ms: int,
+    schedule_rate: float,
+    is_active: bool,
+    resolved_at_as_of: int,
+) -> list[dict[str, object]]:
+    all_times = sorted(label_tick_times | set(special_times.keys()))
     series: list[dict[str, object]] = []
-    for t in all_timestamps:
-        actual: object = None
-        if t >= start_ms and t <= now_ms:
-            resolved_at_t = sum(1 for ts in terminal_timestamps if ts <= t)
-            actual = resolved_at_t
-
+    for t in all_times:
+        actual: object = _resolved_count_at(terminal_timestamps, t) if t <= as_of_ms else None
+        required = _required_at(t, start_ms, deadline_ms, total_puzzles)
         projection: object = None
-        if t >= now_ms:
-            raw = last_actual_resolved + target_rate * (t - now_ms)
-            projection = min(total_puzzles, raw)
+        if is_active and t >= as_of_ms:
+            projection = min(float(total_puzzles), resolved_at_as_of + schedule_rate * (t - as_of_ms))
+        point: dict[str, object] = {"timeMs": t, "actual": actual, "required": required, "projection": projection}
+        kind = special_times.get(t)
+        if kind is not None:
+            point["kind"] = kind
+        series.append(point)
+    return series
 
-        if deadline_ms > start_ms and t <= deadline_ms:
-            frac = max(0.0, min(1.0, (t - start_ms) / (deadline_ms - start_ms)))
-            target: float = frac * total_puzzles
-        else:
-            target = float(total_puzzles)
 
-        series.append({"timeMs": t, "actual": actual, "projection": projection, "target": target})
+def _build_pace_summary(
+    run_status: str,
+    as_of_ms: int,
+    deadline_ms: int,
+    total_puzzles: int,
+    resolved_at_as_of: int,
+    required_at_as_of: float,
+    projected_finish_ms: int | None,
+    completed_at_ms: int | None,
+    aborted_at_ms: int | None,
+) -> dict[str, object]:
+    remaining = total_puzzles - resolved_at_as_of
+    delta = resolved_at_as_of - required_at_as_of
+
+    if run_status == "completed":
+        state = "completed"
+    elif run_status == "aborted":
+        state = "aborted"
+    elif as_of_ms >= deadline_ms:
+        state = "active_overdue"
+    elif abs(delta) <= 1:
+        state = "active_on_pace"
+    elif delta > 0:
+        state = "active_ahead"
+    else:
+        state = "active_behind"
 
     return {
+        "state": state,
+        "resolvedItems": resolved_at_as_of,
+        "totalItems": total_puzzles,
+        "remainingItems": remaining,
+        "deltaItemsVsRequired": delta,
+        "deadlineDeltaMs": deadline_ms - as_of_ms,
+        "projectedFinishMs": projected_finish_ms,
+        "completedAtMs": completed_at_ms,
+        "abortedAtMs": aborted_at_ms,
+        "completedDeltaMs": (deadline_ms - completed_at_ms) if completed_at_ms is not None else None,
+        "abortedDeltaMs": (deadline_ms - aborted_at_ms) if aborted_at_ms is not None else None,
+    }
+
+
+def _pace_chart_data(
+    run: Run,
+    run_puzzles: list[RunTrainingItem],
+    schedule_cfg: ScheduleConfig,
+    tz_str: str = "UTC",
+) -> dict[str, object] | None:
+    if run.run_index >= len(schedule_cfg.runs):
+        return None
+
+    target_hours = float(schedule_cfg.runs[run.run_index].target_hours)
+    total_queue = schedule_cfg.total_queue
+    total_puzzles = len(run_puzzles)
+    tz = _parse_tz(tz_str)
+
+    start_ms = int(run.started_at.timestamp() * 1000)
+    deadline_ms = start_ms + int(target_hours * 3_600_000)
+
+    completed_at_ms: int | None = (
+        int(run.completed_at.timestamp() * 1000) if run.completed_at is not None else None
+    )
+    aborted_at_ms: int | None = (
+        int(run.aborted_at.timestamp() * 1000) if run.aborted_at is not None else None
+    )
+
+    if completed_at_ms is not None:
+        run_status = "completed"
+    elif aborted_at_ms is not None:
+        run_status = "aborted"
+    else:
+        run_status = "active"
+
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    as_of_ms = completed_at_ms if completed_at_ms is not None else (aborted_at_ms if aborted_at_ms is not None else now_ms)
+
+    terminal_timestamps = _compute_terminal_timestamps(run_puzzles, total_queue)
+    resolved_at_as_of = _resolved_count_at(terminal_timestamps, as_of_ms)
+
+    schedule_rate = total_puzzles / (deadline_ms - start_ms) if deadline_ms > start_ms else 0.0
+    required_at_as_of = _required_at(as_of_ms, start_ms, deadline_ms, total_puzzles)
+
+    is_active = run_status == "active"
+    projected_finish_ms = (
+        _compute_projected_finish(as_of_ms, resolved_at_as_of, total_puzzles, schedule_rate)
+        if is_active
+        else None
+    )
+
+    domain_start_ms = start_ms
+    domain_end_ms = _compute_domain_end(
+        run_status, deadline_ms, projected_finish_ms, completed_at_ms, aborted_at_ms
+    )
+
+    label_ticks = _generate_label_ticks(
+        domain_start_ms, domain_end_ms, start_ms, deadline_ms, run_status, projected_finish_ms, tz
+    )
+    label_tick_times: set[int] = {cast(int, t["timeMs"]) for t in label_ticks}
+    # Build in ascending priority order so that later (more specific) kinds win
+    # when two timestamps collide (e.g. domain_end_ms == deadline_ms).
+    special_times: dict[int, str] = {
+        domain_end_ms: "domain_end",
+        as_of_ms: "as_of",
+        start_ms: "start",
+        deadline_ms: "deadline",
+    }
+    if projected_finish_ms is not None:
+        special_times[projected_finish_ms] = "projected_finish"
+    if completed_at_ms is not None:
+        special_times[completed_at_ms] = "completed"
+    if aborted_at_ms is not None:
+        special_times[aborted_at_ms] = "aborted"
+
+    series = _generate_series(
+        label_tick_times, special_times,
+        as_of_ms, terminal_timestamps,
+        total_puzzles, start_ms, deadline_ms,
+        schedule_rate, is_active, resolved_at_as_of,
+    )
+    summary = _build_pace_summary(
+        run_status, as_of_ms, deadline_ms,
+        total_puzzles, resolved_at_as_of, required_at_as_of,
+        projected_finish_ms, completed_at_ms, aborted_at_ms,
+    )
+
+    return {
+        "runStatus": run_status,
         "startMs": start_ms,
         "deadlineMs": deadline_ms,
-        "totalItems": total_puzzles,
-        "labelTicks": label_ticks,
+        "asOfMs": as_of_ms,
         "domainStartMs": domain_start_ms,
+        "domainEndMs": domain_end_ms,
+        "totalItems": total_puzzles,
+        "resolvedItems": resolved_at_as_of,
+        "requiredResolvedAtAsOf": required_at_as_of,
+        "projectedFinishMs": projected_finish_ms,
+        "labelTicks": label_ticks,
         "series": series,
-        "status": status,
-        "itemDelta": puzzle_delta,
-        "timeRemainingMs": deadline_ms - now_ms,
+        "summary": summary,
     }
 
 
@@ -473,7 +649,7 @@ def get_active_run_summary(user_id: int) -> dict[str, object] | None:
     return {"runId": run_id, "scheduleName": schedule_name, "runIndex": run_index}
 
 
-def run_dict(run: Run) -> dict[str, object]:
+def run_dict(run: Run, tz: str = "UTC") -> dict[str, object]:
     _, config = _get_schedule_config(run)
     total_queue = config.total_queue
 
@@ -507,7 +683,7 @@ def run_dict(run: Run) -> dict[str, object]:
         "currentRunTrainingItemId": _current_run_puzzle_id(run.id, total_queue),
         "targetAccuracy": run.target_accuracy,
         "targetSolveSeconds": run.target_solve_seconds,
-        "paceChart": _pace_chart_data(run, run_puzzles, config),
+        "paceChart": _pace_chart_data(run, run_puzzles, config, tz),
     }
 
 
@@ -1124,6 +1300,7 @@ def _build_run_puzzle_overview(
     training_id: int,
     run_just_completed: bool = False,
     completing_attempt_id: int | None = None,
+    tz: str = "UTC",
 ) -> dict[str, object]:
     payload = get_content(run_puzzle.training_item_id)
 
@@ -1226,8 +1403,7 @@ def _build_run_puzzle_overview(
             run_puzzle, training_id, total_queue
         ),
         "runPace": {
-            "chartData": _pace_chart_data(run, all_run_puzzles, config),
-            "isRunActive": run.completed_at is None and run.aborted_at is None,
+            "chartData": _pace_chart_data(run, all_run_puzzles, config, tz),
         },
         "stats": {
             "runIndex": run.run_index,
@@ -1253,13 +1429,14 @@ def get_run_puzzle_overview(
     run_puzzle_id: int,
     user_id: int,
     selected_attempt_id: int | None = None,
+    tz: str = "UTC",
 ) -> dict[str, object]:
     run = _get_owned_run(run_id, user_id)
     run_puzzle = db.session.get(RunTrainingItem, run_puzzle_id)
     if run_puzzle is None or run_puzzle.run_id != run.id:
         raise NotFoundError("Puzzle not found", "The requested puzzle could not be found in this run.")
     overview = _build_run_puzzle_overview(
-        run, run_puzzle, selected_attempt_id, run.training_id
+        run, run_puzzle, selected_attempt_id, run.training_id, tz=tz
     )
     return {
         "overview": overview,
@@ -1295,6 +1472,7 @@ def complete_attempt(
     run_puzzle_id: int,
     uci_moves: list[str],
     client_time_spent_ms: int | None = None,
+    tz: str = "UTC",
 ) -> dict[str, object]:
     attempt, run_puzzle, run = _get_owned_attempt(attempt_id, user_id)
 
@@ -1347,6 +1525,7 @@ def complete_attempt(
         run, run_puzzle, attempt_id, run.training_id,
         run_just_completed=run_just_completed,
         completing_attempt_id=attempt_id,
+        tz=tz,
     )
 
     return {
@@ -1400,7 +1579,7 @@ def get_training_item_history(run_id: int, training_item_id: int, user_id: int) 
 
 
 def get_attempt(
-    run_id: int, run_puzzle_id: int, attempt_id: int, user_id: int
+    run_id: int, run_puzzle_id: int, attempt_id: int, user_id: int, tz: str = "UTC"
 ) -> dict[str, object]:
     run = _get_owned_run(run_id, user_id)
     run_puzzle = db.session.get(RunTrainingItem, run_puzzle_id)
@@ -1420,7 +1599,7 @@ def get_attempt(
         f"/app/runs/{run_id}/training-items/{run_puzzle_id}/overview?attempt={attempt_id}"
     )
     overview = _build_run_puzzle_overview(
-        run, run_puzzle, attempt_id, run.training_id
+        run, run_puzzle, attempt_id, run.training_id, tz=tz
     )
     return {
         "kind": "completed_attempt",

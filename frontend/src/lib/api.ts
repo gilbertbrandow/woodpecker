@@ -422,7 +422,49 @@ export type PositionStatus =
   | 'solved_with_retries'
   | 'failed'
 
-type PaceChartTick = { timeMs: number; actual: number | null; projection: number | null; target: number }
+export type PaceChartTickKind =
+  | 'start'
+  | 'calendar'
+  | 'deadline'
+  | 'as_of'
+  | 'domain_end'
+  | 'projected_finish'
+  | 'completed'
+  | 'aborted'
+
+export type PaceChartLabelTick = {
+  timeMs: number
+  kind: PaceChartTickKind
+  shortLabel: string
+}
+
+export type PaceChartPoint = {
+  timeMs: number
+  actual: number | null
+  required: number
+  projection: number | null
+  kind?: PaceChartTickKind
+}
+
+export type PaceChartSummary = {
+  state:
+    | 'active_ahead'
+    | 'active_on_pace'
+    | 'active_behind'
+    | 'active_overdue'
+    | 'completed'
+    | 'aborted'
+  resolvedItems: number
+  totalItems: number
+  remainingItems: number
+  deltaItemsVsRequired: number
+  deadlineDeltaMs: number
+  projectedFinishMs: number | null
+  completedAtMs: number | null
+  abortedAtMs: number | null
+  completedDeltaMs: number | null
+  abortedDeltaMs: number | null
+}
 
 export type RunTrainingItemAttemptEntry = {
   id: number
@@ -448,15 +490,19 @@ export type RunTrainingItemFull = {
 }
 
 export type PaceChartData = {
+  runStatus: 'active' | 'completed' | 'aborted'
   startMs: number
   deadlineMs: number
-  totalItems: number
-  labelTicks: number[]
+  asOfMs: number
   domainStartMs: number
-  series: PaceChartTick[]
-  status: 'ahead' | 'on_pace' | 'behind'
-  itemDelta: number
-  timeRemainingMs: number
+  domainEndMs: number
+  totalItems: number
+  resolvedItems: number
+  requiredResolvedAtAsOf: number
+  projectedFinishMs: number | null
+  labelTicks: PaceChartLabelTick[]
+  series: PaceChartPoint[]
+  summary: PaceChartSummary
 }
 
 export type ActiveRun = {
@@ -597,7 +643,6 @@ export type RunTrainingItemOverview = {
   sameTrainingItemAcrossRuns: SameTrainingItemRunOverview[]
   runPace: {
     chartData: PaceChartData | null
-    isRunActive: boolean
   }
   stats: {
     runIndex: number
@@ -1025,7 +1070,10 @@ export const api = {
       }),
     list: (trainingId: number): Promise<Run[]> =>
       request(`/training/${trainingId}/runs`),
-    get: (runId: number): Promise<Run> => request(`/runs/${runId}`),
+    get: (runId: number): Promise<Run> => {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      return request(`/runs/${runId}?tz=${encodeURIComponent(tz)}`)
+    },
     trainingItems: (runId: number): Promise<RunTrainingItemList> =>
       request(`/runs/${runId}/training-items`),
     getTrainingItem: (runId: number, runTrainingItemId: number): Promise<RunTrainingItemFull> =>
@@ -1035,15 +1083,19 @@ export const api = {
       runTrainingItemId: number,
       attemptId?: number,
     ): Promise<{ overview: RunTrainingItemOverview; selectedAttemptId: number | null }> => {
-      const qs = attemptId !== undefined ? `?attempt=${attemptId}` : ''
-      return request(`/runs/${runId}/training-items/${runTrainingItemId}/overview${qs}`)
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const p = new URLSearchParams({ tz })
+      if (attemptId !== undefined) p.set('attempt', String(attemptId))
+      return request(`/runs/${runId}/training-items/${runTrainingItemId}/overview?${p.toString()}`)
     },
     getAttempt: (
       runId: number,
       runTrainingItemId: number,
       attemptId: number,
-    ): Promise<GetAttemptResponse> =>
-      request(`/runs/${runId}/training-items/${runTrainingItemId}/attempts/${attemptId}`),
+    ): Promise<GetAttemptResponse> => {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      return request(`/runs/${runId}/training-items/${runTrainingItemId}/attempts/${attemptId}?tz=${encodeURIComponent(tz)}`)
+    },
     startTrainingItem: (runId: number, runTrainingItemId: number): Promise<RunTrainingItemAttemptView> =>
       request(`/runs/${runId}/training-items/${runTrainingItemId}/attempts`, { method: 'POST' }),
     continue: (runId: number): Promise<ContinueRunResult> =>
@@ -1132,10 +1184,12 @@ export const api = {
       attemptId: number,
       uciMoves: string[],
       clientTimeSpentMs: number,
-    ): Promise<CompleteAttemptResult> =>
-      request(`/runs/${runId}/training-items/${runTrainingItemId}/attempts/${attemptId}/complete`, {
-        method: 'POST',
-        body: JSON.stringify({ uciMoves, clientTimeSpentMs }),
-      }),
+    ): Promise<CompleteAttemptResult> => {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      return request(
+        `/runs/${runId}/training-items/${runTrainingItemId}/attempts/${attemptId}/complete?tz=${encodeURIComponent(tz)}`,
+        { method: 'POST', body: JSON.stringify({ uciMoves, clientTimeSpentMs }) },
+      )
+    },
   },
 }

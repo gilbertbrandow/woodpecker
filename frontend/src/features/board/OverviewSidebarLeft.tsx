@@ -6,7 +6,6 @@ import { RunPaceCard } from './RunPaceCard'
 
 type OverviewSidebarLeftProps = {
   paceChart: PaceChartData | null
-  isRunActive: boolean
   accuracy: RunTrainingItemOverview['stats']['accuracy']
   averageSolveTime: RunTrainingItemOverview['stats']['averageSolveTime']
   runProgress: RunTrainingItemOverview['progress']['runProgress']
@@ -15,7 +14,6 @@ type OverviewSidebarLeftProps = {
 
 export function OverviewSidebarLeft({
   paceChart,
-  isRunActive,
   accuracy,
   averageSolveTime,
   runProgress,
@@ -23,7 +21,7 @@ export function OverviewSidebarLeft({
 }: OverviewSidebarLeftProps): React.ReactElement {
   return (
     <>
-      {paceChart !== null && <RunPaceCard chartData={paceChart} isRunActive={isRunActive} stretch />}
+      {paceChart !== null && <RunPaceCard chartData={paceChart} stretch />}
       <OverviewStatsSection
         accuracy={accuracy}
         averageSolveTime={averageSolveTime}

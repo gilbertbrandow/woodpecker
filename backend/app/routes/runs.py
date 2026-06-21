@@ -16,8 +16,9 @@ def get_active_run() -> tuple[Response, int] | Response:
 @runs_bp.get("/<int:run_id>")
 @login_required
 def get_run(run_id: int) -> tuple[Response, int] | Response:
+    tz = request.args.get("tz", "UTC")
     run = run_svc.get_run(run_id)
-    return jsonify(run_svc.run_dict(run))
+    return jsonify(run_svc.run_dict(run, tz))
 
 
 @runs_bp.post("/<int:run_id>/continue")
@@ -45,8 +46,9 @@ def get_run_training_item(run_id: int, run_training_item_id: int) -> tuple[Respo
 @login_required
 def get_run_training_item_overview(run_id: int, run_training_item_id: int) -> tuple[Response, int] | Response:
     selected_attempt_id = request.args.get("attempt", type=int)
+    tz = request.args.get("tz", "UTC")
     result = run_svc.get_run_puzzle_overview(
-        run_id, run_training_item_id, session["user_id"], selected_attempt_id
+        run_id, run_training_item_id, session["user_id"], selected_attempt_id, tz
     )
     return jsonify(result)
 
@@ -78,8 +80,9 @@ def complete_run_attempt(
         else None
     )
 
+    tz = request.args.get("tz", "UTC")
     result = run_svc.complete_attempt(
-        attempt_id, session["user_id"], run_id, run_training_item_id, uci_moves, client_time_ms
+        attempt_id, session["user_id"], run_id, run_training_item_id, uci_moves, client_time_ms, tz
     )
     return jsonify(result)
 
@@ -89,7 +92,8 @@ def complete_run_attempt(
 def get_attempt(
     run_id: int, run_training_item_id: int, attempt_id: int
 ) -> tuple[Response, int] | Response:
-    result = run_svc.get_attempt(run_id, run_training_item_id, attempt_id, session["user_id"])
+    tz = request.args.get("tz", "UTC")
+    result = run_svc.get_attempt(run_id, run_training_item_id, attempt_id, session["user_id"], tz)
     return jsonify(result)
 
 
