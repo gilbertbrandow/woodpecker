@@ -21,3 +21,15 @@ lichess_tactics:
 scraped_positional:
   - name: chess-positions.csv
     url: https://raw.githubusercontent.com/neilgd/chess-position-analysis-results/master/data/chess-positions.csv
+
+lichess_evals:
+  - name: lichess_db_eval.jsonl.zst
+    url: https://database.lichess.org/lichess_db_eval.jsonl.zst
+
+otb_elite_games:
+  - name: LumbrasGigaBase_OTB_ELITE_ELO2400.7z
+    url: https://huggingface.co/datasets/simongilbertbrandow/elite-otb-chess-games/resolve/main/LumbrasGigaBase_OTB_ELITE_ELO2400.7z
+
+decoy_positions:
+  - name: decoy_positions.jsonl
+    url: https://huggingface.co/datasets/simongilbertbrandow/chess-decoy-positions/resolve/main/decoy_positions.jsonl
