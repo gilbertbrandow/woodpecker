@@ -105,6 +105,49 @@ export type DecoySourceMetadata = {
   opening: TrainingItemOpening | null
 }
 
+export type DecoyOpeningCount = {
+  displayName: string
+  count: number
+}
+
+export type DecoySourceRunMetadata = {
+  totalDecoysAfterRun: number
+  importedCount: number
+  topOpenings: DecoyOpeningCount[]
+  generatedAt: string
+}
+
+export type DecoyGame = {
+  white: string
+  black: string
+  whiteTitle: string | null
+  blackTitle: string | null
+  event: string | null
+  date: string | null
+  lichessId: string | null
+}
+
+export type DecoyItem = {
+  id: number
+  fen: string
+  opponentMove: string
+  acceptedMoves: DecoyAcceptedMove[]
+  bestCp: number
+  depth: number
+  moveNumber: number
+  analysisUrl: string | null
+  opening: TrainingItemOpening | null
+  game: DecoyGame | null
+}
+
+export type DecoyPage = {
+  puzzles: DecoyItem[]
+  page: number
+  pageSize: number
+  totalPages: number
+  total: number
+}
+
 export type SourceMetadata = LichessTacticSourceMetadata | ScrapedPositionalSourceMetadata | DecoySourceMetadata
 
 export type LichessTactic = {
@@ -1179,6 +1222,17 @@ export const api = {
         if (params.opening) p.set('opening', params.opening)
         const qs = p.toString()
         return request(`/sources/scraped-positional/items${qs ? `?${qs}` : ''}`)
+      },
+    },
+    decoys: {
+      sourceRunMetadata: (): Promise<{ metadata: DecoySourceRunMetadata | null }> =>
+        request('/sources/decoys/source-run-metadata'),
+      items: (params: { page?: number; opening?: string }): Promise<DecoyPage> => {
+        const p = new URLSearchParams()
+        if (params.page !== undefined) p.set('page', String(params.page))
+        if (params.opening) p.set('opening', params.opening)
+        const qs = p.toString()
+        return request(`/sources/decoys/items${qs ? `?${qs}` : ''}`)
       },
     },
   },
