@@ -35,7 +35,7 @@ const BADGE_CONFIG: Record<TrainingItemType, BadgeConfig> = {
   decoy: {
     label: 'Decoy',
     tooltip: 'A quiet position with no decisive move, included to train resisting the urge to force something when nothing is there.',
-    className: 'border-sky-600/30 bg-sky-50 text-sky-800 dark:bg-sky-900/20 dark:text-sky-400',
+    className: 'border-amber-500/40 bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-300',
     icon: <Fish className="h-3 w-3" />,
   },
 }
