@@ -20,7 +20,7 @@ VALID_SORT_COLUMNS: dict[str, str] = {
     "popularity": "p.popularity",
     "nb_plays": "p.nb_plays",
 }
-VALID_SOURCES = {"LICHESS_TACTIC", "SCRAPED_POSITIONAL"}
+VALID_SOURCES = {"LICHESS_TACTIC", "SCRAPED_POSITIONAL", "DECOY"}
 
 
 def subset_status(subset: Subset) -> str:
@@ -281,6 +281,70 @@ def _sample_scraped_positionals(
     return [row.id for row in rows]
 
 
+def _sample_decoys(
+    config: dict[str, object],
+    subset_id: int,
+    count: int,
+) -> list[int]:
+    opening_cfg = config.get("opening") or {}
+    opening_items: list[str] = []
+    opening_strength = 0.0
+    if isinstance(opening_cfg, dict):
+        items_raw = opening_cfg.get("items", [])
+        opening_items = list(items_raw) if isinstance(items_raw, list) else []  # type: ignore[arg-type]
+        if opening_items:
+            opening_strength = float(opening_cfg.get("strength", 0.0))  # type: ignore[arg-type]
+
+    rows = db.session.execute(
+        sa.text("""
+            WITH RECURSIVE
+            opening_descendants AS (
+                SELECT id FROM openings WHERE name = ANY(:opening_keys)
+                UNION ALL
+                SELECT o.id FROM openings o
+                JOIN opening_descendants d ON o.parent_id = d.id
+            ),
+            eligible AS (
+                SELECT ti.id
+                FROM training_items ti
+                JOIN decoy_puzzles dp ON dp.training_item_id = ti.id
+                WHERE ti.id NOT IN (
+                    SELECT training_item_id FROM subset_training_items
+                    WHERE subset_id = :sid
+                )
+            ),
+            weighted AS (
+                SELECT
+                    e.id,
+                    CASE
+                        WHEN :opening_strength = 0 THEN 1.0
+                        WHEN EXISTS (
+                            SELECT 1 FROM decoy_puzzles dp2
+                            JOIN games g2 ON g2.id = dp2.game_id
+                            WHERE dp2.training_item_id = e.id
+                              AND g2.opening_id IN (SELECT id FROM opening_descendants)
+                        ) THEN 1.0
+                        ELSE 1.0 - :opening_strength
+                    END AS weight
+                FROM eligible e
+            )
+            SELECT id
+            FROM weighted
+            WHERE weight > 0
+            ORDER BY ln(random()) / weight DESC
+            LIMIT :count
+        """),
+        {
+            "sid": subset_id,
+            "opening_keys": opening_items,
+            "opening_strength": opening_strength,
+            "count": count,
+        },
+    ).all()
+
+    return [row.id for row in rows]
+
+
 def _sample_all_sources(
     sources: list[dict],
     subset_id: int,
@@ -297,6 +361,8 @@ def _sample_all_sources(
             ids = _sample_lichess_tactics(cfg, subset_id, count)
         elif source == "SCRAPED_POSITIONAL":
             ids = _sample_scraped_positionals(cfg, subset_id, count)
+        elif source == "DECOY":
+            ids = _sample_decoys(cfg, subset_id, count)
         else:
             ids = []
         all_ids.extend(ids)
@@ -499,6 +565,7 @@ def list_active_puzzles(
 
     lichess_ti_ids = [r.training_item_id for r in ti_rows if r.source_type == "LICHESS_TACTIC"]
     positional_ti_ids = [r.training_item_id for r in ti_rows if r.source_type == "SCRAPED_POSITIONAL"]
+    decoy_ti_ids = [r.training_item_id for r in ti_rows if r.source_type == "DECOY"]
 
     # ── Lichess tactics ──────────────────────────────────────────────────────
     lichess_rows = db.session.execute(
@@ -575,6 +642,21 @@ def list_active_puzzles(
                 {"name": tr.name, "displayName": tr.display_name or tr.name}
             )
 
+    # ── Decoys ───────────────────────────────────────────────────────────────
+    decoy_rows = db.session.execute(
+        sa.text("""
+            SELECT dp.id, dp.training_item_id, dp.best_cp,
+                   o.name AS opening_name, o.display_name AS opening_display_name, o.eco AS opening_eco
+            FROM decoy_puzzles dp
+            LEFT JOIN games g ON g.id = dp.game_id
+            LEFT JOIN openings o ON o.id = g.opening_id
+            WHERE dp.training_item_id = ANY(:ids)
+        """),
+        {"ids": decoy_ti_ids},
+    ).all() if decoy_ti_ids else []
+
+    decoy_by_ti: dict[int, Any] = {r.training_item_id: r for r in decoy_rows}
+
     # ── Assemble in original page order ─────────────────────────────────────
     puzzles: list[dict[str, object]] = []
     for ti_row in ti_rows:
@@ -612,6 +694,20 @@ def list_active_puzzles(
                 "difficultyMinRating": r.difficulty_min_rating,
                 "difficultyMaxRating": r.difficulty_max_rating,
                 "themes": sp_theme_map.get(r.id, []),
+                "opening": opening,
+            })
+        elif ti_row.source_type == "DECOY":
+            r = decoy_by_ti.get(ti_id)
+            if r is None:
+                continue
+            opening = (
+                {"name": r.opening_name, "displayName": r.opening_display_name or r.opening_name, "eco": r.opening_eco}
+                if r.opening_name else None
+            )
+            puzzles.append({
+                "sourceType": "DECOY",
+                "trainingItemId": ti_id,
+                "bestCp": r.best_cp,
                 "opening": opening,
             })
 
@@ -791,6 +887,32 @@ def _positional_stats(training_item_ids: list[int]) -> dict[str, object]:
     }
 
 
+def _decoy_stats(training_item_ids: list[int]) -> dict[str, object]:
+    if not training_item_ids:
+        return {"count": 0, "openings": []}
+
+    opening_rows = db.session.execute(
+        sa.text("""
+            SELECT o.name, o.display_name, COUNT(*) AS cnt
+            FROM decoy_puzzles dp
+            JOIN games g ON g.id = dp.game_id
+            JOIN openings o ON o.id = g.opening_id
+            WHERE dp.training_item_id = ANY(:ids)
+            GROUP BY o.name, o.display_name
+            ORDER BY cnt DESC
+        """),
+        {"ids": training_item_ids},
+    ).all()
+    openings: list[dict[str, object]] = [
+        {"name": r.name, "displayName": r.display_name, "count": r.cnt} for r in opening_rows
+    ]
+
+    return {
+        "count": len(training_item_ids),
+        "openings": openings,
+    }
+
+
 def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
     subset = _get_viewable_subset(subset_id, user_id)
 
@@ -827,6 +949,9 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
         sources_out["SCRAPED_POSITIONAL"] = _positional_stats(
             by_source.get("SCRAPED_POSITIONAL", [])
         )
+
+    if "DECOY" in configured_sources or "DECOY" in by_source:
+        sources_out["DECOY"] = _decoy_stats(by_source.get("DECOY", []))
 
     return {"sources": sources_out, "totalActive": total}
 
