@@ -15,11 +15,13 @@ if TYPE_CHECKING:
 class SourceImportSource(enum.Enum):
     LICHESS_TACTICS = "LICHESS_TACTICS"
     SCRAPED_POSITIONAL = "SCRAPED_POSITIONAL"
+    DECOY = "DECOY"
 
 
 class SourceImportOperation(enum.Enum):
     LICHESS_TACTICS_IMPORT = "LICHESS_TACTICS_IMPORT"
     SCRAPED_POSITIONAL_IMPORT = "SCRAPED_POSITIONAL_IMPORT"
+    DECOY_IMPORT = "DECOY_IMPORT"
 
 
 class SourceImportStatus(enum.Enum):
@@ -50,11 +52,14 @@ class SourceImportRun(Base):
     training_items: Mapped[list["TrainingItem"]] = relationship(
         "TrainingItem", back_populates="source_import_run"
     )
-    metadata_row: Mapped["LichessTacticsSourceRunMetadata | None"] = relationship(
+    lichess_tactics_metadata_row: Mapped["LichessTacticsSourceRunMetadata | None"] = relationship(
         "LichessTacticsSourceRunMetadata", back_populates="source_import_run", uselist=False
     )
     positional_metadata_row: Mapped["ScrapedPositionalSourceRunMetadata | None"] = relationship(
         "ScrapedPositionalSourceRunMetadata", back_populates="source_import_run", uselist=False
+    )
+    decoy_metadata_row: Mapped["DecoySourceRunMetadata | None"] = relationship(
+        "DecoySourceRunMetadata", back_populates="source_import_run", uselist=False
     )
 
 
@@ -78,7 +83,7 @@ class LichessTacticsSourceRunMetadata(Base):
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     source_import_run: Mapped[SourceImportRun] = relationship(
-        "SourceImportRun", back_populates="metadata_row"
+        "SourceImportRun", back_populates="lichess_tactics_metadata_row"
     )
 
     __table_args__ = (
@@ -109,5 +114,30 @@ class ScrapedPositionalSourceRunMetadata(Base):
         UniqueConstraint(
             "source_import_run_id",
             name="uq_scraped_positional_source_run_metadata_source_import_run_id",
+        ),
+    )
+
+
+class DecoySourceRunMetadata(Base):
+    __tablename__ = "decoy_source_run_metadata"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_import_run_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("source_import_runs.id"), nullable=False
+    )
+    imported_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    skipped_existing_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    total_decoys_after_run: Mapped[int] = mapped_column(Integer, nullable=False)
+    opening_counts_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    source_import_run: Mapped["SourceImportRun"] = relationship(
+        "SourceImportRun", back_populates="decoy_metadata_row"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "source_import_run_id",
+            name="uq_decoy_source_run_metadata_source_import_run_id",
         ),
     )
