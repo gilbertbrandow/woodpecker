@@ -122,6 +122,8 @@ export type DecoyGame = {
   black: string
   whiteTitle: string | null
   blackTitle: string | null
+  whiteElo: number | null
+  blackElo: number | null
   event: string | null
   date: string | null
   lichessId: string | null

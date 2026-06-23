@@ -37,6 +37,8 @@ def _serialize_puzzle(dp: DecoyPuzzle) -> dict:
                 "black": game.black,
                 "whiteTitle": game.white_title,
                 "blackTitle": game.black_title,
+                "whiteElo": game.white_elo,
+                "blackElo": game.black_elo,
                 "event": game.event,
                 "date": game.date,
                 "lichessId": game.lichess_id,
