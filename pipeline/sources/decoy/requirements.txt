@@ -1,2 +1,0 @@
-python-chess>=1.999
-zstandard>=0.22
