@@ -65,9 +65,11 @@ def _find_opening_id(
     if opening_name and opening_name in by_display_name:
         return by_display_name[opening_name]
     if eco:
-        candidates = by_eco.get(eco, [])
-        if candidates:
-            return candidates[0][0]
+        # Lichess ECO codes use sub-variant suffixes (e.g. "D24b"); fall back to base 3-char code.
+        for code in dict.fromkeys([eco, eco[:3]]):
+            candidates = by_eco.get(code, [])
+            if candidates:
+                return candidates[0][0]
     return None
 
 
