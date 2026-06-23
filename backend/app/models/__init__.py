@@ -6,6 +6,7 @@ from app.models.source_import_run import (
     SourceImportStatus,
     LichessTacticsSourceRunMetadata,
     ScrapedPositionalSourceRunMetadata,
+    DecoySourceRunMetadata,
 )
 from app.models.training_item import TrainingItem, TrainingItemSource
 from app.models.lichess_tactic import LichessTactic, lichess_tactic_theme_links, lichess_tactic_openings
@@ -14,6 +15,8 @@ from app.models.opening import Opening
 from app.models.scraped_positional_difficulty import ScrapedPositionalDifficulty
 from app.models.scraped_positional_theme import ScrapedPositionalTheme
 from app.models.scraped_positional_puzzle import ScrapedPositionalPuzzle, scraped_positional_theme_links
+from app.models.game import Game
+from app.models.decoy_puzzle import DecoyPuzzle
 from app.models.subset import Subset, SubsetTrainingItem
 from app.models.schedule import Schedule
 from app.models.training import Training
@@ -29,6 +32,7 @@ __all__ = [
     "SourceImportStatus",
     "LichessTacticsSourceRunMetadata",
     "ScrapedPositionalSourceRunMetadata",
+    "DecoySourceRunMetadata",
     "TrainingItem",
     "TrainingItemSource",
     "LichessTactic",
@@ -40,6 +44,8 @@ __all__ = [
     "ScrapedPositionalTheme",
     "ScrapedPositionalPuzzle",
     "scraped_positional_theme_links",
+    "Game",
+    "DecoyPuzzle",
     "Subset",
     "SubsetTrainingItem",
     "Schedule",
