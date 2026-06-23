@@ -18,6 +18,7 @@ const MIN_LABEL_PCT = 14
 const SEGMENT_BG: Partial<Record<TrainingItemSource, string>> = {
   LICHESS_TACTIC: 'bg-cyan-50 dark:bg-cyan-950/30',
   SCRAPED_POSITIONAL: 'bg-indigo-50 dark:bg-indigo-950/30',
+  DECOY: 'bg-amber-50 dark:bg-amber-950/30',
 }
 
 export function SplitSlider({
