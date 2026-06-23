@@ -335,7 +335,7 @@ def scan(
                                     "whiteTitle": game.headers.get("WhiteTitle"),
                                     "blackTitle": game.headers.get("BlackTitle"),
                                     "moveNumber": move_num,
-                                    "eco": game.headers.get("ECO"),
+                                    "eco": (game.headers.get("ECO") or "")[:3] or None,
                                     "openingName": game.headers.get("Opening"),
                                     "lichessGameUrl": game_lichess_url,
                                 }
