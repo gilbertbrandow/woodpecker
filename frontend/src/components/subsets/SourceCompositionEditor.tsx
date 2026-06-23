@@ -408,9 +408,16 @@ export function SourceCompositionEditor({
               </div>
 
               <CollapsibleContent>
-                {entry && entry.source !== "DECOY" && (
+                {entry && (
                   <div className="border-t px-4 pb-5 pt-4">
-                    {entry.source === "LICHESS_TACTIC" ? (
+                    {entry.source === "DECOY" ? (
+                      <p className="text-xs text-muted-foreground">
+                        Decoys have no configuration options. They are sampled
+                        uniformly from the full pool of imported positions.
+                        Use the distribution slider above to control how often
+                        they appear relative to other sources.
+                      </p>
+                    ) : entry.source === "LICHESS_TACTIC" ? (
                       <LichessTacticConfigEditor
                         config={entry.config}
                         onChange={(cfg) => updateConfig(entryIndex, cfg)}
