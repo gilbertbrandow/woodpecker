@@ -324,6 +324,8 @@ def scan(
                                 "black": game.headers.get("Black"),
                                 "whiteElo": game.headers.get("WhiteElo"),
                                 "blackElo": game.headers.get("BlackElo"),
+                                "whiteTitle": game.headers.get("WhiteTitle"),
+                                "blackTitle": game.headers.get("BlackTitle"),
                                 "moveNumber": move_num,
                                 "eco": game.headers.get("ECO"),
                                 "openingName": game.headers.get("Opening"),
