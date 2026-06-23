@@ -20,6 +20,19 @@ function PlayerCell({ name, title, elo }: { name: string; title: string | null; 
 
 const COLUMNS: ColumnDef<DecoyItem>[] = [
   {
+    id: 'position',
+    header: 'Position',
+    cell: ({ row }) => {
+      const { moveNumber, fen } = row.original
+      const sideToMove = fen.split(' ')[1] === 'w' ? 'White' : 'Black'
+      return (
+        <span className="text-xs tabular-nums text-muted-foreground whitespace-nowrap">
+          Move {moveNumber} · <span className="text-foreground">{sideToMove}</span>
+        </span>
+      )
+    },
+  },
+  {
     id: 'white',
     header: 'White',
     cell: ({ row }) => {
