@@ -56,9 +56,14 @@ export type ScrapedPositionalSourceConfig = {
   opening?: { items?: string[]; strength?: number }
 }
 
+export type DecoySourceConfig = {
+  opening?: { items?: string[]; strength?: number }
+}
+
 export type SourceEntry =
   | { source: 'LICHESS_TACTIC'; percentage: number; config: LichessTacticSourceConfig }
   | { source: 'SCRAPED_POSITIONAL'; percentage: number; config: ScrapedPositionalSourceConfig }
+  | { source: 'DECOY'; percentage: number; config: DecoySourceConfig }
 
 export type SubsetConfig = {
   sources: SourceEntry[]
@@ -86,8 +91,18 @@ export type ScrapedPositionalSourceMetadata = {
   opening: TrainingItemOpening | null
 }
 
+export type DecoyAcceptedMove = {
+  uci: string
+  cp: number
+  dropCp: number
+  line: string
+}
+
 export type DecoySourceMetadata = {
   sourceType: 'DECOY'
+  acceptedMoves: DecoyAcceptedMove[]
+  bestCp: number
+  opening: TrainingItemOpening | null
 }
 
 export type SourceMetadata = LichessTacticSourceMetadata | ScrapedPositionalSourceMetadata | DecoySourceMetadata

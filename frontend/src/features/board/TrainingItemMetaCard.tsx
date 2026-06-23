@@ -2,7 +2,7 @@ import * as React from 'react'
 import { ChevronDown } from 'lucide-react'
 import { Badge } from '../../components/ui/badge'
 import { cn } from '../../lib/utils'
-import type { LichessTacticSourceMetadata, ScrapedPositionalSourceMetadata, SourceMetadata } from '../../lib/api'
+import type { DecoySourceMetadata, LichessTacticSourceMetadata, ScrapedPositionalSourceMetadata, SourceMetadata } from '../../lib/api'
 import type { PlySelection } from './boardPage.helpers'
 import { TrainingItemTypeBadge } from '../../components/TrainingItemTypeBadge'
 
@@ -213,6 +213,45 @@ function ScrapedPositionalSection({
   )
 }
 
+function DecoySection({
+  source,
+  trainingItemId,
+  focusMode,
+  runPosition,
+}: {
+  source: DecoySourceMetadata
+  trainingItemId: number | undefined
+  focusMode: boolean
+  runPosition: number | undefined
+}): React.ReactElement {
+  const puzzleId = trainingItemId ?? '—'
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-3">
+        <div>
+          <span className="text-xs text-muted-foreground">Puzzle </span>
+          <span className="text-sm font-mono">
+            #{focusMode && runPosition !== undefined ? runPosition + 1 : puzzleId}
+          </span>
+        </div>
+        {!focusMode && <TrainingItemTypeBadge source="DECOY" />}
+      </div>
+      {!focusMode && source.acceptedMoves.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">Accepted moves</span>
+          <div className="flex flex-wrap gap-1.5">
+            {source.acceptedMoves.map((m) => (
+              <Badge key={m.uci} variant="outline" className="font-mono text-xs font-normal">
+                {m.uci}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function SourceSection({
   source,
   trainingItemId,
@@ -230,6 +269,9 @@ function SourceSection({
   if (source.sourceType === 'SCRAPED_POSITIONAL') {
     return <ScrapedPositionalSection source={source} trainingItemId={trainingItemId} focusMode={focusMode} runPosition={runPosition} />
   }
+  if (source.sourceType === 'DECOY') {
+    return <DecoySection source={source} trainingItemId={trainingItemId} focusMode={focusMode} runPosition={runPosition} />
+  }
   return null
 }
 
@@ -246,7 +288,7 @@ type TrainingItemMetaCardProps = {
 type PuzzleSummary = {
   puzzleId: string | number
   ratingDisplay: string | number
-  sourceType: 'LICHESS_TACTIC' | 'SCRAPED_POSITIONAL' | null
+  sourceType: 'LICHESS_TACTIC' | 'SCRAPED_POSITIONAL' | 'DECOY' | null
 }
 
 function resolvePuzzleSummary(source: SourceMetadata, trainingItemId: number | undefined): PuzzleSummary {
@@ -263,6 +305,13 @@ function resolvePuzzleSummary(source: SourceMetadata, trainingItemId: number | u
       puzzleId: trainingItemId ?? source.internalId,
       ratingDisplay: minRating != null && maxRating != null ? `${minRating}–${maxRating}` : label,
       sourceType: 'SCRAPED_POSITIONAL',
+    }
+  }
+  if (source.sourceType === 'DECOY') {
+    return {
+      puzzleId: trainingItemId ?? '—',
+      ratingDisplay: '—',
+      sourceType: 'DECOY',
     }
   }
   return { puzzleId: '', ratingDisplay: '', sourceType: null }
