@@ -7,6 +7,8 @@ from sqlalchemy.orm import selectinload
 
 from app.exceptions import NotFoundError
 from app.extensions import db
+from app.models.decoy_puzzle import DecoyPuzzle
+from app.models.game import Game
 from app.models.lichess_tactic import LichessTactic
 from app.models.opening import Opening
 from app.models.scraped_positional_puzzle import ScrapedPositionalPuzzle
@@ -59,8 +61,17 @@ class ScrapedPositionalMetadata(SourceMetadata):
 
 @dataclass
 class DecoyMetadata(SourceMetadata):
+    accepted_moves: list[dict[str, object]]
+    best_cp: int
+    opening: dict[str, object] | None = None
+
     def to_api_dict(self) -> dict[str, object]:
-        return {"sourceType": "DECOY"}
+        return {
+            "sourceType": "DECOY",
+            "acceptedMoves": self.accepted_moves,
+            "bestCp": self.best_cp,
+            "opening": self.opening,
+        }
 
 
 @dataclass
@@ -78,6 +89,7 @@ _HANDLERS: dict[TrainingItemSource, tuple[
 def _register_handlers() -> None:
     _HANDLERS[TrainingItemSource.LICHESS_TACTIC] = (_lichess_tactic_payload, _lichess_tactic_payload_batch)
     _HANDLERS[TrainingItemSource.SCRAPED_POSITIONAL] = (_scraped_positional_payload, _scraped_positional_payload_batch)
+    _HANDLERS[TrainingItemSource.DECOY] = (_decoy_payload, _decoy_payload_batch)
 
 
 def get_content(training_item_id: int) -> TrainingItemPayload:
@@ -211,6 +223,40 @@ def _opening_dict(opening: Opening) -> dict[str, object]:
         "displayName": opening.display_name,
         "eco": opening.eco,
     }
+
+
+def _decoy_payload(training_item_id: int) -> TrainingItemPayload:
+    decoy = db.session.execute(
+        sa.select(DecoyPuzzle)
+        .options(selectinload(DecoyPuzzle.game).selectinload(Game.opening))
+        .where(DecoyPuzzle.training_item_id == training_item_id)
+    ).scalar_one()
+    return _build_decoy_payload(decoy)
+
+
+def _decoy_payload_batch(training_item_ids: list[int]) -> dict[int, TrainingItemPayload]:
+    decoys = db.session.execute(
+        sa.select(DecoyPuzzle)
+        .options(selectinload(DecoyPuzzle.game).selectinload(Game.opening))
+        .where(DecoyPuzzle.training_item_id.in_(training_item_ids))
+    ).scalars().all()
+    return {d.training_item_id: _build_decoy_payload(d) for d in decoys}
+
+
+def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
+    accepted_ucis = [m["uci"] for m in decoy.accepted_moves if isinstance(m, dict) and "uci" in m]
+    opening = decoy.game.opening if decoy.game else None
+    return TrainingItemPayload(
+        contract=SolveContract(
+            fen=decoy.fen,
+            plies=[decoy.opponent_move, accepted_ucis],
+        ),
+        metadata=DecoyMetadata(
+            accepted_moves=list(decoy.accepted_moves),
+            best_cp=decoy.best_cp,
+            opening=_opening_dict(opening) if opening else None,
+        ),
+    )
 
 
 _register_handlers()
