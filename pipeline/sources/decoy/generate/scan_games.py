@@ -235,6 +235,7 @@ def scan(
     positions_checked = 0
     decoys_found = 0
     lichess_queries = 0
+    seen_fens: set[str] = set()
 
     conn = open_db(db_path)
     game_source = stream_games_by_elo if sort_by_elo else stream_games
@@ -284,57 +285,63 @@ def scan(
                         positions_checked += 1
                         result = lookup(conn, current_fen_4)
                         if result is not None:
-                            decoys_found += 1
-                            decoys_this_game += 1
-
-                            if fetch_lichess_urls and not game_lichess_fetched:
-                                # Query once per OTB game, reuse URL for any further decoys
-                                lichess_queries += 1
-                                print(
-                                    f"  [API call #{lichess_queries}] {game.headers.get('White')} vs "
-                                    f"{game.headers.get('Black')} move {move_num} — querying Lichess ...",
-                                    flush=True,
-                                )
-                                try:
-                                    game_lichess_url = _fetch_lichess_url(
-                                        current_fen_4, http, last_req, fen_cache
-                                    )
-                                except _LichessAuthError as e:
-                                    print(f"\nWarning: {e}\nDisabling Lichess URL fetching for this run.", flush=True)
-                                    fetch_lichess_urls = False
-                                print(f"  → {game_lichess_url}", flush=True)
-                                game_lichess_fetched = True
-                            elif decoys_this_game > 1:
-                                print(
-                                    f"  [reuse] {game.headers.get('White')} vs "
-                                    f"{game.headers.get('Black')} move {move_num} — reusing {game_lichess_url}",
-                                    flush=True,
-                                )
-
-                            record = {
-                                "fen": prev_fen_4,
-                                "opponentMove": prev_move_uci,
-                                "bestCp": result["bestCp"],
-                                "depth": result["depth"],
-                                "acceptedMoves": result["acceptedMoves"],
-                                "source": "otb_master",
-                                "event": event,
-                                "date": game.headers.get("Date"),
-                                "white": game.headers.get("White"),
-                                "black": game.headers.get("Black"),
-                                "whiteElo": game.headers.get("WhiteElo"),
-                                "blackElo": game.headers.get("BlackElo"),
-                                "whiteTitle": game.headers.get("WhiteTitle"),
-                                "blackTitle": game.headers.get("BlackTitle"),
-                                "moveNumber": move_num,
-                                "eco": game.headers.get("ECO"),
-                                "openingName": game.headers.get("Opening"),
-                                "lichessGameUrl": game_lichess_url,
-                            }
-                            out.write(json.dumps(record, ensure_ascii=False) + "\n")
                             next_check_at = move_num + 10
-                            if decoys_this_game >= max_per_game:
-                                break
+
+                            if prev_fen_4 in seen_fens:
+                                # Same position already emitted from a different game — skip
+                                pass
+                            else:
+                                seen_fens.add(prev_fen_4)
+                                decoys_found += 1
+                                decoys_this_game += 1
+
+                                if fetch_lichess_urls and not game_lichess_fetched:
+                                    # Query once per OTB game, reuse URL for any further decoys
+                                    lichess_queries += 1
+                                    print(
+                                        f"  [API call #{lichess_queries}] {game.headers.get('White')} vs "
+                                        f"{game.headers.get('Black')} move {move_num} — querying Lichess ...",
+                                        flush=True,
+                                    )
+                                    try:
+                                        game_lichess_url = _fetch_lichess_url(
+                                            current_fen_4, http, last_req, fen_cache
+                                        )
+                                    except _LichessAuthError as e:
+                                        print(f"\nWarning: {e}\nDisabling Lichess URL fetching for this run.", flush=True)
+                                        fetch_lichess_urls = False
+                                    print(f"  → {game_lichess_url}", flush=True)
+                                    game_lichess_fetched = True
+                                elif decoys_this_game > 1:
+                                    print(
+                                        f"  [reuse] {game.headers.get('White')} vs "
+                                        f"{game.headers.get('Black')} move {move_num} — reusing {game_lichess_url}",
+                                        flush=True,
+                                    )
+
+                                record = {
+                                    "fen": prev_fen_4,
+                                    "opponentMove": prev_move_uci,
+                                    "bestCp": result["bestCp"],
+                                    "depth": result["depth"],
+                                    "acceptedMoves": result["acceptedMoves"],
+                                    "source": "otb_master",
+                                    "event": event,
+                                    "date": game.headers.get("Date"),
+                                    "white": game.headers.get("White"),
+                                    "black": game.headers.get("Black"),
+                                    "whiteElo": game.headers.get("WhiteElo"),
+                                    "blackElo": game.headers.get("BlackElo"),
+                                    "whiteTitle": game.headers.get("WhiteTitle"),
+                                    "blackTitle": game.headers.get("BlackTitle"),
+                                    "moveNumber": move_num,
+                                    "eco": game.headers.get("ECO"),
+                                    "openingName": game.headers.get("Opening"),
+                                    "lichessGameUrl": game_lichess_url,
+                                }
+                                out.write(json.dumps(record, ensure_ascii=False) + "\n")
+                                if decoys_this_game >= max_per_game:
+                                    break
 
                     prev_fen_4 = current_fen_4
                     prev_move_uci = move.uci()
