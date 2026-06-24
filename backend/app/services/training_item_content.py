@@ -65,6 +65,7 @@ class DecoyMetadata(SourceMetadata):
     accepted_moves: list[dict[str, object]]
     best_cp: int
     move_number: int
+    depth: int = 0
     analysis_url: str | None = None
     game: dict[str, object] | None = None
     opening: dict[str, object] | None = None
@@ -75,6 +76,7 @@ class DecoyMetadata(SourceMetadata):
             "acceptedMoves": self.accepted_moves,
             "bestCp": self.best_cp,
             "moveNumber": self.move_number,
+            "depth": self.depth,
             "analysisUrl": self.analysis_url,
             "game": self.game,
             "opening": self.opening,
@@ -265,6 +267,7 @@ def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
             accepted_moves=list(decoy.accepted_moves),
             best_cp=decoy.best_cp,
             move_number=decoy.move_number,
+            depth=decoy.depth,
             analysis_url=analysis_url,
             game={
                 "white": game.white,
