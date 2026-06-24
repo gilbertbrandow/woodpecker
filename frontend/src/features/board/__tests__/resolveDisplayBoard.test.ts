@@ -26,6 +26,7 @@ const PGN_2_MOVES: TrainingItemMetaPgnDisplay = {
     { san: 'd5', uci: 'd7d5', fen: PLY_2_FEN, from: 'd7', to: 'd5', moveNumber: 1, isWhite: false, moveStatus: 'correct' },
   ],
   variation: null,
+  subvariations: null,
 }
 
 const PGN_WITH_WRONG: TrainingItemMetaPgnDisplay = {
@@ -36,6 +37,7 @@ const PGN_WITH_WRONG: TrainingItemMetaPgnDisplay = {
   variation: [
     { san: 'd5', uci: 'd7d5', fen: PLY_2_FEN, from: 'd7', to: 'd5', moveNumber: 1, isWhite: false, moveStatus: 'correct' },
   ],
+  subvariations: null,
 }
 
 const SOLVED_ATTEMPT: OverviewAttemptView = {

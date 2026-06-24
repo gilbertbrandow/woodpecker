@@ -414,7 +414,7 @@ export function SourceCompositionEditor({
                       <p className="text-xs text-muted-foreground">
                         Decoys have no configuration options. They are sampled
                         uniformly from the full pool of imported positions.
-                        Use the distribution slider above to control how often
+                        Use the distribution slider below to control how often
                         they appear relative to other sources.
                       </p>
                     ) : entry.source === "LICHESS_TACTIC" ? (

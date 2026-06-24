@@ -16,26 +16,33 @@ type DisplayMoveMin = {
 type TrainingItemMetaPgnDisplayMin = {
   mainline: DisplayMoveMin[]
   variation: DisplayMoveMin[] | null
+  subvariations: DisplayMoveMin[][] | null
 }
 
 function MoveToken({
   move,
   line,
   index,
+  subIndex,
   selectedPly,
   onPlyClick,
 }: {
   move: DisplayMoveMin
-  line: 'main' | 'variation'
+  line: 'main' | 'variation' | 'subvariation'
   index: number
+  subIndex?: number
   selectedPly: PlySelection | null | undefined
   onPlyClick: ((ply: PlySelection) => void) | undefined
 }): React.ReactElement {
-  const isSelected =
-    selectedPly !== null &&
-    selectedPly !== undefined &&
-    selectedPly.line === line &&
-    selectedPly.index === index
+  const isSelected = (() => {
+    if (!selectedPly) return false
+    if (selectedPly.line !== line) return false
+    if (selectedPly.index !== index) return false
+    if (line === 'subvariation' && selectedPly.line === 'subvariation') {
+      return selectedPly.subIndex === subIndex
+    }
+    return true
+  })()
 
   const isWrong = move.moveStatus === 'wrong'
   const san = (
@@ -43,6 +50,10 @@ function MoveToken({
       {move.san}{isWrong && <span className="text-red-600 dark:text-red-400">??</span>}
     </span>
   )
+
+  const plyTarget: PlySelection = line === 'subvariation'
+    ? { line: 'subvariation', subIndex: subIndex ?? 0, index }
+    : { line, index }
 
   if (!onPlyClick) {
     return (
@@ -55,7 +66,7 @@ function MoveToken({
   return (
     <button
       type="button"
-      onClick={() => onPlyClick({ line, index })}
+      onClick={() => onPlyClick(plyTarget)}
       className={cn(
         'inline rounded px-0.5',
         isSelected ? 'bg-foreground text-background' : 'cursor-pointer hover:bg-muted',
@@ -69,11 +80,13 @@ function MoveToken({
 function MoveSequence({
   moves,
   line,
+  subIndex,
   selectedPly,
   onPlyClick,
 }: {
   moves: DisplayMoveMin[]
-  line: 'main' | 'variation'
+  line: 'main' | 'variation' | 'subvariation'
+  subIndex?: number
   selectedPly: PlySelection | null | undefined
   onPlyClick: ((ply: PlySelection) => void) | undefined
 }): React.ReactElement {
@@ -90,12 +103,38 @@ function MoveSequence({
       )
     }
     items.push(
-      <MoveToken key={`m${i}`} move={move} line={line} index={i} selectedPly={selectedPly} onPlyClick={onPlyClick} />,
+      <MoveToken key={`m${i}`} move={move} line={line} index={i} subIndex={subIndex} selectedPly={selectedPly} onPlyClick={onPlyClick} />,
     )
     if (i < moves.length - 1) items.push(' ')
   }
   return <span>{items}</span>
 }
+
+function SubvariationsBlock({
+  subvariations,
+  selectedPly,
+  onPlyClick,
+}: {
+  subvariations: DisplayMoveMin[][]
+  selectedPly: PlySelection | null | undefined
+  onPlyClick: ((ply: PlySelection) => void) | undefined
+}): React.ReactElement | null {
+  if (subvariations.length === 0) return null
+  return (
+    <>
+      <span className="text-xs text-muted-foreground"> (</span>
+      <div className="pl-3 text-xs text-muted-foreground">
+        {subvariations.map((sv, si) => (
+          <div key={si}>
+            <MoveSequence moves={sv} line="subvariation" subIndex={si} selectedPly={selectedPly} onPlyClick={onPlyClick} />
+          </div>
+        ))}
+      </div>
+      <span className="text-xs text-muted-foreground">)</span>
+    </>
+  )
+}
+
 
 function computeNextPly(
   selected: PlySelection | null | undefined,
@@ -107,6 +146,8 @@ function computeNextPly(
   if (selected === null || selected === undefined) {
     return mainLen > 0 ? { line: 'main', index: 0 } : null
   }
+
+  if (selected.line === 'subvariation') return null
 
   if (selected.line === 'main') {
     const next = selected.index + 1
@@ -121,6 +162,8 @@ function computePrevPly(
   selected: PlySelection | null | undefined,
 ): PlySelection | null {
   if (selected === null || selected === undefined) return null
+
+  if (selected.line === 'subvariation') return null
 
   if (selected.line === 'variation') {
     return selected.index > 0 ? { line: 'variation', index: selected.index - 1 } : null
@@ -213,6 +256,20 @@ function ScrapedPositionalSection({
   )
 }
 
+function PlayerLabel({ name, title, elo }: { name: string; title: string | null; elo: number | null }): React.ReactElement {
+  return (
+    <span className="flex items-center gap-1 text-xs">
+      {title && (
+        <span className="font-semibold" style={{ color: 'hsl(37, 74%, 43%)' }}>{title}</span>
+      )}
+      <span>{name}</span>
+      {elo !== null && (
+        <span className="tabular-nums text-muted-foreground">({elo})</span>
+      )}
+    </span>
+  )
+}
+
 function DecoySection({
   source,
   trainingItemId,
@@ -225,6 +282,7 @@ function DecoySection({
   runPosition: number | undefined
 }): React.ReactElement {
   const puzzleId = trainingItemId ?? '—'
+  const g = source.game
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-3">
@@ -236,16 +294,32 @@ function DecoySection({
         </div>
         {!focusMode && <TrainingItemTypeBadge source="DECOY" />}
       </div>
-      {!focusMode && source.acceptedMoves.length > 0 && (
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">Accepted moves</span>
-          <div className="flex flex-wrap gap-1.5">
-            {source.acceptedMoves.map((m) => (
-              <Badge key={m.uci} variant="outline" className="font-mono text-xs font-normal">
-                {m.uci}
-              </Badge>
-            ))}
+      {!focusMode && g !== null && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <span className="w-9 shrink-0 text-xs text-muted-foreground">White</span>
+            <div className="rounded-md bg-muted px-2 py-1">
+              <PlayerLabel name={g.white} title={g.whiteTitle} elo={g.whiteElo} />
+            </div>
           </div>
+          <div className="flex items-center gap-2">
+            <span className="w-9 shrink-0 text-xs text-muted-foreground">Black</span>
+            <div className="rounded-md bg-muted px-2 py-1">
+              <PlayerLabel name={g.black} title={g.blackTitle} elo={g.blackElo} />
+            </div>
+          </div>
+          {g.event !== null && (
+            <div className="flex items-center gap-2">
+              <span className="w-9 shrink-0 text-xs text-muted-foreground">Event</span>
+              <span className="truncate py-1 text-xs">{g.event}</span>
+            </div>
+          )}
+          {g.date !== null && (
+            <div className="flex items-center gap-2">
+              <span className="w-9 shrink-0 text-xs text-muted-foreground">Date</span>
+              <span className="py-1 font-mono text-xs">{g.date}</span>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -310,7 +384,7 @@ function resolvePuzzleSummary(source: SourceMetadata, trainingItemId: number | u
   if (source.sourceType === 'DECOY') {
     return {
       puzzleId: trainingItemId ?? '—',
-      ratingDisplay: '—',
+      ratingDisplay: source.moveNumber,
       sourceType: 'DECOY',
     }
   }
@@ -334,11 +408,12 @@ export function MobileOverviewMetaBar({
 }: MobileOverviewMetaBarProps): React.ReactElement {
   const [isOpen, setIsOpen] = React.useState(false)
 
-  const opening = source.sourceType !== 'DECOY' ? source.opening : null
+  const opening = source.opening
   const themes: Array<{ name: string; displayName: string | null }> =
     source.sourceType !== 'DECOY' ? source.themes : []
+  const decoyGame = source.sourceType === 'DECOY' ? source.game : null
   const hasDetails =
-    opening !== null || themes.length > 0 || (pgnDisplay !== null && pgnDisplay.mainline.length > 0)
+    opening !== null || themes.length > 0 || (pgnDisplay !== null && pgnDisplay.mainline.length > 0) || decoyGame !== null
 
   const { puzzleId, ratingDisplay, sourceType } = resolvePuzzleSummary(source, trainingItemId)
 
@@ -354,7 +429,7 @@ export function MobileOverviewMetaBar({
           <span className="shrink-0 font-mono text-sm">#{puzzleId}</span>
           {sourceType !== null && <TrainingItemTypeBadge source={sourceType} />}
           <span className="shrink-0 text-sm tabular-nums">
-            <span className="text-xs text-muted-foreground">Rating: </span>
+            <span className="text-xs text-muted-foreground">{source.sourceType === 'DECOY' ? 'Move: ' : 'Rating: '}</span>
             {ratingDisplay}
           </span>
         </div>
@@ -367,6 +442,34 @@ export function MobileOverviewMetaBar({
 
       {isOpen && (
         <div className="absolute top-full left-[-1px] right-[-1px] z-50 flex flex-col gap-3 rounded-b-md border border-t-0 border-border bg-background px-3 pb-3 pt-3 shadow-md">
+          {decoyGame !== null && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-9 shrink-0 text-xs text-muted-foreground">White</span>
+                <div className="rounded-md bg-muted px-2 py-1">
+                  <PlayerLabel name={decoyGame.white} title={decoyGame.whiteTitle} elo={decoyGame.whiteElo} />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-9 shrink-0 text-xs text-muted-foreground">Black</span>
+                <div className="rounded-md bg-muted px-2 py-1">
+                  <PlayerLabel name={decoyGame.black} title={decoyGame.blackTitle} elo={decoyGame.blackElo} />
+                </div>
+              </div>
+              {decoyGame.event !== null && (
+                <div className="flex items-center gap-2">
+                  <span className="w-9 shrink-0 text-xs text-muted-foreground">Event</span>
+                  <span className="truncate py-1 text-xs">{decoyGame.event}</span>
+                </div>
+              )}
+              {decoyGame.date !== null && (
+                <div className="flex items-center gap-2">
+                  <span className="w-9 shrink-0 text-xs text-muted-foreground">Date</span>
+                  <span className="py-1 font-mono text-xs">{decoyGame.date}</span>
+                </div>
+              )}
+            </div>
+          )}
           {opening !== null && (
             <div className="flex items-center gap-1.5 overflow-hidden">
               <span className="shrink-0 font-mono text-xs font-semibold">{opening.eco}</span>
@@ -387,8 +490,11 @@ export function MobileOverviewMetaBar({
               <MoveSequence moves={pgnDisplay.mainline} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />
               {pgnDisplay.variation !== null && (
                 <span className="text-xs">
-                  (<MoveSequence moves={pgnDisplay.variation} line="variation" selectedPly={selectedPly} onPlyClick={onPlyClick} />)
+                  {' '}(<MoveSequence moves={pgnDisplay.variation} line="variation" selectedPly={selectedPly} onPlyClick={onPlyClick} />)
                 </span>
+              )}
+              {pgnDisplay.subvariations !== null && (
+                <SubvariationsBlock subvariations={pgnDisplay.subvariations} selectedPly={selectedPly} onPlyClick={onPlyClick} />
               )}
             </div>
           )}
@@ -424,8 +530,7 @@ export function TrainingItemMetaCard({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onPlyClick, selectedPly, pgnDisplay])
 
-  const opening =
-    source.sourceType !== 'DECOY' ? source.opening : null
+  const opening = source.opening
 
   return (
     <div className="flex flex-col gap-3 rounded-md border border-border px-3 py-3">
@@ -440,7 +545,10 @@ export function TrainingItemMetaCard({
         <div className={cn('text-sm leading-relaxed', 'border-t border-border pt-2')}>
           <MoveSequence moves={pgnDisplay.mainline} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />
           {pgnDisplay.variation !== null && (
-            <span className="text-xs">(<MoveSequence moves={pgnDisplay.variation} line="variation" selectedPly={selectedPly} onPlyClick={onPlyClick} />)</span>
+            <span className="text-xs"> (<MoveSequence moves={pgnDisplay.variation} line="variation" selectedPly={selectedPly} onPlyClick={onPlyClick} />)</span>
+          )}
+          {pgnDisplay.subvariations !== null && (
+            <SubvariationsBlock subvariations={pgnDisplay.subvariations} selectedPly={selectedPly} onPlyClick={onPlyClick} />
           )}
         </div>
       )}

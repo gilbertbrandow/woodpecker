@@ -102,6 +102,9 @@ export type DecoySourceMetadata = {
   sourceType: 'DECOY'
   acceptedMoves: DecoyAcceptedMove[]
   bestCp: number
+  analysisUrl: string | null
+  moveNumber: number
+  game: DecoyGame | null
   opening: TrainingItemOpening | null
 }
 
@@ -629,6 +632,7 @@ export type DisplayMove = {
 export type TrainingItemMetaPgnDisplay = {
   mainline: DisplayMove[]
   variation: DisplayMove[] | null
+  subvariations: DisplayMove[][] | null
 }
 
 export type OverviewAttemptBoardView = {

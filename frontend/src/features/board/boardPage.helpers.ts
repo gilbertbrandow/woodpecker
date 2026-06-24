@@ -170,10 +170,9 @@ export function formatTimeRemaining(ms: number): string {
   return `${h} hour${h === 1 ? '' : 's'}`
 }
 
-export type PlySelection = {
-  line: 'main' | 'variation'
-  index: number
-}
+export type PlySelection =
+  | { line: 'main' | 'variation'; index: number }
+  | { line: 'subvariation'; subIndex: number; index: number }
 
 function applyUciDisplay(
   chess: Chess,
@@ -213,7 +212,7 @@ export function buildPgnDisplay(
   autoVariation: boolean = true,
 ): TrainingItemMetaPgnDisplay {
   const solutionMoves = plies.map(resolveStep)
-  if (solutionMoves.length === 0) return { mainline: [], variation: null }
+  if (solutionMoves.length === 0) return { mainline: [], variation: null, subvariations: null }
 
   if (attemptStatus === 'in_progress') {
     const chess = new Chess(baseFen)
@@ -223,14 +222,14 @@ export function buildPgnDisplay(
       if (!move) break
       mainline.push(move)
     }
-    return { mainline, variation: null }
+    return { mainline, variation: null, subvariations: null }
   }
 
   if (attemptStatus === 'solved') {
     const chess = new Chess(baseFen)
     const mainline: DisplayMove[] = []
     const firstOpponent = applyUciDisplay(chess, solutionMoves[0], 'opponent')
-    if (!firstOpponent) return { mainline, variation: null }
+    if (!firstOpponent) return { mainline, variation: null, subvariations: null }
     mainline.push(firstOpponent)
     for (let i = 0; i < attemptMoves.length; i++) {
       const isLast = i === attemptMoves.length - 1
@@ -246,18 +245,18 @@ export function buildPgnDisplay(
         }
       }
     }
-    return { mainline, variation: null }
+    return { mainline, variation: null, subvariations: null }
   }
 
   const chess = new Chess(baseFen)
   const mainline: DisplayMove[] = []
 
   const opponentFirst = applyUciDisplay(chess, solutionMoves[0], 'opponent')
-  if (!opponentFirst) return { mainline: [], variation: null }
+  if (!opponentFirst) return { mainline: [], variation: null, subvariations: null }
   mainline.push(opponentFirst)
 
   if (attemptMoves.length === 0) {
-    return { mainline, variation: null }
+    return { mainline, variation: null, subvariations: null }
   }
 
   let branchFen = chess.fen()
@@ -303,7 +302,7 @@ export function buildPgnDisplay(
     }
   }
 
-  return { mainline, variation: variation.length > 0 ? variation : null }
+  return { mainline, variation: variation.length > 0 ? variation : null, subvariations: null }
 }
 
 export function resolveDisplayBoard(
@@ -317,11 +316,16 @@ export function resolveDisplayBoard(
   if (mode === 'overview') {
     const base: BoardState = { ...board, dests: new Map() }
     if (selectedPly !== null && overviewPgnDisplay !== null) {
-      const plyList =
-        selectedPly.line === 'main'
-          ? overviewPgnDisplay.mainline
-          : (overviewPgnDisplay.variation ?? [])
-      const ply = plyList[selectedPly.index]
+      let ply: DisplayMove | undefined
+      if (selectedPly.line === 'subvariation') {
+        ply = overviewPgnDisplay.subvariations?.[selectedPly.subIndex]?.[selectedPly.index]
+      } else {
+        const plyList =
+          selectedPly.line === 'main'
+            ? overviewPgnDisplay.mainline
+            : (overviewPgnDisplay.variation ?? [])
+        ply = plyList[selectedPly.index]
+      }
       if (ply) {
         const feedbackResult: MoveFeedbackResult | null =
           ply.moveStatus === 'correct' ? 'correct' : ply.moveStatus === 'wrong' ? 'wrong' : null
