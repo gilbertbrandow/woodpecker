@@ -8,6 +8,7 @@ import { TrainingItemTypeBadge } from '../../components/TrainingItemTypeBadge'
 
 type DisplayMoveMin = {
   san: string
+  uci?: string
   moveNumber: number
   isWhite: boolean
   moveStatus: 'correct' | 'wrong' | 'opponent' | null
@@ -135,6 +136,107 @@ function SubvariationsBlock({
   )
 }
 
+
+type CloudEvalStatus =
+  | { status: 'idle' | 'loading' | 'not_found' | 'error' }
+  | { status: 'found'; eval: string; depth: number }
+
+function formatEval(pvs: Array<{ cp?: number; mate?: number }>): string {
+  const pv = pvs[0]
+  if (!pv) return '0.00'
+  if (pv.mate !== undefined) return pv.mate > 0 ? `M${pv.mate}` : `-M${Math.abs(pv.mate)}`
+  const p = (pv.cp ?? 0) / 100
+  return p >= 0 ? `+${p.toFixed(2)}` : p.toFixed(2)
+}
+
+function CloudEvalSection({ fen }: { fen: string }): React.ReactElement {
+  const [state, setState] = React.useState<CloudEvalStatus>({ status: 'idle' })
+
+  React.useEffect(() => {
+    setState({ status: 'loading' })
+    const controller = new AbortController()
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams({ fen, multiPv: '1' })
+      fetch(`https://lichess.org/api/cloud-eval?${params}`, { signal: controller.signal })
+        .then(res => {
+          if (res.status === 404) { setState({ status: 'not_found' }); return null }
+          if (!res.ok) { setState({ status: 'error' }); return null }
+          return res.json()
+        })
+        .then((data: { depth: number; pvs: Array<{ cp?: number; mate?: number }> } | null) => {
+          if (data == null) return
+          const pv = data.pvs?.[0]
+          if (pv == null) { setState({ status: 'not_found' }); return }
+          setState({ status: 'found', eval: formatEval(data.pvs), depth: data.depth })
+        })
+        .catch((err: Error) => { if (err.name !== 'AbortError') setState({ status: 'error' }) })
+    }, 300)
+    return () => { clearTimeout(timer); controller.abort() }
+  }, [fen])
+
+  return (
+    <div className="flex items-center gap-2 border-t border-border pt-3 pb-1">
+      <span className="shrink-0 text-xs text-muted-foreground">Cloud eval</span>
+      {state.status === 'loading' && (
+        <span className="text-xs text-muted-foreground">…</span>
+      )}
+      {(state.status === 'not_found' || state.status === 'error') && (
+        <span className="text-xs text-muted-foreground">—</span>
+      )}
+      {state.status === 'found' && (
+        <>
+          <span className="font-mono text-xs font-semibold tabular-nums">{state.eval}</span>
+          <span className="text-xs text-muted-foreground">depth {state.depth}</span>
+        </>
+      )}
+    </div>
+  )
+}
+
+function DecoyEvalSection({
+  source,
+  selectedPly,
+  pgnDisplay,
+}: {
+  source: DecoySourceMetadata
+  selectedPly: PlySelection | null | undefined
+  pgnDisplay: TrainingItemMetaPgnDisplayMin | null
+}): React.ReactElement {
+  const cpByUci = React.useMemo(() => {
+    const map = new Map<string, number>()
+    for (const m of source.acceptedMoves) map.set(m.uci, m.cp)
+    return map
+  }, [source.acceptedMoves])
+
+  const resolvedCp = React.useMemo((): number | null => {
+    if (!selectedPly || (selectedPly.line === 'main' && selectedPly.index === 0)) {
+      return source.bestCp
+    }
+    if (selectedPly.line === 'subvariation') {
+      const sv = pgnDisplay?.subvariations?.[selectedPly.subIndex]?.[selectedPly.index]
+      return sv?.uci != null ? (cpByUci.get(sv.uci) ?? null) : null
+    }
+    if (selectedPly.line === 'main' && selectedPly.index > 0) {
+      const move = pgnDisplay?.mainline[selectedPly.index]
+      return move?.uci != null ? (cpByUci.get(move.uci) ?? null) : null
+    }
+    return source.bestCp
+  }, [selectedPly, pgnDisplay, cpByUci, source.bestCp])
+
+  return (
+    <div className="flex items-center gap-2 border-t border-border pt-3 pb-1">
+      <span className="shrink-0 text-xs text-muted-foreground">Eval</span>
+      {resolvedCp != null ? (
+        <>
+          <span className="font-mono text-xs font-semibold tabular-nums">{formatEval([{ cp: resolvedCp }])}</span>
+          <span className="text-xs text-muted-foreground">depth {source.depth}</span>
+        </>
+      ) : (
+        <span className="text-xs text-muted-foreground">—</span>
+      )}
+    </div>
+  )
+}
 
 function computeNextPly(
   selected: PlySelection | null | undefined,
@@ -357,6 +459,7 @@ type TrainingItemMetaCardProps = {
   focusMode?: boolean
   selectedPly?: PlySelection | null
   onPlyClick?: (ply: PlySelection) => void
+  boardFen?: string
 }
 
 type PuzzleSummary = {
@@ -397,6 +500,7 @@ type MobileOverviewMetaBarProps = {
   trainingItemId?: number
   selectedPly?: PlySelection | null
   onPlyClick?: (ply: PlySelection) => void
+  boardFen?: string
 }
 
 export function MobileOverviewMetaBar({
@@ -405,6 +509,7 @@ export function MobileOverviewMetaBar({
   trainingItemId,
   selectedPly,
   onPlyClick,
+  boardFen,
 }: MobileOverviewMetaBarProps): React.ReactElement {
   const [isOpen, setIsOpen] = React.useState(false)
 
@@ -498,6 +603,12 @@ export function MobileOverviewMetaBar({
               )}
             </div>
           )}
+          {source.sourceType === 'DECOY'
+            ? <DecoyEvalSection source={source} selectedPly={selectedPly} pgnDisplay={pgnDisplay} />
+            : boardFen !== undefined
+              ? <CloudEvalSection fen={boardFen} />
+              : null
+          }
         </div>
       )}
     </div>
@@ -512,6 +623,7 @@ export function TrainingItemMetaCard({
   focusMode = false,
   selectedPly,
   onPlyClick,
+  boardFen,
 }: TrainingItemMetaCardProps): React.ReactElement {
   React.useEffect(() => {
     if (!onPlyClick || !pgnDisplay) return
@@ -551,6 +663,13 @@ export function TrainingItemMetaCard({
             <SubvariationsBlock subvariations={pgnDisplay.subvariations} selectedPly={selectedPly} onPlyClick={onPlyClick} />
           )}
         </div>
+      )}
+      {!focusMode && (
+        source.sourceType === 'DECOY'
+          ? <DecoyEvalSection source={source} selectedPly={selectedPly} pgnDisplay={pgnDisplay} />
+          : boardFen !== undefined
+            ? <CloudEvalSection fen={boardFen} />
+            : null
       )}
     </div>
   )

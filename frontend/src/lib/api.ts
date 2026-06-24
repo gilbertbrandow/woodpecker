@@ -102,6 +102,7 @@ export type DecoySourceMetadata = {
   sourceType: 'DECOY'
   acceptedMoves: DecoyAcceptedMove[]
   bestCp: number
+  depth: number
   analysisUrl: string | null
   moveNumber: number
   game: DecoyGame | null
