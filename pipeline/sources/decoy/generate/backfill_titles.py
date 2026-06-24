@@ -10,7 +10,7 @@ from pathlib import Path
 
 import chess.pgn
 
-from scan_games import _ensure_extracted
+from scan_games import _ensure_extracted, _title_fallback
 
 
 def _build_title_index(pgn_path: Path) -> dict[tuple, tuple[str | None, str | None]]:
@@ -58,12 +58,12 @@ def main() -> None:
             key = (record.get("white"), record.get("black"), record.get("event"), record.get("date"))
             if key in index:
                 white_title, black_title = index[key]
-                record["whiteTitle"] = white_title
-                record["blackTitle"] = black_title
+                record["whiteTitle"] = _title_fallback(white_title, record.get("whiteElo"))
+                record["blackTitle"] = _title_fallback(black_title, record.get("blackElo"))
                 patched += 1
             else:
-                record["whiteTitle"] = None
-                record["blackTitle"] = None
+                record["whiteTitle"] = _title_fallback(None, record.get("whiteElo"))
+                record["blackTitle"] = _title_fallback(None, record.get("blackElo"))
                 no_match += 1
             records.append(json.dumps(record, ensure_ascii=False))
 

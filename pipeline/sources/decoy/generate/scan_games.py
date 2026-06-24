@@ -16,6 +16,18 @@ import requests
 from eval_db import DB_PATH, lookup, open_db
 
 MOVE_MIN = 20
+GM_ELO_THRESHOLD = 2600
+
+
+def _title_fallback(title: str | None, elo_str: str | None) -> str | None:
+    if title:
+        return title
+    try:
+        if elo_str and int(elo_str) >= GM_ELO_THRESHOLD:
+            return "GM"
+    except (ValueError, TypeError):
+        pass
+    return None
 
 _EXPLORER_URL = "https://explorer.lichess.org/masters"
 _LICHESS_GAME_BASE = "https://lichess.org/{}"
@@ -332,8 +344,8 @@ def scan(
                                     "black": game.headers.get("Black"),
                                     "whiteElo": game.headers.get("WhiteElo"),
                                     "blackElo": game.headers.get("BlackElo"),
-                                    "whiteTitle": game.headers.get("WhiteTitle"),
-                                    "blackTitle": game.headers.get("BlackTitle"),
+                                    "whiteTitle": _title_fallback(game.headers.get("WhiteTitle"), game.headers.get("WhiteElo")),
+                                    "blackTitle": _title_fallback(game.headers.get("BlackTitle"), game.headers.get("BlackElo")),
                                     "moveNumber": move_num,
                                     "eco": (game.headers.get("ECO") or "")[:3] or None,
                                     "openingName": game.headers.get("Opening"),

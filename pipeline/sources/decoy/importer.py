@@ -187,7 +187,7 @@ def process_batch(
             "training_item_id": ti_id,
             "fen": item["fen"],
             "opponent_move": item["opponentMove"],
-            "accepted_moves": json.dumps(item["acceptedMoves"]),
+            "accepted_moves": item["acceptedMoves"],
             "best_cp": item["bestCp"],
             "depth": item["depth"],
             "move_number": item["moveNumber"],
