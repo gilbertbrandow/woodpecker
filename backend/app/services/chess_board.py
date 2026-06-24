@@ -75,6 +75,7 @@ def compute_attempt_pgn(
         return None
 
     plies = contract.plies
+    is_decoy = len(plies) >= 2 and isinstance(plies[1], list)
 
     def _make_display_move(
         board: chess.Board,
@@ -100,8 +101,25 @@ def compute_attempt_pgn(
         except Exception:
             return None
 
+    def _decoy_subvariations(player_uci: str | None) -> list[list[dict[str, object]]] | None:
+        accepted: list[str] = plies[1]  # type: ignore[assignment]
+        result: list[list[dict[str, object]]] = []
+        for acc_uci in accepted:
+            if acc_uci == player_uci:
+                continue
+            sub_board = chess.Board(contract.fen)
+            try:
+                sub_board.push_uci(_resolve(plies[0]))
+            except Exception:
+                continue
+            sv = _make_display_move(sub_board, acc_uci, "correct")
+            if sv:
+                result.append([sv])
+        return result if result else None
+
     mainline: list[dict[str, object]] = []
     variation: list[dict[str, object]] | None = None
+    subvariations: list[list[dict[str, object]]] | None = None
 
     board = chess.Board(contract.fen)
     try:
@@ -109,7 +127,7 @@ def compute_attempt_pgn(
         if opp_move:
             mainline.append(opp_move)
     except Exception:
-        return {"mainline": mainline, "variation": None}
+        return {"mainline": mainline, "variation": None, "subvariations": None}
 
     player_positions = list(range(1, len(plies), 2))
 
@@ -126,7 +144,9 @@ def compute_attempt_pgn(
                     opp = _make_display_move(board, _resolve(plies[opp_idx]), "opponent")
                     if opp:
                         mainline.append(opp)
-        return {"mainline": mainline, "variation": None}
+        if is_decoy:
+            subvariations = _decoy_subvariations(moves[0] if moves else None)
+        return {"mainline": mainline, "variation": None, "subvariations": subvariations}
 
     for i, uci in enumerate(moves):
         if i >= len(player_positions):
@@ -138,30 +158,33 @@ def compute_attempt_pgn(
             break
         mainline.append(dm)
         if is_wrong and not board.is_checkmate():
-            var_board = chess.Board(contract.fen)
-            try:
-                var_board.push_uci(_resolve(plies[0]))
-                for j in range(i):
-                    var_board.push_uci(moves[j])
-                    if player_positions[j] + 1 < len(plies):
-                        var_board.push_uci(_resolve(plies[player_positions[j] + 1]))
-            except Exception:
-                break
-            variation = []
-            var_idx = player_positions[i]
-            for k in range(var_idx, len(plies)):
-                vdm = _make_display_move(
-                    var_board,
-                    _resolve(plies[k]),
-                    "correct" if k % 2 == 1 else "opponent",
-                )
-                if not vdm:
+            if is_decoy:
+                subvariations = _decoy_subvariations(uci)
+            else:
+                var_board = chess.Board(contract.fen)
+                try:
+                    var_board.push_uci(_resolve(plies[0]))
+                    for j in range(i):
+                        var_board.push_uci(moves[j])
+                        if player_positions[j] + 1 < len(plies):
+                            var_board.push_uci(_resolve(plies[player_positions[j] + 1]))
+                except Exception:
                     break
-                variation.append(vdm)
+                variation = []
+                var_idx = player_positions[i]
+                for k in range(var_idx, len(plies)):
+                    vdm = _make_display_move(
+                        var_board,
+                        _resolve(plies[k]),
+                        "correct" if k % 2 == 1 else "opponent",
+                    )
+                    if not vdm:
+                        break
+                    variation.append(vdm)
             break
         if i + 1 < len(moves) and player_positions[i] + 1 < len(plies):
             opp = _make_display_move(board, _resolve(plies[player_positions[i] + 1]), "opponent")
             if opp:
                 mainline.append(opp)
 
-    return {"mainline": mainline, "variation": variation}
+    return {"mainline": mainline, "variation": variation, "subvariations": subvariations}
