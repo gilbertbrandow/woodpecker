@@ -22,7 +22,7 @@ export function AttemptTypeCard({ isPractice, currentTryNumber, maxTriesPerPuzzl
   }
 
   return (
-    <div className={`rounded-lg border border-slate-600/30 bg-slate-50 text-slate-800 dark:bg-slate-900/20 dark:text-slate-400 ${compact ? 'px-3 py-2' : 'p-4'}`}>
+    <div className={`rounded-lg border border-border bg-transparent text-foreground ${compact ? 'px-3 py-2' : 'p-4'}`}>
       <div className="flex items-center gap-2">
         <Lightbulb className={`shrink-0 ${compact ? 'h-3 w-3' : 'h-4 w-4'}`} />
         <span className={`font-medium ${compact ? 'text-xs' : 'text-sm'}`}>Scored attempt</span>
