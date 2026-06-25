@@ -72,7 +72,11 @@ export function usePgnNavigation({
       }
       return
     }
-    setSelectedPly({ line: 'main', index: overviewPgnDisplay.mainline.length - 1 })
+    let targetIndex = overviewPgnDisplay.mainline.length - 1
+    while (targetIndex > 0 && overviewPgnDisplay.mainline[targetIndex].moveStatus === null) {
+      targetIndex--
+    }
+    setSelectedPly({ line: 'main', index: targetIndex })
   }, [overviewPgnDisplay, mode])
 
   const isAtHead =

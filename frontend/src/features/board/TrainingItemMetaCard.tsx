@@ -27,6 +27,7 @@ function MoveToken({
   subIndex,
   selectedPly,
   onPlyClick,
+  numberPrefix,
 }: {
   move: DisplayMoveMin
   line: 'main' | 'variation' | 'subvariation'
@@ -34,6 +35,7 @@ function MoveToken({
   subIndex?: number
   selectedPly: PlySelection | null | undefined
   onPlyClick: ((ply: PlySelection) => void) | undefined
+  numberPrefix?: string
 }): React.ReactElement {
   const isSelected = (() => {
     if (!selectedPly) return false
@@ -46,6 +48,9 @@ function MoveToken({
   })()
 
   const isWrong = move.moveStatus === 'wrong'
+  const prefix = numberPrefix ? (
+    <span className={cn('tabular-nums', !isSelected && 'text-muted-foreground/60')}>{numberPrefix}</span>
+  ) : null
   const san = (
     <span className="font-chess">
       {move.san}{isWrong && <span className="text-red-600 dark:text-red-400">??</span>}
@@ -58,8 +63,8 @@ function MoveToken({
 
   if (!onPlyClick) {
     return (
-      <span className={cn(isSelected && 'rounded bg-foreground px-0.5 text-background')}>
-        {san}
+      <span className={cn('px-0.5', isSelected && 'rounded bg-foreground text-background')}>
+        {prefix}{san}
       </span>
     )
   }
@@ -73,7 +78,7 @@ function MoveToken({
         isSelected ? 'bg-foreground text-background' : 'cursor-pointer hover:bg-muted',
       )}
     >
-      {san}
+      {prefix}{san}
     </button>
   )
 }
@@ -84,29 +89,24 @@ function MoveSequence({
   subIndex,
   selectedPly,
   onPlyClick,
+  startIndex = 0,
 }: {
   moves: DisplayMoveMin[]
   line: 'main' | 'variation' | 'subvariation'
   subIndex?: number
   selectedPly: PlySelection | null | undefined
   onPlyClick: ((ply: PlySelection) => void) | undefined
+  startIndex?: number
 }): React.ReactElement {
   const items: React.ReactNode[] = []
   for (let i = 0; i < moves.length; i++) {
     const move = moves[i]
     const showNumber = move.isWhite || i === 0
-    if (showNumber) {
-      items.push(
-        <span key={`n${i}`} className="text-muted-foreground/60 tabular-nums">
-          {move.moveNumber}{move.isWhite ? '.' : '...'}
-        </span>,
-        '',
-      )
-    }
+    const numberPrefix = showNumber ? `${move.moveNumber}${move.isWhite ? '.' : '...'} ` : undefined
     items.push(
-      <MoveToken key={`m${i}`} move={move} line={line} index={i} subIndex={subIndex} selectedPly={selectedPly} onPlyClick={onPlyClick} />,
+      <MoveToken key={`m${i}`} move={move} line={line} index={i + startIndex} subIndex={subIndex} selectedPly={selectedPly} onPlyClick={onPlyClick} numberPrefix={numberPrefix} />,
     )
-    if (i < moves.length - 1) items.push(' ')
+    if (i < moves.length - 1) items.push(' ')
   }
   return <span>{items}</span>
 }
@@ -123,15 +123,15 @@ function SubvariationsBlock({
   if (subvariations.length === 0) return null
   return (
     <>
-      <span className="text-xs text-muted-foreground"> (</span>
-      <div className="pl-3 text-xs text-muted-foreground">
+      <span className="text-muted-foreground"> (</span>
+      <div className="text-[10px] text-muted-foreground space-y-1 my-1.5">
         {subvariations.map((sv, si) => (
           <div key={si}>
             <MoveSequence moves={sv} line="subvariation" subIndex={si} selectedPly={selectedPly} onPlyClick={onPlyClick} />
           </div>
         ))}
       </div>
-      <span className="text-xs text-muted-foreground">)</span>
+      <span className="text-muted-foreground">)</span>
     </>
   )
 }
@@ -213,11 +213,11 @@ function DecoyEvalSection({
       return source.bestCp
     }
     if (selectedPly.line === 'subvariation') {
-      const sv = pgnDisplay?.subvariations?.[selectedPly.subIndex]?.[selectedPly.index]
+      const sv = pgnDisplay?.subvariations?.[selectedPly.subIndex]?.[0]
       return sv?.uci != null ? (cpByUci.get(sv.uci) ?? null) : null
     }
     if (selectedPly.line === 'main' && selectedPly.index > 0) {
-      const move = pgnDisplay?.mainline[selectedPly.index]
+      const move = pgnDisplay?.mainline[Math.min(selectedPly.index, 1)]
       return move?.uci != null ? (cpByUci.get(move.uci) ?? null) : null
     }
     return source.bestCp
@@ -249,7 +249,12 @@ function computeNextPly(
     return mainLen > 0 ? { line: 'main', index: 0 } : null
   }
 
-  if (selected.line === 'subvariation') return null
+  if (selected.line === 'subvariation') {
+    const sv = pgnDisplay.subvariations?.[selected.subIndex]
+    if (!sv) return null
+    const next = selected.index + 1
+    return next < sv.length ? { line: 'subvariation', subIndex: selected.subIndex, index: next } : null
+  }
 
   if (selected.line === 'main') {
     const next = selected.index + 1
@@ -265,7 +270,9 @@ function computePrevPly(
 ): PlySelection | null {
   if (selected === null || selected === undefined) return null
 
-  if (selected.line === 'subvariation') return null
+  if (selected.line === 'subvariation') {
+    return selected.index > 0 ? { line: 'subvariation', subIndex: selected.subIndex, index: selected.index - 1 } : null
+  }
 
   if (selected.line === 'variation') {
     return selected.index > 0 ? { line: 'variation', index: selected.index - 1 } : null
@@ -592,14 +599,23 @@ export function MobileOverviewMetaBar({
           )}
           {pgnDisplay !== null && pgnDisplay.mainline.length > 0 && (
             <div className="border-t border-border pt-2 text-sm leading-relaxed">
-              <MoveSequence moves={pgnDisplay.mainline} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />
-              {pgnDisplay.variation !== null && (
-                <span className="text-xs">
-                  {' '}(<MoveSequence moves={pgnDisplay.variation} line="variation" selectedPly={selectedPly} onPlyClick={onPlyClick} />)
-                </span>
-              )}
-              {pgnDisplay.subvariations !== null && (
-                <SubvariationsBlock subvariations={pgnDisplay.subvariations} selectedPly={selectedPly} onPlyClick={onPlyClick} />
+              {pgnDisplay.subvariations !== null ? (
+                <>
+                  <MoveSequence moves={pgnDisplay.mainline.slice(0, 2)} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />
+                  <SubvariationsBlock subvariations={pgnDisplay.subvariations} selectedPly={selectedPly} onPlyClick={onPlyClick} />
+                  {pgnDisplay.mainline.length > 2 && (
+                    <>{' '}<MoveSequence moves={pgnDisplay.mainline.slice(2)} line="main" startIndex={2} selectedPly={selectedPly} onPlyClick={onPlyClick} /></>
+                  )}
+                </>
+              ) : (
+                <>
+                  <MoveSequence moves={pgnDisplay.mainline} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />
+                  {pgnDisplay.variation !== null && (
+                    <span className="text-xs">
+                      {' '}(<MoveSequence moves={pgnDisplay.variation} line="variation" selectedPly={selectedPly} onPlyClick={onPlyClick} />)
+                    </span>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -655,12 +671,21 @@ export function TrainingItemMetaCard({
       )}
       {pgnDisplay !== null && pgnDisplay.mainline.length > 0 && (
         <div className={cn('text-sm leading-relaxed', 'border-t border-border pt-2')}>
-          <MoveSequence moves={pgnDisplay.mainline} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />
-          {pgnDisplay.variation !== null && (
-            <span className="text-xs"> (<MoveSequence moves={pgnDisplay.variation} line="variation" selectedPly={selectedPly} onPlyClick={onPlyClick} />)</span>
-          )}
-          {pgnDisplay.subvariations !== null && (
-            <SubvariationsBlock subvariations={pgnDisplay.subvariations} selectedPly={selectedPly} onPlyClick={onPlyClick} />
+          {pgnDisplay.subvariations !== null ? (
+            <>
+              <MoveSequence moves={pgnDisplay.mainline.slice(0, 2)} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />
+              <SubvariationsBlock subvariations={pgnDisplay.subvariations} selectedPly={selectedPly} onPlyClick={onPlyClick} />
+              {pgnDisplay.mainline.length > 2 && (
+                <>{' '}<MoveSequence moves={pgnDisplay.mainline.slice(2)} line="main" startIndex={2} selectedPly={selectedPly} onPlyClick={onPlyClick} /></>
+              )}
+            </>
+          ) : (
+            <>
+              <MoveSequence moves={pgnDisplay.mainline} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />
+              {pgnDisplay.variation !== null && (
+                <span className="text-xs"> (<MoveSequence moves={pgnDisplay.variation} line="variation" selectedPly={selectedPly} onPlyClick={onPlyClick} />)</span>
+              )}
+            </>
           )}
         </div>
       )}
