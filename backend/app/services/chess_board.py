@@ -103,6 +103,7 @@ def compute_attempt_pgn(
 
     def _decoy_subvariations(player_uci: str | None) -> list[list[dict[str, object]]] | None:
         accepted: list[str] = plies[1]  # type: ignore[assignment]
+        lines = contract.decoy_lines or {}
         result: list[list[dict[str, object]]] = []
         for acc_uci in accepted:
             if acc_uci == player_uci:
@@ -112,9 +113,15 @@ def compute_attempt_pgn(
                 sub_board.push_uci(_resolve(plies[0]))
             except Exception:
                 continue
-            sv = _make_display_move(sub_board, acc_uci, "correct")
-            if sv:
-                result.append([sv])
+            line_ucis = lines.get(acc_uci, acc_uci).split()
+            sv_moves: list[dict[str, object]] = []
+            for idx, line_uci in enumerate(line_ucis):
+                dm = _make_display_move(sub_board, line_uci, "correct" if idx == 0 else None)
+                if not dm:
+                    break
+                sv_moves.append(dm)
+            if sv_moves:
+                result.append(sv_moves)
         return result if result else None
 
     mainline: list[dict[str, object]] = []
@@ -145,7 +152,14 @@ def compute_attempt_pgn(
                     if opp:
                         mainline.append(opp)
         if is_decoy:
-            subvariations = _decoy_subvariations(moves[0] if moves else None)
+            player_uci = moves[0] if moves else None
+            if player_uci and contract.decoy_lines:
+                for cont_uci in contract.decoy_lines.get(player_uci, "").split()[1:]:
+                    cont_dm = _make_display_move(board, cont_uci, None)
+                    if not cont_dm:
+                        break
+                    mainline.append(cont_dm)
+            subvariations = _decoy_subvariations(player_uci)
         return {"mainline": mainline, "variation": None, "subvariations": subvariations}
 
     for i, uci in enumerate(moves):

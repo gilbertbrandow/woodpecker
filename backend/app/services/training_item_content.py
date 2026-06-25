@@ -254,6 +254,11 @@ def _decoy_payload_batch(training_item_ids: list[int]) -> dict[int, TrainingItem
 
 def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
     accepted_ucis = [m["uci"] for m in decoy.accepted_moves if isinstance(m, dict) and "uci" in m]
+    decoy_lines = {
+        m["uci"]: m["line"]
+        for m in decoy.accepted_moves
+        if isinstance(m, dict) and "uci" in m and m.get("line")
+    }
     game = decoy.game
     opening = game.opening if game else None
     analysis_url = decoy.analysis_url or f"https://lichess.org/analysis/{quote(decoy.fen, safe='/')}"
@@ -262,6 +267,7 @@ def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
         contract=SolveContract(
             fen=fen,
             plies=[decoy.opponent_move, accepted_ucis],
+            decoy_lines=decoy_lines or None,
         ),
         metadata=DecoyMetadata(
             accepted_moves=list(decoy.accepted_moves),
