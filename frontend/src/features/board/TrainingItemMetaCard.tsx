@@ -136,61 +136,12 @@ function SubvariationsBlock({
   )
 }
 
-
-type CloudEvalStatus =
-  | { status: 'idle' | 'loading' | 'not_found' | 'error' }
-  | { status: 'found'; eval: string; depth: number }
-
 function formatEval(pvs: Array<{ cp?: number; mate?: number }>): string {
   const pv = pvs[0]
   if (!pv) return '0.00'
   if (pv.mate !== undefined) return pv.mate > 0 ? `M${pv.mate}` : `-M${Math.abs(pv.mate)}`
   const p = (pv.cp ?? 0) / 100
   return p >= 0 ? `+${p.toFixed(2)}` : p.toFixed(2)
-}
-
-function CloudEvalSection({ fen }: { fen: string }): React.ReactElement {
-  const [state, setState] = React.useState<CloudEvalStatus>({ status: 'idle' })
-
-  React.useEffect(() => {
-    setState({ status: 'loading' })
-    const controller = new AbortController()
-    const timer = setTimeout(() => {
-      const params = new URLSearchParams({ fen, multiPv: '1' })
-      fetch(`https://lichess.org/api/cloud-eval?${params}`, { signal: controller.signal })
-        .then(res => {
-          if (res.status === 404) { setState({ status: 'not_found' }); return null }
-          if (!res.ok) { setState({ status: 'error' }); return null }
-          return res.json()
-        })
-        .then((data: { depth: number; pvs: Array<{ cp?: number; mate?: number }> } | null) => {
-          if (data == null) return
-          const pv = data.pvs?.[0]
-          if (pv == null) { setState({ status: 'not_found' }); return }
-          setState({ status: 'found', eval: formatEval(data.pvs), depth: data.depth })
-        })
-        .catch((err: Error) => { if (err.name !== 'AbortError') setState({ status: 'error' }) })
-    }, 300)
-    return () => { clearTimeout(timer); controller.abort() }
-  }, [fen])
-
-  return (
-    <div className="flex items-center gap-2 border-t border-border pt-3 pb-1">
-      <span className="shrink-0 text-xs text-muted-foreground">Cloud eval</span>
-      {state.status === 'loading' && (
-        <span className="text-xs text-muted-foreground">…</span>
-      )}
-      {(state.status === 'not_found' || state.status === 'error') && (
-        <span className="text-xs text-muted-foreground">—</span>
-      )}
-      {state.status === 'found' && (
-        <>
-          <span className="font-mono text-xs font-semibold tabular-nums">{state.eval}</span>
-          <span className="text-xs text-muted-foreground">depth {state.depth}</span>
-        </>
-      )}
-    </div>
-  )
 }
 
 function DecoyEvalSection({
@@ -466,7 +417,6 @@ type TrainingItemMetaCardProps = {
   focusMode?: boolean
   selectedPly?: PlySelection | null
   onPlyClick?: (ply: PlySelection) => void
-  boardFen?: string
 }
 
 type PuzzleSummary = {
@@ -507,7 +457,6 @@ type MobileOverviewMetaBarProps = {
   trainingItemId?: number
   selectedPly?: PlySelection | null
   onPlyClick?: (ply: PlySelection) => void
-  boardFen?: string
 }
 
 export function MobileOverviewMetaBar({
@@ -516,7 +465,6 @@ export function MobileOverviewMetaBar({
   trainingItemId,
   selectedPly,
   onPlyClick,
-  boardFen,
 }: MobileOverviewMetaBarProps): React.ReactElement {
   const [isOpen, setIsOpen] = React.useState(false)
 
@@ -619,12 +567,9 @@ export function MobileOverviewMetaBar({
               )}
             </div>
           )}
-          {source.sourceType === 'DECOY'
-            ? <DecoyEvalSection source={source} selectedPly={selectedPly} pgnDisplay={pgnDisplay} />
-            : boardFen !== undefined
-              ? <CloudEvalSection fen={boardFen} />
-              : null
-          }
+          {source.sourceType === 'DECOY' && (
+            <DecoyEvalSection source={source} selectedPly={selectedPly} pgnDisplay={pgnDisplay} />
+          )}
         </div>
       )}
     </div>
@@ -639,7 +584,6 @@ export function TrainingItemMetaCard({
   focusMode = false,
   selectedPly,
   onPlyClick,
-  boardFen,
 }: TrainingItemMetaCardProps): React.ReactElement {
   React.useEffect(() => {
     if (!onPlyClick || !pgnDisplay) return
@@ -689,12 +633,8 @@ export function TrainingItemMetaCard({
           )}
         </div>
       )}
-      {!focusMode && (
-        source.sourceType === 'DECOY'
-          ? <DecoyEvalSection source={source} selectedPly={selectedPly} pgnDisplay={pgnDisplay} />
-          : boardFen !== undefined
-            ? <CloudEvalSection fen={boardFen} />
-            : null
+      {!focusMode && source.sourceType === 'DECOY' && (
+        <DecoyEvalSection source={source} selectedPly={selectedPly} pgnDisplay={pgnDisplay} />
       )}
     </div>
   )

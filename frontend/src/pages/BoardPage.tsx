@@ -311,7 +311,6 @@ export function BoardPage(): React.ReactElement | null {
         trainingItemId={overviewData.runTrainingItem.trainingItemId}
         selectedPly={selectedPly}
         onPlyClick={setSelectedPly}
-        boardFen={displayBoard.fen}
       />
     ) : ctrl.solvingView !== null ? (
       <AttemptTypeCard
@@ -422,7 +421,6 @@ export function BoardPage(): React.ReactElement | null {
           focusMode={ctrl.mode !== 'overview'}
           selectedPly={ctrl.mode === 'overview' ? selectedPly : null}
           onPlyClick={ctrl.mode === 'overview' ? setSelectedPly : undefined}
-          boardFen={ctrl.mode === 'overview' ? displayBoard.fen : undefined}
         />
       )}
       {ctrl.mode === 'focus' && (
