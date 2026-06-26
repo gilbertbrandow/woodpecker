@@ -330,6 +330,69 @@ function PlayerLabel({ name, title, elo }: { name: string; title: string | null;
   )
 }
 
+function DecoyGameInfo({ g }: { g: NonNullable<DecoySourceMetadata['game']> }): React.ReactElement {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <span className="w-9 shrink-0 text-xs text-muted-foreground">White</span>
+        <div className="rounded-md bg-muted px-2 py-1">
+          <PlayerLabel name={g.white} title={g.whiteTitle} elo={g.whiteElo} />
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="w-9 shrink-0 text-xs text-muted-foreground">Black</span>
+        <div className="rounded-md bg-muted px-2 py-1">
+          <PlayerLabel name={g.black} title={g.blackTitle} elo={g.blackElo} />
+        </div>
+      </div>
+      {g.event !== null && (
+        <div className="flex items-center gap-2">
+          <span className="w-9 shrink-0 text-xs text-muted-foreground">Event</span>
+          <span className="truncate py-1 text-xs">{g.event}</span>
+        </div>
+      )}
+      {g.date !== null && (
+        <div className="flex items-center gap-2">
+          <span className="w-9 shrink-0 text-xs text-muted-foreground">Date</span>
+          <span className="py-1 font-mono text-xs">{g.date}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PgnDisplayBlock({
+  pgnDisplay,
+  selectedPly,
+  onPlyClick,
+}: {
+  pgnDisplay: TrainingItemMetaPgnDisplayMin
+  selectedPly: PlySelection | null | undefined
+  onPlyClick: ((ply: PlySelection) => void) | undefined
+}): React.ReactElement {
+  if (pgnDisplay.subvariations !== null) {
+    return (
+      <>
+        <MoveSequence moves={pgnDisplay.mainline.slice(0, 2)} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />
+        <SubvariationsBlock subvariations={pgnDisplay.subvariations} selectedPly={selectedPly} onPlyClick={onPlyClick} />
+        {pgnDisplay.mainline.length > 2 && (
+          <>{' '}<MoveSequence moves={pgnDisplay.mainline.slice(2)} line="main" startIndex={2} selectedPly={selectedPly} onPlyClick={onPlyClick} /></>
+        )}
+      </>
+    )
+  }
+  return (
+    <>
+      <MoveSequence moves={pgnDisplay.mainline} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />
+      {pgnDisplay.variation !== null && (
+        <span className="text-xs">
+          {' '}(<MoveSequence moves={pgnDisplay.variation} line="variation" selectedPly={selectedPly} onPlyClick={onPlyClick} />)
+        </span>
+      )}
+    </>
+  )
+}
+
 function DecoySection({
   source,
   trainingItemId,
@@ -354,34 +417,7 @@ function DecoySection({
         </div>
         {!focusMode && <TrainingItemTypeBadge source="DECOY" />}
       </div>
-      {!focusMode && g !== null && (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <span className="w-9 shrink-0 text-xs text-muted-foreground">White</span>
-            <div className="rounded-md bg-muted px-2 py-1">
-              <PlayerLabel name={g.white} title={g.whiteTitle} elo={g.whiteElo} />
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-9 shrink-0 text-xs text-muted-foreground">Black</span>
-            <div className="rounded-md bg-muted px-2 py-1">
-              <PlayerLabel name={g.black} title={g.blackTitle} elo={g.blackElo} />
-            </div>
-          </div>
-          {g.event !== null && (
-            <div className="flex items-center gap-2">
-              <span className="w-9 shrink-0 text-xs text-muted-foreground">Event</span>
-              <span className="truncate py-1 text-xs">{g.event}</span>
-            </div>
-          )}
-          {g.date !== null && (
-            <div className="flex items-center gap-2">
-              <span className="w-9 shrink-0 text-xs text-muted-foreground">Date</span>
-              <span className="py-1 font-mono text-xs">{g.date}</span>
-            </div>
-          )}
-        </div>
-      )}
+      {!focusMode && g !== null && <DecoyGameInfo g={g} />}
     </div>
   )
 }
@@ -503,32 +539,7 @@ export function MobileOverviewMetaBar({
       {isOpen && (
         <div className="absolute top-full left-[-1px] right-[-1px] z-50 flex flex-col gap-3 rounded-b-md border border-t-0 border-border bg-background px-3 pb-3 pt-3 shadow-md">
           {decoyGame !== null && (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <span className="w-9 shrink-0 text-xs text-muted-foreground">White</span>
-                <div className="rounded-md bg-muted px-2 py-1">
-                  <PlayerLabel name={decoyGame.white} title={decoyGame.whiteTitle} elo={decoyGame.whiteElo} />
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-9 shrink-0 text-xs text-muted-foreground">Black</span>
-                <div className="rounded-md bg-muted px-2 py-1">
-                  <PlayerLabel name={decoyGame.black} title={decoyGame.blackTitle} elo={decoyGame.blackElo} />
-                </div>
-              </div>
-              {decoyGame.event !== null && (
-                <div className="flex items-center gap-2">
-                  <span className="w-9 shrink-0 text-xs text-muted-foreground">Event</span>
-                  <span className="truncate py-1 text-xs">{decoyGame.event}</span>
-                </div>
-              )}
-              {decoyGame.date !== null && (
-                <div className="flex items-center gap-2">
-                  <span className="w-9 shrink-0 text-xs text-muted-foreground">Date</span>
-                  <span className="py-1 font-mono text-xs">{decoyGame.date}</span>
-                </div>
-              )}
-            </div>
+            <DecoyGameInfo g={decoyGame} />
           )}
           {opening !== null && (
             <div className="flex items-center gap-1.5 overflow-hidden">
@@ -547,24 +558,7 @@ export function MobileOverviewMetaBar({
           )}
           {pgnDisplay !== null && pgnDisplay.mainline.length > 0 && (
             <div className="border-t border-border pt-2 text-sm leading-relaxed">
-              {pgnDisplay.subvariations !== null ? (
-                <>
-                  <MoveSequence moves={pgnDisplay.mainline.slice(0, 2)} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />
-                  <SubvariationsBlock subvariations={pgnDisplay.subvariations} selectedPly={selectedPly} onPlyClick={onPlyClick} />
-                  {pgnDisplay.mainline.length > 2 && (
-                    <>{' '}<MoveSequence moves={pgnDisplay.mainline.slice(2)} line="main" startIndex={2} selectedPly={selectedPly} onPlyClick={onPlyClick} /></>
-                  )}
-                </>
-              ) : (
-                <>
-                  <MoveSequence moves={pgnDisplay.mainline} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />
-                  {pgnDisplay.variation !== null && (
-                    <span className="text-xs">
-                      {' '}(<MoveSequence moves={pgnDisplay.variation} line="variation" selectedPly={selectedPly} onPlyClick={onPlyClick} />)
-                    </span>
-                  )}
-                </>
-              )}
+              <PgnDisplayBlock pgnDisplay={pgnDisplay} selectedPly={selectedPly} onPlyClick={onPlyClick} />
             </div>
           )}
           {source.sourceType === 'DECOY' && (
@@ -615,22 +609,7 @@ export function TrainingItemMetaCard({
       )}
       {pgnDisplay !== null && pgnDisplay.mainline.length > 0 && (
         <div className={cn('text-sm leading-relaxed', 'border-t border-border pt-2')}>
-          {pgnDisplay.subvariations !== null ? (
-            <>
-              <MoveSequence moves={pgnDisplay.mainline.slice(0, 2)} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />
-              <SubvariationsBlock subvariations={pgnDisplay.subvariations} selectedPly={selectedPly} onPlyClick={onPlyClick} />
-              {pgnDisplay.mainline.length > 2 && (
-                <>{' '}<MoveSequence moves={pgnDisplay.mainline.slice(2)} line="main" startIndex={2} selectedPly={selectedPly} onPlyClick={onPlyClick} /></>
-              )}
-            </>
-          ) : (
-            <>
-              <MoveSequence moves={pgnDisplay.mainline} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />
-              {pgnDisplay.variation !== null && (
-                <span className="text-xs"> (<MoveSequence moves={pgnDisplay.variation} line="variation" selectedPly={selectedPly} onPlyClick={onPlyClick} />)</span>
-              )}
-            </>
-          )}
+          <PgnDisplayBlock pgnDisplay={pgnDisplay} selectedPly={selectedPly} onPlyClick={onPlyClick} />
         </div>
       )}
       {!focusMode && source.sourceType === 'DECOY' && (
