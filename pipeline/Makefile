@@ -4,9 +4,21 @@ DATABASE_URL  ?= postgresql://woodpecker:woodpecker@localhost:5432/woodpecker
 DOCKER_DB_URL  = $(subst localhost,host.docker.internal,$(DATABASE_URL))
 RAW_MOUNT      = -v $(PIPELINE_DIR)/data/raw:/app/pipeline/data/raw
 
-.PHONY: build-base build-openings build-lichess-tactics build-scraped-positional \
+.PHONY: setup lint \
+        build-base build-openings build-lichess-tactics build-scraped-positional \
         import-openings import-lichess-tactics import-scraped-positional \
         generate-decoy-dataset import-decoy-positions
+
+# ── Dev tooling ────────────────────────────────────────────────────────────────
+
+setup:
+	python3 -m venv $(PIPELINE_DIR)/.venv
+	$(PIPELINE_DIR)/.venv/bin/pip install --upgrade pip
+	$(PIPELINE_DIR)/.venv/bin/pip install -r $(PIPELINE_DIR)/requirements.txt
+
+lint:
+	$(PIPELINE_DIR)/.venv/bin/ruff check $(PIPELINE_DIR)
+	cd $(REPO_DIR) && $(PIPELINE_DIR)/.venv/bin/mypy pipeline/
 
 # ── Images ─────────────────────────────────────────────────────────────────────
 

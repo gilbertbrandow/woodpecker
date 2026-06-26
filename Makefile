@@ -55,10 +55,12 @@ seed-dev:
 setup:
 	$(MAKE) -C backend setup
 	$(MAKE) -C frontend setup
+	$(MAKE) -C pipeline setup
 
 lint:
 	$(MAKE) -C backend lint
 	$(MAKE) -C frontend lint
+	$(MAKE) -C pipeline lint
 
 test:
 	$(LOCAL_COMPOSE) build --quiet backend frontend
