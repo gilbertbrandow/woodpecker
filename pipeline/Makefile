@@ -18,7 +18,7 @@ setup:
 
 lint:
 	$(PIPELINE_DIR)/.venv/bin/ruff check $(PIPELINE_DIR)
-	cd $(REPO_DIR) && $(PIPELINE_DIR)/.venv/bin/mypy pipeline/
+	cd $(REPO_DIR) && $(REPO_DIR)/backend/.venv/bin/mypy pipeline/
 
 # ── Images ─────────────────────────────────────────────────────────────────────
 
