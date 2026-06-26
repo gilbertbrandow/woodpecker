@@ -4,7 +4,6 @@ import { Link } from '@tanstack/react-router'
 import { useAuth } from '../context/auth'
 import { TrainingItemTypeBadge } from '../components/TrainingItemTypeBadge'
 
-
 export function SourcesListPage(): React.ReactElement | null {
   const { user } = useAuth()
 
