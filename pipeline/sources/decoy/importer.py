@@ -2,13 +2,14 @@ import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
+from urllib.parse import quote
 
+import chess
 import click
 import sqlalchemy as sa
 from sqlalchemy import func, select, text as sa_text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from app.models.decoy_puzzle import DecoyPuzzle
@@ -33,17 +34,16 @@ def _safe_int(val: Any) -> int | None:
         return None
 
 
-def _build_analysis_url(lichess_game_url: str | None, fen: str, move_number: int) -> str | None:
-    if not lichess_game_url:
-        return None
-    game_id = lichess_game_url.rstrip("/").split("/")[-1]
-    parts = fen.split()
-    side_to_move = parts[1] if len(parts) >= 2 else "w"
-    # fen is the position BEFORE opponent's last move; opponent's side is side_to_move.
-    # If opponent is white (side_to_move == "w"), the solver is black → /black orientation.
-    orientation = "/black" if side_to_move == "w" else ""
-    ply = move_number - 1
-    return f"https://lichess.org/{game_id}{orientation}#{ply}"
+def _build_analysis_url(fen: str, opponent_move: str) -> str:
+    """Return a Lichess analysis URL pointing to the position the player must solve."""
+    try:
+        parts = fen.split()
+        full_fen = fen if len(parts) == 6 else f"{fen} 0 1"
+        board = chess.Board(full_fen)
+        board.push_uci(opponent_move)
+        return f"https://lichess.org/analysis/{quote(board.fen(), safe='/')}"
+    except Exception:
+        return f"https://lichess.org/analysis/{quote(fen, safe='/')}"
 
 
 def _load_opening_caches(session: Session) -> tuple[dict[str, int], dict[str, list[tuple[int, str]]]]:
@@ -163,26 +163,19 @@ def process_batch(
         opening_by_display_name, opening_by_eco,
     )
 
-    n = len(new_items)
-    ti_result = cast(
-        CursorResult[Any],
-        session.execute(
+    decoy_rows: list[dict[str, Any]] = []
+    for item in new_items:
+        ti_id = session.execute(
             sa.text(
                 "INSERT INTO training_items (source_type, source_import_run_id) "
-                "SELECT 'DECOY', :run_id FROM generate_series(1, :n) "
-                "RETURNING id"
+                "VALUES ('DECOY', :run_id) RETURNING id"
             ),
-            {"n": n, "run_id": source_import_run_id},
-        ),
-    )
-    new_ti_ids = [row.id for row in ti_result]
-
-    decoy_rows: list[dict[str, Any]] = []
-    for item, ti_id in zip(new_items, new_ti_ids):
+            {"run_id": source_import_run_id},
+        ).scalar_one()
         url = item.get("lichessGameUrl")
         lichess_id = url.split("/")[-1] if url else None
         game_id = game_id_map.get(lichess_id) if lichess_id else None
-        analysis_url = _build_analysis_url(url, item["fen"], item["moveNumber"])
+        analysis_url = _build_analysis_url(item["fen"], item["opponentMove"])
         decoy_rows.append({
             "training_item_id": ti_id,
             "fen": item["fen"],
