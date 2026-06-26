@@ -10,10 +10,10 @@ from pathlib import Path
 
 import chess
 import chess.pgn
-import py7zr
+import py7zr  # type: ignore[import-not-found]
 import requests
 
-from eval_db import DB_PATH, lookup, open_db
+from eval_db import DB_PATH, lookup, open_db  # type: ignore[import-not-found]
 
 MOVE_MIN = 20
 GM_ELO_THRESHOLD = 2600
@@ -167,7 +167,7 @@ def _fetch_lichess_url(
         try:
             resp = http.get(
                 _EXPLORER_URL,
-                params={"fen": fen, "topGames": 1, "moves": 0},
+                params={"fen": fen, "topGames": "1", "moves": "0"},
                 timeout=10,
             )
             last_req[0] = time.monotonic()

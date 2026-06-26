@@ -10,7 +10,7 @@ from pathlib import Path
 
 import chess.pgn
 
-from scan_games import _ensure_extracted, _title_fallback
+from scan_games import _ensure_extracted, _title_fallback  # type: ignore[import-not-found]
 
 
 def _build_title_index(pgn_path: Path) -> dict[tuple, tuple[str | None, str | None]]:

@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-import eval_db
+import eval_db  # type: ignore[import-not-found]
 
 
 def main() -> None:

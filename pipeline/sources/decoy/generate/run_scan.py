@@ -5,7 +5,7 @@ import os
 import sys
 from pathlib import Path
 
-import scan_games
+import scan_games  # type: ignore[import-not-found]
 
 
 def main() -> None:
