@@ -3,6 +3,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from urllib.parse import quote
 
+import chess
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
@@ -252,6 +253,20 @@ def _decoy_payload_batch(training_item_ids: list[int]) -> dict[int, TrainingItem
     return {d.training_item_id: _build_decoy_payload(d) for d in decoys}
 
 
+def _serialize_game(game: Game) -> dict[str, object]:
+    return {
+        "white": game.white,
+        "black": game.black,
+        "whiteTitle": game.white_title,
+        "blackTitle": game.black_title,
+        "whiteElo": game.white_elo,
+        "blackElo": game.black_elo,
+        "event": game.event,
+        "date": game.date,
+        "lichessId": game.lichess_id,
+    }
+
+
 def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
     accepted_ucis = [m["uci"] for m in decoy.accepted_moves if isinstance(m, dict) and "uci" in m]
     decoy_lines = {
@@ -261,13 +276,23 @@ def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
     }
     game = decoy.game
     opening = game.opening if game else None
-    analysis_url = decoy.analysis_url or f"https://lichess.org/analysis/{quote(decoy.fen, safe='/')}"
-    fen = decoy.fen if len(decoy.fen.split()) == 6 else f"{decoy.fen} 0 {decoy.move_number}"
+    fullmove = (decoy.move_number + 1) // 2
+    fen = decoy.fen if len(decoy.fen.split()) == 6 else f"{decoy.fen} 0 {fullmove}"
+    if decoy.analysis_url:
+        analysis_url = decoy.analysis_url
+    else:
+        try:
+            post_board = chess.Board(fen)
+            post_board.push_uci(decoy.opponent_move)
+            analysis_url = f"https://lichess.org/analysis/{quote(post_board.fen(), safe='/')}"
+        except Exception:
+            analysis_url = f"https://lichess.org/analysis/{quote(fen, safe='/')}"
     return TrainingItemPayload(
         contract=SolveContract(
             fen=fen,
             plies=[decoy.opponent_move, accepted_ucis],
             decoy_lines=decoy_lines or None,
+            is_decoy=True,
         ),
         metadata=DecoyMetadata(
             accepted_moves=list(decoy.accepted_moves),
@@ -275,17 +300,7 @@ def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
             move_number=decoy.move_number,
             depth=decoy.depth,
             analysis_url=analysis_url,
-            game={
-                "white": game.white,
-                "black": game.black,
-                "whiteTitle": game.white_title,
-                "blackTitle": game.black_title,
-                "whiteElo": game.white_elo,
-                "blackElo": game.black_elo,
-                "event": game.event,
-                "date": game.date,
-                "lichessId": game.lichess_id,
-            } if game else None,
+            game=_serialize_game(game) if game else None,
             opening=_opening_dict(opening) if opening else None,
         ),
     )

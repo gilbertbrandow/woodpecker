@@ -895,9 +895,10 @@ def _decoy_stats(training_item_ids: list[int]) -> dict[str, object]:
         sa.text("""
             SELECT o.name, o.display_name, COUNT(*) AS cnt
             FROM decoy_puzzles dp
-            JOIN games g ON g.id = dp.game_id
-            JOIN openings o ON o.id = g.opening_id
+            LEFT JOIN games g ON g.id = dp.game_id
+            LEFT JOIN openings o ON o.id = g.opening_id
             WHERE dp.training_item_id = ANY(:ids)
+              AND o.name IS NOT NULL
             GROUP BY o.name, o.display_name
             ORDER BY cnt DESC
         """),

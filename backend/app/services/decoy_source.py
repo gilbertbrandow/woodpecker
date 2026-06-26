@@ -11,6 +11,7 @@ from app.models.source_import_run import (
     SourceImportSource,
     SourceImportStatus,
 )
+from app.services.training_item_content import _serialize_game
 
 ITEMS_PAGE_SIZE = 20
 
@@ -31,20 +32,7 @@ def _serialize_puzzle(dp: DecoyPuzzle) -> dict:
             {"name": opening.name, "displayName": opening.display_name, "eco": opening.eco}
             if opening else None
         ),
-        "game": (
-            {
-                "white": game.white,
-                "black": game.black,
-                "whiteTitle": game.white_title,
-                "blackTitle": game.black_title,
-                "whiteElo": game.white_elo,
-                "blackElo": game.black_elo,
-                "event": game.event,
-                "date": game.date,
-                "lichessId": game.lichess_id,
-            }
-            if game else None
-        ),
+        "game": _serialize_game(game) if game else None,
     }
 
 
@@ -112,7 +100,9 @@ def get_latest_source_run_metadata() -> dict | None:
         return None
 
     top_openings = sorted(
-        row.opening_counts_json.items(), key=lambda x: x[1], reverse=True
+        ((k, v) for k, v in row.opening_counts_json.items() if k != "Unknown"),
+        key=lambda x: x[1],
+        reverse=True,
     )[:15]
 
     return {
@@ -121,7 +111,6 @@ def get_latest_source_run_metadata() -> dict | None:
         "topOpenings": [
             {"displayName": display_name, "count": int(count)}
             for display_name, count in top_openings
-            if display_name != "Unknown"
         ],
         "generatedAt": row.generated_at.isoformat(),
     }

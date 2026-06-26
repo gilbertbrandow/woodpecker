@@ -75,7 +75,7 @@ def compute_attempt_pgn(
         return None
 
     plies = contract.plies
-    is_decoy = len(plies) >= 2 and isinstance(plies[1], list)
+    is_decoy = contract.is_decoy
 
     def _make_display_move(
         board: chess.Board,
@@ -113,7 +113,8 @@ def compute_attempt_pgn(
                 sub_board.push_uci(_resolve(plies[0]))
             except Exception:
                 continue
-            line_ucis = lines.get(acc_uci, acc_uci).split()
+            line_str = lines.get(acc_uci)
+            line_ucis = line_str.split() if line_str else [acc_uci]
             sv_moves: list[dict[str, object]] = []
             for idx, line_uci in enumerate(line_ucis):
                 dm = _make_display_move(sub_board, line_uci, "correct" if idx == 0 else None)
