@@ -34,4 +34,5 @@ class DecoyPuzzle(Base):
 
     __table_args__ = (
         Index("ix_decoy_puzzles_game_id", "game_id"),
+        Index("ix_decoy_puzzles_fen", "fen"),
     )

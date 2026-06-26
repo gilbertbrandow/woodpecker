@@ -71,6 +71,9 @@ def _stub_decoy(
     opponent_move: str = "e2e4",
     accepted_moves: list | None = None,
     best_cp: int = 12,
+    move_number: int = 2,
+    depth: int = 20,
+    analysis_url: str | None = None,
 ) -> MagicMock:
     d = MagicMock()
     d.training_item_id = training_item_id
@@ -82,6 +85,9 @@ def _stub_decoy(
         {"uci": "g8f6", "cp": 5, "dropCp": 7, "line": "g8f6"},
     ]
     d.best_cp = best_cp
+    d.move_number = move_number
+    d.depth = depth
+    d.analysis_url = analysis_url
     d.game = None
     return d
 
@@ -112,3 +118,23 @@ def test_decoy_metadata_to_api_dict_has_correct_shape() -> None:
 def test_get_content_batch_with_empty_list_returns_empty_dict() -> None:
     result = get_content_batch([])
     assert result == {}
+
+
+@pytest.mark.parametrize(
+    "move_number,expected_fullmove",
+    [
+        (20, 10),  # even ply: Black's 10th move → fullmove 10
+        (21, 10),  # odd ply: White's 11th move → fullmove still 10
+        (22, 11),  # even ply: Black's 11th move → fullmove 11
+    ],
+)
+def test_decoy_payload_fullmove_number_from_four_part_fen(
+    move_number: int, expected_fullmove: int
+) -> None:
+    # 4-part FEN (no halfmove/fullmove); the service must append them correctly.
+    four_part_fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq -"
+    decoy = _stub_decoy(fen=four_part_fen, move_number=move_number, analysis_url="https://x")
+    with patch("app.services.training_item_content.db") as mock_db:
+        mock_db.session.execute.return_value.scalar_one.return_value = decoy
+        payload = _decoy_payload(10)
+    assert payload.contract.fen == f"{four_part_fen} 0 {expected_fullmove}"

@@ -276,7 +276,7 @@ def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
     }
     game = decoy.game
     opening = game.opening if game else None
-    fullmove = (decoy.move_number + 1) // 2
+    fullmove = decoy.move_number // 2
     fen = decoy.fen if len(decoy.fen.split()) == 6 else f"{decoy.fen} 0 {fullmove}"
     if decoy.analysis_url:
         analysis_url = decoy.analysis_url

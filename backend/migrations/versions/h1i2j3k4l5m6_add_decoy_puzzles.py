@@ -77,6 +77,7 @@ def upgrade() -> None:
         sa.UniqueConstraint("training_item_id", name="uq_decoy_puzzles_training_item_id"),
     )
     op.create_index("ix_decoy_puzzles_game_id", "decoy_puzzles", ["game_id"])
+    op.create_index("ix_decoy_puzzles_fen", "decoy_puzzles", ["fen"])
 
     # 4. Create decoy_source_run_metadata table
     op.create_table(
@@ -103,6 +104,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("decoy_source_run_metadata")
+    op.drop_index("ix_decoy_puzzles_fen", table_name="decoy_puzzles")
     op.drop_index("ix_decoy_puzzles_game_id", table_name="decoy_puzzles")
     op.drop_table("decoy_puzzles")
     op.drop_index("ix_games_source_import_run_id", table_name="games")
