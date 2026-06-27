@@ -28,6 +28,10 @@ import { RunResolverPage } from './pages/RunResolverPage'
 import { TrainingItemResolverPage } from './pages/TrainingItemResolverPage'
 import { BoardPage } from './pages/BoardPage'
 import { SolveFlowLayout } from './components/SolveFlowLayout'
+import { AdminUsersPage } from './pages/AdminUsersPage'
+import { AdminWaitlistPage } from './pages/AdminWaitlistPage'
+import { AdminWhitelistPage } from './pages/AdminWhitelistPage'
+import { AdminWhitelistNewPage } from './pages/AdminWhitelistNewPage'
 
 type RouterContext = {
   auth: AuthContextValue
@@ -280,6 +284,60 @@ const runRoute = createRoute({
   component: RunPage,
 })
 
+const adminIndexRoute = createRoute({
+  getParentRoute: () => appShellRoute,
+  path: '/admin',
+  beforeLoad: ({ context }) => {
+    if (context.auth.loading) return
+    // TODO: restore isSuperAdmin check before merge
+    throw redirect({ to: '/app/admin/users' })
+  },
+})
+
+const adminUsersRoute = createRoute({
+  getParentRoute: () => appShellRoute,
+  path: '/admin/users',
+  staticData: { crumb: { group: 'Admin', leaf: 'Users' } },
+  beforeLoad: ({ context }) => {
+    if (context.auth.loading) return
+    // TODO: restore isSuperAdmin check before merge
+  },
+  component: AdminUsersPage,
+})
+
+const adminWaitlistRoute = createRoute({
+  getParentRoute: () => appShellRoute,
+  path: '/admin/waitlist',
+  staticData: { crumb: { group: 'Admin', leaf: 'Waitlist' } },
+  beforeLoad: ({ context }) => {
+    if (context.auth.loading) return
+    // TODO: restore isSuperAdmin check before merge
+  },
+  component: AdminWaitlistPage,
+})
+
+const adminWhitelistRoute = createRoute({
+  getParentRoute: () => appShellRoute,
+  path: '/admin/whitelist',
+  staticData: { crumb: { group: 'Admin', leaf: 'Whitelist' } },
+  beforeLoad: ({ context }) => {
+    if (context.auth.loading) return
+    // TODO: restore isSuperAdmin check before merge
+  },
+  component: AdminWhitelistPage,
+})
+
+const adminWhitelistNewRoute = createRoute({
+  getParentRoute: () => appShellRoute,
+  path: '/admin/whitelist/new',
+  staticData: { crumb: { group: 'Admin', parents: [{ label: 'Whitelist', to: '/app/admin/whitelist' }], leaf: 'Add entry' } },
+  beforeLoad: ({ context }) => {
+    if (context.auth.loading) return
+    // TODO: restore isSuperAdmin check before merge
+  },
+  component: AdminWhitelistNewPage,
+})
+
 const solveFlowRoute = createRoute({
   getParentRoute: () => appRoute,
   id: 'solve-flow',
@@ -336,6 +394,11 @@ const routeTree = rootRoute.addChildren([
       lichessTacticsDashboardRoute,
       scrapedPositionalRoute,
       decoySourceRoute,
+      adminIndexRoute,
+      adminUsersRoute,
+      adminWaitlistRoute,
+      adminWhitelistRoute,
+      adminWhitelistNewRoute,
     ]),
     solveFlowRoute.addChildren([
       runSolveRoute,

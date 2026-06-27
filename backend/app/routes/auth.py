@@ -3,7 +3,7 @@ import os
 from flask import Blueprint, redirect, session, request, jsonify, Response
 from werkzeug.wrappers import Response as WerkzeugResponse
 from app.extensions import db
-from app.models.user import User
+from app.models.user import User, WaitlistEntry
 from app.services.auth_service import (
     build_lichess_auth_url,
     exchange_code_for_token,
@@ -11,7 +11,6 @@ from app.services.auth_service import (
     get_or_create_user,
     create_user_from_onboarding,
     update_waitlist_email,
-    get_waitlist_email,
     is_access_approved,
 )
 from app.services.validation import validate_display_name, validate_email
@@ -103,8 +102,15 @@ def me() -> tuple[Response, int] | Response:
             "lichessUsername": lichess_username,
             "avatarUrl": None,
         })
-    email = get_waitlist_email(lichess_username)
-    return jsonify({"status": "waitlisted", "email": email})
+
+    entry = db.session.execute(
+        db.select(WaitlistEntry).filter_by(lichess_username=lichess_username)
+    ).scalar_one_or_none()
+    if not entry:
+        auth_session.clear()
+        return jsonify({"error": "not authenticated"}), 401
+
+    return jsonify({"status": "waitlisted", "email": entry.email})
 
 
 @auth_bp.post("/onboarding")

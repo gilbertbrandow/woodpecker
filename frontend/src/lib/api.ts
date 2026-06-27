@@ -10,6 +10,41 @@ export type AuthUser = {
   boardTheme: string
   pieceTheme: string
   showTimerTenths: boolean
+  isSuperAdmin: boolean
+}
+
+export type AdminUser = {
+  id: number
+  lichessUsername: string
+  displayName: string
+  avatarUrl: string | null
+  createdAt: string
+  lastLoginAt: string | null
+  lastSeenAt: string | null
+  isSuperAdmin: boolean
+}
+
+export type AdminWaitlistEntry = {
+  id: number
+  lichessUsername: string
+  email: string | null
+  createdAt: string
+  updatedAt: string
+  isWhitelisted: boolean
+}
+
+export type AdminWhitelistEntry = {
+  id: number
+  lichessUsername: string
+  createdAt: string
+  isRegistered: boolean
+}
+
+export type AdminStats = {
+  maxUsers: number
+  activeUserCount: number
+  waitlistCount: number
+  whitelistCount: number
 }
 
 export type OnboardingState = {
@@ -1267,5 +1302,38 @@ export const api = {
         { method: 'POST', body: JSON.stringify({ uciMoves, clientTimeSpentMs }) },
       )
     },
+  },
+  admin: {
+    users: (params: { page?: number; q?: string }): Promise<{ items: AdminUser[]; total: number }> => {
+      const p = new URLSearchParams()
+      if (params.page !== undefined) p.set('page', String(params.page))
+      if (params.q) p.set('q', params.q)
+      const qs = p.toString()
+      return request(`/admin/users${qs ? `?${qs}` : ''}`)
+    },
+    waitlist: (params: { page?: number; q?: string }): Promise<{ items: AdminWaitlistEntry[]; total: number }> => {
+      const p = new URLSearchParams()
+      if (params.page !== undefined) p.set('page', String(params.page))
+      if (params.q) p.set('q', params.q)
+      const qs = p.toString()
+      return request(`/admin/waitlist${qs ? `?${qs}` : ''}`)
+    },
+    whitelist: (params: { page?: number; q?: string }): Promise<{ items: AdminWhitelistEntry[]; total: number }> => {
+      const p = new URLSearchParams()
+      if (params.page !== undefined) p.set('page', String(params.page))
+      if (params.q) p.set('q', params.q)
+      const qs = p.toString()
+      return request(`/admin/whitelist${qs ? `?${qs}` : ''}`)
+    },
+    addWhitelist: (lichessUsername: string): Promise<AdminWhitelistEntry> =>
+      request('/admin/whitelist', { method: 'POST', body: JSON.stringify({ lichessUsername }) }),
+    deleteWhitelist: (username: string): Promise<void> =>
+      request(`/admin/whitelist/${encodeURIComponent(username)}`, { method: 'DELETE' }),
+    deleteWaitlist: (username: string): Promise<void> =>
+      request(`/admin/waitlist/${encodeURIComponent(username)}`, { method: 'DELETE' }),
+    lichessPlayerSearch: (term: string): Promise<{ result: { id: string; name: string }[] }> =>
+      request(`/admin/lichess/player-search?term=${encodeURIComponent(term)}`),
+    stats: (): Promise<AdminStats> =>
+      request('/admin/stats'),
   },
 }

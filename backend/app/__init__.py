@@ -17,6 +17,7 @@ from app.routes.leaderboard import leaderboard_bp
 from app.routes.dashboard import dashboard_bp
 from app.routes.sources import sources_bp
 from app.routes.users import users_bp
+from app.routes.admin import admin_bp
 from app.cli import register_commands
 from app.errors import register_error_handlers
 
@@ -57,6 +58,29 @@ def create_app() -> Flask:
         if user_id:
             sentry_sdk.set_user({"id": str(user_id)})
 
+    @app.before_request
+    def update_last_seen() -> None:
+        # TODO: uncomment after migration j3k4l5m6n7o8 is applied to prod
+        pass
+        # user_id = session.get("user_id")
+        # if not user_id:
+        #     return
+        # import sqlalchemy as sa
+        # from datetime import datetime, timezone, timedelta
+        # from app.models.user import User
+        # db.session.execute(
+        #     sa.update(User)
+        #     .where(
+        #         User.id == user_id,
+        #         sa.or_(
+        #             User.last_seen_at.is_(None),
+        #             User.last_seen_at < datetime.now(timezone.utc) - timedelta(minutes=5),
+        #         ),
+        #     )
+        #     .values(last_seen_at=datetime.now(timezone.utc))
+        # )
+        # db.session.commit()
+
     app.register_blueprint(health_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(settings_bp)
@@ -70,6 +94,7 @@ def create_app() -> Flask:
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(sources_bp)
     app.register_blueprint(users_bp)
+    app.register_blueprint(admin_bp)
 
     register_commands(app)
     register_error_handlers(app)
