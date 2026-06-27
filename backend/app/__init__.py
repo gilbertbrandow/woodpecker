@@ -17,6 +17,7 @@ from app.routes.leaderboard import leaderboard_bp
 from app.routes.dashboard import dashboard_bp
 from app.routes.sources import sources_bp
 from app.routes.users import users_bp
+from app.routes.admin import admin_bp
 from app.cli import register_commands
 from app.errors import register_error_handlers
 
@@ -70,6 +71,7 @@ def create_app() -> Flask:
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(sources_bp)
     app.register_blueprint(users_bp)
+    app.register_blueprint(admin_bp)
 
     register_commands(app)
     register_error_handlers(app)

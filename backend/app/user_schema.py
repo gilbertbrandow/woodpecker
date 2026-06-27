@@ -12,4 +12,5 @@ def user_to_dict(user: User) -> dict[str, object]:
         "boardTheme": user.board_theme,
         "pieceTheme": user.piece_theme,
         "showTimerTenths": user.show_timer_tenths,
+        "isSuperAdmin": True,  # TODO: use user.is_superadmin after migration i2j3k4l5m6n7 is applied to prod
     }

@@ -77,6 +77,7 @@ def get_or_create_user(access_token: str) -> dict[str, object]:
     ).scalar_one_or_none()
 
     if existing:
+        # TODO: set last_login_at here after migration i2j3k4l5m6n7 is applied to prod
         return {"status": "active", "user_id": existing.id}
 
     in_whitelist = whitelist_service.is_whitelisted(lichess_username)
@@ -102,17 +103,26 @@ def _upsert_waitlist(lichess_username: str) -> None:
         db.select(WaitlistEntry).filter_by(lichess_username=lichess_username)
     ).scalar_one_or_none()
 
-    if not existing:
+    if existing:
+        existing.updated_at = datetime.now(timezone.utc)
+    else:
+        now = datetime.now(timezone.utc)
         entry = WaitlistEntry(
             lichess_username=lichess_username,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=now,
+            updated_at=now,
         )
         db.session.add(entry)
-        db.session.commit()
+    db.session.commit()
 
 
 def create_user_from_onboarding(lichess_username: str, display_name: str, avatar_url: str | None) -> User:
+    waitlist_entry = db.session.execute(
+        db.select(WaitlistEntry).filter_by(lichess_username=lichess_username)
+    ).scalar_one_or_none()
+    if waitlist_entry:
+        db.session.delete(waitlist_entry)
+
     user = User(
         lichess_username=lichess_username,
         display_name=display_name,

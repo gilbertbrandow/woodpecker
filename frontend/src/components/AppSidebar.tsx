@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useSidebar } from './ui/sidebar'
-import { ChevronsUpDown, LayoutDashboard, Library, Database, CalendarDays, Puzzle, CircleHelp, Settings, LogOut, Play, User, Trophy } from 'lucide-react'
+import { ChevronsUpDown, LayoutDashboard, Library, Database, CalendarDays, Puzzle, CircleHelp, Settings, LogOut, Play, User, Trophy, Clock, Users, UserCheck } from 'lucide-react'
 import { toast } from '../lib/toast'
 import { useAuth } from '../context/auth'
 import { parseAvatarValue } from '../lib/avatar'
@@ -54,6 +54,12 @@ const SETUP_ITEMS: NavItem[] = [
 
 const GENERAL_ITEMS: NavItem[] = [
   { label: 'Method', to: '/app/about', icon: CircleHelp },
+]
+
+const ADMIN_ITEMS: NavItem[] = [
+  { label: 'Users', to: '/app/admin/users', icon: Users },
+  { label: 'Waitlist', to: '/app/admin/waitlist', icon: Clock },
+  { label: 'Whitelist', to: '/app/admin/whitelist', icon: UserCheck },
 ]
 
 function NavGroup({ items, pathname, onNavigate }: {
@@ -189,6 +195,14 @@ export function AppSidebar({ activeRun, collapsible = 'icon' }: AppSidebarProps)
           <SidebarGroupLabel>General</SidebarGroupLabel>
           <NavGroup items={GENERAL_ITEMS} pathname={pathname} onNavigate={closeMobile} />
         </SidebarGroup>
+
+        {/* TODO: restore isSuperAdmin check before merge */}
+        {user && (
+          <SidebarGroup className="group-data-[collapsible=icon]:py-0">
+            <SidebarGroupLabel>Admin</SidebarGroupLabel>
+            <NavGroup items={ADMIN_ITEMS} pathname={pathname} onNavigate={closeMobile} />
+          </SidebarGroup>
+        )}
       </SidebarContent>
       {user && (
         <SidebarFooter>

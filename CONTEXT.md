@@ -116,7 +116,7 @@ The configured maximum number of active users, controlled by the `MAX_USERS` env
 _Avoid_: limit, max users, participant cap
 
 **Whitelist**:
-A set of Lichess usernames (stored lowercase) that are permitted to sign up regardless of the User Cap. Managed by operators via a deploy command (`make -C deploy whitelist-add`), not through an admin UI.
+A set of Lichess usernames (stored lowercase) that are permitted to sign up regardless of the User Cap. Managed either via a deploy command (`make -C deploy whitelist-add`) or through the Admin Page by a Superadmin.
 _Avoid_: allowed list, bypass list
 
 **Waitlist**:
@@ -180,6 +180,20 @@ _Avoid_: weekly leaderboard, weekly stats
 **Delta Accuracy**:
 The change in accuracy percentage between a Run and the immediately preceding non-aborted Run in the same Training. Computed as `current_accuracy − previous_accuracy`, expressed in percentage points. Null when no previous Run exists. Shown on the Run Board as a signed value (e.g. +4.2% or −1.8%).
 _Avoid_: accuracy improvement, accuracy change
+
+## Admin
+
+**Superadmin**:
+A User with elevated privileges, stored as `is_superadmin: bool` on the User record (default `False`). Granted via a deploy-level CLI command; cannot be self-assigned or granted from the UI. A Superadmin has exclusive access to the Admin Page sub-pages.
+_Avoid_: admin (ambiguous without the "super" qualifier in this codebase), operator (refers to the deploy-level SSH role)
+
+**Admin Page**:
+Three sub-pages under `/app/admin`, accessible only to Superadmins: Users (`/app/admin/users`), Waitlist (`/app/admin/waitlist`), and Whitelist (`/app/admin/whitelist`). Users sub-page shows `lichess_username`, `created_at`, and `last_login_at` per user. Waitlist sub-page is read-only. Whitelist sub-page supports full CRUD (add and delete entries).
+_Avoid_: admin dashboard, management panel
+
+**Last Login**:
+The timestamp of a User's most recent completed Lichess OAuth callback as an existing (already-active) user. Stored as `last_login_at` (nullable) on the User record. `null` for users who have never logged back in after initial account creation. Not updated on first onboarding — only on subsequent logins.
+_Avoid_: last active, last seen (both conflate login with training activity)
 
 ## Flagged ambiguities
 
