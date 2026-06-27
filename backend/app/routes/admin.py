@@ -72,9 +72,9 @@ def list_users() -> Response:
                 "displayName": u.display_name,
                 "createdAt": u.created_at.isoformat(),
                 "avatarUrl": u.avatar_url,
-                "lastLoginAt": None,  # TODO: u.last_login_at.isoformat() if u.last_login_at else None after migration i2j3k4l5m6n7
-                "lastSeenAt": None,  # TODO: u.last_seen_at.isoformat() if u.last_seen_at else None after migration j3k4l5m6n7o8
-                "isSuperAdmin": False,  # TODO: u.is_superadmin after migration i2j3k4l5m6n7
+                "lastLoginAt": u.last_login_at.isoformat() if u.last_login_at else None,
+                "lastSeenAt": u.last_seen_at.isoformat() if u.last_seen_at else None,
+                "isSuperAdmin": u.is_superadmin,
             }
             for u in users
         ],

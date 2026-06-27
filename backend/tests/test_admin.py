@@ -11,11 +11,11 @@ from app.models.user import User, WaitlistEntry, WhitelistEntry
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _make_user(db_session, *, username: str) -> User:
-    """Create and flush a User. is_superadmin is not yet a column (migration i2j3k4l5m6n7 pending)."""
+def _make_user(db_session, *, username: str, is_superadmin: bool = False) -> User:
     user = User(
         lichess_username=username,
         display_name=username,
+        is_superadmin=is_superadmin,
         created_at=datetime.now(timezone.utc),
     )
     db_session.add(user)
@@ -68,12 +68,17 @@ class TestAdminRequired:
             response = client.get("/admin/users")
         assert response.status_code == 401
 
-    @pytest.mark.skip(reason="requires migration i2j3k4l5m6n7: admin_required superadmin check not yet active")
     def test_regular_user_gets_403(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        pass
+        user = _make_user(db_session, username="regularuser")
+        db_session.commit()
+        with app.test_client() as client:
+            with client.session_transaction() as sess:
+                sess["user_id"] = user.id
+            response = client.get("/admin/users")
+        assert response.status_code == 403
 
-    def test_authenticated_user_gets_through(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        user = _make_user(db_session, username="adminuser")
+    def test_superadmin_gets_through(self, app: Flask, db_session) -> None:  # type: ignore[misc]
+        user = _make_user(db_session, username="adminuser", is_superadmin=True)
         db_session.commit()
         with app.test_client() as client:
             with client.session_transaction() as sess:
@@ -87,7 +92,7 @@ class TestAdminRequired:
 @pytest.mark.integration
 class TestAdminStats:
     def test_returns_all_counts(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="statsadmin")
+        admin = _make_user(db_session, username="statsadmin", is_superadmin=True)
         _make_user(db_session, username="statsuser")
         _make_waitlist(db_session, username="statswaiter")
         _make_whitelist(db_session, username="statsvip")
@@ -106,7 +111,7 @@ class TestAdminStats:
         assert "maxUsers" in data
 
     def test_max_users_zero_when_env_unset(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="statsenvadmin")
+        admin = _make_user(db_session, username="statsenvadmin", is_superadmin=True)
         db_session.commit()
 
         with patch.dict("os.environ", {"MAX_USERS": ""}):
@@ -118,7 +123,7 @@ class TestAdminStats:
         assert response.get_json()["maxUsers"] == 0
 
     def test_max_users_from_env(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="statsenvadmin2")
+        admin = _make_user(db_session, username="statsenvadmin2", is_superadmin=True)
         db_session.commit()
 
         with patch.dict("os.environ", {"MAX_USERS": "50"}):
@@ -135,7 +140,7 @@ class TestAdminStats:
 @pytest.mark.integration
 class TestAdminUsers:
     def test_returns_all_users(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="theadmin")
+        admin = _make_user(db_session, username="theadmin", is_superadmin=True)
         _make_user(db_session, username="playerone")
         _make_user(db_session, username="playertwo")
         db_session.commit()
@@ -151,7 +156,7 @@ class TestAdminUsers:
         assert len(data["items"]) == 3
 
     def test_response_shape(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="shapeadmin")
+        admin = _make_user(db_session, username="shapeadmin", is_superadmin=True)
         db_session.commit()
 
         with app.test_client() as client:
@@ -169,7 +174,7 @@ class TestAdminUsers:
         assert "isSuperAdmin" in item
 
     def test_search_filters_by_username(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="searchadmin")
+        admin = _make_user(db_session, username="searchadmin", is_superadmin=True)
         _make_user(db_session, username="alphaplayer")
         _make_user(db_session, username="betaplayer")
         db_session.commit()
@@ -184,7 +189,7 @@ class TestAdminUsers:
         assert data["items"][0]["lichessUsername"] == "alphaplayer"
 
     def test_search_is_case_insensitive(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="ciadmin")
+        admin = _make_user(db_session, username="ciadmin", is_superadmin=True)
         _make_user(db_session, username="CamelUser")
         db_session.commit()
 
@@ -196,7 +201,7 @@ class TestAdminUsers:
         assert response.get_json()["total"] == 1
 
     def test_last_login_at_is_null(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="nullloginadmin")
+        admin = _make_user(db_session, username="nullloginadmin", is_superadmin=True)
         db_session.commit()
 
         with app.test_client() as client:
@@ -206,9 +211,19 @@ class TestAdminUsers:
 
         assert item["lastLoginAt"] is None
 
-    @pytest.mark.skip(reason="requires migration i2j3k4l5m6n7: is_superadmin column not yet present")
     def test_is_superadmin_flag_reflects_role(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        pass
+        admin = _make_user(db_session, username="flagadmin", is_superadmin=True)
+        _make_user(db_session, username="flagregular")
+        db_session.commit()
+
+        with app.test_client() as client:
+            with client.session_transaction() as sess:
+                sess["user_id"] = admin.id
+            items = client.get("/admin/users").get_json()["items"]
+
+        by_username = {i["lichessUsername"]: i for i in items}
+        assert by_username["flagadmin"]["isSuperAdmin"] is True
+        assert by_username["flagregular"]["isSuperAdmin"] is False
 
 
 # ── GET /admin/waitlist ───────────────────────────────────────────────────────
@@ -216,7 +231,7 @@ class TestAdminUsers:
 @pytest.mark.integration
 class TestAdminWaitlist:
     def test_returns_waitlist_entries(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="wladmin")
+        admin = _make_user(db_session, username="wladmin", is_superadmin=True)
         _make_waitlist(db_session, username="waitinguser")
         db_session.commit()
 
@@ -235,7 +250,7 @@ class TestAdminWaitlist:
         assert "isWhitelisted" in item
 
     def test_is_whitelisted_false_by_default(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="wliswhiteadmin")
+        admin = _make_user(db_session, username="wliswhiteadmin", is_superadmin=True)
         _make_waitlist(db_session, username="pendinguser")
         db_session.commit()
 
@@ -247,7 +262,7 @@ class TestAdminWaitlist:
         assert item["isWhitelisted"] is False
 
     def test_is_whitelisted_true_when_whitelisted(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="wliswhitetrue")
+        admin = _make_user(db_session, username="wliswhitetrue", is_superadmin=True)
         _make_waitlist(db_session, username="vipwaiter")
         _make_whitelist(db_session, username="vipwaiter")
         db_session.commit()
@@ -260,7 +275,7 @@ class TestAdminWaitlist:
         assert item["isWhitelisted"] is True
 
     def test_empty_waitlist(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="wlemptyadmin")
+        admin = _make_user(db_session, username="wlemptyadmin", is_superadmin=True)
         db_session.commit()
 
         with app.test_client() as client:
@@ -272,7 +287,7 @@ class TestAdminWaitlist:
         assert data["items"] == []
 
     def test_search_filters_waitlist(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="wlsearchadmin")
+        admin = _make_user(db_session, username="wlsearchadmin", is_superadmin=True)
         _make_waitlist(db_session, username="waituser_alpha")
         _make_waitlist(db_session, username="waituser_beta")
         db_session.commit()
@@ -291,7 +306,7 @@ class TestAdminWaitlist:
 @pytest.mark.integration
 class TestAdminWaitlistDelete:
     def test_removes_entry(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="wldeladmin")
+        admin = _make_user(db_session, username="wldeladmin", is_superadmin=True)
         _make_waitlist(db_session, username="deletemewaiter")
         db_session.commit()
 
@@ -302,7 +317,7 @@ class TestAdminWaitlistDelete:
             assert client.get("/admin/waitlist").get_json()["total"] == 0
 
     def test_missing_entry_returns_404(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="wl404deladmin")
+        admin = _make_user(db_session, username="wl404deladmin", is_superadmin=True)
         db_session.commit()
 
         with app.test_client() as client:
@@ -311,7 +326,7 @@ class TestAdminWaitlistDelete:
             assert client.delete("/admin/waitlist/ghost").status_code == 404
 
     def test_delete_is_case_insensitive(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="wlcasedeladmin")
+        admin = _make_user(db_session, username="wlcasedeladmin", is_superadmin=True)
         _make_waitlist(db_session, username="casewaiter")
         db_session.commit()
 
@@ -326,7 +341,7 @@ class TestAdminWaitlistDelete:
 @pytest.mark.integration
 class TestAdminWhitelistGet:
     def test_returns_whitelist_entries(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="wlgetadmin")
+        admin = _make_user(db_session, username="wlgetadmin", is_superadmin=True)
         _make_whitelist(db_session, username="vipuser")
         db_session.commit()
 
@@ -343,7 +358,7 @@ class TestAdminWhitelistGet:
         assert "isRegistered" in item
 
     def test_is_registered_false_when_no_user(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="wlregfalseadmin")
+        admin = _make_user(db_session, username="wlregfalseadmin", is_superadmin=True)
         _make_whitelist(db_session, username="notregistered")
         db_session.commit()
 
@@ -355,7 +370,7 @@ class TestAdminWhitelistGet:
         assert item["isRegistered"] is False
 
     def test_is_registered_true_when_user_exists(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="wlregtrue")
+        admin = _make_user(db_session, username="wlregtrue", is_superadmin=True)
         _make_user(db_session, username="registeredvip")
         _make_whitelist(db_session, username="registeredvip")
         db_session.commit()
@@ -369,7 +384,7 @@ class TestAdminWhitelistGet:
         assert registered["isRegistered"] is True
 
     def test_search_filters_whitelist(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="wlsearchgetadmin")
+        admin = _make_user(db_session, username="wlsearchgetadmin", is_superadmin=True)
         _make_whitelist(db_session, username="alice")
         _make_whitelist(db_session, username="bob")
         db_session.commit()
@@ -388,7 +403,7 @@ class TestAdminWhitelistGet:
 @pytest.mark.integration
 class TestAdminWhitelistAdd:
     def test_adds_entry(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="wladdadmin")
+        admin = _make_user(db_session, username="wladdadmin", is_superadmin=True)
         db_session.commit()
 
         with app.test_client() as client:
@@ -403,7 +418,7 @@ class TestAdminWhitelistAdd:
         assert "createdAt" in data
 
     def test_normalises_to_lowercase(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="wllowadmin")
+        admin = _make_user(db_session, username="wllowadmin", is_superadmin=True)
         db_session.commit()
 
         with app.test_client() as client:
@@ -415,7 +430,7 @@ class TestAdminWhitelistAdd:
         assert data["total"] == 1
 
     def test_duplicate_returns_409(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="wldupadmin")
+        admin = _make_user(db_session, username="wldupadmin", is_superadmin=True)
         _make_whitelist(db_session, username="existing")
         db_session.commit()
 
@@ -425,7 +440,7 @@ class TestAdminWhitelistAdd:
             assert client.post("/admin/whitelist", json={"lichessUsername": "existing"}).status_code == 409
 
     def test_already_registered_user_returns_409(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="wlregadmin")
+        admin = _make_user(db_session, username="wlregadmin", is_superadmin=True)
         _make_user(db_session, username="activeuser")
         db_session.commit()
 
@@ -437,7 +452,7 @@ class TestAdminWhitelistAdd:
         assert response.status_code == 409
 
     def test_missing_body_returns_400(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="wlbodyadmin")
+        admin = _make_user(db_session, username="wlbodyadmin", is_superadmin=True)
         db_session.commit()
 
         with app.test_client() as client:
@@ -451,7 +466,7 @@ class TestAdminWhitelistAdd:
 @pytest.mark.integration
 class TestAdminWhitelistDelete:
     def test_removes_entry(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="wldeladmin")
+        admin = _make_user(db_session, username="wldeladmin", is_superadmin=True)
         _make_whitelist(db_session, username="deleteme")
         db_session.commit()
 
@@ -462,7 +477,7 @@ class TestAdminWhitelistDelete:
             assert client.get("/admin/whitelist").get_json()["total"] == 0
 
     def test_missing_entry_returns_404(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="wl404admin")
+        admin = _make_user(db_session, username="wl404admin", is_superadmin=True)
         db_session.commit()
 
         with app.test_client() as client:
@@ -471,7 +486,7 @@ class TestAdminWhitelistDelete:
             assert client.delete("/admin/whitelist/doesnotexist").status_code == 404
 
     def test_delete_is_case_insensitive(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        admin = _make_user(db_session, username="wlcasedeadmin")
+        admin = _make_user(db_session, username="wlcasedeadmin", is_superadmin=True)
         _make_whitelist(db_session, username="casetest")
         db_session.commit()
 
@@ -560,17 +575,35 @@ class TestStaleWaitlistSession:
         assert response.get_json()["status"] == "waitlisted"
 
 
-# ── last_login_at (pending migration i2j3k4l5m6n7) ───────────────────────────
+# ── last_login_at ─────────────────────────────────────────────────────────────
 
 @pytest.mark.integration
 class TestLastLoginAt:
-    @pytest.mark.skip(reason="requires migration i2j3k4l5m6n7: last_login_at column not yet present")
     def test_new_user_has_null_last_login(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        pass
+        admin = _make_user(db_session, username="nullloginadmin2", is_superadmin=True)
+        db_session.commit()
 
-    @pytest.mark.skip(reason="requires migration i2j3k4l5m6n7: last_login_at not yet updated on login")
+        with app.test_client() as client:
+            with client.session_transaction() as sess:
+                sess["user_id"] = admin.id
+            item = client.get("/admin/users").get_json()["items"][0]
+
+        assert item["lastLoginAt"] is None
+
     def test_returning_user_gets_last_login_set(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        pass
+        _make_user(db_session, username="returninguser")
+        db_session.commit()
+
+        with _patch_berserk(_make_lichess_mock("returninguser")):
+            from app.services.auth_service import get_or_create_user
+            get_or_create_user("fake_token")
+
+        from app.models.user import User as UserModel
+        user = db_session.execute(
+            sa.select(UserModel).filter_by(lichess_username="returninguser")
+        ).scalar_one()
+        db_session.refresh(user)
+        assert user.last_login_at is not None
 
     def test_onboarding_does_not_create_user(self, app: Flask, db_session) -> None:  # type: ignore[misc]
         with patch.dict("os.environ", {"MAX_USERS": "10"}):
@@ -591,10 +624,24 @@ class TestLastLoginAt:
 
 @pytest.mark.integration
 class TestMeIncludesSuperAdmin:
-    @pytest.mark.skip(reason="requires migration i2j3k4l5m6n7: isSuperAdmin hardcoded True in prod-compat build")
     def test_regular_user_is_not_superadmin(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        pass
+        user = _make_user(db_session, username="meregular")
+        db_session.commit()
 
-    @pytest.mark.skip(reason="requires migration i2j3k4l5m6n7: isSuperAdmin hardcoded True in prod-compat build")
+        with app.test_client() as client:
+            with client.session_transaction() as sess:
+                sess["user_id"] = user.id
+            data = client.get("/auth/me").get_json()
+
+        assert data["isSuperAdmin"] is False
+
     def test_superadmin_user_flag_is_true(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        pass
+        user = _make_user(db_session, username="mesuperadmin", is_superadmin=True)
+        db_session.commit()
+
+        with app.test_client() as client:
+            with client.session_transaction() as sess:
+                sess["user_id"] = user.id
+            data = client.get("/auth/me").get_json()
+
+        assert data["isSuperAdmin"] is True

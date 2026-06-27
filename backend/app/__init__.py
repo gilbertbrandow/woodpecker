@@ -1,5 +1,7 @@
 import os
+import sqlalchemy as sa
 import sentry_sdk
+from datetime import datetime, timezone
 from flask import Flask, session
 from sentry_sdk.integrations.flask import FlaskIntegration
 from app.exceptions import AppError
@@ -60,26 +62,23 @@ def create_app() -> Flask:
 
     @app.before_request
     def update_last_seen() -> None:
-        # TODO: uncomment after migration j3k4l5m6n7o8 is applied to prod
-        pass
-        # user_id = session.get("user_id")
-        # if not user_id:
-        #     return
-        # import sqlalchemy as sa
-        # from datetime import datetime, timezone, timedelta
-        # from app.models.user import User
-        # db.session.execute(
-        #     sa.update(User)
-        #     .where(
-        #         User.id == user_id,
-        #         sa.or_(
-        #             User.last_seen_at.is_(None),
-        #             User.last_seen_at < datetime.now(timezone.utc) - timedelta(minutes=5),
-        #         ),
-        #     )
-        #     .values(last_seen_at=datetime.now(timezone.utc))
-        # )
-        # db.session.commit()
+        from datetime import timedelta
+        from app.models.user import User
+        user_id = session.get("user_id")
+        if not user_id:
+            return
+        db.session.execute(
+            sa.update(User)
+            .where(
+                User.id == user_id,
+                sa.or_(
+                    User.last_seen_at.is_(None),
+                    User.last_seen_at < datetime.now(timezone.utc) - timedelta(minutes=5),
+                ),
+            )
+            .values(last_seen_at=datetime.now(timezone.utc))
+        )
+        db.session.commit()
 
     app.register_blueprint(health_bp)
     app.register_blueprint(auth_bp)

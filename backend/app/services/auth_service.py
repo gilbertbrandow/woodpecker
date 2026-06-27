@@ -77,7 +77,8 @@ def get_or_create_user(access_token: str) -> dict[str, object]:
     ).scalar_one_or_none()
 
     if existing:
-        # TODO: set last_login_at here after migration i2j3k4l5m6n7 is applied to prod
+        existing.last_login_at = datetime.now(timezone.utc)
+        db.session.commit()
         return {"status": "active", "user_id": existing.id}
 
     in_whitelist = whitelist_service.is_whitelisted(lichess_username)
