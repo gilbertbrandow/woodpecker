@@ -1,0 +1,14 @@
+pipeline/data/raw/
+pipeline/data/*.jsonl
+pipeline/data/*.sqlite
+pipeline/data/*.sqlite-shm
+pipeline/data/*.sqlite-wal
+pipeline/data/*.log
+pipeline/sources/decoy/generate/
+frontend/node_modules/
+backend/node_modules/
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.venv/

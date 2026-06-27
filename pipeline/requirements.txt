@@ -4,3 +4,5 @@ click>=8.0
 requests>=2.33
 pyyaml>=6.0
 types-pyyaml>=6.0
+types-requests>=2.31
+ruff>=0.4

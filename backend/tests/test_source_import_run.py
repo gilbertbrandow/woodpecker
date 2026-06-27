@@ -94,8 +94,8 @@ class TestSourceImportRunModel:
         run = _make_source_run(db_session)
         meta = _make_metadata(db_session, run)
         db_session.expire(run)
-        assert run.metadata_row is not None
-        assert run.metadata_row.id == meta.id
+        assert run.lichess_tactics_metadata_row is not None
+        assert run.lichess_tactics_metadata_row.id == meta.id
 
     def test_metadata_unique_constraint_raises_on_duplicate(self, db_session) -> None:
         run = _make_source_run(db_session)

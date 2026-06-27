@@ -10,6 +10,7 @@ import { Switch } from "../ui/switch";
 import { SplitSlider } from "./SplitSlider";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 import type {
+  DecoySourceConfig,
   SourceEntry,
   LichessTacticSourceConfig,
   ScrapedPositionalSourceConfig,
@@ -41,19 +42,21 @@ export const DEFAULT_LICHESS_ENTRY: SourceEntry = {
   },
 };
 
-const ALL_SOURCE_TYPES = ["LICHESS_TACTIC", "SCRAPED_POSITIONAL"] as const;
+const ALL_SOURCE_TYPES = ["LICHESS_TACTIC", "SCRAPED_POSITIONAL", "DECOY"] as const;
 type KnownSource = (typeof ALL_SOURCE_TYPES)[number];
 
-const ORDERED_SOURCES: KnownSource[] = ["LICHESS_TACTIC", "SCRAPED_POSITIONAL"];
+const ORDERED_SOURCES: KnownSource[] = ["LICHESS_TACTIC", "SCRAPED_POSITIONAL", "DECOY"];
 
 const SOURCE_LABELS: Record<KnownSource, string> = {
   LICHESS_TACTIC: "Lichess Tactics",
   SCRAPED_POSITIONAL: "Scraped Positionals",
+  DECOY: "Decoys",
 };
 
 const SOURCE_ABOUT_URLS: Record<KnownSource, string> = {
   LICHESS_TACTIC: "/app/sources/lichess-tactics",
   SCRAPED_POSITIONAL: "/app/sources/scraped-positional-puzzles",
+  DECOY: "/app/sources/decoys",
 };
 
 type SourceCompositionEditorProps = {
@@ -75,7 +78,7 @@ function equalSplit(sources: SourceEntry[]): SourceEntry[] {
 
 function defaultConfig(
   source: KnownSource,
-): LichessTacticSourceConfig | ScrapedPositionalSourceConfig {
+): LichessTacticSourceConfig | ScrapedPositionalSourceConfig | DecoySourceConfig {
   if (source === "LICHESS_TACTIC") return { ...DEFAULT_LICHESS_ENTRY.config };
   return {};
 }
@@ -314,7 +317,7 @@ export function SourceCompositionEditor({
 
   const updateConfig = (
     index: number,
-    config: LichessTacticSourceConfig | ScrapedPositionalSourceConfig,
+    config: LichessTacticSourceConfig | ScrapedPositionalSourceConfig | DecoySourceConfig,
   ): void => {
     suppressSync.current = true;
     onChange(
@@ -407,7 +410,14 @@ export function SourceCompositionEditor({
               <CollapsibleContent>
                 {entry && (
                   <div className="border-t px-4 pb-5 pt-4">
-                    {entry.source === "LICHESS_TACTIC" ? (
+                    {entry.source === "DECOY" ? (
+                      <p className="text-xs text-muted-foreground">
+                        Decoys have no configuration options. They are sampled
+                        uniformly from the full pool of imported positions.
+                        Use the distribution slider below to control how often
+                        they appear relative to other sources.
+                      </p>
+                    ) : entry.source === "LICHESS_TACTIC" ? (
                       <LichessTacticConfigEditor
                         config={entry.config}
                         onChange={(cfg) => updateConfig(entryIndex, cfg)}

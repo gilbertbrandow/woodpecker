@@ -24,6 +24,7 @@ from app.services.chess_board import compute_attempt_board, compute_attempt_pgn
 from app.services.schedule_config import ScheduleConfig
 from app.services.solve_contract import SolveContract
 from app.services.training_item_content import (
+    DecoyMetadata,
     LichessTacticMetadata,
     ScrapedPositionalMetadata,
     SourceMetadata,
@@ -1222,6 +1223,8 @@ def _compute_overview_actions(run: Run, metadata: SourceMetadata) -> dict[str, o
         analyze_url: str | None = metadata.game_url
     elif isinstance(metadata, ScrapedPositionalMetadata):
         analyze_url = metadata.lichess_url
+    elif isinstance(metadata, DecoyMetadata):
+        analyze_url = metadata.analysis_url
     else:
         analyze_url = None
 

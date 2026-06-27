@@ -1,0 +1,5 @@
+chess>=1.9
+py7zr>=0.21
+zstandard>=0.22
+requests>=2.33
+huggingface_hub>=0.20

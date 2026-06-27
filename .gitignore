@@ -22,3 +22,8 @@ pipeline/data/raw/*
 !pipeline/data/raw/.gitkeep
 pipeline/data/cache/*
 !pipeline/data/cache/.gitkeep
+pipeline/data/*.sqlite
+pipeline/data/*.sqlite-shm
+pipeline/data/*.sqlite-wal
+pipeline/data/*.jsonl
+pipeline/data/*.log

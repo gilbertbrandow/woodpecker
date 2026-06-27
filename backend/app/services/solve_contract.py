@@ -6,3 +6,5 @@ from dataclasses import dataclass, field
 class SolveContract:
     fen: str
     plies: Sequence[str | list[str]] = field(default_factory=list)
+    decoy_lines: dict[str, str] | None = None
+    is_decoy: bool = False

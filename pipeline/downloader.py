@@ -12,7 +12,8 @@ def ensure_file(raw_dir: Path, name: str, url: str) -> Path:
         return path
     click.echo(f"Downloading {name} ...")
     # timeout=(connect_s, read_between_chunks_s) — not total transfer time
-    resp = requests.get(url, timeout=(10, 300), stream=True)
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; woodpecker-pipeline/1.0)"}
+    resp = requests.get(url, timeout=(10, 300), stream=True, headers=headers)
     resp.raise_for_status()
     total = int(resp.headers.get("content-length", 0))
     written = 0

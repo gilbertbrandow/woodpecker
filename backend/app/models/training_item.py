@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.extensions import Base
 
 if TYPE_CHECKING:
+    from app.models.decoy_puzzle import DecoyPuzzle
     from app.models.lichess_tactic import LichessTactic
     from app.models.scraped_positional_puzzle import ScrapedPositionalPuzzle
     from app.models.source_import_run import SourceImportRun
@@ -34,6 +35,9 @@ class TrainingItem(Base):
     )
     positional_puzzle: Mapped["ScrapedPositionalPuzzle"] = relationship(
         "ScrapedPositionalPuzzle", back_populates="training_item", uselist=False
+    )
+    decoy_puzzle: Mapped["DecoyPuzzle"] = relationship(
+        "DecoyPuzzle", back_populates="training_item", uselist=False
     )
     source_import_run: Mapped["SourceImportRun | None"] = relationship(
         "SourceImportRun", back_populates="training_items"
