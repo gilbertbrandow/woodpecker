@@ -47,6 +47,15 @@ const COLUMNS: ColumnDef<AdminUser>[] = [
     ),
   },
   {
+    accessorKey: 'lastSeenAt',
+    header: 'Last seen',
+    cell: ({ row }) => (
+      <span className="tabular-nums text-muted-foreground">
+        {row.original.lastSeenAt ? formatDate(row.original.lastSeenAt) : '—'}
+      </span>
+    ),
+  },
+  {
     id: 'role',
     header: 'Role',
     cell: ({ row }) =>

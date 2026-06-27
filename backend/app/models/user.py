@@ -18,6 +18,8 @@ class User(Base):
     # TODO: uncomment after migration i2j3k4l5m6n7 is applied to prod
     # is_superadmin: Mapped[bool] = mapped_column(nullable=False, default=False, server_default=sa.false())
     # last_login_at: Mapped[datetime | None] = mapped_column(nullable=True, default=None)
+    # TODO: uncomment after migration j3k4l5m6n7o8 is applied to prod
+    # last_seen_at: Mapped[datetime | None] = mapped_column(nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(timezone.utc)
     )

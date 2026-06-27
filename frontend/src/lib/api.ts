@@ -20,6 +20,7 @@ export type AdminUser = {
   avatarUrl: string | null
   createdAt: string
   lastLoginAt: string | null
+  lastSeenAt: string | null
   isSuperAdmin: boolean
 }
 

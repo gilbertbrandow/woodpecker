@@ -165,6 +165,7 @@ class TestAdminUsers:
         assert "displayName" in item
         assert "createdAt" in item
         assert "lastLoginAt" in item
+        assert "lastSeenAt" in item
         assert "isSuperAdmin" in item
 
     def test_search_filters_by_username(self, app: Flask, db_session) -> None:  # type: ignore[misc]
