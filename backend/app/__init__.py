@@ -77,6 +77,7 @@ def create_app() -> Flask:
                 ),
             )
             .values(last_seen_at=datetime.now(timezone.utc))
+            .execution_options(synchronize_session=False)
         )
         db.session.commit()
 
