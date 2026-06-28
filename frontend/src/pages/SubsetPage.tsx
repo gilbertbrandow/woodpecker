@@ -9,7 +9,6 @@ import {
   api,
   type Subset,
   type SubsetConfig,
-  type SourceEntry,
   type SubsetStats as SubsetStatsType,
 } from "../lib/api";
 import { SchedulesTable } from "../components/schedules/SchedulesTable";
@@ -52,6 +51,17 @@ import {
 
 const MIN_LOCK_PUZZLES = 5;
 
+const DEFAULT_CONFIG: SubsetConfig = { sources: [DEFAULT_LICHESS_ENTRY] };
+
+function configFromSubset(s: Subset): SubsetConfig {
+  if (!s.config) return DEFAULT_CONFIG;
+  return {
+    sources: s.config.sources ?? [DEFAULT_LICHESS_ENTRY],
+    subsetRefs: s.config.subsetRefs,
+    excludeSubsets: s.config.excludeSubsets,
+  };
+}
+
 function UsedBySchedules({ subsetId }: { subsetId: number }): React.ReactElement {
   const [open, setOpen] = useState(true);
   const [count, setCount] = useState<number | null>(null);
@@ -77,10 +87,7 @@ function UsedBySchedules({ subsetId }: { subsetId: number }): React.ReactElement
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="pt-4">
-          <SchedulesTable
-            subsetId={subsetId}
-            onCountChange={setCount}
-          />
+          <SchedulesTable subsetId={subsetId} onCountChange={setCount} />
         </div>
       </CollapsibleContent>
     </Collapsible>
@@ -97,9 +104,9 @@ export function SubsetPage(): React.ReactElement | null {
   const [pageLoading, setPageLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>("configuration");
 
-  const [sources, setSources] = useState<SourceEntry[]>([DEFAULT_LICHESS_ENTRY]);
-  const [savedSources, setSavedSources] = useState<SourceEntry[]>([DEFAULT_LICHESS_ENTRY]);
-  const isDirty = JSON.stringify(sources) !== JSON.stringify(savedSources);
+  const [config, setConfig] = useState<SubsetConfig>(DEFAULT_CONFIG);
+  const [savedConfig, setSavedConfig] = useState<SubsetConfig>(DEFAULT_CONFIG);
+  const isDirty = JSON.stringify(config) !== JSON.stringify(savedConfig);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isFilling, setIsFilling] = useState(false);
@@ -135,9 +142,9 @@ export function SubsetPage(): React.ReactElement | null {
       .get(id)
       .then(async (s) => {
         setSubset(s);
-        const initialSources: SourceEntry[] = s.config?.sources ?? [DEFAULT_LICHESS_ENTRY];
-        setSources(initialSources);
-        setSavedSources(initialSources);
+        const initial = configFromSubset(s);
+        setConfig(initial);
+        setSavedConfig(initial);
         setActiveTab(s.status === "locked" ? "insights" : "configuration");
         if (s.status !== "draft") {
           await loadStats(id);
@@ -151,10 +158,9 @@ export function SubsetPage(): React.ReactElement | null {
     if (!subset) return;
     setIsSaving(true);
     try {
-      const config: SubsetConfig = { sources };
       const updated = await api.subsets.saveConfig(id, subset.puzzleCount, config);
       setSubset(updated);
-      setSavedSources(sources);
+      setSavedConfig(config);
       if (updated.status === "draft") {
         setStats(null);
         setTotal(0);
@@ -173,10 +179,9 @@ export function SubsetPage(): React.ReactElement | null {
     setIsFilling(true);
     try {
       if (isDirty) {
-        const config: SubsetConfig = { sources };
         const updated = await api.subsets.saveConfig(id, subset.puzzleCount, config);
         setSubset(updated);
-        setSavedSources(sources);
+        setSavedConfig(config);
         setStats(null);
         setTotal(0);
       }
@@ -364,10 +369,8 @@ export function SubsetPage(): React.ReactElement | null {
           {!locked && isOwn && (
             <div className="flex flex-col gap-3 pb-5">
               <p className="rounded-md border bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
-                Configuration is a set of preferences, not hard guarantees.
-                Rating bounds are strict — everything else is weighted sampling.
-                We always try to fill to your target count; if the eligible pool
-                is smaller, you get however many puzzles match.
+                Configuration is a set of preferences where we sample training items best effort, not hard guarantees.
+                We always try to fill to your target count; if the eligible pool is smaller, you get however many puzzles match.
               </p>
             </div>
           )}
@@ -380,11 +383,26 @@ export function SubsetPage(): React.ReactElement | null {
           )}
 
           <SourceCompositionEditor
-            value={sources}
-            onChange={setSources}
+            value={{
+              sources: config.sources ?? [],
+              subsetRefs: config.subsetRefs ?? [],
+            }}
+            onChange={(v) =>
+              setConfig((prev) => ({
+                ...prev,
+                sources: v.sources,
+                subsetRefs: v.subsetRefs.length > 0 ? v.subsetRefs : undefined,
+              }))
+            }
+            excludeSubsets={config.excludeSubsets ?? []}
+            onExcludeSubsetsChange={(v) =>
+              setConfig((prev) => ({
+                ...prev,
+                excludeSubsets: v.length > 0 ? v : undefined,
+              }))
+            }
             disabled={locked || !isOwn || isBusy}
           />
-
         </TabsContent>
 
         <TabsContent value="puzzles">

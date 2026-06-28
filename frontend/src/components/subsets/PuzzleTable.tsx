@@ -249,6 +249,8 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
       cell: ({ row }) =>
         row.original.sourceType === 'LICHESS_TACTIC' ? (
           <span className="tabular-nums">{row.original.rating}</span>
+        ) : row.original.sourceType === 'DECOY' ? (
+          <span className="text-muted-foreground">—</span>
         ) : row.original.difficultyMinRating != null && row.original.difficultyMaxRating != null ? (
           <span className="tabular-nums">{row.original.difficultyMinRating}–{row.original.difficultyMaxRating}</span>
         ) : (
@@ -260,7 +262,9 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
       header: 'Themes',
       enableSorting: false,
       meta: { className: 'min-w-52' } satisfies ColMeta,
-      cell: ({ row }) => <LabelBadges items={row.original.themes} />,
+      cell: ({ row }) => row.original.sourceType !== 'DECOY'
+        ? <LabelBadges items={row.original.themes} />
+        : null,
     },
     {
       id: 'opening',
@@ -277,7 +281,10 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
       cell: ({ row }) => {
         const url = row.original.sourceType === 'LICHESS_TACTIC'
           ? row.original.gameUrl
-          : row.original.lichessUrl
+          : row.original.sourceType === 'SCRAPED_POSITIONAL'
+          ? row.original.lichessUrl
+          : row.original.analysisUrl
+        if (!url) return null
         return (
           <a
             href={url}
