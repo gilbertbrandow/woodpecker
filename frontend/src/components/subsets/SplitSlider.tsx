@@ -1,10 +1,13 @@
 import * as React from 'react'
 import { useRef, useEffect, useCallback } from 'react'
 import { cn } from '../../lib/utils'
-import { TrainingItemTypeBadge } from '../TrainingItemTypeBadge'
-import type { TrainingItemSource } from '../../lib/api'
 
-export type SliderSegment = { source: TrainingItemSource; percentage: number }
+export type SliderSegment = {
+  key: string
+  percentage: number
+  bgClass: string
+  label?: React.ReactNode
+}
 
 type SplitSliderProps = {
   segments: SliderSegment[]
@@ -14,12 +17,6 @@ type SplitSliderProps = {
 }
 
 const MIN_LABEL_PCT = 14
-
-const SEGMENT_BG: Partial<Record<TrainingItemSource, string>> = {
-  LICHESS_TACTIC: 'bg-cyan-50 dark:bg-cyan-950/30',
-  SCRAPED_POSITIONAL: 'bg-indigo-50 dark:bg-indigo-950/30',
-  DECOY: 'bg-amber-50 dark:bg-amber-950/30',
-}
 
 export function SplitSlider({
   segments,
@@ -125,17 +122,17 @@ export function SplitSlider({
     >
       {segments.map((seg, i) => (
         <div
-          key={seg.source}
+          key={seg.key}
           className={cn(
             'relative flex items-center justify-center overflow-hidden',
-            SEGMENT_BG[seg.source],
+            seg.bgClass,
             i > 0 && 'border-l border-border/40',
           )}
           style={{ width: `${seg.percentage}%` }}
         >
-          {seg.percentage >= MIN_LABEL_PCT && (
+          {seg.percentage >= MIN_LABEL_PCT && seg.label && (
             <div className="pointer-events-none">
-              <TrainingItemTypeBadge source={seg.source} />
+              {seg.label}
             </div>
           )}
           {seg.percentage > 0 && (
