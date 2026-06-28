@@ -289,7 +289,7 @@ const adminIndexRoute = createRoute({
   path: '/admin',
   beforeLoad: ({ context }) => {
     if (context.auth.loading) return
-    // TODO: restore isSuperAdmin check before merge
+    if (!context.auth.user?.isSuperAdmin) throw redirect({ to: '/app' })
     throw redirect({ to: '/app/admin/users' })
   },
 })
@@ -300,7 +300,7 @@ const adminUsersRoute = createRoute({
   staticData: { crumb: { group: 'Admin', leaf: 'Users' } },
   beforeLoad: ({ context }) => {
     if (context.auth.loading) return
-    // TODO: restore isSuperAdmin check before merge
+    if (!context.auth.user?.isSuperAdmin) throw redirect({ to: '/app' })
   },
   component: AdminUsersPage,
 })
@@ -311,7 +311,7 @@ const adminWaitlistRoute = createRoute({
   staticData: { crumb: { group: 'Admin', leaf: 'Waitlist' } },
   beforeLoad: ({ context }) => {
     if (context.auth.loading) return
-    // TODO: restore isSuperAdmin check before merge
+    if (!context.auth.user?.isSuperAdmin) throw redirect({ to: '/app' })
   },
   component: AdminWaitlistPage,
 })
@@ -322,7 +322,7 @@ const adminWhitelistRoute = createRoute({
   staticData: { crumb: { group: 'Admin', leaf: 'Whitelist' } },
   beforeLoad: ({ context }) => {
     if (context.auth.loading) return
-    // TODO: restore isSuperAdmin check before merge
+    if (!context.auth.user?.isSuperAdmin) throw redirect({ to: '/app' })
   },
   component: AdminWhitelistPage,
 })
@@ -333,7 +333,7 @@ const adminWhitelistNewRoute = createRoute({
   staticData: { crumb: { group: 'Admin', parents: [{ label: 'Whitelist', to: '/app/admin/whitelist' }], leaf: 'Add entry' } },
   beforeLoad: ({ context }) => {
     if (context.auth.loading) return
-    // TODO: restore isSuperAdmin check before merge
+    if (!context.auth.user?.isSuperAdmin) throw redirect({ to: '/app' })
   },
   component: AdminWhitelistNewPage,
 })

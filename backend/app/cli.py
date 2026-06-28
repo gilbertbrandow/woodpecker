@@ -28,5 +28,6 @@ def register_commands(app: Flask) -> None:
         if not user:
             click.echo(f"No active user found with Lichess username '{normalized}'.")
             return
-        # TODO: restore after migration i2j3k4l5m6n7 is applied to prod
-        click.echo("superadmin-add is disabled until the migration is applied.")
+        user.is_superadmin = True
+        db.session.commit()
+        click.echo(f"Granted superadmin to {normalized}.")

@@ -196,8 +196,7 @@ export function AppSidebar({ activeRun, collapsible = 'icon' }: AppSidebarProps)
           <NavGroup items={GENERAL_ITEMS} pathname={pathname} onNavigate={closeMobile} />
         </SidebarGroup>
 
-        {/* TODO: restore isSuperAdmin check before merge */}
-        {user && (
+        {user?.isSuperAdmin && (
           <SidebarGroup className="group-data-[collapsible=icon]:py-0">
             <SidebarGroupLabel>Admin</SidebarGroupLabel>
             <NavGroup items={ADMIN_ITEMS} pathname={pathname} onNavigate={closeMobile} />
