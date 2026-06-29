@@ -2,6 +2,19 @@ import * as React from "react";
 import { useState, useEffect, useMemo } from "react";
 import { ChevronDown, CircleHelp, CircleOff, Plus, Trash2 } from "lucide-react";
 import {
+  ALL_SOURCE_TYPES,
+  ORDERED_SOURCES,
+  type KnownSource,
+  addSource,
+  removeSource,
+  addSubsetRef as applyAddSubsetRef,
+  removeSubsetRef as applyRemoveSubsetRef,
+  clearSubsetRefs,
+  applySplit,
+  updateSourceConfig,
+  updateSubsetRefEntry,
+} from "../../lib/sourceComposition";
+import {
   Collapsible,
   CollapsibleTrigger,
   CollapsibleContent,
@@ -52,11 +65,6 @@ export const DEFAULT_LICHESS_ENTRY: SourceEntry = {
   },
 };
 
-const ALL_SOURCE_TYPES = ["LICHESS_TACTIC", "SCRAPED_POSITIONAL", "DECOY"] as const;
-type KnownSource = (typeof ALL_SOURCE_TYPES)[number];
-
-const ORDERED_SOURCES: KnownSource[] = ["LICHESS_TACTIC", "SCRAPED_POSITIONAL", "DECOY"];
-
 const SOURCE_LABELS: Record<KnownSource, string> = {
   LICHESS_TACTIC: "Lichess Tactics",
   SCRAPED_POSITIONAL: "Scraped Positionals",
@@ -77,12 +85,6 @@ const SOURCE_BG: Record<KnownSource, string> = {
 
 const SUBSET_REF_BG = "bg-zinc-100 dark:bg-zinc-800/50";
 
-const SOURCE_DISPLAY_NAMES: Record<string, string> = {
-  LICHESS_TACTIC: "Lichess Tactics",
-  SCRAPED_POSITIONAL: "Scraped Positionals",
-  DECOY: "Decoys",
-};
-
 const CANDIDATE_MOVE_COUNTS = [3, 4, 5, 6] as const;
 
 type SourceCompositionEditorProps = {
@@ -92,14 +94,6 @@ type SourceCompositionEditorProps = {
   onExcludeSubsetsChange: (v: number[]) => void;
   disabled?: boolean;
 };
-
-function equalSplitAll<T extends { percentage: number }>(entries: T[]): T[] {
-  const n = entries.length;
-  if (n === 0) return entries;
-  const base = Math.floor(100 / n);
-  const remainder = 100 - base * n;
-  return entries.map((e, i) => ({ ...e, percentage: base + (i === 0 ? remainder : 0) }));
-}
 
 function defaultConfig(
   source: KnownSource,
@@ -165,7 +159,7 @@ function DecoyConfigEditor({
         <CollapsibleContent>
           <div className="flex flex-wrap gap-2 pt-3">
             {CANDIDATE_MOVE_COUNTS.map((n) => {
-              const selected = allSelected || selectedCounts.includes(n);
+              const selected = selectedCounts.includes(n);
               return (
                 <button
                   key={n}
@@ -179,6 +173,7 @@ function DecoyConfigEditor({
                   }`}
                 >
                   {n}
+                  <span className="ml-1.5 text-xs opacity-60">moves</span>
                 </button>
               );
             })}
@@ -432,7 +427,7 @@ function SubsetRefRow({
               onCheckedChange={() => toggleSource(src)}
               disabled={disabled}
             />
-            <span className="text-xs">{SOURCE_DISPLAY_NAMES[src] ?? src}</span>
+            <span className="text-xs">{(SOURCE_LABELS as Record<string, string>)[src] ?? src}</span>
           </label>
         ))}
       </div>
@@ -563,7 +558,8 @@ export function SourceCompositionEditor({
 }: SourceCompositionEditorProps): React.ReactElement {
   const activeNames = value.sources.map((e) => e.source);
   const [openCards, setOpenCards] = useState<Set<string>>(() => new Set());
-  const [refsEnabled, setRefsEnabled] = useState<boolean>(() => value.subsetRefs.length > 0);
+  const [refsOn, setRefsOn] = useState<boolean>(() => value.subsetRefs.length > 0);
+  const refsEnabled = value.subsetRefs.length > 0 || refsOn;
 
   // All locked subsets — loaded once, used for both referenced and excluded pickers
   const [lockedSubsets, setLockedSubsets] = useState<Subset[]>([]);
@@ -605,41 +601,23 @@ export function SourceCompositionEditor({
     const isActive = activeNames.includes(source);
     if (isActive) {
       if (totalEntries === 1) return;
-      const newSources = value.sources.filter((s) => s.source !== source);
-      const combined = [...newSources, ...value.subsetRefs];
-      const equalized = equalSplitAll(combined);
-      const nSrc = newSources.length;
-      onChange({
-        sources: equalized.slice(0, nSrc) as SourceEntry[],
-        subsetRefs: equalized.slice(nSrc) as SubsetRefEntry[],
-      });
+      onChange(removeSource(value, source));
       setOpenCards((prev) => {
         const next = new Set(prev);
         next.delete(source);
         return next;
       });
     } else {
-      const newEntry = { source, percentage: 0, config: defaultConfig(source) } as SourceEntry;
-      const ordered = ORDERED_SOURCES.filter((s) =>
-        [...activeNames, source].includes(s),
-      ).map((s) => (s === source ? newEntry : value.sources.find((e) => e.source === s)!));
-      const combined = [...ordered, ...value.subsetRefs];
-      const equalized = equalSplitAll(combined);
-      const nSrc = ordered.length;
-      onChange({
-        sources: equalized.slice(0, nSrc) as SourceEntry[],
-        subsetRefs: equalized.slice(nSrc) as SubsetRefEntry[],
-      });
+      onChange(addSource(value, source, defaultConfig(source)));
     }
   };
 
   const toggleSubsetRefs = (): void => {
     if (refsEnabled) {
       if (isRefsLast) return;
-      setRefsEnabled(false);
+      setRefsOn(false);
       if (value.subsetRefs.length > 0) {
-        const equalized = equalSplitAll(value.sources);
-        onChange({ sources: equalized as SourceEntry[], subsetRefs: [] });
+        onChange(clearSubsetRefs(value));
       }
       setOpenCards((prev) => {
         const next = new Set(prev);
@@ -647,33 +625,20 @@ export function SourceCompositionEditor({
         return next;
       });
     } else {
-      setRefsEnabled(true);
+      setRefsOn(true);
       setOpenCards((prev) => new Set(prev).add(REFS_CARD_KEY));
     }
   };
 
   const updateSplit = (newSegments: SliderSegment[]): void => {
-    const pctMap = new Map(newSegments.map((s) => [s.key, s.percentage]));
-    onChange({
-      sources: value.sources.map((e) => ({
-        ...e,
-        percentage: pctMap.get(e.source) ?? e.percentage,
-      })) as SourceEntry[],
-      subsetRefs: value.subsetRefs.map((r) => ({
-        ...r,
-        percentage: pctMap.get(`ref:${r.subsetId}`) ?? r.percentage,
-      })),
-    });
+    onChange(applySplit(value, newSegments));
   };
 
   const updateConfig = (
     index: number,
     config: LichessTacticSourceConfig | ScrapedPositionalSourceConfig | DecoySourceConfig,
   ): void => {
-    onChange({
-      ...value,
-      sources: value.sources.map((e, i) => (i === index ? { ...e, config } : e)) as SourceEntry[],
-    });
+    onChange(updateSourceConfig(value, index, config));
   };
 
   const addSubsetRef = (subset: Subset): void => {
@@ -683,28 +648,14 @@ export function SourceCompositionEditor({
       next.set(subset.id, subset);
       return next;
     });
-    const newRef: SubsetRefEntry = { subsetId: subset.id, percentage: 0 };
-    const combined = [...value.sources, ...value.subsetRefs, newRef];
-    const equalized = equalSplitAll(combined);
-    const nSrc = value.sources.length;
-    const nRef = value.subsetRefs.length + 1;
-    onChange({
-      sources: equalized.slice(0, nSrc) as SourceEntry[],
-      subsetRefs: equalized.slice(nSrc, nSrc + nRef) as SubsetRefEntry[],
-    });
+    onChange(applyAddSubsetRef(value, subset.id));
     setOpenCards((prev) => new Set(prev).add(REFS_CARD_KEY));
   };
 
   const removeSubsetRef = (subsetId: number): void => {
-    const newRefs = value.subsetRefs.filter((r) => r.subsetId !== subsetId);
-    const combined = [...value.sources, ...newRefs];
-    const equalized = equalSplitAll(combined);
-    const nSrc = value.sources.length;
-    onChange({
-      sources: equalized.slice(0, nSrc) as SourceEntry[],
-      subsetRefs: equalized.slice(nSrc) as SubsetRefEntry[],
-    });
-    if (newRefs.length === 0) {
+    const newValue = applyRemoveSubsetRef(value, subsetId);
+    onChange(newValue);
+    if (newValue.subsetRefs.length === 0) {
       setOpenCards((prev) => {
         const next = new Set(prev);
         next.delete(REFS_CARD_KEY);
@@ -714,10 +665,7 @@ export function SourceCompositionEditor({
   };
 
   const updateSubsetRef = (subsetId: number, updated: SubsetRefEntry): void => {
-    onChange({
-      ...value,
-      subsetRefs: value.subsetRefs.map((r) => (r.subsetId === subsetId ? updated : r)),
-    });
+    onChange(updateSubsetRefEntry(value, subsetId, updated));
   };
 
   const segments: SliderSegment[] = [
