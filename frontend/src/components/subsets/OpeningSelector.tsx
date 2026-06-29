@@ -15,6 +15,7 @@ type OpeningSelectorProps = {
   value: OpeningValue
   onChange: (v: OpeningValue) => void
   disabled?: boolean
+  hideWarning?: boolean
 }
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -26,7 +27,7 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced
 }
 
-export function OpeningSelector({ value, onChange, disabled = false }: OpeningSelectorProps): React.ReactElement {
+export function OpeningSelector({ value, onChange, disabled = false, hideWarning = false }: OpeningSelectorProps): React.ReactElement {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Opening[]>([])
   const [searching, setSearching] = useState(false)
@@ -105,13 +106,15 @@ export function OpeningSelector({ value, onChange, disabled = false }: OpeningSe
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex gap-2 rounded-md border border-amber-600/30 bg-amber-50/40 p-3 dark:border-amber-700/20 dark:bg-amber-900/10">
-        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-500/70" />
-        <p className="text-xs text-amber-800 dark:text-amber-400/70">
-          Opening tags only exist for puzzles arising before move 20. Activating opening preferences
-          strongly biases towards early-game positions and shrinks the eligible pool significantly.
-        </p>
-      </div>
+      {!hideWarning && (
+        <div className="flex gap-2 rounded-md border border-amber-600/30 bg-amber-50/40 p-3 dark:border-amber-700/20 dark:bg-amber-900/10">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-500/70" />
+          <p className="text-xs text-amber-800 dark:text-amber-400/70">
+            Opening tags only exist for puzzles arising before move 20. Activating opening preferences
+            strongly biases towards early-game positions and shrinks the eligible pool significantly.
+          </p>
+        </div>
+      )}
 
       <div ref={containerRef} className="relative">
         <Input

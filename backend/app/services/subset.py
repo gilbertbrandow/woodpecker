@@ -51,11 +51,23 @@ def subset_to_dict(subset: Subset, owner: User | None = None) -> dict[str, objec
     return d
 
 
-def _validate_sources_config(config: dict[str, object]) -> None:
-    sources = config.get("sources")
-    if not isinstance(sources, list) or not sources:
-        raise ValidationError("Sources required", "At least one source must be configured.")
+def _validate_config(config: dict[str, object]) -> None:
+    sources = config.get("sources") or []
+    subset_refs = config.get("subsetRefs") or []
+    exclude_subsets = config.get("excludeSubsets") or []
+
+    if not isinstance(sources, list):
+        raise ValidationError("Invalid sources", "Sources must be a list.")
+    if not isinstance(subset_refs, list):
+        raise ValidationError("Invalid subsetRefs", "SubsetRefs must be a list.")
+    if not isinstance(exclude_subsets, list):
+        raise ValidationError("Invalid excludeSubsets", "ExcludedSubsets must be a list.")
+
+    if not sources and not subset_refs:
+        raise ValidationError("Sources required", "At least one source or subset reference must be configured.")
+
     total_pct = 0
+
     for entry in sources:
         if not isinstance(entry, dict):
             raise ValidationError("Invalid source", "Each source entry must be a valid object.")
@@ -66,8 +78,64 @@ def _validate_sources_config(config: dict[str, object]) -> None:
         if not isinstance(pct, int) or pct < 1:
             raise ValidationError("Invalid percentage", "Each source percentage must be a whole number of at least 1.")
         total_pct += pct
+
+    ref_ids: list[int] = []
+    for entry in subset_refs:
+        if not isinstance(entry, dict):
+            raise ValidationError("Invalid subset reference", "Each subset reference must be a valid object.")
+        sid_raw = entry.get("subsetId")
+        if not isinstance(sid_raw, int):
+            raise ValidationError("Invalid subset reference", "Each subset reference must have a valid integer subsetId.")
+        pct = entry.get("percentage")
+        if not isinstance(pct, int) or pct < 1:
+            raise ValidationError("Invalid percentage", "Each subset reference percentage must be a whole number of at least 1.")
+        total_pct += pct
+        excl_srcs = entry.get("excludeSources")
+        if excl_srcs is not None:
+            if not isinstance(excl_srcs, list):
+                raise ValidationError("Invalid excludeSources", "excludeSources must be a list of source type strings.")
+            for s in excl_srcs:
+                if s not in VALID_SOURCES:
+                    raise ValidationError("Unknown source type in excludeSources", f"'{s}' is not a valid source type.")
+        ref_ids.append(sid_raw)
+
     if total_pct != 100:
         raise ValidationError("Invalid percentages", f"Source percentages must sum to 100, but they sum to {total_pct}.")
+
+    exclude_ids: list[int] = []
+    for eid in exclude_subsets:
+        if not isinstance(eid, int):
+            raise ValidationError("Invalid excludeSubsets", "Each entry in excludeSubsets must be an integer subset ID.")
+        exclude_ids.append(eid)
+
+    overlap = set(ref_ids) & set(exclude_ids)
+    if overlap:
+        raise ValidationError(
+            "Contradictory configuration",
+            "The same subset cannot appear in both subsetRefs and excludeSubsets.",
+        )
+
+    all_ids_to_check = list(set(ref_ids + exclude_ids))
+    if all_ids_to_check:
+        locked_ids = {
+            row.id
+            for row in db.session.execute(
+                sa.text("SELECT id FROM subsets WHERE id = ANY(:ids) AND locked_at IS NOT NULL"),
+                {"ids": all_ids_to_check},
+            ).all()
+        }
+        for sid in ref_ids:
+            if sid not in locked_ids:
+                raise ValidationError(
+                    "Invalid subset reference",
+                    f"Subset {sid} does not exist or is not locked.",
+                )
+        for sid in exclude_ids:
+            if sid not in locked_ids:
+                raise ValidationError(
+                    "Invalid excluded subset",
+                    f"Subset {sid} does not exist or is not locked.",
+                )
 
 
 def _distribute_counts(sources: list[dict], total: int) -> list[int]:
@@ -87,6 +155,7 @@ def _sample_lichess_tactics(
     config: dict[str, object],
     subset_id: int,
     count: int,
+    exclude_ti_ids: list[int] | None = None,
 ) -> list[int]:
     rating_cfg = config.get("rating") or {}
     if not isinstance(rating_cfg, dict):
@@ -137,6 +206,7 @@ def _sample_lichess_tactics(
                       SELECT training_item_id FROM subset_training_items
                       WHERE subset_id = :sid
                   )
+                  AND (:excl_count = 0 OR ti.id != ALL(:excl_ids))
             ),
             theme_scores AS (
                 SELECT ltl.lichess_tactic_id,
@@ -180,6 +250,8 @@ def _sample_lichess_tactics(
             "opening_keys": opening_items,
             "opening_strength": opening_strength,
             "count": count,
+            "excl_ids": exclude_ti_ids or [],
+            "excl_count": len(exclude_ti_ids) if exclude_ti_ids else 0,
         },
     ).all()
 
@@ -190,6 +262,7 @@ def _sample_scraped_positionals(
     config: dict[str, object],
     subset_id: int,
     count: int,
+    exclude_ti_ids: list[int] | None = None,
 ) -> list[int]:
     difficulties_raw = config.get("difficulty")
     difficulties: list[int] = (
@@ -233,6 +306,7 @@ def _sample_scraped_positionals(
                       SELECT training_item_id FROM subset_training_items
                       WHERE subset_id = :sid
                   )
+                  AND (:excl_count = 0 OR ti.id != ALL(:excl_ids))
             ),
             theme_filtered AS (
                 SELECT e.id
@@ -275,6 +349,8 @@ def _sample_scraped_positionals(
             "opening_keys": opening_items,
             "opening_strength": opening_strength,
             "count": count,
+            "excl_ids": exclude_ti_ids or [],
+            "excl_count": len(exclude_ti_ids) if exclude_ti_ids else 0,
         },
     ).all()
 
@@ -285,6 +361,7 @@ def _sample_decoys(
     config: dict[str, object],
     subset_id: int,
     count: int,
+    exclude_ti_ids: list[int] | None = None,
 ) -> list[int]:
     opening_cfg = config.get("opening") or {}
     opening_items: list[str] = []
@@ -294,6 +371,13 @@ def _sample_decoys(
         opening_items = list(items_raw) if isinstance(items_raw, list) else []  # type: ignore[arg-type]
         if opening_items:
             opening_strength = float(opening_cfg.get("strength", 0.0))  # type: ignore[arg-type]
+
+    counts_raw = config.get("acceptedMovesCounts")
+    accepted_counts: list[int] = (
+        [int(c) for c in counts_raw if isinstance(c, int)]
+        if isinstance(counts_raw, list) and len(counts_raw) > 0
+        else []
+    )
 
     rows = db.session.execute(
         sa.text("""
@@ -312,6 +396,8 @@ def _sample_decoys(
                     SELECT training_item_id FROM subset_training_items
                     WHERE subset_id = :sid
                 )
+                  AND (:counts_len = 0 OR jsonb_array_length(dp.accepted_moves) = ANY(:accepted_counts))
+                  AND (:excl_count = 0 OR ti.id != ALL(:excl_ids))
             ),
             weighted AS (
                 SELECT
@@ -338,33 +424,96 @@ def _sample_decoys(
             "sid": subset_id,
             "opening_keys": opening_items,
             "opening_strength": opening_strength,
+            "accepted_counts": accepted_counts,
+            "counts_len": len(accepted_counts),
             "count": count,
+            "excl_ids": exclude_ti_ids or [],
+            "excl_count": len(exclude_ti_ids) if exclude_ti_ids else 0,
         },
     ).all()
 
     return [row.id for row in rows]
 
 
+def _resolve_excluded_ti_ids(exclude_subset_ids: list[int]) -> list[int]:
+    if not exclude_subset_ids:
+        return []
+    rows = db.session.execute(
+        sa.text("SELECT training_item_id FROM subset_training_items WHERE subset_id = ANY(:ids)"),
+        {"ids": exclude_subset_ids},
+    ).all()
+    return [row.training_item_id for row in rows]
+
+
+def _sample_subset_ref(
+    ref_entry: dict[str, object],
+    subset_id: int,
+    count: int,
+    exclude_ti_ids: list[int] | None = None,
+) -> list[int]:
+    ref_id = int(ref_entry["subsetId"])  # type: ignore[call-overload]
+    excl_srcs_raw = ref_entry.get("excludeSources") or []
+    excl_srcs: list[str] = [str(s) for s in excl_srcs_raw] if isinstance(excl_srcs_raw, list) else []
+
+    rows = db.session.execute(
+        sa.text("""
+            SELECT sti.training_item_id
+            FROM subset_training_items sti
+            JOIN training_items ti ON ti.id = sti.training_item_id
+            WHERE sti.subset_id = :ref_id
+              AND (:excl_src_count = 0 OR ti.source_type::text != ALL(:excl_srcs))
+              AND sti.training_item_id NOT IN (
+                  SELECT training_item_id FROM subset_training_items
+                  WHERE subset_id = :sid
+              )
+              AND (:excl_count = 0 OR sti.training_item_id != ALL(:excl_ids))
+            ORDER BY random()
+            LIMIT :count
+        """),
+        {
+            "ref_id": ref_id,
+            "sid": subset_id,
+            "excl_srcs": excl_srcs,
+            "excl_src_count": len(excl_srcs),
+            "excl_ids": exclude_ti_ids or [],
+            "excl_count": len(exclude_ti_ids) if exclude_ti_ids else 0,
+            "count": count,
+        },
+    ).all()
+
+    return [row.training_item_id for row in rows]
+
+
 def _sample_all_sources(
     sources: list[dict],
     subset_id: int,
     total_count: int,
+    subset_refs: list[dict] | None = None,
+    exclude_subset_ids: list[int] | None = None,
 ) -> list[int]:
-    counts = _distribute_counts(sources, total_count)
+    _subset_refs = subset_refs or []
+    exclude_ti_ids = _resolve_excluded_ti_ids(exclude_subset_ids or [])
+
+    all_entries: list[dict] = [*sources, *_subset_refs]
+    counts = _distribute_counts(all_entries, total_count)
+
     all_ids: list[int] = []
-    for source_entry, count in zip(sources, counts):
+    for entry, count in zip(all_entries, counts):
         if count == 0:
             continue
-        cfg: dict[str, object] = source_entry.get("config") or {}
-        source = source_entry["source"]
-        if source == "LICHESS_TACTIC":
-            ids = _sample_lichess_tactics(cfg, subset_id, count)
-        elif source == "SCRAPED_POSITIONAL":
-            ids = _sample_scraped_positionals(cfg, subset_id, count)
-        elif source == "DECOY":
-            ids = _sample_decoys(cfg, subset_id, count)
+        if "subsetId" in entry:
+            ids = _sample_subset_ref(entry, subset_id, count, exclude_ti_ids)
         else:
-            ids = []
+            cfg: dict[str, object] = entry.get("config") or {}
+            source = entry["source"]
+            if source == "LICHESS_TACTIC":
+                ids = _sample_lichess_tactics(cfg, subset_id, count, exclude_ti_ids)
+            elif source == "SCRAPED_POSITIONAL":
+                ids = _sample_scraped_positionals(cfg, subset_id, count, exclude_ti_ids)
+            elif source == "DECOY":
+                ids = _sample_decoys(cfg, subset_id, count, exclude_ti_ids)
+            else:
+                ids = []
         all_ids.extend(ids)
     random.shuffle(all_ids)
     return all_ids
@@ -374,8 +523,10 @@ def _sample_and_insert(
     subset_id: int,
     sources: list[dict],
     count: int,
+    subset_refs: list[dict] | None = None,
+    exclude_subset_ids: list[int] | None = None,
 ) -> int:
-    sampled_ids = _sample_all_sources(sources, subset_id, count)
+    sampled_ids = _sample_all_sources(sources, subset_id, count, subset_refs, exclude_subset_ids)
 
     if not sampled_ids:
         return 0
@@ -425,7 +576,7 @@ def save_config(
         raise ConflictError("Subset is locked", "This subset has been locked and can no longer be modified.")
     if not (5 <= puzzle_count <= 1000):
         raise ValidationError("Invalid puzzle count", "The puzzle count must be between 5 and 1,000.")
-    _validate_sources_config(config)
+    _validate_config(config)
 
     db.session.execute(
         sa.delete(SubsetTrainingItem).where(SubsetTrainingItem.subset_id == subset_id)
@@ -444,8 +595,11 @@ def fill(subset_id: int, user_id: int) -> tuple[int, int]:
     if subset.config is None or subset.puzzle_count is None:
         raise ValidationError("Configuration required", "A configuration must be set before performing this action.")
 
-    sources: list[dict] = (subset.config or {}).get("sources", [])  # type: ignore[assignment]
-    if not sources:
+    cfg = subset.config or {}
+    sources: list[dict] = cfg.get("sources", [])  # type: ignore[assignment]
+    subset_refs: list[dict] = cfg.get("subsetRefs", [])  # type: ignore[assignment]
+    exclude_subset_ids: list[int] = cfg.get("excludeSubsets", [])  # type: ignore[assignment]
+    if not sources and not subset_refs:
         raise ValidationError("Configuration required", "A configuration must be set before performing this action.")
 
     db.session.execute(
@@ -456,6 +610,8 @@ def fill(subset_id: int, user_id: int) -> tuple[int, int]:
         subset_id=subset_id,
         sources=sources,
         count=subset.puzzle_count,
+        subset_refs=subset_refs,
+        exclude_subset_ids=exclude_subset_ids,
     )
     db.session.commit()
     return filled, subset.puzzle_count
@@ -468,8 +624,11 @@ def refill(subset_id: int, user_id: int) -> tuple[int, int]:
     if subset.config is None or subset.puzzle_count is None:
         raise ValidationError("Configuration required", "A configuration must be set before performing this action.")
 
-    sources: list[dict] = (subset.config or {}).get("sources", [])  # type: ignore[assignment]
-    if not sources:
+    cfg = subset.config or {}
+    sources: list[dict] = cfg.get("sources", [])  # type: ignore[assignment]
+    subset_refs: list[dict] = cfg.get("subsetRefs", [])  # type: ignore[assignment]
+    exclude_subset_ids: list[int] = cfg.get("excludeSubsets", [])  # type: ignore[assignment]
+    if not sources and not subset_refs:
         raise ValidationError("Configuration required", "A configuration must be set before performing this action.")
 
     active_count: int = db.session.execute(
@@ -484,6 +643,8 @@ def refill(subset_id: int, user_id: int) -> tuple[int, int]:
         subset_id=subset_id,
         sources=sources,
         count=needed,
+        subset_refs=subset_refs,
+        exclude_subset_ids=exclude_subset_ids,
     )
     db.session.commit()
     return filled, needed
@@ -645,7 +806,7 @@ def list_active_puzzles(
     # ── Decoys ───────────────────────────────────────────────────────────────
     decoy_rows = db.session.execute(
         sa.text("""
-            SELECT dp.id, dp.training_item_id, dp.best_cp,
+            SELECT dp.id, dp.training_item_id, dp.best_cp, dp.analysis_url,
                    o.name AS opening_name, o.display_name AS opening_display_name, o.eco AS opening_eco
             FROM decoy_puzzles dp
             LEFT JOIN games g ON g.id = dp.game_id
@@ -708,6 +869,7 @@ def list_active_puzzles(
                 "sourceType": "DECOY",
                 "trainingItemId": ti_id,
                 "bestCp": r.best_cp,
+                "analysisUrl": r.analysis_url,
                 "opening": opening,
             })
 
@@ -1011,6 +1173,18 @@ def list_subsets(
         offset = (page - 1) * page_size
         limit_clause = f"LIMIT {page_size} OFFSET {offset}"
 
+    has_trained_col = ""
+    if locked_only:
+        has_trained_col = """,
+                   EXISTS (
+                       SELECT 1 FROM trainings t
+                       JOIN schedules s ON s.id = t.schedule_id
+                       JOIN runs r ON r.training_id = t.id
+                       WHERE s.subset_id = sub.id
+                         AND t.user_id = :uid
+                         AND r.completed_at IS NOT NULL
+                   ) AS has_trained"""
+
     rows = db.session.execute(
         sa.text(f"""
             SELECT sub.id, sub.name, sub.config,
@@ -1024,7 +1198,7 @@ def list_subsets(
                            WHERE sti.subset_id = sub.id LIMIT 1
                        ) THEN 'filled'
                        ELSE 'draft'
-                   END AS status
+                   END AS status{has_trained_col}
             {base_sql}
             ORDER BY sub.created_at DESC
             {limit_clause}
@@ -1034,7 +1208,7 @@ def list_subsets(
 
     items: list[dict[str, object]] = []
     for row in rows:
-        items.append({
+        item: dict[str, object] = {
             "id": row.id,
             "name": row.name,
             "status": row.status,
@@ -1047,7 +1221,10 @@ def list_subsets(
                 "displayName": row.display_name,
                 "avatarUrl": row.avatar_url,
             },
-        })
+        }
+        if locked_only:
+            item["hasTrained"] = bool(row.has_trained)
+        items.append(item)
 
     return {"items": items, "total": total if total is not None else len(items)}
 

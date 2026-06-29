@@ -80,6 +80,8 @@ type DataTableProps<T> = {
   onClearFilters?: () => void
   tableId?: string | false
   syncedFilters?: SyncedFilter[]
+  footerRow?: React.ReactNode
+  onFooterRowClick?: () => void
 }
 
 export function DataTable<T>({
@@ -101,6 +103,8 @@ export function DataTable<T>({
   onClearFilters,
   tableId,
   syncedFilters,
+  footerRow,
+  onFooterRowClick,
 }: DataTableProps<T>): React.ReactElement {
   const { getParam, getMultiParam, setParams } = useTableUrlSync(tableId)
 
@@ -315,13 +319,14 @@ export function DataTable<T>({
             ))}
           </TableHeader>
           <TableBody>
-            {loading && pageRows.length === 0 ? (
+            {loading && pageRows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-10 text-center">
                   <Loader2 className="mx-auto h-4 w-4 animate-spin text-muted-foreground" />
                 </TableCell>
               </TableRow>
-            ) : pageRows.length === 0 ? (
+            )}
+            {!loading && pageRows.length === 0 && !footerRow && (
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
@@ -330,23 +335,37 @@ export function DataTable<T>({
                   {emptyMessage}
                 </TableCell>
               </TableRow>
-            ) : (
-              pageRows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className={[
-                    onRowClick ? 'cursor-pointer' : '',
-                    getRowClassName ? getRowClassName(row.original) : '',
-                  ].filter(Boolean).join(' ') || undefined}
-                  onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className={cn('whitespace-nowrap', (cell.column.columnDef.meta as ColMeta | undefined)?.className)}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+            )}
+            {pageRows.map((row) => (
+              <TableRow
+                key={row.id}
+                className={[
+                  onRowClick ? 'cursor-pointer' : '',
+                  getRowClassName ? getRowClassName(row.original) : '',
+                ].filter(Boolean).join(' ') || undefined}
+                onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id} className={cn('whitespace-nowrap', (cell.column.columnDef.meta as ColMeta | undefined)?.className)}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+            {!loading && footerRow && (
+              <TableRow
+                className={onFooterRowClick ? 'cursor-pointer' : 'hover:bg-transparent'}
+                onClick={onFooterRowClick}
+                role={onFooterRowClick ? 'button' : undefined}
+                tabIndex={onFooterRowClick ? 0 : undefined}
+                onKeyDown={onFooterRowClick ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onFooterRowClick() }
+                } : undefined}
+              >
+                <TableCell colSpan={columns.length} className="py-2">
+                  {footerRow}
+                </TableCell>
+              </TableRow>
             )}
           </TableBody>
         </Table>

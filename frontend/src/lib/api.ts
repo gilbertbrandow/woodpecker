@@ -77,6 +77,7 @@ export type Subset = {
   createdAt: string
   lockedAt: string | null
   ownedBy: { id: number; displayName: string; avatarUrl: string | null }
+  hasTrained?: boolean
 }
 
 export type LichessTacticSourceConfig = {
@@ -93,6 +94,7 @@ export type ScrapedPositionalSourceConfig = {
 
 export type DecoySourceConfig = {
   opening?: { items?: string[]; strength?: number }
+  acceptedMovesCounts?: number[]
 }
 
 export type SourceEntry =
@@ -100,8 +102,16 @@ export type SourceEntry =
   | { source: 'SCRAPED_POSITIONAL'; percentage: number; config: ScrapedPositionalSourceConfig }
   | { source: 'DECOY'; percentage: number; config: DecoySourceConfig }
 
+export type SubsetRefEntry = {
+  subsetId: number
+  percentage: number
+  excludeSources?: string[]
+}
+
 export type SubsetConfig = {
   sources: SourceEntry[]
+  subsetRefs?: SubsetRefEntry[]
+  excludeSubsets?: number[]
 }
 
 export type LichessTacticTheme = { name: string; displayName: string | null }
@@ -217,7 +227,15 @@ export type ScrapedPositionalRow = {
   opening: TrainingItemOpening | null
 }
 
-export type TrainingItemRow = LichessTacticRow | ScrapedPositionalRow
+export type DecoyRow = {
+  trainingItemId: number
+  sourceType: 'DECOY'
+  bestCp: number
+  analysisUrl: string | null
+  opening: TrainingItemOpening | null
+}
+
+export type TrainingItemRow = LichessTacticRow | ScrapedPositionalRow | DecoyRow
 
 export type SortColumn = 'rating' | 'popularity' | 'nb_plays'
 export type SortOrder = 'asc' | 'desc'
@@ -257,10 +275,16 @@ export type ScrapedPositionalStats = {
   openings: { name: string; displayName: string; count: number }[]
 }
 
+export type DecoyStats = {
+  count: number
+  openings: { name: string; displayName: string; count: number }[]
+}
+
 export type SubsetStats = {
   sources: {
     LICHESS_TACTIC?: LichessTacticStats
     SCRAPED_POSITIONAL?: ScrapedPositionalStats
+    DECOY?: DecoyStats
   }
   totalActive: number
 }

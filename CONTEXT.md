@@ -75,8 +75,16 @@ A standardized encyclopedia code identifying a chess opening by its initial move
 _Avoid_: opening code
 
 **SourceComposition**:
-The breakdown of a Subset by Source, expressed as integer percentages that always sum to 100. Stored as part of the Subset config. Each entry carries a Source identifier, a percentage, and a per-source filter config. Determines how many TrainingItems are drawn from each Source during sampling. A Subset with a single Source has a SourceComposition of 100% for that Source. Percentages are hard caps — if a Source's eligible pool is smaller than its allocation, that Source fills what it can and the shortfall is reported to the user rather than redistributed.
+The breakdown of how a Subset is filled, expressed as integer percentages across Sources and SubsetRefs that always sum to 100. Stored as part of the Subset config under a `sources` key (for Source entries) and a `subsetRefs` key (for SubsetRef entries). Determines how many TrainingItems are drawn from each Source or SubsetRef during sampling. Percentages are hard caps — if an entry's eligible pool is smaller than its allocation, that entry fills what it can and the shortfall is reported to the user rather than redistributed.
 _Avoid_: source split, source ratio, source weights
+
+**SubsetRef**:
+An entry in the SourceComposition that draws TrainingItems from an existing locked Subset rather than from an external Source. Carries a `subsetId`, a percentage of the total allocation, and an optional `excludeSources` list of source types to skip when sampling from the referenced Subset (opt-out; omitting the field means all source types in the referenced Subset are eligible). SubsetRefs and Sources share the same 100% allocation pool.
+_Avoid_: subset reference, source subset
+
+**ExcludedSubsets**:
+A list of locked Subset IDs stored at the top level of the Subset config (`excludeSubsets: [id, ...]`). Any TrainingItem already present in any listed Subset is ineligible during sampling, regardless of which Source or SubsetRef would have produced it. Applied across all Sources and SubsetRefs during every fill and refill.
+_Avoid_: exclusion list, blocked subsets
 
 **Mixed-source Subset**:
 A Subset whose SourceComposition references more than one Source (e.g. 60% Lichess Tactics, 40% Scraped Positional). Within a single Run a user may encounter any source type. The solving loop, overview stats, and attempt history are source-agnostic; only the TrainingItem metadata display varies.

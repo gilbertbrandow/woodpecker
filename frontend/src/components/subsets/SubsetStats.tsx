@@ -23,6 +23,7 @@ import type {
   SubsetStats as SubsetStatsType,
   LichessTacticStats,
   ScrapedPositionalStats,
+  DecoyStats,
 } from '../../lib/api'
 import { formatNumber } from '../../lib/utils'
 
@@ -421,6 +422,19 @@ function ScrapedPositionalStatsSection({
   )
 }
 
+function DecoyStatsSection({ stats }: { stats: DecoyStats }): React.ReactElement {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <StatCard label="Puzzles" value={String(stats.count)} />
+      </div>
+      {stats.openings.length > 0 && (
+        <OpeningCharts openings={stats.openings} />
+      )}
+    </div>
+  )
+}
+
 export function SubsetStats({ stats, collapsible = true }: SubsetStatsProps): React.ReactElement {
   const [open, setOpen] = useState(true)
   const [chartsReady, setChartsReady] = useState(false)
@@ -430,8 +444,12 @@ export function SubsetStats({ stats, collapsible = true }: SubsetStatsProps): Re
 
   const lichessStats = stats.sources.LICHESS_TACTIC
   const positionalStats = stats.sources.SCRAPED_POSITIONAL
-  const hasMultipleSources =
-    (lichessStats !== undefined ? 1 : 0) + (positionalStats !== undefined ? 1 : 0) > 1
+  const decoyStats = stats.sources.DECOY
+  const sourceCount =
+    (lichessStats !== undefined ? 1 : 0) +
+    (positionalStats !== undefined ? 1 : 0) +
+    (decoyStats !== undefined ? 1 : 0)
+  const hasMultipleSources = sourceCount > 1
 
   const inner = (
     <div className="flex flex-col gap-6">
@@ -454,6 +472,15 @@ export function SubsetStats({ stats, collapsible = true }: SubsetStatsProps): Re
             <p className="text-sm font-medium text-muted-foreground">Scraped Positionals</p>
           )}
           <ScrapedPositionalStatsSection stats={positionalStats} chartsReady={chartsReady} />
+        </div>
+      )}
+
+      {decoyStats && (
+        <div className="flex flex-col gap-4">
+          {hasMultipleSources && (
+            <p className="text-sm font-medium text-muted-foreground">Decoys</p>
+          )}
+          <DecoyStatsSection stats={decoyStats} />
         </div>
       )}
     </div>
