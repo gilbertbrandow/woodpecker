@@ -446,13 +446,13 @@ def _resolve_excluded_ti_ids(exclude_subset_ids: list[int]) -> list[int]:
 
 
 def _sample_subset_ref(
-    config: dict[str, object],
+    ref_entry: dict[str, object],
     subset_id: int,
     count: int,
     exclude_ti_ids: list[int] | None = None,
 ) -> list[int]:
-    ref_id = int(config["subsetId"])  # type: ignore[call-overload]
-    excl_srcs_raw = config.get("excludeSources") or []
+    ref_id = int(ref_entry["subsetId"])  # type: ignore[call-overload]
+    excl_srcs_raw = ref_entry.get("excludeSources") or []
     excl_srcs: list[str] = [str(s) for s in excl_srcs_raw] if isinstance(excl_srcs_raw, list) else []
 
     rows = db.session.execute(
