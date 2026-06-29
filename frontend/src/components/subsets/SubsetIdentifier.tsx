@@ -1,5 +1,6 @@
 import * as React from "react";
 import type { Subset } from "../../lib/api";
+import { cn } from "../../lib/utils";
 import { UserAvatar } from "../UserAvatar";
 
 export function formatLockedDate(lockedAt: string | null): string {
@@ -33,7 +34,7 @@ export function SubsetIdentifier({
   const displayName = truncate(subset.name, maxNameLength);
 
   return (
-    <div className={`flex min-w-0 items-center gap-2 ${className ?? ""}`}>
+    <div className={cn("flex min-w-0 items-center gap-2", className)}>
       <UserAvatar
         displayName={subset.ownedBy.displayName}
         avatarUrl={subset.ownedBy.avatarUrl}

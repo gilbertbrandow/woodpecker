@@ -904,7 +904,7 @@ export function SourceCompositionEditor({
           Exclude subsets
         </p>
         <p className="text-xs text-muted-foreground">
-          You may add any number of existing subsets here whos training items are excluded from use in this new subset.
+          You may add any number of existing subsets here whose training items are excluded from use in this new subset.
         </p>
         <ExcludedSubsetsTable
           excluded={excludedSubsets}

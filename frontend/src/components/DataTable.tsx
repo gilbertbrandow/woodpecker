@@ -352,7 +352,7 @@ export function DataTable<T>({
                 ))}
               </TableRow>
             ))}
-            {footerRow && (
+            {!loading && footerRow && (
               <TableRow
                 className={onFooterRowClick ? 'cursor-pointer' : 'hover:bg-transparent'}
                 onClick={onFooterRowClick}
