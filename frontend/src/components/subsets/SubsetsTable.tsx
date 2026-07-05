@@ -43,8 +43,11 @@ export function SubsetsTable(): React.ReactElement {
   const deletingIdRef = useRef(deletingId)
   deletingIdRef.current = deletingId
 
+  const blockNavRef = useRef(false)
+
   const handleDelete = async (item: Subset): Promise<void> => {
     setDeletingId(item.id)
+    blockNavRef.current = true
     try {
       await api.subsets.delete(item.id)
       toast.success('Subset deleted', { description: `"${item.name}" has been removed.` })
@@ -52,6 +55,7 @@ export function SubsetsTable(): React.ReactElement {
     } catch {
     } finally {
       setDeletingId(null)
+      setTimeout(() => { blockNavRef.current = false }, 300)
     }
   }
   const handleDeleteRef = useRef(handleDelete)
@@ -105,8 +109,8 @@ export function SubsetsTable(): React.ReactElement {
         header: '',
         enableSorting: false,
         cell: ({ row }) => {
-          const isOwn = row.original.ownedBy.id === user?.id
-          if (!isOwn) return null
+          const canDelete = row.original.ownedBy.id === user?.id && row.original.status !== 'locked'
+          if (!canDelete) return null
           return (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -166,12 +170,13 @@ export function SubsetsTable(): React.ReactElement {
           statuses: filters.statuses?.length ? filters.statuses : undefined,
         })
       }
-      onRowClick={(subset) =>
+      onRowClick={(subset) => {
+        if (blockNavRef.current) return
         void navigate({
           to: '/app/subsets/$subsetId',
           params: { subsetId: String(subset.id) },
         })
-      }
+      }}
       emptyMessage="No subsets match your filters."
     />
   )

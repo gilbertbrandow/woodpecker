@@ -54,14 +54,18 @@ export function SchedulesTable({
   const deletingIdRef = useRef(deletingId);
   deletingIdRef.current = deletingId;
 
+  const blockNavRef = useRef(false);
+
   const handleDelete = async (item: ScheduleSummary): Promise<void> => {
     setDeletingId(item.id);
+    blockNavRef.current = true;
     try {
       await api.schedules.delete(item.id);
       toast.success("Schedule deleted", { description: `"${item.name}" has been removed.` });
       setRefreshKey((k) => k + 1);
     } finally {
       setDeletingId(null);
+      setTimeout(() => { blockNavRef.current = false; }, 300);
     }
   };
   const handleDeleteRef = useRef(handleDelete);
@@ -143,8 +147,8 @@ export function SchedulesTable({
         header: "",
         enableSorting: false,
         cell: ({ row }) => {
-          const isOwn = row.original.createdBy.id === user?.id;
-          if (!isOwn) return null;
+          const canDelete = row.original.createdBy.id === user?.id && row.original.status !== 'locked';
+          if (!canDelete) return null;
           return (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -207,12 +211,13 @@ export function SchedulesTable({
         })
       }
       onDataChange={(_, total) => onCountChange?.(total)}
-      onRowClick={(schedule) =>
+      onRowClick={(schedule) => {
+        if (blockNavRef.current) return;
         void navigate({
           to: "/app/schedules/$scheduleId",
           params: { scheduleId: String(schedule.id) },
-        })
-      }
+        });
+      }}
       emptyMessage="No schedules match your filters."
     />
   );
