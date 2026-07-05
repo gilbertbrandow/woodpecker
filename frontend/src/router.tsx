@@ -266,21 +266,21 @@ const sourcesListRoute = createRoute({
 const lichessTacticsDashboardRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/sources/lichess-tactics',
-  staticData: { crumb: { group: 'Setup', parents: [{ label: 'Sources', to: '/app/sources' }], leaf: 'Lichess Tactics' } },
+  staticData: { crumb: { group: 'Setup', parents: [{ label: 'Sources', to: '/app/sources' }], leaf: null } },
   component: LichessTacticsSourcePage,
 })
 
 const scrapedPositionalRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/sources/scraped-positional-puzzles',
-  staticData: { crumb: { group: 'Setup', parents: [{ label: 'Sources', to: '/app/sources' }], leaf: 'Scraped Positional' } },
+  staticData: { crumb: { group: 'Setup', parents: [{ label: 'Sources', to: '/app/sources' }], leaf: null } },
   component: ScrapedPositionalSourcePage,
 })
 
 const decoySourceRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/sources/decoys',
-  staticData: { crumb: { group: 'Setup', parents: [{ label: 'Sources', to: '/app/sources' }], leaf: 'Decoys' } },
+  staticData: { crumb: { group: 'Setup', parents: [{ label: 'Sources', to: '/app/sources' }], leaf: null } },
   component: DecoySourcePage,
 })
 
