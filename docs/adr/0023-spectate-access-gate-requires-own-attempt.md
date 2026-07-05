@@ -1,0 +1,3 @@
+# Spectate access gate: requester must have attempted the same TrainingItem
+
+The spectate endpoint (`GET /training-items/{id}/attempts/{attempt_id}`) exposes another user's move history. Rather than opening this to any authenticated user, access is gated on the requester having at least one completed TrainingAttempt on the same TrainingItem. This "you've been there too" rule limits exposure of move data to users with a genuine comparison interest, and avoids building a separate permission model. The alternative — any authenticated user can view any attempt — was rejected as too broad for a feature whose value is peer comparison, not general browsing.

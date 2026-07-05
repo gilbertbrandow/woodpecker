@@ -1,0 +1,106 @@
+import sqlalchemy as sa
+from sqlalchemy.orm import selectinload
+
+from app.extensions import db
+from app.exceptions import ForbiddenError, NotFoundError
+from app.models.run import TrainingAttempt, Run, RunTrainingItem
+from app.models.training import Training
+from app.models.user import User
+from app.models.schedule import Schedule
+from app.services.attempt_state import attempt_type_fields
+from app.services.chess_board import compute_attempt_board, compute_attempt_pgn
+from app.services.schedule_config import ScheduleConfig
+from app.services.training_item_content import get_content
+
+
+def _require_own_attempt(training_item_id: int, user_id: int) -> None:
+    exists = db.session.scalar(
+        sa.select(sa.literal(1))
+        .select_from(RunTrainingItem)
+        .join(Run, RunTrainingItem.run_id == Run.id)
+        .join(Training, Run.training_id == Training.id)
+        .where(
+            RunTrainingItem.training_item_id == training_item_id,
+            Training.user_id == user_id,
+        )
+        .limit(1)
+    )
+    if exists is None:
+        raise ForbiddenError(
+            "Access denied",
+            "You must have attempted this puzzle yourself to access this data.",
+        )
+
+
+def get_attempt_history(training_item_id: int, user_id: int) -> dict[str, object]:
+    _require_own_attempt(training_item_id, user_id)
+
+    run_training_items = list(
+        db.session.scalars(
+            sa.select(RunTrainingItem)
+            .options(selectinload(RunTrainingItem.attempts))
+            .where(RunTrainingItem.training_item_id == training_item_id)
+        ).all()
+    )
+
+    rows: list[dict[str, object]] = []
+    for rp in run_training_items:
+        run = db.session.get(Run, rp.run_id)
+        if run is None:
+            continue
+        training = db.session.get(Training, run.training_id)
+        if training is None:
+            continue
+        user = db.session.get(User, training.user_id)
+        if user is None:
+            continue
+        schedule = db.session.get(Schedule, training.schedule_id)
+        if schedule is None or not isinstance(schedule.config, dict):
+            continue
+        config = ScheduleConfig.from_dict(schedule.config)
+        total_queue = config.total_queue
+
+        sorted_attempts = sorted(
+            [a for a in rp.attempts if a.status != "in_progress"],
+            key=lambda a: a.try_number,
+        )
+        for a in sorted_attempts:
+            type_data = attempt_type_fields(sorted_attempts, a.try_number, total_queue)
+            rows.append({
+                "attemptId": a.id,
+                "userId": training.user_id,
+                "displayName": user.display_name,
+                "avatarUrl": user.avatar_url,
+                "runIndex": run.run_index,
+                "tryNumber": a.try_number,
+                "countsTowardsTraining": type_data["countsTowardsTraining"],
+                "result": a.status,
+                "timeSpentMs": a.time_spent_ms,
+            })
+
+    return {"attempts": rows}
+
+
+def get_spectate_view(training_item_id: int, attempt_id: int, user_id: int) -> dict[str, object]:
+    _require_own_attempt(training_item_id, user_id)
+
+    attempt = db.session.get(TrainingAttempt, attempt_id)
+    if attempt is None:
+        raise NotFoundError("Attempt not found", "The requested attempt does not exist.")
+
+    rp = db.session.get(RunTrainingItem, attempt.run_training_item_id)
+    if rp is None or rp.training_item_id != training_item_id:
+        raise NotFoundError("Attempt not found", "The requested attempt does not exist.")
+
+    if attempt.status == "in_progress":
+        raise NotFoundError("Attempt not found", "The requested attempt is still in progress.")
+
+    payload = get_content(training_item_id)
+    attempt_moves = attempt.moves if isinstance(attempt.moves, list) else []
+
+    return {
+        "attemptId": attempt.id,
+        "timeSpentMs": attempt.time_spent_ms,
+        "board": compute_attempt_board(payload.contract, attempt.status, attempt_moves),
+        "pgnDisplay": compute_attempt_pgn(payload.contract, attempt.status, attempt_moves),
+    }
