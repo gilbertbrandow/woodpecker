@@ -115,7 +115,7 @@ export function SubsetPage(): React.ReactElement | null {
   const [total, setTotal] = useState(0);
   const [stats, setStats] = useState<SubsetStatsType | null>(null);
 
-  useSetBreadcrumbTitle(subset?.name);
+  useSetBreadcrumbTitle(subset?.name, undefined, 'Subset');
 
   useEffect(() => {
     if (!authLoading && !user) {

@@ -144,7 +144,7 @@ export function TrainingPage(): React.ReactElement | null {
   const [detailStatus, setDetailStatus] = useState<TrainingDetailStatus | null>(null)
   const [chartsReady, setChartsReady] = useState(false)
 
-  useSetBreadcrumbTitle(training?.schedule?.name)
+  useSetBreadcrumbTitle(training?.schedule?.name, undefined, 'Training')
 
   useEffect(() => {
     if (!authLoading && !user) {

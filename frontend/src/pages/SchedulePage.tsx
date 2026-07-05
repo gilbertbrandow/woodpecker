@@ -160,7 +160,7 @@ export function SchedulePage(): React.ReactElement | null {
   const [usedByOpen, setUsedByOpen] = useState(true);
   const [leaderboardOpen, setLeaderboardOpen] = useState(true);
 
-  useSetBreadcrumbTitle(schedule?.name)
+  useSetBreadcrumbTitle(schedule?.name, undefined, 'Schedule')
 
   useEffect(() => {
     if (!authLoading && !user) {
