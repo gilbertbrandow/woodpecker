@@ -520,8 +520,8 @@ export function BoardPage(): React.ReactElement | null {
 
   const spectateLabelNode =
     ctrl.mode === 'overview' && spectateState !== null ? (
-      <div className="flex items-center gap-1.5 px-3 pb-2 text-xs font-medium">
-        <span className="text-muted-foreground">Inspecting</span>
+      <div className="flex items-center gap-1.5 rounded-full border bg-background/90 px-3 py-1 text-xs font-medium shadow-sm backdrop-blur-sm">
+        <span>Currently inspecting</span>
         <UserAvatar
           displayName={spectateState.displayName}
           avatarUrl={spectateState.avatarUrl}

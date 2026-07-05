@@ -70,6 +70,7 @@ export function OverviewSidebarRight({
           countsTowardsTraining: a.countsTowardsTraining,
           result: a.result,
           timeSpentMs: a.timeSpentMs,
+          startedAt: a.startedAt,
           userId: a.userId,
           displayName: a.displayName,
           avatarUrl: a.avatarUrl,

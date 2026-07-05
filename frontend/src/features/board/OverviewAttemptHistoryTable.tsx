@@ -2,6 +2,7 @@ import * as React from 'react'
 import { ArrowUpDown, ArrowUp, ArrowDown, Check, X, CircleOff } from 'lucide-react'
 import { formatSolveTimeMs } from '../../lib/utils'
 import { UserAvatar } from '../../components/UserAvatar'
+import { ConceptIcon } from '../../components/ConceptIcon'
 import {
   Table,
   TableHeader,
@@ -23,12 +24,13 @@ export type OverviewAttemptHistoryRow = {
   countsTowardsTraining: boolean
   result: 'solved' | 'failed'
   timeSpentMs: number | null
+  startedAt?: string | null
   userId?: number
   displayName?: string
   avatarUrl?: string | null
 }
 
-type SortKey = 'runOrder' | 'tryNumber' | 'timeSpentMs'
+type SortKey = 'runOrder' | 'tryNumber' | 'timeSpentMs' | 'startedAt'
 type SortDir = 'asc' | 'desc'
 
 type OverviewAttemptHistoryTableProps = {
@@ -49,6 +51,10 @@ function sortRows(
       primary = (a.runOrder - b.runOrder) * factor
     } else if (key === 'tryNumber') {
       primary = (a.tryNumber - b.tryNumber) * factor
+    } else if (key === 'startedAt') {
+      const sa = a.startedAt ?? ''
+      const sb = b.startedAt ?? ''
+      primary = sa < sb ? -factor : sa > sb ? factor : 0
     } else {
       if (a.timeSpentMs === null && b.timeSpentMs === null) primary = 0
       else if (a.timeSpentMs === null) primary = 1
@@ -86,7 +92,7 @@ export function OverviewAttemptHistoryTable({
   selectedAttemptId,
   onSelectAttempt,
 }: OverviewAttemptHistoryTableProps): React.ReactElement {
-  const [sortKey, setSortKey] = React.useState<SortKey>('runOrder')
+  const [sortKey, setSortKey] = React.useState<SortKey>('startedAt')
   const [sortDir, setSortDir] = React.useState<SortDir>('desc')
   const [page, setPage] = React.useState(0)
 
@@ -103,7 +109,7 @@ export function OverviewAttemptHistoryTable({
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     } else {
       setSortKey(key)
-      setSortDir(key === 'runOrder' ? 'desc' : 'asc')
+      setSortDir(key === 'tryNumber' || key === 'timeSpentMs' ? 'asc' : 'desc')
     }
     setPage(0)
   }
@@ -122,9 +128,10 @@ export function OverviewAttemptHistoryTable({
               <TableHead className="whitespace-nowrap px-2 py-0">
                 <button
                   type="button"
-                  className="inline-flex items-center text-xs font-medium text-muted-foreground"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground"
                   onClick={() => handleSort('runOrder')}
                 >
+                  <ConceptIcon concept="Run" className="h-3 w-3" />
                   Run
                   <SortIndicator active={sortKey === 'runOrder'} dir={sortDir} />
                 </button>
@@ -135,7 +142,7 @@ export function OverviewAttemptHistoryTable({
                   className="inline-flex items-center text-xs font-medium text-muted-foreground"
                   onClick={() => handleSort('tryNumber')}
                 >
-                  Attempt
+                  Try
                   <SortIndicator active={sortKey === 'tryNumber'} dir={sortDir} />
                 </button>
               </TableHead>
@@ -148,6 +155,16 @@ export function OverviewAttemptHistoryTable({
                 >
                   Time
                   <SortIndicator active={sortKey === 'timeSpentMs'} dir={sortDir} />
+                </button>
+              </TableHead>
+              <TableHead className="whitespace-nowrap px-2 py-0">
+                <button
+                  type="button"
+                  className="inline-flex items-center text-xs font-medium text-muted-foreground"
+                  onClick={() => handleSort('startedAt')}
+                >
+                  Date
+                  <SortIndicator active={sortKey === 'startedAt'} dir={sortDir} />
                 </button>
               </TableHead>
             </TableRow>
@@ -199,6 +216,9 @@ export function OverviewAttemptHistoryTable({
                   </TableCell>
                   <TableCell className="whitespace-nowrap px-2 py-1.5 text-xs tabular-nums text-muted-foreground">
                     {row.timeSpentMs !== null ? formatSolveTimeMs(row.timeSpentMs) : '—'}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap px-2 py-1.5 text-xs tabular-nums text-muted-foreground">
+                    {row.startedAt ? row.startedAt.slice(0, 10) : '—'}
                   </TableCell>
                 </TableRow>
               )

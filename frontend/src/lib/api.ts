@@ -738,6 +738,7 @@ export type AttemptHistoryRow = {
   countsTowardsTraining: boolean
   result: 'solved' | 'failed'
   timeSpentMs: number | null
+  startedAt: string
 }
 
 export type AttemptSpectateView = {

@@ -64,7 +64,7 @@ export function BoardCenterColumn({
       )}
       <div className="relative shrink-0" style={{ width: board.boardSize }}>
         {spectateLabel && (
-          <div className="pointer-events-none absolute inset-x-0 top-0 flex -translate-y-full justify-center">
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex -translate-y-1/2 justify-center">
             <div className="pointer-events-auto">{spectateLabel}</div>
           </div>
         )}
