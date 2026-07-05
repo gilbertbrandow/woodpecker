@@ -6,7 +6,6 @@ import { useRunLeaderboard } from '../hooks/useRunLeaderboard'
 import { useWeeklyLeaderboard } from '../hooks/useWeeklyLeaderboard'
 import { RunLeaderboard } from '../components/leaderboard/RunLeaderboard'
 import { WeeklyLeaderboard } from '../components/leaderboard/WeeklyLeaderboard'
-import { Flag } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -76,7 +75,7 @@ export function LeaderboardPage(): React.ReactElement | null {
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between border-b pb-2.5">
-          <span className="flex items-center gap-1.5 text-sm font-medium"><Flag className="h-3.5 w-3.5 text-muted-foreground" />Run board</span>
+          <span className="flex items-center gap-1.5 text-sm font-medium">Run board</span>
           <span className="hidden text-xs text-muted-foreground sm:block">
             One row per run
           </span>

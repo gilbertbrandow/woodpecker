@@ -48,6 +48,7 @@ import {
   CollapsibleTrigger,
   CollapsibleContent,
 } from "../components/ui/collapsible";
+import { ConceptIcon } from "../components/ConceptIcon";
 
 const MIN_LOCK_PUZZLES = 5;
 
@@ -263,7 +264,7 @@ export function SubsetPage(): React.ReactElement | null {
   return (
     <PageWrapper>
       <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <h1 className="text-xl font-semibold">{subset.name}</h1>
+        <h1 className="flex items-center gap-2 text-xl font-semibold"><ConceptIcon concept="Subset" />{subset.name}</h1>
         <StatusBadge status={subset.status} />
         <span className="text-sm text-muted-foreground">
           {subset.puzzleCount} puzzles

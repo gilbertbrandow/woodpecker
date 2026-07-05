@@ -19,6 +19,7 @@ import { UserAvatar } from "../UserAvatar";
 import { ServerDataTable } from "../ServerDataTable";
 import { api, type AllTrainingSummary } from "../../lib/api";
 import { useUserFilterSpec } from "../../hooks/useUserFilterSpec";
+import { ConceptIcon } from "../ConceptIcon";
 
 const PAGE_SIZE = 20;
 
@@ -100,7 +101,7 @@ export function TrainingTable({
             {
               id: "schedule",
               accessorFn: (row: AllTrainingSummary) => row.scheduleName,
-              header: "Schedule",
+              header: () => <span className="flex items-center gap-1.5"><ConceptIcon concept="Schedule" className="h-3.5 w-3.5 text-muted-foreground" />Schedule</span>,
               cell: ({ row }: { row: { original: AllTrainingSummary } }) => (
                 <Link
                   to="/app/schedules/$scheduleId"

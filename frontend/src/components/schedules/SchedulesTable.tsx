@@ -24,6 +24,7 @@ import { api } from "../../lib/api";
 import { useUserFilterSpec } from "../../hooks/useUserFilterSpec";
 import { formatDuration } from "./DurationInput";
 import { toast } from "../../lib/toast";
+import { ConceptIcon } from "../ConceptIcon";
 
 const PAGE_SIZE = 20;
 
@@ -88,7 +89,7 @@ export function SchedulesTable({
       {
         id: "subset",
         accessorFn: (row) => row.subsetName,
-        header: "Subset",
+        header: () => <span className="flex items-center gap-1.5"><ConceptIcon concept="Subset" className="h-3.5 w-3.5 text-muted-foreground" />Subset</span>,
         enableSorting: false,
         cell: ({ row }) => (
           <Link
@@ -110,7 +111,7 @@ export function SchedulesTable({
       },
       {
         accessorKey: "runCount",
-        header: "Runs",
+        header: () => <span className="flex items-center gap-1.5"><ConceptIcon concept="Run" className="h-3.5 w-3.5 text-muted-foreground" />Runs</span>,
         cell: ({ row }) => (
           <span className="tabular-nums text-muted-foreground">
             {row.original.runCount > 0 ? row.original.runCount : "—"}

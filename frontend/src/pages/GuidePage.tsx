@@ -100,6 +100,7 @@ export function GuidePage(): React.ReactElement {
       </section>
 
       <section className="flex flex-col gap-4">
+        <h2 className="text-base font-semibold">Concepts</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {CONCEPTS.map(({ icon: Icon, title, description }) => (
             <div key={title} className="flex flex-col gap-2 rounded-md border border-border p-4">
