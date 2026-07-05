@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Info } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
 import { Drawer, DrawerTrigger, DrawerContent } from './ui/drawer'
 
 interface Props {
@@ -21,6 +22,12 @@ export function WhatIsThisDrawer({ title, description, triggerLabel = 'What is t
         <div className="mx-auto w-full max-w-2xl px-8 py-6">
           <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">{title}</div>
           <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
+          <Link
+            to="/app/guide"
+            className="mt-4 inline-flex text-xs text-muted-foreground underline-offset-4 hover:underline"
+          >
+            Learn more on the Guide page
+          </Link>
         </div>
       </DrawerContent>
     </Drawer>
