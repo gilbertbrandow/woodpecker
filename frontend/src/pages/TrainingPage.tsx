@@ -3,7 +3,7 @@ import * as React from 'react'
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams, Link } from '@tanstack/react-router'
 import { toast } from '../lib/toast'
-import { Ban, ChevronDown, Loader2, Play } from 'lucide-react'
+import { Ban, ChevronDown, Flag, Loader2, Play } from 'lucide-react'
 import { type ColumnDef } from '@tanstack/react-table'
 import {
   ComposedChart,
@@ -269,7 +269,7 @@ export function TrainingPage(): React.ReactElement | null {
     return [
       {
         id: 'index',
-        header: '#',
+        header: () => <Flag className="h-3.5 w-3.5 text-muted-foreground" />,
         enableSorting: false,
         cell: ({ row }) => (
           <span className="tabular-nums text-sm text-muted-foreground">{row.original.index + 1}</span>

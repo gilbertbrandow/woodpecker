@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useSidebar } from './ui/sidebar'
-import { ChevronsUpDown, LayoutDashboard, Library, Database, CalendarDays, Puzzle, CircleHelp, Settings, LogOut, Play, User, Trophy, Clock, Users, UserCheck } from 'lucide-react'
+import { ChevronsUpDown, LayoutDashboard, Library, Database, CalendarDays, Puzzle, BookOpen, Compass, Settings, LogOut, Play, User, Trophy, Clock, Users, UserCheck } from 'lucide-react'
 import { toast } from '../lib/toast'
 import { useAuth } from '../context/auth'
 import { parseAvatarValue } from '../lib/avatar'
@@ -52,8 +52,9 @@ const SETUP_ITEMS: NavItem[] = [
   { label: 'Schedules', to: '/app/schedules', icon: CalendarDays },
 ]
 
-const GENERAL_ITEMS: NavItem[] = [
-  { label: 'Method', to: '/app/about', icon: CircleHelp },
+const FOOTER_ITEMS: NavItem[] = [
+  { label: 'About the method', to: '/app/about', icon: BookOpen },
+  { label: 'How does it work?', to: '/app/guide', icon: Compass },
 ]
 
 const ADMIN_ITEMS: NavItem[] = [
@@ -191,11 +192,6 @@ export function AppSidebar({ activeRun, collapsible = 'icon' }: AppSidebarProps)
           <NavGroup items={SETUP_ITEMS} pathname={pathname} onNavigate={closeMobile} />
         </SidebarGroup>
 
-        <SidebarGroup className="group-data-[collapsible=icon]:py-0">
-          <SidebarGroupLabel>General</SidebarGroupLabel>
-          <NavGroup items={GENERAL_ITEMS} pathname={pathname} onNavigate={closeMobile} />
-        </SidebarGroup>
-
         {user?.isSuperAdmin && (
           <SidebarGroup className="group-data-[collapsible=icon]:py-0">
             <SidebarGroupLabel>Admin</SidebarGroupLabel>
@@ -205,6 +201,25 @@ export function AppSidebar({ activeRun, collapsible = 'icon' }: AppSidebarProps)
       </SidebarContent>
       {user && (
         <SidebarFooter>
+          <div className="flex flex-col gap-1 mb-2">
+            {FOOTER_ITEMS.map(({ label, to, icon: Icon }) => {
+              const isActive = pathname.startsWith(to)
+              return (
+                <SidebarMenuButton
+                  key={to}
+                  asChild
+                  isActive={isActive}
+                  tooltip={label}
+                  className="text-foreground/30 hover:text-foreground/60 hover:bg-transparent active:bg-transparent"
+                >
+                  <Link to={to} onClick={closeMobile}>
+                    <Icon className="h-4 w-4" />
+                    <span>{label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              )
+            })}
+          </div>
           <SidebarMenu>
             <SidebarMenuItem>
               <DropdownMenu>

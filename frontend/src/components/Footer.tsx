@@ -13,7 +13,7 @@ type FooterProps = {
 export function Footer({ className = '' }: FooterProps): React.ReactElement {
   return (
     <footer className={`border-t border-border ${className}`}>
-      <div className="flex items-center justify-between px-4 py-4 text-xs text-muted-foreground sm:px-6">
+      <div className="flex h-14 items-center justify-between px-4 text-xs text-muted-foreground sm:px-6">
         <a
           href={GITHUB_URL}
           target="_blank"

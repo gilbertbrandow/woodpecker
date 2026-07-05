@@ -3,7 +3,7 @@ import * as React from 'react'
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { toast } from '../lib/toast'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Flag } from 'lucide-react'
 import { useAuth } from '../context/auth'
 import {
   api,
@@ -321,7 +321,7 @@ export function RunPage(): React.ReactElement | null {
 <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 className="text-xl font-semibold">Run {run.runIndex + 1}</h1>
+            <h1 className="flex items-center gap-2 text-xl font-semibold"><Flag className="h-4 w-4 shrink-0 text-muted-foreground" />Run {run.runIndex + 1}</h1>
             <Badge variant="outline">{RUN_STATUS_LABELS[run.status]}</Badge>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
