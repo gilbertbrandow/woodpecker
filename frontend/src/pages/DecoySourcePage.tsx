@@ -2,6 +2,7 @@ import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { useState } from 'react'
 import { useAuth } from '../context/auth'
+import { useSetBreadcrumbTitle } from '../hooks/useSetBreadcrumbTitle'
 import { SourceDetailShell } from '../components/sources/SourceDetailShell'
 import { DecoyAbout } from '../components/sources/DecoyAbout'
 import { DecoyExplore } from '../components/sources/DecoyExplore'
@@ -10,6 +11,7 @@ import { TrainingItemTypeBadge } from '../components/TrainingItemTypeBadge'
 export function DecoySourcePage(): React.ReactElement | null {
   const { user } = useAuth()
   const [exploreOpened, setExploreOpened] = useState(false)
+  useSetBreadcrumbTitle('Decoys', undefined, 'Source')
 
   if (!user) return null
 

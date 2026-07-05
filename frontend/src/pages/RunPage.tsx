@@ -272,7 +272,7 @@ export function RunPage(): React.ReactElement | null {
         : undefined,
     [participation, run?.trainingId],
   )
-  useSetBreadcrumbTitle(run ? `Run ${run.runIndex + 1}` : undefined, breadcrumbParents)
+  useSetBreadcrumbTitle(run ? `Run ${run.runIndex + 1}` : undefined, breadcrumbParents, 'Run')
 
   useEffect(() => {
     if (!authLoading && !user) {
