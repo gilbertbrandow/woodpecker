@@ -1,9 +1,11 @@
 import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { Link } from '@tanstack/react-router'
+import { Database } from 'lucide-react'
 import { useAuth } from '../context/auth'
 import { TrainingItemTypeBadge } from '../components/TrainingItemTypeBadge'
 import { ConceptIcon } from '../components/ConceptIcon'
+import { WhatIsThisDrawer } from '../components/WhatIsThisDrawer'
 
 export function SourcesListPage(): React.ReactElement | null {
   const { user } = useAuth()
@@ -13,6 +15,12 @@ export function SourcesListPage(): React.ReactElement | null {
   return (
     <PageWrapper className="flex flex-col gap-6">
       <h1 className="flex items-center gap-2 text-base font-semibold"><ConceptIcon concept="Source" />Sources</h1>
+
+      <WhatIsThisDrawer
+        triggerLabel="What is a Source?"
+        title={<><Database className="h-4 w-4" />Source</>}
+        description="A named external puzzle database and the origin of all puzzles that can be included in a Subset. Each source defines its own solving conditions — what constitutes a correct solution is source-specific, not universal."
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-4 rounded-lg border bg-card p-6">
