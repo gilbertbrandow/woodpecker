@@ -728,6 +728,25 @@ export type OverviewAttemptView = {
   }
 }
 
+export type AttemptHistoryRow = {
+  attemptId: number
+  userId: number
+  displayName: string
+  avatarUrl: string | null
+  runIndex: number
+  tryNumber: number
+  countsTowardsTraining: boolean
+  result: 'solved' | 'failed'
+  timeSpentMs: number | null
+}
+
+export type AttemptSpectateView = {
+  attemptId: number
+  timeSpentMs: number | null
+  board: OverviewAttemptBoardView | null
+  pgnDisplay: TrainingItemMetaPgnDisplay | null
+}
+
 export type SameTrainingItemRunOverview = {
   runId: number
   runIndex: number
@@ -1224,6 +1243,12 @@ export const api = {
       request(`/runs/${runId}/training-items/${runTrainingItemId}/attempts`, { method: 'POST' }),
     continue: (runId: number): Promise<ContinueRunResult> =>
       request(`/runs/${runId}/continue`, { method: 'POST' }),
+  },
+  trainingItems: {
+    getAttemptHistory: (trainingItemId: number): Promise<{ attempts: AttemptHistoryRow[] }> =>
+      request(`/training-items/${trainingItemId}/attempt-history`),
+    getSpectateView: (trainingItemId: number, attemptId: number): Promise<AttemptSpectateView> =>
+      request(`/training-items/${trainingItemId}/attempts/${attemptId}`),
   },
   dashboard: {
     get: (opts?: { trainingId?: number; runIndex?: number }): Promise<DashboardData> => {

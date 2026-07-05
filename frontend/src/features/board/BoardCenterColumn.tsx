@@ -20,6 +20,7 @@ type BoardCenterColumnProps = {
   mobileExtras?: React.ReactNode
   timerBar?: { leftPct: number; color: string; tooltipText: string } | null
   overlay?: React.ReactNode
+  spectateLabel?: React.ReactNode
 }
 
 export function BoardCenterColumn({
@@ -36,6 +37,7 @@ export function BoardCenterColumn({
   mobileExtras,
   timerBar,
   overlay,
+  spectateLabel,
 }: BoardCenterColumnProps): React.ReactElement {
   const boardSurfaceProps: BoardSurfaceProps = {
     boardKey: board.boardKey,
@@ -61,6 +63,11 @@ export function BoardCenterColumn({
         </div>
       )}
       <div className="relative shrink-0" style={{ width: board.boardSize }}>
+        {spectateLabel && (
+          <div className="pointer-events-none absolute inset-x-0 top-0 flex -translate-y-full justify-center">
+            <div className="pointer-events-auto">{spectateLabel}</div>
+          </div>
+        )}
         {timerBar && (
           <Tooltip delayDuration={100}>
             <TooltipTrigger asChild>

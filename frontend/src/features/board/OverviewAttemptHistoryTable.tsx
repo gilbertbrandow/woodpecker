@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { ArrowUpDown, ArrowUp, ArrowDown, Check, X, CircleOff } from 'lucide-react'
 import { formatSolveTimeMs } from '../../lib/utils'
+import { UserAvatar } from '../../components/UserAvatar'
 import {
   Table,
   TableHeader,
@@ -22,6 +23,9 @@ export type OverviewAttemptHistoryRow = {
   countsTowardsTraining: boolean
   result: 'solved' | 'failed'
   timeSpentMs: number | null
+  userId?: number
+  displayName?: string
+  avatarUrl?: string | null
 }
 
 type SortKey = 'runOrder' | 'tryNumber' | 'timeSpentMs'
@@ -114,6 +118,7 @@ export function OverviewAttemptHistoryTable({
         <Table className="min-w-max">
           <TableHeader>
             <TableRow>
+              <TableHead className="whitespace-nowrap px-2 py-0 text-xs">User</TableHead>
               <TableHead className="whitespace-nowrap px-2 py-0">
                 <button
                   type="button"
@@ -157,6 +162,17 @@ export function OverviewAttemptHistoryTable({
                   className="cursor-pointer"
                   onClick={() => onSelectAttempt(row.attemptId)}
                 >
+                  <TableCell className="whitespace-nowrap px-2 py-1.5">
+                    {row.displayName ? (
+                      <UserAvatar
+                        displayName={row.displayName}
+                        avatarUrl={row.avatarUrl ?? null}
+                        className="h-4 w-4"
+                      />
+                    ) : (
+                      <span className="inline-block h-4 w-4 rounded-full bg-muted" />
+                    )}
+                  </TableCell>
                   <TableCell className="whitespace-nowrap px-2 py-1.5 text-xs tabular-nums">
                     {row.runLabel}
                   </TableCell>

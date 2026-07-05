@@ -4,6 +4,7 @@ import { useAuth } from '../context/auth'
 import { Clock, CheckCircle2, XCircle } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
 import { Button } from '../components/ui/button'
+import { UserAvatar } from '../components/UserAvatar'
 import { useBoardPageController } from '../features/board/useBoardPageController'
 import { BoardPageShell } from '../features/board/BoardPageShell'
 import { BoardCenterColumn } from '../features/board/BoardCenterColumn'
@@ -23,6 +24,7 @@ import { useOverviewAttemptSelection } from '../features/board/useOverviewAttemp
 import { usePgnNavigation } from '../features/board/usePgnNavigation'
 import { resolveDisplayBoard, formatTimer, formatTargetSolveTime } from '../features/board/boardPage.helpers'
 import type { BoardState } from '../features/board/useBoardPageController'
+import type { AttemptSpectateView, SelectableUser } from '../lib/api'
 
 function parsePositiveInt(value: unknown): number | null {
   if (typeof value === 'number') {
@@ -91,8 +93,30 @@ export function BoardPage(): React.ReactElement | null {
       onUrlAttemptChange: setAttemptInUrl,
     })
 
+  const [spectateState, setSpectateState] = React.useState<{
+    displayName: string
+    avatarUrl: string | null
+    view: AttemptSpectateView
+  } | null>(null)
+
+  React.useEffect(() => {
+    setSpectateState(null)
+  }, [runTrainingItemId])
+
+  const handleSpectateAttempt = React.useCallback(
+    (view: AttemptSpectateView, user: { displayName: string; avatarUrl: string | null }): void => {
+      setSpectateState({ view, displayName: user.displayName, avatarUrl: user.avatarUrl })
+    },
+    [],
+  )
+
+  const handleClearSpectate = React.useCallback((): void => {
+    setSpectateState(null)
+  }, [])
+
   const handleSelectAttemptForTable = React.useCallback(
     (aId: number): void => {
+      handleClearSpectate()
       const row = historyRows.find((r) => r.attemptId === aId)
       if (!row) return
       if (row.runId === Number(runIdStr)) {
@@ -105,7 +129,7 @@ export function BoardPage(): React.ReactElement | null {
         })
       }
     },
-    [historyRows, runIdStr, handleSelectAttempt, navigate],
+    [historyRows, runIdStr, handleSelectAttempt, navigate, handleClearSpectate],
   )
 
   const { pgnDisplay, selectedPly, setSelectedPly, isAtHead } = usePgnNavigation({
@@ -117,9 +141,11 @@ export function BoardPage(): React.ReactElement | null {
   })
 
 
-  const overviewPgnDisplay = ctrl.mode === 'overview' ? (selectedAttempt?.pgnDisplay ?? null) : null
+  const overviewPgnDisplay = ctrl.mode === 'overview'
+    ? (spectateState?.view.pgnDisplay ?? selectedAttempt?.pgnDisplay ?? null)
+    : null
 
-  const displayBoard = React.useMemo(
+  const baseDisplayBoard = React.useMemo(
     (): BoardState =>
       resolveDisplayBoard(
         ctrl.board,
@@ -131,6 +157,17 @@ export function BoardPage(): React.ReactElement | null {
       ),
     [ctrl.board, ctrl.mode, selectedPly, pgnDisplay, selectedAttempt, overviewPgnDisplay],
   )
+
+  const displayBoard = React.useMemo((): BoardState => {
+    if (spectateState === null || ctrl.mode !== 'overview') return baseDisplayBoard
+    const spectateBoard = spectateState.view.board
+    if (!spectateBoard?.terminalFen) return baseDisplayBoard
+    return {
+      ...baseDisplayBoard,
+      fen: spectateBoard.terminalFen,
+      lastMove: spectateBoard.lastMove ?? undefined,
+    }
+  }, [baseDisplayBoard, spectateState, ctrl.mode])
 
   const lastOverviewTimerTextRef = React.useRef(ZERO_TIMER)
   const lastOverviewMetTargetTimeRef = React.useRef<boolean | null>(null)
@@ -152,8 +189,10 @@ export function BoardPage(): React.ReactElement | null {
 
   const overviewData = ctrl.overview.data
 
-  const frozenTimerTenths =
-    selectedAttempt === null || selectedAttempt.timeSpentMs === null
+  const spectateTimeMs = spectateState?.view.timeSpentMs ?? null
+  const frozenTimerTenths = spectateState !== null
+    ? (spectateTimeMs !== null ? Math.round(spectateTimeMs / 100) : 0)
+    : selectedAttempt === null || selectedAttempt.timeSpentMs === null
       ? 0
       : Math.round(selectedAttempt.timeSpentMs / 100)
 
@@ -185,7 +224,9 @@ export function BoardPage(): React.ReactElement | null {
   const timerElapsedTenths = ctrl.mode === 'overview' ? frozenTimerTenths : ctrl.timer.elapsedTenths
   const timerTargetSolveTenths = ctrl.mode === 'focus' ? ctrl.timer.targetSolveTenths : null
 
-  const isSolvedAttempt = displayedAttempt?.status === 'solved'
+  const isSolvedAttempt = spectateState !== null
+    ? spectateState.view.board?.result === 'correct'
+    : displayedAttempt?.status === 'solved'
 
   const selectedAccuracyDelta = selectedAttempt?.impact?.accuracyDeltaPct ?? null
   const selectedSolveTimeDelta = selectedAttempt?.impact?.averageSolveTimeDeltaMs ?? null
@@ -457,21 +498,38 @@ export function BoardPage(): React.ReactElement | null {
           />
         </div>
       )}
-      {ctrl.mode === 'overview' && overviewData !== null && (
+      {ctrl.mode === 'overview' && overviewData !== null && user !== null && (
         <OverviewSidebarRight
           key={runTrainingItemId}
           historyRows={historyRows}
           selectedAttemptId={selectedAttemptId}
           onSelectAttempt={handleSelectAttemptForTable}
+          onSpectateAttempt={handleSpectateAttempt}
+          onClearSpectate={handleClearSpectate}
           isLoadingNextPuzzle={ctrl.isLoadingNextPuzzle}
           onNextPuzzle={() => void ctrl.actions.handleNextPuzzle()}
           onRetake={() => void ctrl.actions.handleRetake()}
           nextPuzzleDisabledReason={overviewData.actions.nextTrainingItem.disabledReason}
           analyzeUrl={overviewData.actions.analyze.url}
+          trainingItemId={overviewData.runTrainingItem.trainingItemId}
+          currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl } satisfies SelectableUser}
         />
       )}
     </>
   )
+
+  const spectateLabelNode =
+    ctrl.mode === 'overview' && spectateState !== null ? (
+      <div className="flex items-center gap-1.5 px-3 pb-2 text-xs font-medium">
+        <span className="text-muted-foreground">Inspecting</span>
+        <UserAvatar
+          displayName={spectateState.displayName}
+          avatarUrl={spectateState.avatarUrl}
+          className="h-4 w-4"
+        />
+        <span>{spectateState.displayName}</span>
+      </div>
+    ) : undefined
 
   const centerNode = (
     <BoardCenterColumn
@@ -487,6 +545,7 @@ export function BoardPage(): React.ReactElement | null {
       mobileHeader={centerMobileHeader}
       timerBar={timerBar}
       overlay={overlayNode}
+      spectateLabel={spectateLabelNode}
     />
   )
 
