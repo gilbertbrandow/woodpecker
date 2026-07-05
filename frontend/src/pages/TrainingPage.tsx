@@ -469,7 +469,7 @@ export function TrainingPage(): React.ReactElement | null {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-6">
-          <TabsTrigger value="configure">Configure</TabsTrigger>
+          <TabsTrigger value="configure">Runs</TabsTrigger>
           <TabsTrigger value="insights">Insights</TabsTrigger>
         </TabsList>
 

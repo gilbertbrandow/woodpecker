@@ -43,7 +43,6 @@ import {
 } from "../components/ui/table";
 import { RunLeaderboard } from "../components/leaderboard/RunLeaderboard";
 import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
 import {
   AlertDialog,
@@ -350,9 +349,7 @@ export function SchedulePage(): React.ReactElement | null {
         <div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h1 className="flex items-center gap-2 text-xl font-semibold"><ConceptIcon concept="Schedule" />{schedule.name}</h1>
-            <Badge variant="outline" className="capitalize text-xs">
-              {schedule.status}
-            </Badge>
+            <StatusBadge status={schedule.status} />
             <span className="text-sm text-muted-foreground">
               {formatDuration(schedule.totalHours)}
             </span>
