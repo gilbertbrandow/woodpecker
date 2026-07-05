@@ -76,6 +76,7 @@ def get_attempt_history(training_item_id: int, user_id: int) -> dict[str, object
                 "countsTowardsTraining": type_data["countsTowardsTraining"],
                 "result": a.status,
                 "timeSpentMs": a.time_spent_ms,
+                "startedAt": a.started_at.isoformat(),
             })
 
     return {"attempts": rows}
