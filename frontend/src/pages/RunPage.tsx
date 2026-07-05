@@ -31,6 +31,7 @@ import {
 import { RunTrainingItemTable } from '../components/runs/RunTrainingItemTable'
 import { RunPaceCard } from '../features/board/RunPaceCard'
 import { UserAvatar } from '../components/UserAvatar'
+import { ConceptIcon } from '../components/ConceptIcon'
 
 function InsightsTab({ run, puzzleList }: { run: Run; puzzleList: RunTrainingItemList }): React.ReactElement {
   const [breakdownOpen, setBreakdownOpen] = useState(true)
@@ -321,7 +322,7 @@ export function RunPage(): React.ReactElement | null {
 <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 className="text-xl font-semibold">Run {run.runIndex + 1}</h1>
+            <h1 className="flex items-center gap-2 text-xl font-semibold"><ConceptIcon concept="Run" />Run {run.runIndex + 1}</h1>
             <Badge variant="outline">{RUN_STATUS_LABELS[run.status]}</Badge>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground">

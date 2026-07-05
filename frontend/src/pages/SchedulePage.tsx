@@ -43,7 +43,6 @@ import {
 } from "../components/ui/table";
 import { RunLeaderboard } from "../components/leaderboard/RunLeaderboard";
 import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
 import {
   AlertDialog,
@@ -68,6 +67,7 @@ import {
   formatDuration,
 } from "../components/schedules/DurationInput";
 import { formatDate, formatNumber } from "../lib/utils";
+import { ConceptIcon } from "../components/ConceptIcon";
 
 const MAX_RUNS = 20;
 
@@ -348,10 +348,8 @@ export function SchedulePage(): React.ReactElement | null {
 <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 className="text-xl font-semibold">{schedule.name}</h1>
-            <Badge variant="outline" className="capitalize text-xs">
-              {schedule.status}
-            </Badge>
+            <h1 className="flex items-center gap-2 text-xl font-semibold"><ConceptIcon concept="Schedule" />{schedule.name}</h1>
+            <StatusBadge status={schedule.status} />
             <span className="text-sm text-muted-foreground">
               {formatDuration(schedule.totalHours)}
             </span>
@@ -436,8 +434,10 @@ export function SchedulePage(): React.ReactElement | null {
               })
             }
           >
-            <UserAvatar displayName={subset.ownedBy.displayName} avatarUrl={subset.ownedBy.avatarUrl} />
-            <span className="min-w-0 flex-1 truncate font-medium">{subset.name}</span>
+            <span className="flex min-w-0 flex-1 items-center gap-2">
+              <ConceptIcon concept="Subset" className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="truncate font-medium">{subset.name}</span>
+            </span>
             <StatusBadge status={subset.status} />
             <span className="shrink-0 whitespace-nowrap text-sm tabular-nums text-muted-foreground">
               {subset.puzzleCount} puzzles
@@ -533,7 +533,7 @@ export function SchedulePage(): React.ReactElement | null {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-full">#</TableHead>
+                          <TableHead className="w-full"><span className="flex items-center gap-1.5"><ConceptIcon concept="Run" className="h-3.5 w-3.5 text-muted-foreground" />Run</span></TableHead>
                           <TableHead className="whitespace-nowrap">Duration</TableHead>
                           <TableHead className="whitespace-nowrap">Break after</TableHead>
                           {!locked && <TableHead />}

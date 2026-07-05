@@ -18,6 +18,7 @@ import { TrainingListPage } from './pages/TrainingListPage'
 import { TrainingPage } from './pages/TrainingPage'
 import { TrainingNewPage } from './pages/TrainingNewPage'
 import { AboutPage } from './pages/AboutPage'
+import { GuidePage } from './pages/GuidePage'
 import { LeaderboardPage } from './pages/LeaderboardPage'
 import { SourcesListPage } from './pages/SourcesListPage'
 import { LichessTacticsSourcePage } from './pages/LichessTacticsSourcePage'
@@ -244,8 +245,15 @@ const leaderboardRoute = createRoute({
 const aboutRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/about',
-  staticData: { crumb: { group: 'General', leaf: 'About' } },
+  staticData: { crumb: { group: 'General', leaf: 'Method' } },
   component: AboutPage,
+})
+
+const guideRoute = createRoute({
+  getParentRoute: () => appShellRoute,
+  path: '/guide',
+  staticData: { crumb: { group: 'General', leaf: 'Guide' } },
+  component: GuidePage,
 })
 
 const sourcesListRoute = createRoute({
@@ -389,6 +397,7 @@ const routeTree = rootRoute.addChildren([
       trainingRoute,
       leaderboardRoute,
       aboutRoute,
+      guideRoute,
       runRoute,
       sourcesListRoute,
       lichessTacticsDashboardRoute,

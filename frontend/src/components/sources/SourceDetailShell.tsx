@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { useRef } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs'
+import { ConceptIcon } from '../ConceptIcon'
 
 type Props = {
   title: string
@@ -32,7 +33,7 @@ export function SourceDetailShell({
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-3">
-          <h1 className="text-base font-semibold">{title}</h1>
+          <h1 className="flex items-center gap-2 text-base font-semibold"><ConceptIcon concept="Source" />{title}</h1>
           {badge}
         </div>
         <p className="text-sm text-muted-foreground">{summary}</p>

@@ -53,6 +53,7 @@ import { formatDuration } from '../components/schedules/DurationInput'
 import { formatDate, formatStartedAt } from '../lib/utils'
 import { TrainingProgressCard } from '../components/TrainingProgressCard'
 import { CurrentTrainingStatus } from '../components/CurrentTrainingStatus'
+import { ConceptIcon } from '../components/ConceptIcon'
 
 const ACCURACY_CONFIG: ChartConfig = {
   bar: { label: 'Accuracy %', color: 'hsl(var(--chart-1))' },
@@ -269,10 +270,10 @@ export function TrainingPage(): React.ReactElement | null {
     return [
       {
         id: 'index',
-        header: '#',
+        header: () => <span className="flex items-center gap-1.5"><ConceptIcon concept="Run" className="h-3.5 w-3.5 text-muted-foreground" />Run</span>,
         enableSorting: false,
         cell: ({ row }) => (
-          <span className="tabular-nums text-sm text-muted-foreground">{row.original.index + 1}</span>
+          <span className="tabular-nums text-sm text-muted-foreground">Run {row.original.index + 1}</span>
         ),
       },
       {
@@ -405,7 +406,7 @@ export function TrainingPage(): React.ReactElement | null {
       <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 className="text-xl font-semibold">{schedule.name}</h1>
+            <h1 className="flex items-center gap-2 text-xl font-semibold"><ConceptIcon concept="Training" />{schedule.name}</h1>
             <StatusBadge status={trainingStateToStatusValue(detailStatus?.state ?? training.status)} />
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
@@ -452,15 +453,14 @@ export function TrainingPage(): React.ReactElement | null {
             })
           }
         >
-          <UserAvatar
-            displayName={schedule.createdBy.displayName}
-            avatarUrl={schedule.createdBy.avatarUrl}
-          />
-          <span className="min-w-0 flex-1 truncate font-medium">{schedule.name}</span>
+          <span className="flex min-w-0 flex-1 items-center gap-2">
+            <ConceptIcon concept="Schedule" className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="truncate font-medium">{schedule.name}</span>
+          </span>
           <StatusBadge status="locked" />
-          <span className="shrink-0 whitespace-nowrap text-sm tabular-nums text-muted-foreground">{schedule.runCount} runs</span>
           {schedule.totalHours > 0 && (
             <span className="hidden shrink-0 whitespace-nowrap text-sm text-muted-foreground sm:block">
+              Total duration: {" "}
               {formatDuration(schedule.totalHours)}
             </span>
           )}
@@ -469,7 +469,7 @@ export function TrainingPage(): React.ReactElement | null {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-6">
-          <TabsTrigger value="configure">Configure</TabsTrigger>
+          <TabsTrigger value="configure">Runs</TabsTrigger>
           <TabsTrigger value="insights">Insights</TabsTrigger>
         </TabsList>
 

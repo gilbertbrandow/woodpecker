@@ -75,7 +75,7 @@ export function LeaderboardPage(): React.ReactElement | null {
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between border-b pb-2.5">
-          <span className="text-sm font-medium">Run board</span>
+          <span className="flex items-center gap-1.5 text-sm font-medium">Run board</span>
           <span className="hidden text-xs text-muted-foreground sm:block">
             One row per run
           </span>
