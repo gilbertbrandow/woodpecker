@@ -8,6 +8,7 @@ Monthly AWS costs reported by the `aws-cost-report` workflow. Updated automatica
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | 2026-04 | $24.00 | $2.29 | $1.01 | $0.10 | $15.00 | $4.80 | $0.81 | 225.9 | Registrar is one-off cost for domain, the rest is lower because not full month active |
 | 2026-05 | $20.71 | $11.12 | $1.03 | — | — | $4.14 | $4.41 | 196.61 | Other is mainly Elastic IP (VPC) |
+| 2026-06 | $20.21 | $10.85 | $1.01 | $0.03 | — | $4.04 | $4.28 | 200.75 | |
 
 ## Infrastructure
 
