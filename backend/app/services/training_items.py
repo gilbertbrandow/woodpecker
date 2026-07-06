@@ -1,5 +1,4 @@
 import sqlalchemy as sa
-from sqlalchemy.orm import selectinload
 
 from app.extensions import db
 from app.exceptions import ForbiddenError, NotFoundError
@@ -42,37 +41,48 @@ def get_attempt_history(
 ) -> dict[str, object]:
     _require_own_attempt(training_item_id, user_id)
 
-    run_training_items = list(
-        db.session.scalars(
-            sa.select(RunTrainingItem)
-            .options(selectinload(RunTrainingItem.attempts))
-            .where(RunTrainingItem.training_item_id == training_item_id)
-        ).all()
+    # Single join query — replaces N×4 individual session.get() calls.
+    context_stmt = (
+        sa.select(RunTrainingItem, Run, Training, User, Schedule)
+        .join(Run, RunTrainingItem.run_id == Run.id)
+        .join(Training, Run.training_id == Training.id)
+        .join(User, Training.user_id == User.id)
+        .join(Schedule, Training.schedule_id == Schedule.id)
+        .where(RunTrainingItem.training_item_id == training_item_id)
     )
+    if user_ids:
+        context_stmt = context_stmt.where(Training.user_id.in_(user_ids))
+
+    context_rows = db.session.execute(context_stmt).all()
+    if not context_rows:
+        return {"attempts": [], "total": 0}
+
+    # Batch-load all non-in-progress attempts for the matched RunTrainingItems.
+    # Load without result_filter here: attempt_type_fields needs the full attempt
+    # list as context to compute countsTowardsTraining correctly.
+    rp_ids = [row.RunTrainingItem.id for row in context_rows]
+    all_attempts = db.session.scalars(
+        sa.select(TrainingAttempt)
+        .where(
+            TrainingAttempt.run_training_item_id.in_(rp_ids),
+            TrainingAttempt.status != "in_progress",
+        )
+    ).all()
+    attempts_by_rp: dict[int, list[TrainingAttempt]] = {}
+    for a in all_attempts:
+        attempts_by_rp.setdefault(a.run_training_item_id, []).append(a)
 
     rows: list[dict[str, object]] = []
-    for rp in run_training_items:
-        run = db.session.get(Run, rp.run_id)
-        if run is None:
-            continue
-        training = db.session.get(Training, run.training_id)
-        if training is None:
-            continue
-        if user_ids and training.user_id not in user_ids:
-            continue
-        user = db.session.get(User, training.user_id)
-        if user is None:
-            continue
-        schedule = db.session.get(Schedule, training.schedule_id)
-        if schedule is None or not isinstance(schedule.config, dict):
+    for ctx in context_rows:
+        rp, run, training, user, schedule = (
+            ctx.RunTrainingItem, ctx.Run, ctx.Training, ctx.User, ctx.Schedule
+        )
+        if not isinstance(schedule.config, dict):
             continue
         config = ScheduleConfig.from_dict(schedule.config)
         total_queue = config.total_queue
 
-        sorted_attempts = sorted(
-            [a for a in rp.attempts if a.status != "in_progress"],
-            key=lambda a: a.try_number,
-        )
+        sorted_attempts = sorted(attempts_by_rp.get(rp.id, []), key=lambda a: a.try_number)
         for a in sorted_attempts:
             if result_filter and a.status not in result_filter:
                 continue
