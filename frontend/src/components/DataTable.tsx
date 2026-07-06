@@ -275,7 +275,7 @@ export function DataTable<T>({
             <button
               type="button"
               onClick={clearFilters}
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               <Undo2 className="h-3 w-3" />
               Clear filters

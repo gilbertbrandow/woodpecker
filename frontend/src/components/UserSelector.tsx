@@ -31,12 +31,14 @@ type UserSelectorProps = {
   value: SelectableUser[]
   onChange: (users: SelectableUser[]) => void
   disabled?: boolean
+  className?: string
 }
 
 export function UserSelector({
   value,
   onChange,
   disabled = false,
+  className,
 }: UserSelectorProps): React.ReactElement {
   const { user: authUser } = useAuth()
   const me: SelectableUser | null =
@@ -94,6 +96,7 @@ export function UserSelector({
           className={cn(
             'flex h-8 w-fit items-center gap-2 rounded-md border border-input bg-background px-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50',
             open && 'border-ring ring-1 ring-ring',
+            className,
           )}
         >
           {value.length === 0 ? (

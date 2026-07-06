@@ -14,6 +14,9 @@ type UsePgnNavigationParams = {
   }
   selectedAttempt: OverviewAttemptView | null
   boardKey: number
+  // When spectating another user's attempt, pass their pgnDisplay here so that
+  // selectedPly auto-selection and navigation operate on the correct PGN.
+  overviewPgnDisplayOverride?: TrainingItemMetaPgnDisplay | null
 }
 
 export type PgnNavigationResult = {
@@ -29,6 +32,7 @@ export function usePgnNavigation({
   session,
   selectedAttempt,
   boardKey,
+  overviewPgnDisplayOverride,
 }: UsePgnNavigationParams): PgnNavigationResult {
   const [selectedPly, setSelectedPly] = useState<PlySelection | null>(null)
 
@@ -53,7 +57,10 @@ export function usePgnNavigation({
     )
   }, [mode, solvingView, session])
 
-  const overviewPgnDisplay: TrainingItemMetaPgnDisplay | null = selectedAttempt?.pgnDisplay ?? null
+  const overviewPgnDisplay: TrainingItemMetaPgnDisplay | null =
+    overviewPgnDisplayOverride !== undefined
+      ? overviewPgnDisplayOverride
+      : (selectedAttempt?.pgnDisplay ?? null)
 
   const pgnDisplay = mode === 'overview' ? overviewPgnDisplay : focusPgnDisplay
 

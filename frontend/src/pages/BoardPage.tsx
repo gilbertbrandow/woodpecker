@@ -19,6 +19,7 @@ import { ProgressCard } from '../features/board/ProgressCard'
 import { RunPaceCard } from '../features/board/RunPaceCard'
 import { RunCompleteOverlay } from '../features/board/RunCompleteOverlay'
 import { OverviewAttemptHistoryTable } from '../features/board/OverviewAttemptHistoryTable'
+import type { OverviewAttemptHistoryRow } from '../features/board/OverviewAttemptHistoryTable'
 import { MobileActionsBar } from '../features/board/MobileActionsBar'
 import { useOverviewAttemptSelection } from '../features/board/useOverviewAttemptSelection'
 import { usePgnNavigation } from '../features/board/usePgnNavigation'
@@ -115,21 +116,19 @@ export function BoardPage(): React.ReactElement | null {
   }, [])
 
   const handleSelectAttemptForTable = React.useCallback(
-    (aId: number): void => {
+    (row: OverviewAttemptHistoryRow): void => {
       handleClearSpectate()
-      const row = historyRows.find((r) => r.attemptId === aId)
-      if (!row) return
       if (row.runId === Number(runIdStr)) {
-        handleSelectAttempt(aId)
+        handleSelectAttempt(row.attemptId)
       } else {
         void navigate({
           to: '/app/runs/$runId/training-items/$runTrainingItemId/overview',
           params: { runId: String(row.runId), runTrainingItemId: String(row.runTrainingItemId) },
-          search: { attempt: aId },
+          search: { attempt: row.attemptId },
         })
       }
     },
-    [historyRows, runIdStr, handleSelectAttempt, navigate, handleClearSpectate],
+    [runIdStr, handleSelectAttempt, navigate, handleClearSpectate],
   )
 
   const { pgnDisplay, selectedPly, setSelectedPly, isAtHead } = usePgnNavigation({
@@ -138,6 +137,7 @@ export function BoardPage(): React.ReactElement | null {
     session: ctrl.session,
     selectedAttempt,
     boardKey: ctrl.board.boardKey,
+    overviewPgnDisplayOverride: spectateState?.view.pgnDisplay,
   })
 
 
@@ -392,7 +392,7 @@ export function BoardPage(): React.ReactElement | null {
         analyzeUrl={overviewData.actions.analyze.url}
         nextDisabledReason={overviewData.actions.nextTrainingItem.disabledReason}
         isLoadingNextPuzzle={ctrl.isLoadingNextPuzzle}
-        onRetake={() => void ctrl.actions.handleRetake()}
+        onRetake={() => { handleClearSpectate(); void ctrl.actions.handleRetake() }}
         onNextPuzzle={() => void ctrl.actions.handleNextPuzzle()}
       />
     ) : null
@@ -415,12 +415,15 @@ export function BoardPage(): React.ReactElement | null {
               : null
           }
         />
-        <OverviewAttemptHistoryTable
-          key={runTrainingItemId}
-          rows={historyRows}
-          selectedAttemptId={selectedAttemptId}
-          onSelectAttempt={handleSelectAttemptForTable}
-        />
+        {user !== null && (
+          <OverviewAttemptHistoryTable
+            trainingItemId={overviewData.runTrainingItem.trainingItemId}
+            initialRows={historyRows}
+            currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl }}
+            selectedAttemptId={selectedAttemptId}
+            onRowClick={handleSelectAttemptForTable}
+          />
+        )}
       </div>
     ) : undefined
 
@@ -508,7 +511,7 @@ export function BoardPage(): React.ReactElement | null {
           onClearSpectate={handleClearSpectate}
           isLoadingNextPuzzle={ctrl.isLoadingNextPuzzle}
           onNextPuzzle={() => void ctrl.actions.handleNextPuzzle()}
-          onRetake={() => void ctrl.actions.handleRetake()}
+          onRetake={() => { handleClearSpectate(); void ctrl.actions.handleRetake() }}
           nextPuzzleDisabledReason={overviewData.actions.nextTrainingItem.disabledReason}
           analyzeUrl={overviewData.actions.analyze.url}
           trainingItemId={overviewData.runTrainingItem.trainingItemId}
@@ -521,7 +524,7 @@ export function BoardPage(): React.ReactElement | null {
   const spectateLabelNode =
     ctrl.mode === 'overview' && spectateState !== null ? (
       <div className="flex items-center gap-1.5 rounded-full border bg-background/90 px-3 py-1 text-xs font-medium shadow-sm backdrop-blur-sm">
-        <span>Currently inspecting</span>
+        <span>Inspecting</span>
         <UserAvatar
           displayName={spectateState.displayName}
           avatarUrl={spectateState.avatarUrl}
