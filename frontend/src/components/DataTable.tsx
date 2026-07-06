@@ -107,6 +107,7 @@ export function DataTable<T>({
   onFooterRowClick,
 }: DataTableProps<T>): React.ReactElement {
   const { getParam, getMultiParam, setParams } = useTableUrlSync(tableId)
+  const theadRef = React.useRef<HTMLTableSectionElement>(null)
 
   const [sorting, setSorting] = useState<SortingState>(() => {
     const fromUrl = parseSortParam(getParam('sort'))
@@ -286,7 +287,7 @@ export function DataTable<T>({
 
       <div className="relative overflow-x-auto rounded-md border">
         <Table className="min-w-max">
-          <TableHeader>
+          <TableHeader ref={theadRef}>
             {table.getHeaderGroups().map((hg) => (
               <TableRow key={hg.id}>
                 {hg.headers.map((h) => {
@@ -370,7 +371,10 @@ export function DataTable<T>({
           </TableBody>
         </Table>
         {loading && pageRows.length > 0 && (
-          <div className="absolute inset-0 flex items-center justify-center rounded-md backdrop-blur-[2px] bg-background/40">
+          <div
+            className="absolute inset-x-0 bottom-0 flex items-center justify-center rounded-b-md backdrop-blur-[2px] bg-background/40"
+            style={{ top: theadRef.current?.offsetHeight ?? 0 }}
+          >
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         )}
