@@ -29,6 +29,15 @@ export function BoardPageShell({
     if (!hasOpened) setHasOpened(true)
   }
 
+  React.useEffect(() => {
+    if (!open) return
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [open])
+
   return (
     <div className="flex flex-1 flex-col overflow-x-hidden pb-3 lg:pb-0 lg:px-0">
       <div className="flex flex-1 items-start justify-center lg:items-center lg:overflow-hidden lg:px-6">
@@ -73,14 +82,17 @@ export function BoardPageShell({
               <div
                 role="dialog"
                 aria-modal="true"
+                aria-label="Stats & history"
                 className={cn(
                   'fixed inset-x-0 bottom-0 z-50 mt-24 flex h-[70dvh] flex-col rounded-t-[10px] border bg-background',
                   'transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]',
                   open ? 'translate-y-0' : 'translate-y-full',
                 )}
               >
-                <div
-                  className="mx-auto mt-4 mb-4 h-2 w-[100px] cursor-pointer rounded-full bg-muted"
+                <button
+                  type="button"
+                  aria-label="Close panel"
+                  className="mx-auto mt-4 mb-4 h-2 w-[100px] rounded-full bg-muted hover:bg-muted-foreground/30 transition-colors"
                   onClick={() => setOpen(false)}
                 />
                 <div className="flex-1 overflow-y-auto px-4 pb-6">

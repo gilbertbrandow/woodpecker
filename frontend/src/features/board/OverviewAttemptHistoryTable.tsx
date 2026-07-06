@@ -119,6 +119,7 @@ type OverviewAttemptHistoryTableProps = {
   selectedAttemptId: number | null
   onRowClick: (row: OverviewAttemptHistoryRow) => void
   tableId?: string
+  onUserFilterChange?: (users: SelectableUser[]) => void
 }
 
 export function OverviewAttemptHistoryTable({
@@ -128,6 +129,7 @@ export function OverviewAttemptHistoryTable({
   selectedAttemptId,
   onRowClick,
   tableId = 'hist',
+  onUserFilterChange,
 }: OverviewAttemptHistoryTableProps): React.ReactElement {
   const baseUserFilter = useUserFilterSpec('userId')
 
@@ -136,7 +138,14 @@ export function OverviewAttemptHistoryTable({
       {
         ...baseUserFilter,
         render: (value: SelectableUser[], onChange: (u: SelectableUser[]) => void) => (
-          <UserSelector value={value} onChange={onChange} className="h-7 text-xs" />
+          <UserSelector
+            value={value}
+            onChange={(users) => {
+              onChange(users)
+              onUserFilterChange?.(users)
+            }}
+            className="h-7 text-xs"
+          />
         ),
       },
       {
@@ -155,7 +164,7 @@ export function OverviewAttemptHistoryTable({
         resolveInstant: (id: string) => id,
       },
     ],
-    [baseUserFilter],
+    [baseUserFilter, onUserFilterChange],
   )
 
   const initialCustomValues = React.useMemo(

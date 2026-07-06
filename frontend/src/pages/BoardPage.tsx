@@ -145,18 +145,17 @@ export function BoardPage(): React.ReactElement | null {
     [runIdStr, handleSelectAttempt, navigate, handleClearSpectate],
   )
 
-  // Used for the mobile drawer table. Mirrors OverviewSidebarRight.handleSelectRow:
-  // own-user rows navigate normally; other-user rows spectate without navigating.
-  const trainingItemIdRef = React.useRef<number | null>(null)
-  if (ctrl.overview.data) trainingItemIdRef.current = ctrl.overview.data.runTrainingItem.trainingItemId
+  const trainingItemId = ctrl.overview.data?.runTrainingItem.trainingItemId ?? null
 
-  const handleMobileRowClick = React.useCallback(
+  // Shared handler for both desktop sidebar and mobile drawer tables.
+  // Own-user rows select/navigate normally; other-user rows enter spectate mode.
+  const handleRowClick = React.useCallback(
     (row: OverviewAttemptHistoryRow): void => {
-      if (user !== null && row.userId !== undefined && row.userId !== user.id) {
-        const tid = trainingItemIdRef.current
-        if (tid === null) return
+      if (user === null) return
+      if (row.userId !== undefined && row.userId !== user.id) {
+        if (trainingItemId === null) return
         void api.trainingItems
-          .getSpectateView(tid, row.attemptId)
+          .getSpectateView(trainingItemId, row.attemptId)
           .then((view) =>
             handleSpectateAttempt(view, {
               displayName: row.displayName ?? '',
@@ -168,7 +167,16 @@ export function BoardPage(): React.ReactElement | null {
       }
       handleSelectAttemptForTable(row)
     },
-    [user, handleSelectAttemptForTable, handleSpectateAttempt],
+    [user, trainingItemId, handleSelectAttemptForTable, handleSpectateAttempt],
+  )
+
+  const handleUserFilterChange = React.useCallback(
+    (users: SelectableUser[]): void => {
+      if (users.length === 1 && user !== null && users[0].id === user.id) {
+        handleClearSpectate()
+      }
+    },
+    [user, handleClearSpectate],
   )
 
   const { pgnDisplay, selectedPly, setSelectedPly, isAtHead } = usePgnNavigation({
@@ -464,7 +472,8 @@ export function BoardPage(): React.ReactElement | null {
             initialRows={enrichedHistoryRows}
             currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl }}
             selectedAttemptId={spectateState?.view.attemptId ?? selectedAttemptId}
-            onRowClick={handleMobileRowClick}
+            onRowClick={handleRowClick}
+            onUserFilterChange={handleUserFilterChange}
           />
         )}
       </div>
@@ -548,17 +557,16 @@ export function BoardPage(): React.ReactElement | null {
         <OverviewSidebarRight
           key={runTrainingItemId}
           historyRows={enrichedHistoryRows}
-          selectedAttemptId={selectedAttemptId}
-          onSelectAttempt={handleSelectAttemptForTable}
-          onSpectateAttempt={handleSpectateAttempt}
-          onClearSpectate={handleClearSpectate}
+          selectedAttemptId={spectateState?.view.attemptId ?? selectedAttemptId}
+          onRowClick={handleRowClick}
+          onUserFilterChange={handleUserFilterChange}
           isLoadingNextPuzzle={ctrl.isLoadingNextPuzzle}
           onNextPuzzle={() => void ctrl.actions.handleNextPuzzle()}
           onRetake={() => { handleClearSpectate(); void ctrl.actions.handleRetake() }}
           nextPuzzleDisabledReason={overviewData.actions.nextTrainingItem.disabledReason}
           analyzeUrl={overviewData.actions.analyze.url}
           trainingItemId={overviewData.runTrainingItem.trainingItemId}
-          currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl } satisfies SelectableUser}
+          currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl }}
         />
       )}
     </>
