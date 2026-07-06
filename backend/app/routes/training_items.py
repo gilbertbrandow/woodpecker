@@ -1,4 +1,4 @@
-from flask import Blueprint, Response, jsonify, session
+from flask import Blueprint, Response, jsonify, request, session
 
 from app.decorators import login_required
 from app.services import training_items as training_items_svc
@@ -9,7 +9,19 @@ training_items_bp = Blueprint("training_items", __name__, url_prefix="/training-
 @training_items_bp.get("/<int:training_item_id>/attempt-history")
 @login_required
 def get_attempt_history(training_item_id: int) -> tuple[Response, int] | Response:
-    result = training_items_svc.get_attempt_history(training_item_id, session["user_id"])
+    page = max(1, int(request.args.get("page", 1)))
+    page_size = min(100, max(1, int(request.args.get("pageSize", 20))))
+    user_ids_raw = request.args.getlist("userId")
+    user_ids = [int(uid) for uid in user_ids_raw if uid.isdigit()] or None
+    result_values = request.args.getlist("result") or None
+    result = training_items_svc.get_attempt_history(
+        training_item_id,
+        session["user_id"],
+        page=page,
+        page_size=page_size,
+        user_ids=user_ids,
+        result_filter=result_values,
+    )
     return jsonify(result)
 
 

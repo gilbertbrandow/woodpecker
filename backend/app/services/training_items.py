@@ -32,7 +32,14 @@ def _require_own_attempt(training_item_id: int, user_id: int) -> None:
         )
 
 
-def get_attempt_history(training_item_id: int, user_id: int) -> dict[str, object]:
+def get_attempt_history(
+    training_item_id: int,
+    user_id: int,
+    page: int = 1,
+    page_size: int = 20,
+    user_ids: list[int] | None = None,
+    result_filter: list[str] | None = None,
+) -> dict[str, object]:
     _require_own_attempt(training_item_id, user_id)
 
     run_training_items = list(
@@ -51,6 +58,8 @@ def get_attempt_history(training_item_id: int, user_id: int) -> dict[str, object
         training = db.session.get(Training, run.training_id)
         if training is None:
             continue
+        if user_ids and training.user_id not in user_ids:
+            continue
         user = db.session.get(User, training.user_id)
         if user is None:
             continue
@@ -65,9 +74,13 @@ def get_attempt_history(training_item_id: int, user_id: int) -> dict[str, object
             key=lambda a: a.try_number,
         )
         for a in sorted_attempts:
+            if result_filter and a.status not in result_filter:
+                continue
             type_data = attempt_type_fields(sorted_attempts, a.try_number, total_queue)
             rows.append({
                 "attemptId": a.id,
+                "runId": rp.run_id,
+                "runTrainingItemId": rp.id,
                 "userId": training.user_id,
                 "displayName": user.display_name,
                 "avatarUrl": user.avatar_url,
@@ -79,7 +92,10 @@ def get_attempt_history(training_item_id: int, user_id: int) -> dict[str, object
                 "startedAt": a.started_at.isoformat(),
             })
 
-    return {"attempts": rows}
+    rows.sort(key=lambda r: str(r["startedAt"]), reverse=True)
+    total = len(rows)
+    start = (page - 1) * page_size
+    return {"attempts": rows[start : start + page_size], "total": total}
 
 
 def get_spectate_view(training_item_id: int, attempt_id: int, user_id: int) -> dict[str, object]:
