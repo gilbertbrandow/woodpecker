@@ -23,7 +23,7 @@ export function WeeklyLeaderboard({ rows, currentUserDisplayName, loading = fals
         enableSorting: false,
         header: '',
         cell: ({ row, table }) => (
-          <PositionBadge position={getGlobalPosition(row, table)} variant="cup" />
+          <PositionBadge position={getGlobalPosition(row, table)} />
         ),
       },
       {
