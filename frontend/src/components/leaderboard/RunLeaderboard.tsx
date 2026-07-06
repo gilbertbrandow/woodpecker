@@ -83,7 +83,7 @@ export function RunLeaderboard({
       enableSorting: false,
       header: '',
       cell: ({ row, table }) => (
-        <PositionBadge position={getGlobalPosition(row, table)} />
+        <PositionBadge position={getGlobalPosition(row, table)} variant="cup" />
       ),
     }
 
