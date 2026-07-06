@@ -44,7 +44,7 @@
     "react": "^19.2.7",
     "react-chessground": "^1.5.0",
     "react-dom": "^19.2.7",
-    "recharts": "^3.9.1",
+    "recharts": "^3.9.2",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
     "tailwindcss-animate": "^1.0.7",
