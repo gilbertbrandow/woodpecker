@@ -160,6 +160,7 @@ export function BoardPage(): React.ReactElement | null {
 
   const displayBoard = React.useMemo((): BoardState => {
     if (spectateState === null || ctrl.mode !== 'overview') return baseDisplayBoard
+    if (selectedPly !== null) return baseDisplayBoard
     const spectateBoard = spectateState.view.board
     if (!spectateBoard?.terminalFen) return baseDisplayBoard
     return {
@@ -167,7 +168,7 @@ export function BoardPage(): React.ReactElement | null {
       fen: spectateBoard.terminalFen,
       lastMove: spectateBoard.lastMove ?? undefined,
     }
-  }, [baseDisplayBoard, spectateState, ctrl.mode])
+  }, [baseDisplayBoard, spectateState, ctrl.mode, selectedPly])
 
   const lastOverviewTimerTextRef = React.useRef(ZERO_TIMER)
   const lastOverviewMetTargetTimeRef = React.useRef<boolean | null>(null)
