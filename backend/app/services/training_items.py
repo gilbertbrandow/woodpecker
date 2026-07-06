@@ -1,3 +1,6 @@
+from datetime import datetime
+from typing import cast
+
 import sqlalchemy as sa
 
 from app.extensions import db
@@ -15,12 +18,14 @@ from app.services.training_item_content import get_content
 def _require_own_attempt(training_item_id: int, user_id: int) -> None:
     exists = db.session.scalar(
         sa.select(sa.literal(1))
-        .select_from(RunTrainingItem)
+        .select_from(TrainingAttempt)
+        .join(RunTrainingItem, TrainingAttempt.run_training_item_id == RunTrainingItem.id)
         .join(Run, RunTrainingItem.run_id == Run.id)
         .join(Training, Run.training_id == Training.id)
         .where(
             RunTrainingItem.training_item_id == training_item_id,
             Training.user_id == user_id,
+            TrainingAttempt.status != "in_progress",
         )
         .limit(1)
     )
@@ -99,24 +104,30 @@ def get_attempt_history(
                 "countsTowardsTraining": type_data["countsTowardsTraining"],
                 "result": a.status,
                 "timeSpentMs": a.time_spent_ms,
-                "startedAt": a.started_at.isoformat(),
+                "_started_at": a.started_at,
             })
 
-    rows.sort(key=lambda r: str(r["startedAt"]), reverse=True)
+    rows.sort(key=lambda r: cast(datetime, r["_started_at"]), reverse=True)
     total = len(rows)
     start = (page - 1) * page_size
-    return {"attempts": rows[start : start + page_size], "total": total}
+    page_rows = rows[start : start + page_size]
+    for r in page_rows:
+        r["startedAt"] = cast(datetime, r.pop("_started_at")).isoformat()
+    return {"attempts": page_rows, "total": total}
 
 
 def get_spectate_view(training_item_id: int, attempt_id: int, user_id: int) -> dict[str, object]:
     _require_own_attempt(training_item_id, user_id)
 
-    attempt = db.session.get(TrainingAttempt, attempt_id)
+    attempt = db.session.scalars(
+        sa.select(TrainingAttempt)
+        .join(RunTrainingItem, TrainingAttempt.run_training_item_id == RunTrainingItem.id)
+        .where(
+            TrainingAttempt.id == attempt_id,
+            RunTrainingItem.training_item_id == training_item_id,
+        )
+    ).first()
     if attempt is None:
-        raise NotFoundError("Attempt not found", "The requested attempt does not exist.")
-
-    rp = db.session.get(RunTrainingItem, attempt.run_training_item_id)
-    if rp is None or rp.training_item_id != training_item_id:
         raise NotFoundError("Attempt not found", "The requested attempt does not exist.")
 
     if attempt.status == "in_progress":
