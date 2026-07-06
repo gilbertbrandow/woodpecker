@@ -11,6 +11,8 @@ type BoardPageShellProps = {
   mobileDrawerContent?: React.ReactNode
 }
 
+const DRAG_CLOSE_THRESHOLD_PX = 100
+
 export function BoardPageShell({
   boardSize,
   left,
@@ -24,6 +26,12 @@ export function BoardPageShell({
   // across close/open cycles without a portal unmount.
   const [hasOpened, setHasOpened] = React.useState(false)
 
+  const panelRef = React.useRef<HTMLDivElement>(null)
+  // touchstart Y captured only when the drag handle is the origin touch target
+  const dragStartYRef = React.useRef<number | null>(null)
+
+  const closePanel = React.useCallback((): void => setOpen(false), [])
+
   const handleOpen = (): void => {
     setOpen(true)
     if (!hasOpened) setHasOpened(true)
@@ -32,11 +40,59 @@ export function BoardPageShell({
   React.useEffect(() => {
     if (!open) return
     const onKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key === 'Escape') closePanel()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open])
+  }, [open, closePanel])
+
+  // Drag starts only when the user touches the dedicated drag handle, so scroll
+  // interactions in the content area never trigger a close gesture.
+  const handleDragHandleTouchStart = (e: React.TouchEvent): void => {
+    dragStartYRef.current = e.touches[0].clientY
+    if (panelRef.current) panelRef.current.style.transition = 'none'
+  }
+
+  // Tracked on the panel so the gesture continues even if the finger leaves the handle.
+  const handlePanelTouchMove = (e: React.TouchEvent): void => {
+    if (dragStartYRef.current === null) return
+    const delta = Math.max(0, e.touches[0].clientY - dragStartYRef.current)
+    if (panelRef.current) panelRef.current.style.transform = `translateY(${delta}px)`
+  }
+
+  const handlePanelTouchEnd = (): void => {
+    if (dragStartYRef.current === null) return
+    const panel = panelRef.current
+    dragStartYRef.current = null
+    if (!panel) return
+
+    // Read current offset from the inline style we set during the drag.
+    const match = /translateY\(([^)]+)px\)/.exec(panel.style.transform)
+    const currentOffset = match ? parseFloat(match[1]) : 0
+
+    panel.style.transition = 'transform 0.3s cubic-bezier(0.32,0.72,0,1)'
+
+    if (currentOffset >= DRAG_CLOSE_THRESHOLD_PX) {
+      // Animate to fully off-screen, then flip the React state.
+      panel.style.transform = 'translateY(100%)'
+      setTimeout(() => {
+        setOpen(false)
+        if (panelRef.current) {
+          panelRef.current.style.transform = ''
+          panelRef.current.style.transition = ''
+        }
+      }, 300)
+    } else {
+      // Snap back: animate to 0, then let CSS classes take over.
+      panel.style.transform = 'translateY(0)'
+      setTimeout(() => {
+        if (panelRef.current) {
+          panelRef.current.style.transform = ''
+          panelRef.current.style.transition = ''
+        }
+      }, 300)
+    }
+  }
 
   return (
     <div className="flex flex-1 flex-col overflow-x-hidden pb-3 lg:pb-0 lg:px-0">
@@ -76,13 +132,18 @@ export function BoardPageShell({
                   'fixed inset-0 z-40 bg-black/80 transition-opacity duration-300',
                   open ? 'opacity-100' : 'opacity-0 pointer-events-none',
                 )}
-                onClick={() => setOpen(false)}
+                onClick={closePanel}
               />
-              {/* Panel — mounted once, slides in/out via CSS transform */}
+              {/* Panel — mounted once, slides in/out via CSS transform.
+                  Touch-move and touch-end are on the panel so the gesture tracks
+                  past the handle bounds; drag only activates when started on the handle. */}
               <div
+                ref={panelRef}
                 role="dialog"
                 aria-modal="true"
                 aria-label="Stats & history"
+                onTouchMove={handlePanelTouchMove}
+                onTouchEnd={handlePanelTouchEnd}
                 className={cn(
                   'fixed inset-x-0 bottom-0 z-50 mt-24 flex h-[70dvh] flex-col rounded-t-[10px] border bg-background',
                   'transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]',
@@ -92,8 +153,9 @@ export function BoardPageShell({
                 <button
                   type="button"
                   aria-label="Close panel"
-                  className="mx-auto mt-4 mb-4 h-2 w-[100px] rounded-full bg-muted hover:bg-muted-foreground/30 transition-colors"
-                  onClick={() => setOpen(false)}
+                  className="mx-auto mt-4 mb-4 h-2 w-[100px] touch-none rounded-full bg-muted transition-colors hover:bg-muted-foreground/30"
+                  onClick={closePanel}
+                  onTouchStart={handleDragHandleTouchStart}
                 />
                 <div className="flex-1 overflow-y-auto px-4 pb-6">
                   {mobileDrawerContent}
