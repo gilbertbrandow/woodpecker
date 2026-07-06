@@ -55,7 +55,7 @@ export function MultiSelectFilter({
           )}
         >
           {noneSelected ? (
-            <span>{`Select ${label}…`}</span>
+            <span>{`All ${label.toLowerCase()}`}</span>
           ) : isPartial ? (
             <>
               {visibleOptions.map((o) => (

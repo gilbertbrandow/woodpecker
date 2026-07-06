@@ -118,6 +118,7 @@ type OverviewAttemptHistoryTableProps = {
   currentUser: SelectableUser
   selectedAttemptId: number | null
   onRowClick: (row: OverviewAttemptHistoryRow) => void
+  tableId?: string
 }
 
 export function OverviewAttemptHistoryTable({
@@ -126,6 +127,7 @@ export function OverviewAttemptHistoryTable({
   currentUser,
   selectedAttemptId,
   onRowClick,
+  tableId = 'hist',
 }: OverviewAttemptHistoryTableProps): React.ReactElement {
   const baseUserFilter = useUserFilterSpec('userId')
 
@@ -150,15 +152,16 @@ export function OverviewAttemptHistoryTable({
           />
         ),
         serialize: (v: string[]) => v,
+        resolveInstant: (id: string) => id,
       },
     ],
     [baseUserFilter],
   )
 
   const initialCustomValues = React.useMemo(
-    () => ({ userId: [currentUser] }),
+    () => ({ userId: [currentUser], result: [] }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    [], // captured at mount; currentUser provides the default "me" filter
   )
 
   const initialData = React.useMemo(
@@ -205,7 +208,7 @@ export function OverviewAttemptHistoryTable({
 
   return (
     <ServerDataTable
-      tableId="hist"
+      tableId={tableId}
       columns={columns}
       filters={filters}
       pageSize={PAGE_SIZE}

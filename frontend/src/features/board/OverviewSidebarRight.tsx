@@ -39,17 +39,6 @@ export function OverviewSidebarRight({
     setSpectatedAttemptId(null)
   }, [currentUser.id])
 
-  const enrichedHistoryRows = React.useMemo(
-    () =>
-      historyRows.map((r) => ({
-        ...r,
-        userId: currentUser.id,
-        displayName: currentUser.displayName,
-        avatarUrl: currentUser.avatarUrl,
-      })),
-    [historyRows, currentUser],
-  )
-
   async function handleSelectRow(row: OverviewAttemptHistoryRow): Promise<void> {
     if (row.userId === currentUser.id) {
       setSpectatedAttemptId(null)
@@ -71,7 +60,7 @@ export function OverviewSidebarRight({
       <div className="mt-4 flex flex-col gap-2">
         <OverviewAttemptHistoryTable
           trainingItemId={trainingItemId}
-          initialRows={enrichedHistoryRows}
+          initialRows={historyRows}
           currentUser={currentUser}
           selectedAttemptId={spectatedAttemptId ?? selectedAttemptId}
           onRowClick={(row) => void handleSelectRow(row)}
