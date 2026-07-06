@@ -15,6 +15,7 @@ type MultiSelectFilterProps = {
   options: MultiSelectOption[]
   selected: string[]
   onChange: (values: string[]) => void
+  className?: string
 }
 
 export function MultiSelectFilter({
@@ -22,6 +23,7 @@ export function MultiSelectFilter({
   options,
   selected,
   onChange,
+  className,
 }: MultiSelectFilterProps): React.ReactElement {
   const [open, setOpen] = React.useState(false)
 
@@ -46,12 +48,14 @@ export function MultiSelectFilter({
         <button
           type="button"
           className={cn(
-            'flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
+            'flex h-8 items-center gap-1.5 rounded-md border border-input bg-background text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
+            noneSelected ? 'px-2.5' : 'pl-1 pr-2.5',
             open && 'border-ring ring-1 ring-ring',
+            className,
           )}
         >
           {noneSelected ? (
-            <span>{`Select ${label}…`}</span>
+            <span>{`All ${label.toLowerCase()}`}</span>
           ) : isPartial ? (
             <>
               {visibleOptions.map((o) => (

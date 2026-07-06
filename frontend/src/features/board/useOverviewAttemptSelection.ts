@@ -50,6 +50,7 @@ export function useOverviewAttemptSelection({
       countsTowardsTraining: attempt.countsTowardsTraining,
       result: attempt.status as 'solved' | 'failed',
       timeSpentMs: attempt.timeSpentMs,
+      startedAt: attempt.startedAt,
     }))
   }, [allAttempts])
 

@@ -1,16 +1,16 @@
 import * as React from 'react'
-import { ArrowUpDown, ArrowUp, ArrowDown, Check, X, CircleOff } from 'lucide-react'
+import { Check, X, CircleOff } from 'lucide-react'
+import { type ColumnDef } from '@tanstack/react-table'
 import { formatSolveTimeMs } from '../../lib/utils'
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from '../../components/ui/table'
-import { Button } from '../../components/ui/button'
+import { api } from '../../lib/api'
+import { UserAvatar } from '../../components/UserAvatar'
+import { ConceptIcon } from '../../components/ConceptIcon'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
+import { ServerDataTable, type FetchParams } from '../../components/ServerDataTable'
+import { useUserFilterSpec } from '../../hooks/useUserFilterSpec'
+import { MultiSelectFilter } from '../../components/ui/multi-select-filter'
+import { UserSelector } from '../../components/UserSelector'
+import type { SelectableUser } from '../../lib/api'
 
 export type OverviewAttemptHistoryRow = {
   attemptId: number
@@ -22,199 +22,212 @@ export type OverviewAttemptHistoryRow = {
   countsTowardsTraining: boolean
   result: 'solved' | 'failed'
   timeSpentMs: number | null
+  startedAt?: string | null
+  userId?: number
+  displayName?: string
+  avatarUrl?: string | null
 }
 
-type SortKey = 'runOrder' | 'tryNumber' | 'timeSpentMs'
-type SortDir = 'asc' | 'desc'
+const PAGE_SIZE = 15
+
+const RESULT_OPTIONS = [
+  { label: 'Solved', value: 'solved', icon: <Check className="h-3.5 w-3.5 text-green-600" /> },
+  { label: 'Failed', value: 'failed', icon: <X className="h-3.5 w-3.5 text-red-500" /> },
+]
+
+const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
+  {
+    id: 'user',
+    header: 'User',
+    enableSorting: false,
+    cell: ({ row }) => {
+      const { displayName, avatarUrl } = row.original
+      return displayName ? (
+        <UserAvatar displayName={displayName} avatarUrl={avatarUrl ?? null} className="h-4 w-4" />
+      ) : (
+        <span className="inline-block h-4 w-4 rounded-full bg-muted" />
+      )
+    },
+    meta: { className: 'px-2 py-1 text-xs' },
+  },
+  {
+    id: 'runLabel',
+    accessorKey: 'runOrder',
+    header: () => (
+      <span className="inline-flex items-center gap-1">
+        <ConceptIcon concept="Run" className="h-3 w-3" />
+        Run
+      </span>
+    ),
+    enableSorting: true,
+    cell: ({ row }) => row.original.runLabel,
+    meta: { className: 'px-2 py-1' },
+  },
+  {
+    accessorKey: 'tryNumber',
+    header: 'Try',
+    enableSorting: true,
+    cell: ({ row }) =>
+      row.original.countsTowardsTraining ? (
+        `#${row.original.tryNumber}`
+      ) : (
+        <Tooltip delayDuration={100}>
+          <TooltipTrigger asChild>
+            <span className="inline-flex cursor-default items-center text-muted-foreground/60">
+              <CircleOff className="h-3 w-3" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>This attempt did not count towards score.</TooltipContent>
+        </Tooltip>
+      ),
+    meta: { className: 'px-2 py-1' },
+  },
+  {
+    accessorKey: 'result',
+    header: 'Result',
+    enableSorting: false,
+    cell: ({ row }) =>
+      row.original.result === 'solved' ? (
+        <Check className="h-3 w-3" />
+      ) : (
+        <X className="h-3 w-3" />
+      ),
+    meta: { className: 'px-2 py-1 text-xs' },
+  },
+  {
+    accessorKey: 'timeSpentMs',
+    header: 'Time',
+    enableSorting: true,
+    sortUndefined: 'last',
+    cell: ({ row }) =>
+      row.original.timeSpentMs !== null ? formatSolveTimeMs(row.original.timeSpentMs) : '—',
+    meta: { className: 'px-2 py-1' },
+  },
+  {
+    accessorKey: 'startedAt',
+    header: 'Date',
+    enableSorting: true,
+    cell: ({ row }) => (row.original.startedAt ? row.original.startedAt.slice(0, 10) : '—'),
+    meta: { className: 'px-2 py-1' },
+  },
+]
 
 type OverviewAttemptHistoryTableProps = {
-  rows: OverviewAttemptHistoryRow[]
+  trainingItemId: number
+  initialRows: OverviewAttemptHistoryRow[]
+  currentUser: SelectableUser
   selectedAttemptId: number | null
-  onSelectAttempt: (attemptId: number) => void
+  onRowClick: (row: OverviewAttemptHistoryRow) => void
+  tableId?: string
+  onUserFilterChange?: (users: SelectableUser[]) => void
 }
-
-function sortRows(
-  rows: OverviewAttemptHistoryRow[],
-  key: SortKey,
-  dir: SortDir,
-): OverviewAttemptHistoryRow[] {
-  const factor = dir === 'asc' ? 1 : -1
-  return [...rows].sort((a, b) => {
-    let primary: number
-    if (key === 'runOrder') {
-      primary = (a.runOrder - b.runOrder) * factor
-    } else if (key === 'tryNumber') {
-      primary = (a.tryNumber - b.tryNumber) * factor
-    } else {
-      if (a.timeSpentMs === null && b.timeSpentMs === null) primary = 0
-      else if (a.timeSpentMs === null) primary = 1
-      else if (b.timeSpentMs === null) primary = -1
-      else primary = (a.timeSpentMs - b.timeSpentMs) * factor
-    }
-    if (primary !== 0) return primary
-    if (key !== 'runOrder') {
-      const runComp = b.runOrder - a.runOrder
-      if (runComp !== 0) return runComp
-    }
-    return a.tryNumber - b.tryNumber
-  })
-}
-
-function SortIndicator({
-  active,
-  dir,
-}: {
-  active: boolean
-  dir: SortDir
-}): React.ReactElement {
-  if (!active) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-40" />
-  return dir === 'asc' ? (
-    <ArrowUp className="ml-1 h-3 w-3" />
-  ) : (
-    <ArrowDown className="ml-1 h-3 w-3" />
-  )
-}
-
-const PAGE_SIZE = 5
 
 export function OverviewAttemptHistoryTable({
-  rows,
+  trainingItemId,
+  initialRows,
+  currentUser,
   selectedAttemptId,
-  onSelectAttempt,
+  onRowClick,
+  tableId = 'hist',
+  onUserFilterChange,
 }: OverviewAttemptHistoryTableProps): React.ReactElement {
-  const [sortKey, setSortKey] = React.useState<SortKey>('runOrder')
-  const [sortDir, setSortDir] = React.useState<SortDir>('desc')
-  const [page, setPage] = React.useState(0)
+  const baseUserFilter = useUserFilterSpec('userId')
 
-  const sorted = React.useMemo(
-    () => sortRows(rows, sortKey, sortDir),
-    [rows, sortKey, sortDir],
+  const filters = React.useMemo(
+    () => [
+      {
+        ...baseUserFilter,
+        render: (value: SelectableUser[], onChange: (u: SelectableUser[]) => void) => (
+          <UserSelector
+            value={value}
+            onChange={(users) => {
+              onChange(users)
+              onUserFilterChange?.(users)
+            }}
+            className="h-7 text-xs"
+          />
+        ),
+      },
+      {
+        type: 'custom' as const,
+        key: 'result',
+        render: (value: string[], onChange: (v: string[]) => void) => (
+          <MultiSelectFilter
+            label="Result"
+            options={RESULT_OPTIONS}
+            selected={value}
+            onChange={onChange}
+            className="h-7 text-xs"
+          />
+        ),
+        serialize: (v: string[]) => v,
+        resolveInstant: (id: string) => id,
+      },
+    ],
+    [baseUserFilter, onUserFilterChange],
   )
 
-  const totalPages = Math.ceil(sorted.length / PAGE_SIZE)
-  const visible = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const initialCustomValues = React.useMemo(
+    () => ({ userId: [currentUser], result: [] }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [], // captured at mount; currentUser provides the default "me" filter
+  )
 
-  function handleSort(key: SortKey): void {
-    if (key === sortKey) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortKey(key)
-      setSortDir(key === 'runOrder' ? 'desc' : 'asc')
-    }
-    setPage(0)
-  }
+  const initialData = React.useMemo(
+    () => ({ items: initialRows, total: initialRows.length }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  )
 
-  if (rows.length === 0) {
-    return <p className="text-xs text-muted-foreground">No attempts recorded.</p>
-  }
+  const fetchData = React.useCallback(
+    async (params: FetchParams): Promise<{ items: OverviewAttemptHistoryRow[]; total: number }> => {
+      const { attempts, total } = await api.trainingItems.getAttemptHistory(trainingItemId, {
+        page: params.page,
+        pageSize: PAGE_SIZE,
+        userId: (params.filters.userId ?? []).map(Number),
+        result: params.filters.result ?? [],
+      })
+      return {
+        items: attempts.map((a) => ({
+          attemptId: a.attemptId,
+          runId: a.runId,
+          runLabel: `Run ${a.runIndex + 1}`,
+          runOrder: a.runIndex,
+          runTrainingItemId: a.runTrainingItemId,
+          tryNumber: a.tryNumber,
+          countsTowardsTraining: a.countsTowardsTraining,
+          result: a.result,
+          timeSpentMs: a.timeSpentMs,
+          startedAt: a.startedAt,
+          userId: a.userId,
+          displayName: a.displayName,
+          avatarUrl: a.avatarUrl,
+        })),
+        total,
+      }
+    },
+    [trainingItemId],
+  )
+
+  const getRowClassName = React.useCallback(
+    (row: OverviewAttemptHistoryRow) =>
+      row.attemptId === selectedAttemptId ? 'bg-muted/50' : '',
+    [selectedAttemptId],
+  )
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="overflow-x-auto rounded-md border">
-        <Table className="min-w-max">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="whitespace-nowrap px-2 py-0">
-                <button
-                  type="button"
-                  className="inline-flex items-center text-xs font-medium text-muted-foreground"
-                  onClick={() => handleSort('runOrder')}
-                >
-                  Run
-                  <SortIndicator active={sortKey === 'runOrder'} dir={sortDir} />
-                </button>
-              </TableHead>
-              <TableHead className="whitespace-nowrap px-2 py-0">
-                <button
-                  type="button"
-                  className="inline-flex items-center text-xs font-medium text-muted-foreground"
-                  onClick={() => handleSort('tryNumber')}
-                >
-                  Attempt
-                  <SortIndicator active={sortKey === 'tryNumber'} dir={sortDir} />
-                </button>
-              </TableHead>
-              <TableHead className="whitespace-nowrap px-2 py-0 text-xs">Solved</TableHead>
-              <TableHead className="whitespace-nowrap px-2 py-0">
-                <button
-                  type="button"
-                  className="inline-flex items-center text-xs font-medium text-muted-foreground"
-                  onClick={() => handleSort('timeSpentMs')}
-                >
-                  Time
-                  <SortIndicator active={sortKey === 'timeSpentMs'} dir={sortDir} />
-                </button>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visible.map((row) => {
-              const isSelected = row.attemptId === selectedAttemptId
-              return (
-                <TableRow
-                  key={row.attemptId}
-                  data-state={isSelected ? 'selected' : undefined}
-                  className="cursor-pointer"
-                  onClick={() => onSelectAttempt(row.attemptId)}
-                >
-                  <TableCell className="whitespace-nowrap px-2 py-1.5 text-xs tabular-nums">
-                    {row.runLabel}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap px-2 py-1.5 text-xs text-muted-foreground">
-                    {row.countsTowardsTraining ? (
-                      `#${row.tryNumber}`
-                    ) : (
-                      <Tooltip delayDuration={100}>
-                        <TooltipTrigger asChild>
-                          <span className="inline-flex cursor-default items-center text-muted-foreground/60">
-                            <CircleOff className="h-3 w-3" />
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent>This attempt did not count towards score.</TooltipContent>
-                      </Tooltip>
-                    )}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap px-2 py-1.5">
-                    {row.result === 'solved' ? (
-                      <Check className="h-3 w-3" />
-                    ) : (
-                      <X className="h-3 w-3" />
-                    )}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap px-2 py-1.5 text-xs tabular-nums text-muted-foreground">
-                    {row.timeSpentMs !== null ? formatSolveTimeMs(row.timeSpentMs) : '—'}
-                  </TableCell>
-                </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
-      </div>
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs"
-            disabled={page === 0}
-            onClick={() => setPage((p) => p - 1)}
-          >
-            ← Prev
-          </Button>
-          <span className="text-xs text-muted-foreground">
-            {page + 1} / {totalPages}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs"
-            disabled={page >= totalPages - 1}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Next →
-          </Button>
-        </div>
-      )}
-    </div>
+    <ServerDataTable
+      tableId={tableId}
+      columns={columns}
+      filters={filters}
+      pageSize={PAGE_SIZE}
+      fetchData={fetchData}
+      initialData={initialData}
+      initialCustomValues={initialCustomValues}
+      onRowClick={onRowClick}
+      getRowClassName={getRowClassName}
+      initialSorting={[{ id: 'startedAt', desc: true }]}
+      emptyMessage="No attempts recorded."
+    />
   )
 }

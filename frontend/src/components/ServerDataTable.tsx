@@ -56,6 +56,13 @@ export type ServerDataTableProps<T> = {
   // Optional namespace that prefixes all URL params, e.g. "run" → ?run_userId=…
   // Use when multiple ServerDataTables appear on the same page.
   tableId?: string
+  // Pre-seed custom filter values when no URL param is present for that key.
+  // Useful for "default filter" scenarios (e.g. current user pre-selected).
+  // Only applied at mount; ignored if the URL already carries a value for the key.
+  initialCustomValues?: Record<string, unknown[]>
+  // Pre-populate the table with data on mount, skipping the initial fetch entirely.
+  // The first fetch only runs when filters or page change after mount.
+  initialData?: { items: T[]; total: number }
   // When this value changes the fetch effect re-runs, even if filter/page params haven't
   // changed. Use when a prop that drives fetchData (e.g. scheduleId) can change without
   // the component unmounting — changing instanceKey causes an immediate re-fetch with the
@@ -95,6 +102,8 @@ export function ServerDataTable<T>({
   getRowClassName,
   emptyMessage,
   initialSorting,
+  initialCustomValues,
+  initialData,
 }: ServerDataTableProps<T>): React.ReactElement {
   const { getParam, getMultiParam, setParams } = useTableUrlSync(tableId)
 
@@ -143,15 +152,21 @@ export function ServerDataTable<T>({
       } else {
         const s = spec as CustomFilterSpec<unknown>
         const ids = getMultiParam(spec.key)
-        const instant: unknown[] = []
-        const unresolved: string[] = []
-        for (const id of ids) {
-          const item = s.resolveInstant?.(id) ?? null
-          if (item !== null) instant.push(item)
-          else unresolved.push(id)
+        if (ids.length === 0 && initialCustomValues?.[spec.key]?.length) {
+          // No URL param present — use caller-provided initial values directly.
+          customInstant[spec.key] = initialCustomValues[spec.key]
+          customUnresolved[spec.key] = []
+        } else {
+          const instant: unknown[] = []
+          const unresolved: string[] = []
+          for (const id of ids) {
+            const item = s.resolveInstant?.(id) ?? null
+            if (item !== null) instant.push(item)
+            else unresolved.push(id)
+          }
+          customInstant[spec.key] = instant
+          customUnresolved[spec.key] = unresolved
         }
-        customInstant[spec.key] = instant
-        customUnresolved[spec.key] = unresolved
       }
     }
 
@@ -175,9 +190,9 @@ export function ServerDataTable<T>({
     Object.values(initRef.current!.customUnresolved).some((ids) => ids.length > 0),
   )
   const [page, setPage] = useState(initRef.current.initialPage)
-  const [data, setData] = useState<T[]>([])
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(true)
+  const [data, setData] = useState<T[]>(() => initialData?.items ?? [])
+  const [total, setTotal] = useState(() => initialData?.total ?? 0)
+  const [loading, setLoading] = useState(() => !initialData)
 
   // ---------------------------------------------------------------------------
   // Async hydration for custom filters whose URL IDs weren't in memory
@@ -244,6 +259,15 @@ export function ServerDataTable<T>({
     [customValues],
   )
 
+  // When initialData is provided we skip the first fetch — the data is already loaded.
+  // Using a params-snapshot instead of a consumed-once flag so React Strict Mode's
+  // double-invoke of effects doesn't bypass the skip on the second invocation.
+  const initialFetchParamsRef = useRef<string | null>(
+    initialData !== undefined
+      ? `${debouncedSearchSerialized}|${multiSerialized}|${customSerialized}|${page}|${refreshKey ?? ''}|${instanceKey ?? ''}`
+      : null,
+  )
+
   // ---------------------------------------------------------------------------
   // URL sync: write all current filter values + page to URL params.
   // Fires when any serialised snapshot changes (including after search debounce).
@@ -274,6 +298,14 @@ export function ServerDataTable<T>({
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (isHydrating) return
+
+    // Skip the fetch if params haven't changed from the initial seeded state.
+    // Clearing the ref after any change ensures all subsequent fetches run normally.
+    if (initialFetchParamsRef.current !== null) {
+      const sig = `${debouncedSearchSerialized}|${multiSerialized}|${customSerialized}|${page}|${refreshKey ?? ''}|${instanceKey ?? ''}`
+      if (sig === initialFetchParamsRef.current) return
+      initialFetchParamsRef.current = null
+    }
 
     const filters: Record<string, string[]> = {}
     for (const spec of specs) {

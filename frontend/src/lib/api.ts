@@ -728,6 +728,28 @@ export type OverviewAttemptView = {
   }
 }
 
+export type AttemptHistoryRow = {
+  attemptId: number
+  runId: number
+  runTrainingItemId: number
+  userId: number
+  displayName: string
+  avatarUrl: string | null
+  runIndex: number
+  tryNumber: number
+  countsTowardsTraining: boolean
+  result: 'solved' | 'failed'
+  timeSpentMs: number | null
+  startedAt: string
+}
+
+export type AttemptSpectateView = {
+  attemptId: number
+  timeSpentMs: number | null
+  board: OverviewAttemptBoardView | null
+  pgnDisplay: TrainingItemMetaPgnDisplay | null
+}
+
 export type SameTrainingItemRunOverview = {
   runId: number
   runIndex: number
@@ -1224,6 +1246,22 @@ export const api = {
       request(`/runs/${runId}/training-items/${runTrainingItemId}/attempts`, { method: 'POST' }),
     continue: (runId: number): Promise<ContinueRunResult> =>
       request(`/runs/${runId}/continue`, { method: 'POST' }),
+  },
+  trainingItems: {
+    getAttemptHistory: (
+      trainingItemId: number,
+      opts?: { page?: number; pageSize?: number; userId?: number[]; result?: string[] },
+    ): Promise<{ attempts: AttemptHistoryRow[]; total: number }> => {
+      const p = new URLSearchParams()
+      if (opts?.page) p.set('page', String(opts.page))
+      if (opts?.pageSize) p.set('pageSize', String(opts.pageSize))
+      opts?.userId?.forEach((id) => p.append('userId', String(id)))
+      opts?.result?.forEach((r) => p.append('result', r))
+      const qs = p.toString()
+      return request(`/training-items/${trainingItemId}/attempt-history${qs ? `?${qs}` : ''}`)
+    },
+    getSpectateView: (trainingItemId: number, attemptId: number): Promise<AttemptSpectateView> =>
+      request(`/training-items/${trainingItemId}/attempts/${attemptId}`),
   },
   dashboard: {
     get: (opts?: { trainingId?: number; runIndex?: number }): Promise<DashboardData> => {
