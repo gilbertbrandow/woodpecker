@@ -190,6 +190,9 @@ def get_weekly_board(schedule_id: int | None = None) -> list[dict[str, object]]:
                     COUNT(DISTINCT rp.id) FILTER (WHERE pa.status = 'solved' AND pa.try_number = 1)
                                                 AS puzzles_solved,
                     COUNT(DISTINCT rp.id)       AS resolved_count,
+                    COUNT(DISTINCT rp.id) FILTER (WHERE ti.source_type::text = 'LICHESS_TACTIC')     AS lichess_tactic_count,
+                    COUNT(DISTINCT rp.id) FILTER (WHERE ti.source_type::text = 'SCRAPED_POSITIONAL') AS scraped_positional_count,
+                    COUNT(DISTINCT rp.id) FILTER (WHERE ti.source_type::text = 'DECOY')              AS decoy_count,
                     AVG(
                         CASE ti.source_type::text
                             WHEN 'LICHESS_TACTIC'     THEN lt.rating
@@ -227,8 +230,11 @@ def get_weekly_board(schedule_id: int | None = None) -> list[dict[str, object]]:
                 u.id                                     AS user_id,
                 u.display_name,
                 u.avatar_url,
-                COALESCE(ws.puzzles_solved, 0)           AS puzzles_solved,
-                COALESCE(ws.resolved_count, 0)           AS resolved_count,
+                COALESCE(ws.puzzles_solved, 0)                AS puzzles_solved,
+                COALESCE(ws.resolved_count, 0)               AS resolved_count,
+                COALESCE(ws.lichess_tactic_count, 0)         AS lichess_tactic_count,
+                COALESCE(ws.scraped_positional_count, 0)     AS scraped_positional_count,
+                COALESCE(ws.decoy_count, 0)                  AS decoy_count,
                 ws.avg_rating,
                 ws.avg_solve_time_ms
             FROM active_users au
@@ -246,11 +252,23 @@ def get_weekly_board(schedule_id: int | None = None) -> list[dict[str, object]]:
         accuracy_pct: float | None = (
             round(puzzles_solved / resolved * 100, 1) if resolved > 0 else None
         )
+        lichess_tactic_pct: float | None = (
+            round(int(row.lichess_tactic_count) / resolved * 100, 1) if resolved > 0 else None
+        )
+        scraped_positional_pct: float | None = (
+            round(int(row.scraped_positional_count) / resolved * 100, 1) if resolved > 0 else None
+        )
+        decoy_pct: float | None = (
+            round(int(row.decoy_count) / resolved * 100, 1) if resolved > 0 else None
+        )
         result.append({
             "userId": int(row.user_id),
             "displayName": row.display_name,
             "avatarUrl": row.avatar_url,
             "puzzlesAttempted": resolved,
+            "lichessTacticPct": lichess_tactic_pct,
+            "scrapedPositionalPct": scraped_positional_pct,
+            "decoyPct": decoy_pct,
             "avgRating": float(row.avg_rating) if row.avg_rating is not None else None,
             "avgAccuracyPct": accuracy_pct,
             "avgSolveTimeMs": float(row.avg_solve_time_ms) if row.avg_solve_time_ms is not None else None,
