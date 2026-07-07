@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { useMemo } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
+import { User, Puzzle, Star, Target, Clock } from 'lucide-react'
 import { DataTable } from '../DataTable'
 import { UserAvatar } from '../UserAvatar'
 import { formatSolveTimeMs } from '../../lib/utils'
@@ -14,6 +15,14 @@ type Props = {
   tableId?: string
 }
 
+function H({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>, children: React.ReactNode }): React.ReactElement {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <Icon className="h-3.5 w-3.5" />
+      {children}
+    </span>
+  )
+}
 
 export function WeeklyLeaderboard({ rows, currentUserDisplayName, loading = false, tableId }: Props): React.ReactElement {
   const columns = useMemo<ColumnDef<WeeklyLeaderboardRow>[]>(
@@ -22,6 +31,7 @@ export function WeeklyLeaderboard({ rows, currentUserDisplayName, loading = fals
         id: 'position',
         enableSorting: false,
         header: '',
+        meta: { className: 'w-12' },
         cell: ({ row, table }) => (
           <PositionBadge position={getGlobalPosition(row, table)} />
         ),
@@ -29,7 +39,7 @@ export function WeeklyLeaderboard({ rows, currentUserDisplayName, loading = fals
       {
         id: 'user',
         accessorFn: (r) => r.displayName,
-        header: 'User',
+        header: () => <H icon={User}>User</H>,
         enableSorting: false,
         cell: ({ row }) => (
           <span className="flex items-center gap-2">
@@ -44,7 +54,7 @@ export function WeeklyLeaderboard({ rows, currentUserDisplayName, loading = fals
       {
         id: 'puzzlesSolved',
         accessorFn: (r) => r.puzzlesSolved,
-        header: 'Puzzles solved',
+        header: () => <H icon={Puzzle}>Puzzles solved</H>,
         enableSorting: true,
         cell: ({ row }) => (
           <span className="tabular-nums font-medium">{row.original.puzzlesSolved}</span>
@@ -53,7 +63,7 @@ export function WeeklyLeaderboard({ rows, currentUserDisplayName, loading = fals
       {
         id: 'avgRating',
         accessorFn: (r) => r.avgRating ?? -1,
-        header: 'Avg rating',
+        header: () => <H icon={Star}>Avg rating</H>,
         enableSorting: true,
         cell: ({ row }) =>
           row.original.avgRating !== null ? (
@@ -65,7 +75,7 @@ export function WeeklyLeaderboard({ rows, currentUserDisplayName, loading = fals
       {
         id: 'avgAccuracyPct',
         accessorFn: (r) => r.avgAccuracyPct ?? -1,
-        header: 'Accuracy',
+        header: () => <H icon={Target}>Accuracy</H>,
         enableSorting: true,
         cell: ({ row }) =>
           row.original.avgAccuracyPct !== null ? (
@@ -77,7 +87,8 @@ export function WeeklyLeaderboard({ rows, currentUserDisplayName, loading = fals
       {
         id: 'avgSolveTimeMs',
         accessorFn: (r) => r.avgSolveTimeMs ?? Infinity,
-        header: 'Avg solve time',
+        header: () => <H icon={Clock}>Avg solve time</H>,
+        meta: { rankDesc: false },
         enableSorting: true,
         cell: ({ row }) =>
           row.original.avgSolveTimeMs !== null ? (

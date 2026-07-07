@@ -26,5 +26,21 @@ export function PositionBadge({ position }: { position: number }): React.ReactEl
 }
 
 export function getGlobalPosition<T>(row: { id: string }, table: Table<T>): number {
-  return table.getSortedRowModel().rows.findIndex((r) => r.id === row.id) + 1
+  const { pageIndex, pageSize } = table.getState().pagination
+  const localIndex = table.getRowModel().rows.findIndex((r) => r.id === row.id)
+  const visualIndex = pageIndex * pageSize + localIndex
+
+  const primarySort = table.getState().sorting[0]
+  if (primarySort) {
+    const col = table.getColumn(primarySort.id)
+    // rankDesc: true = higher value is better (default); false = lower value is better (e.g. time)
+    const rankDesc = (col?.columnDef.meta as { rankDesc?: boolean } | undefined)?.rankDesc ?? true
+    const bestFirst = rankDesc === primarySort.desc
+    if (!bestFirst) {
+      const totalRows = table.getFilteredRowModel().rows.length
+      return totalRows - visualIndex
+    }
+  }
+
+  return visualIndex + 1
 }

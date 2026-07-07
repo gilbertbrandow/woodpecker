@@ -2,6 +2,7 @@ import * as React from 'react'
 import { useMemo } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
+import { User, CalendarDays, Flag, Clock, Target, TrendingUp, Activity, ListChecks } from 'lucide-react'
 import { DataTable, type FilterableColumn } from '../DataTable'
 import { UserAvatar } from '../UserAvatar'
 import { StatusBadge, runStatusToStatusValue } from '../StatusBadge'
@@ -36,6 +37,14 @@ function formatDelta(delta: number | null): React.ReactElement {
   )
 }
 
+function H({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>, children: React.ReactNode }): React.ReactElement {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <Icon className="h-3.5 w-3.5" />
+      {children}
+    </span>
+  )
+}
 
 export function RunLeaderboard({
   rows,
@@ -82,6 +91,7 @@ export function RunLeaderboard({
       id: 'position',
       enableSorting: false,
       header: '',
+      meta: { className: 'w-12' },
       cell: ({ row, table }) => (
         <PositionBadge position={getGlobalPosition(row, table)} />
       ),
@@ -90,7 +100,7 @@ export function RunLeaderboard({
     const userColumn: ColumnDef<LeaderboardRun> = {
       id: 'user',
       accessorFn: (r) => r.displayName,
-      header: 'User',
+      header: () => <H icon={User}>User</H>,
       enableSorting: false,
       cell: ({ row }) => (
         <span className="flex items-center gap-2">
@@ -106,7 +116,7 @@ export function RunLeaderboard({
     const scheduleColumn: ColumnDef<LeaderboardRun> = {
       id: 'schedule',
       accessorFn: (r) => String(r.scheduleId),
-      header: 'Schedule',
+      header: () => <H icon={CalendarDays}>Schedule</H>,
       enableSorting: false,
       filterFn: (row, id, val: string[]) => !val.length || val.includes(row.getValue(id) as string),
       cell: ({ row }) => (
@@ -124,7 +134,7 @@ export function RunLeaderboard({
     const runNumberColumn: ColumnDef<LeaderboardRun> = {
       id: 'runNumber',
       accessorFn: (r) => String(r.runIndex + 1),
-      header: 'Run',
+      header: () => <H icon={Flag}>Run</H>,
       enableSorting: false,
       filterFn: (row, id, val: string[]) => !val.length || val.includes(row.getValue(id) as string),
       cell: ({ row }) => (
@@ -135,7 +145,7 @@ export function RunLeaderboard({
     const accuracyColumn: ColumnDef<LeaderboardRun> = {
       id: 'accuracyPct',
       accessorFn: (r) => r.accuracyPct ?? -1,
-      header: 'Accuracy',
+      header: () => <H icon={Target}>Accuracy</H>,
       enableSorting: true,
       cell: ({ row }) =>
         row.original.accuracyPct !== null ? (
@@ -148,19 +158,20 @@ export function RunLeaderboard({
     const deltaColumn: ColumnDef<LeaderboardRun> = {
       id: 'deltaAccuracyPct',
       accessorFn: (r) => r.deltaAccuracyPct ?? -Infinity,
-      header: 'Δ accuracy',
+      header: () => <H icon={TrendingUp}>Δ accuracy</H>,
       enableSorting: true,
       cell: ({ row }) => formatDelta(row.original.deltaAccuracyPct),
     }
 
     function makeTimeColumn(
       id: 'avgSolveTimeMs' | 'avgTimeSolvedMs' | 'avgTimeFailedMs',
-      header: string,
+      label: string,
     ): ColumnDef<LeaderboardRun> {
       return {
         id,
         accessorFn: (r) => r[id] ?? Infinity,
-        header,
+        header: () => <H icon={Clock}>{label}</H>,
+        meta: { rankDesc: false },
         enableSorting: true,
         cell: ({ row }) => {
           const v = row.original[id]
@@ -180,7 +191,7 @@ export function RunLeaderboard({
     const statusColumn: ColumnDef<LeaderboardRun> = {
       id: 'status',
       accessorKey: 'status',
-      header: 'Status',
+      header: () => <H icon={Activity}>Status</H>,
       enableSorting: false,
       cell: ({ row }) => (
         <StatusBadge status={runStatusToStatusValue(row.original.status)} />
@@ -190,8 +201,8 @@ export function RunLeaderboard({
     const startedColumn: ColumnDef<LeaderboardRun> = {
       id: 'startedAt',
       accessorFn: (r) => new Date(r.startedAt).getTime(),
-      header: 'Started',
-      enableSorting: true,
+      header: () => <H icon={CalendarDays}>Started</H>,
+      enableSorting: false,
       cell: ({ row }) => (
         <span className="text-muted-foreground">{formatDate(row.original.startedAt)}</span>
       ),
@@ -203,7 +214,7 @@ export function RunLeaderboard({
     const resolvedColumn: ColumnDef<LeaderboardRun> = {
       id: 'resolvedCount',
       accessorFn: (r) => r.resolvedCount,
-      header: 'Attempts completed',
+      header: () => <H icon={ListChecks}>Attempts completed</H>,
       enableSorting: true,
       cell: ({ row }) => (
         <span className="tabular-nums">
