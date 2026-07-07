@@ -535,6 +535,9 @@ export type WeeklyLeaderboardRow = {
   displayName: string
   avatarUrl: string | null
   puzzlesAttempted: number
+  lichessTacticPct: number | null
+  scrapedPositionalPct: number | null
+  decoyPct: number | null
   avgRating: number | null
   avgAccuracyPct: number | null
   avgSolveTimeMs: number | null

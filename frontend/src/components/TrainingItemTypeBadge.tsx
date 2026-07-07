@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Zap, Compass } from 'lucide-react'
 
-function ScarecrowIcon({ className }: { className?: string }): React.ReactElement {
+export function ScarecrowIcon({ className }: { className?: string }): React.ReactElement {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

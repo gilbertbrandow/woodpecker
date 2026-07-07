@@ -1,12 +1,13 @@
 import * as React from 'react'
 import { useMemo } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
-import { User, Puzzle, ChartColumn, Target, Clock } from 'lucide-react'
+import { User, Puzzle, ChartColumn, Target, Clock, Zap, Compass } from 'lucide-react'
 import { DataTable } from '../DataTable'
 import { UserAvatar } from '../UserAvatar'
 import { formatSolveTimeMs } from '../../lib/utils'
 import type { WeeklyLeaderboardRow } from '../../lib/api'
 import { PositionBadge, getGlobalPosition } from './PositionBadge'
+import { ScarecrowIcon } from '../TrainingItemTypeBadge'
 
 type Props = {
   rows: WeeklyLeaderboardRow[]
@@ -59,6 +60,42 @@ export function WeeklyLeaderboard({ rows, currentUserId, loading = false, tableI
         cell: ({ row }) => (
           <span className="tabular-nums font-medium">{row.original.puzzlesAttempted}</span>
         ),
+      },
+      {
+        id: 'lichessTacticPct',
+        accessorFn: (r) => r.lichessTacticPct ?? -1,
+        header: () => <H icon={Zap}>Tactical</H>,
+        enableSorting: true,
+        cell: ({ row }) =>
+          row.original.lichessTacticPct !== null ? (
+            <span className="tabular-nums">{Math.round(row.original.lichessTacticPct)}%</span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        id: 'scrapedPositionalPct',
+        accessorFn: (r) => r.scrapedPositionalPct ?? -1,
+        header: () => <H icon={Compass}>Positional</H>,
+        enableSorting: true,
+        cell: ({ row }) =>
+          row.original.scrapedPositionalPct !== null ? (
+            <span className="tabular-nums">{Math.round(row.original.scrapedPositionalPct)}%</span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        id: 'decoyPct',
+        accessorFn: (r) => r.decoyPct ?? -1,
+        header: () => <H icon={ScarecrowIcon}>Decoy</H>,
+        enableSorting: true,
+        cell: ({ row }) =>
+          row.original.decoyPct !== null ? (
+            <span className="tabular-nums">{Math.round(row.original.decoyPct)}%</span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
       },
       {
         id: 'avgRating',
