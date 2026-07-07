@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useMemo } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
-import { User, Puzzle, Star, Target, Clock } from 'lucide-react'
+import { User, Puzzle, ChartColumn, Target, Clock } from 'lucide-react'
 import { DataTable } from '../DataTable'
 import { UserAvatar } from '../UserAvatar'
 import { formatSolveTimeMs } from '../../lib/utils'
@@ -54,7 +54,7 @@ export function WeeklyLeaderboard({ rows, currentUserId, loading = false, tableI
       {
         id: 'puzzlesAttempted',
         accessorFn: (r) => r.puzzlesAttempted,
-        header: () => <H icon={Puzzle}>Puzzles attempted</H>,
+        header: () => <H icon={Puzzle}>Puzzles</H>,
         enableSorting: true,
         cell: ({ row }) => (
           <span className="tabular-nums font-medium">{row.original.puzzlesAttempted}</span>
@@ -63,7 +63,7 @@ export function WeeklyLeaderboard({ rows, currentUserId, loading = false, tableI
       {
         id: 'avgRating',
         accessorFn: (r) => r.avgRating ?? -1,
-        header: () => <H icon={Star}>Avg rating</H>,
+        header: () => <H icon={ChartColumn}>Avg rating</H>,
         enableSorting: true,
         cell: ({ row }) =>
           row.original.avgRating !== null ? (

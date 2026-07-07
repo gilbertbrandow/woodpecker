@@ -523,6 +523,7 @@ export type LeaderboardRun = {
   resolvedCount: number
   totalPuzzles: number
   accuracyPct: number | null
+  avgRating: number | null
   avgSolveTimeMs: number | null
   avgTimeSolvedMs: number | null
   avgTimeFailedMs: number | null

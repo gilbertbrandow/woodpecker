@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useMemo } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { User, CalendarDays, Flag, Clock, Target, TrendingUp, Activity, ListChecks } from 'lucide-react'
+import { User, CalendarDays, Flag, Clock, Target, TrendingUp, Activity, ListChecks, ChartColumn } from 'lucide-react'
 import { DataTable, type FilterableColumn } from '../DataTable'
 import { UserAvatar } from '../UserAvatar'
 import { StatusBadge, runStatusToStatusValue } from '../StatusBadge'
@@ -163,6 +163,19 @@ export function RunLeaderboard({
       cell: ({ row }) => formatDelta(row.original.deltaAccuracyPct),
     }
 
+    const avgRatingColumn: ColumnDef<LeaderboardRun> = {
+      id: 'avgRating',
+      accessorFn: (r) => r.avgRating ?? -1,
+      header: () => <H icon={ChartColumn}>Avg rating</H>,
+      enableSorting: true,
+      cell: ({ row }) =>
+        row.original.avgRating !== null ? (
+          <span className="tabular-nums">{Math.round(row.original.avgRating)}</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    }
+
     function makeTimeColumn(
       id: 'avgSolveTimeMs' | 'avgTimeSolvedMs' | 'avgTimeFailedMs',
       label: string,
@@ -185,7 +198,7 @@ export function RunLeaderboard({
     const avgSolveTimeColumn = makeTimeColumn('avgSolveTimeMs', 'Avg time')
 
     if (compact) {
-      return [positionColumn, userColumn, accuracyColumn, deltaColumn, avgSolveTimeColumn]
+      return [positionColumn, userColumn, accuracyColumn, deltaColumn, avgRatingColumn, avgSolveTimeColumn]
     }
 
     const statusColumn: ColumnDef<LeaderboardRun> = {
@@ -232,6 +245,7 @@ export function RunLeaderboard({
       startedColumn,
       accuracyColumn,
       deltaColumn,
+      avgRatingColumn,
       avgSolveTimeColumn,
       avgTimeSolvedColumn,
       avgTimeFailedColumn,
