@@ -49,10 +49,10 @@ def get_leaderboard() -> Response | tuple[Response, int]:
 @leaderboard_bp.get("/weekly")
 @login_required
 def get_weekly_leaderboard() -> Response | tuple[Response, int]:
-    schedule_id: int | None = None
-    raw = request.args.get("scheduleId")
-    if raw is not None:
-        if not raw.isdigit():
+    raw_ids = request.args.getlist("scheduleId")
+    schedule_ids: list[int] | None = None
+    if raw_ids:
+        if not all(r.isdigit() for r in raw_ids):
             return jsonify({"error": "scheduleId must be a positive integer"}), 400
-        schedule_id = int(raw)
-    return jsonify({"rows": leaderboard_svc.get_weekly_board(schedule_id)})
+        schedule_ids = [int(r) for r in raw_ids]
+    return jsonify({"rows": leaderboard_svc.get_weekly_board(schedule_ids)})

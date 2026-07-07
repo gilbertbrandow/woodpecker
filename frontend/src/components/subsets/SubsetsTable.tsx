@@ -23,6 +23,7 @@ import type { Subset } from '../../lib/api'
 import { api } from '../../lib/api'
 import { toast } from '../../lib/toast'
 import { useUserFilterSpec } from '../../hooks/useUserFilterSpec'
+import { DATA_ICONS } from '../../lib/icons'
 
 const PAGE_SIZE = 20
 
@@ -67,6 +68,7 @@ export function SubsetsTable(): React.ReactElement {
         id: 'creator',
         accessorFn: (row) => row.ownedBy.displayName,
         header: 'Creator',
+        meta: { icon: DATA_ICONS.user },
         enableSorting: false,
         cell: ({ row }) => (
           <UserAvatar
@@ -78,17 +80,20 @@ export function SubsetsTable(): React.ReactElement {
       {
         accessorKey: 'name',
         header: 'Name',
+        meta: { icon: DATA_ICONS.name },
         cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
       },
       {
         accessorKey: 'status',
         header: 'Status',
+        meta: { icon: DATA_ICONS.status },
         enableSorting: false,
         cell: ({ row }) => <StatusBadge status={row.original.status} />,
       },
       {
         accessorKey: 'puzzleCount',
         header: 'Puzzles',
+        meta: { icon: DATA_ICONS.puzzles },
         cell: ({ row }) => (
           <span className="tabular-nums text-muted-foreground">{row.original.puzzleCount}</span>
         ),
@@ -98,6 +103,7 @@ export function SubsetsTable(): React.ReactElement {
         accessorFn: (row) =>
           row.lockedAt ? new Date(row.lockedAt).getTime() : new Date(row.createdAt).getTime(),
         header: 'Date',
+        meta: { icon: DATA_ICONS.started },
         cell: ({ row }) => (
           <span className="text-muted-foreground">
             {formatDate(row.original.lockedAt ?? row.original.createdAt)}

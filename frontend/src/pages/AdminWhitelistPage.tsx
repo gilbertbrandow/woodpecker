@@ -9,6 +9,7 @@ import { ServerDataTable } from '../components/ServerDataTable'
 import { AdminUserCapBanner } from '../components/AdminUserCapBanner'
 import { api, type AdminWhitelistEntry } from '../lib/api'
 import { formatDate } from '../lib/utils'
+import { DATA_ICONS } from '../lib/icons'
 import { toast } from '../lib/toast'
 import {
   AlertDialog,
@@ -50,6 +51,7 @@ export function AdminWhitelistPage(): React.ReactElement {
       {
         accessorKey: 'lichessUsername',
         header: 'Lichess username',
+        meta: { icon: DATA_ICONS.lichessUsername },
         cell: ({ row }) => (
           <span className="font-medium">{row.original.lichessUsername}</span>
         ),
@@ -57,6 +59,7 @@ export function AdminWhitelistPage(): React.ReactElement {
       {
         id: 'status',
         header: 'Status',
+        meta: { icon: DATA_ICONS.status },
         enableSorting: false,
         cell: ({ row }) =>
           row.original.isRegistered ? (
@@ -72,6 +75,7 @@ export function AdminWhitelistPage(): React.ReactElement {
       {
         accessorKey: 'createdAt',
         header: 'Added',
+        meta: { icon: DATA_ICONS.started },
         cell: ({ row }) => (
           <span className="tabular-nums text-muted-foreground">
             {formatDate(row.original.createdAt)}

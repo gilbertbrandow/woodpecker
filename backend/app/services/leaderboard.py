@@ -39,10 +39,27 @@ def get_run_board(
                         WHERE pa.run_training_item_id = rp.id
                           AND pa.status != 'in_progress'
                     ))                                                    AS resolved_count,
+                    AVG(
+                        CASE ti.source_type::text
+                            WHEN 'LICHESS_TACTIC'     THEN lt.rating
+                            WHEN 'SCRAPED_POSITIONAL' THEN
+                                CASE spd.value
+                                    WHEN 1 THEN 1500
+                                    WHEN 2 THEN 1800
+                                    WHEN 3 THEN 2000
+                                    WHEN 4 THEN 2200
+                                END
+                            ELSE NULL
+                        END
+                    )                                                     AS avg_rating,
                     AVG(la.time_spent_ms)                                AS avg_solve_time_ms,
                     AVG(first_solve.time_spent_ms)                       AS avg_time_solved_ms,
                     AVG(last_failed.time_spent_ms)                       AS avg_time_failed_ms
                 FROM run_training_items rp
+                JOIN training_items ti ON ti.id = rp.training_item_id
+                LEFT JOIN lichess_tactics lt  ON lt.training_item_id = rp.training_item_id
+                LEFT JOIN scraped_positional_puzzles spp ON spp.training_item_id = rp.training_item_id
+                LEFT JOIN scraped_positional_difficulties spd ON spd.id = spp.difficulty_id
                 LEFT JOIN LATERAL (
                     SELECT pa.time_spent_ms
                     FROM training_attempts pa
@@ -76,6 +93,7 @@ def get_run_board(
                 r.started_at,
                 r.completed_at,
                 r.aborted_at,
+                u.id          AS user_id,
                 u.display_name,
                 u.avatar_url,
                 s.id          AS schedule_id,
@@ -83,6 +101,7 @@ def get_run_board(
                 COALESCE(rs.first_solved_count, 0)  AS first_solved_count,
                 COALESCE(rs.resolved_count, 0)       AS resolved_count,
                 COALESCE(rs.total_puzzles, 0)        AS total_puzzles,
+                rs.avg_rating,
                 rs.avg_solve_time_ms,
                 rs.avg_time_solved_ms,
                 rs.avg_time_failed_ms,
@@ -135,6 +154,7 @@ def get_run_board(
             "completedAt": row.completed_at.isoformat() if row.completed_at else None,
             "abortedAt": row.aborted_at.isoformat() if row.aborted_at else None,
             "status": status,
+            "userId": int(row.user_id),
             "displayName": row.display_name,
             "avatarUrl": row.avatar_url,
             "scheduleId": int(row.schedule_id),
@@ -143,6 +163,7 @@ def get_run_board(
             "resolvedCount": resolved,
             "totalPuzzles": int(row.total_puzzles),
             "accuracyPct": accuracy_pct,
+            "avgRating": float(row.avg_rating) if row.avg_rating is not None else None,
             "avgSolveTimeMs": float(row.avg_solve_time_ms) if row.avg_solve_time_ms is not None else None,
             "avgTimeSolvedMs": float(row.avg_time_solved_ms) if row.avg_time_solved_ms is not None else None,
             "avgTimeFailedMs": float(row.avg_time_failed_ms) if row.avg_time_failed_ms is not None else None,
@@ -151,15 +172,15 @@ def get_run_board(
     return result
 
 
-def get_weekly_board(schedule_id: int | None = None) -> list[dict[str, object]]:
+def get_weekly_board(schedule_ids: list[int] | None = None) -> list[dict[str, object]]:
     params: dict[str, object] = {}
     weekly_schedule_where = ""
     active_schedule_where = ""
 
-    if schedule_id is not None:
-        weekly_schedule_where = "AND t.schedule_id = :schedule_id"
-        active_schedule_where = "WHERE t.schedule_id = :schedule_id"
-        params["schedule_id"] = schedule_id
+    if schedule_ids:
+        weekly_schedule_where = "AND t.schedule_id = ANY(:schedule_ids)"
+        active_schedule_where = "WHERE t.schedule_id = ANY(:schedule_ids)"
+        params["schedule_ids"] = schedule_ids
 
     rows = db.session.execute(
         sa.text(f"""
@@ -169,13 +190,31 @@ def get_weekly_board(schedule_id: int | None = None) -> list[dict[str, object]]:
                     COUNT(DISTINCT rp.id) FILTER (WHERE pa.status = 'solved' AND pa.try_number = 1)
                                                 AS puzzles_solved,
                     COUNT(DISTINCT rp.id)       AS resolved_count,
-                    AVG(lt.rating)              AS avg_rating,
+                    COUNT(DISTINCT rp.id) FILTER (WHERE ti.source_type::text = 'LICHESS_TACTIC')     AS lichess_tactic_count,
+                    COUNT(DISTINCT rp.id) FILTER (WHERE ti.source_type::text = 'SCRAPED_POSITIONAL') AS scraped_positional_count,
+                    COUNT(DISTINCT rp.id) FILTER (WHERE ti.source_type::text = 'DECOY')              AS decoy_count,
+                    AVG(
+                        CASE ti.source_type::text
+                            WHEN 'LICHESS_TACTIC'     THEN lt.rating
+                            WHEN 'SCRAPED_POSITIONAL' THEN
+                                CASE spd.value
+                                    WHEN 1 THEN 1500
+                                    WHEN 2 THEN 1800
+                                    WHEN 3 THEN 2000
+                                    WHEN 4 THEN 2200
+                                END
+                            ELSE NULL
+                        END
+                    )                           AS avg_rating,
                     AVG(pa.time_spent_ms)       AS avg_solve_time_ms
                 FROM training_attempts pa
                 JOIN run_training_items rp ON rp.id = pa.run_training_item_id
                 JOIN runs r       ON r.id = rp.run_id
                 JOIN trainings t  ON t.id = r.training_id
-                LEFT JOIN lichess_tactics lt ON lt.training_item_id = rp.training_item_id
+                JOIN training_items ti ON ti.id = rp.training_item_id
+                LEFT JOIN lichess_tactics lt  ON lt.training_item_id = rp.training_item_id
+                LEFT JOIN scraped_positional_puzzles spp ON spp.training_item_id = rp.training_item_id
+                LEFT JOIN scraped_positional_difficulties spd ON spd.id = spp.difficulty_id
                 WHERE pa.completed_at >= NOW() - INTERVAL '7 days'
                   AND pa.status != 'in_progress'
                   {weekly_schedule_where}
@@ -191,14 +230,17 @@ def get_weekly_board(schedule_id: int | None = None) -> list[dict[str, object]]:
                 u.id                                     AS user_id,
                 u.display_name,
                 u.avatar_url,
-                COALESCE(ws.puzzles_solved, 0)           AS puzzles_solved,
-                COALESCE(ws.resolved_count, 0)           AS resolved_count,
+                COALESCE(ws.puzzles_solved, 0)                AS puzzles_solved,
+                COALESCE(ws.resolved_count, 0)               AS resolved_count,
+                COALESCE(ws.lichess_tactic_count, 0)         AS lichess_tactic_count,
+                COALESCE(ws.scraped_positional_count, 0)     AS scraped_positional_count,
+                COALESCE(ws.decoy_count, 0)                  AS decoy_count,
                 ws.avg_rating,
                 ws.avg_solve_time_ms
             FROM active_users au
             JOIN users u ON u.id = au.user_id
             LEFT JOIN weekly_stats ws ON ws.user_id = au.user_id
-            ORDER BY COALESCE(ws.puzzles_solved, 0) DESC, u.display_name
+            ORDER BY COALESCE(ws.resolved_count, 0) DESC, u.display_name
         """),
         params,
     ).all()
@@ -210,11 +252,23 @@ def get_weekly_board(schedule_id: int | None = None) -> list[dict[str, object]]:
         accuracy_pct: float | None = (
             round(puzzles_solved / resolved * 100, 1) if resolved > 0 else None
         )
+        lichess_tactic_pct: float | None = (
+            round(int(row.lichess_tactic_count) / resolved * 100, 1) if resolved > 0 else None
+        )
+        scraped_positional_pct: float | None = (
+            round(int(row.scraped_positional_count) / resolved * 100, 1) if resolved > 0 else None
+        )
+        decoy_pct: float | None = (
+            round(int(row.decoy_count) / resolved * 100, 1) if resolved > 0 else None
+        )
         result.append({
             "userId": int(row.user_id),
             "displayName": row.display_name,
             "avatarUrl": row.avatar_url,
-            "puzzlesSolved": puzzles_solved,
+            "puzzlesAttempted": resolved,
+            "lichessTacticPct": lichess_tactic_pct,
+            "scrapedPositionalPct": scraped_positional_pct,
+            "decoyPct": decoy_pct,
             "avgRating": float(row.avg_rating) if row.avg_rating is not None else None,
             "avgAccuracyPct": accuracy_pct,
             "avgSolveTimeMs": float(row.avg_solve_time_ms) if row.avg_solve_time_ms is not None else None,

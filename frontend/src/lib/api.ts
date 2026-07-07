@@ -514,6 +514,7 @@ export type LeaderboardRun = {
   completedAt: string | null
   abortedAt: string | null
   status: RunStatus
+  userId: number
   displayName: string
   avatarUrl: string | null
   scheduleId: number
@@ -522,6 +523,7 @@ export type LeaderboardRun = {
   resolvedCount: number
   totalPuzzles: number
   accuracyPct: number | null
+  avgRating: number | null
   avgSolveTimeMs: number | null
   avgTimeSolvedMs: number | null
   avgTimeFailedMs: number | null
@@ -532,7 +534,10 @@ export type WeeklyLeaderboardRow = {
   userId: number
   displayName: string
   avatarUrl: string | null
-  puzzlesSolved: number
+  puzzlesAttempted: number
+  lichessTacticPct: number | null
+  scrapedPositionalPct: number | null
+  decoyPct: number | null
   avgRating: number | null
   avgAccuracyPct: number | null
   avgSolveTimeMs: number | null
@@ -1284,10 +1289,10 @@ export const api = {
       const qs = p.toString()
       return request<{ runs: LeaderboardRun[] }>(`/leaderboard${qs ? `?${qs}` : ''}`).then((r) => r.runs)
     },
-    getWeekly: (scheduleId?: number): Promise<WeeklyLeaderboardRow[]> =>
-      request<{ rows: WeeklyLeaderboardRow[] }>(
-        `/leaderboard/weekly${scheduleId !== undefined ? `?scheduleId=${scheduleId}` : ''}`,
-      ).then((r) => r.rows),
+    getWeekly: (scheduleIds?: number[]): Promise<WeeklyLeaderboardRow[]> => {
+      const qs = scheduleIds?.length ? scheduleIds.map((id) => `scheduleId=${id}`).join('&') : ''
+      return request<{ rows: WeeklyLeaderboardRow[] }>(`/leaderboard/weekly${qs ? `?${qs}` : ''}`).then((r) => r.rows)
+    },
   },
   sources: {
     lichessTactics: {

@@ -4,7 +4,7 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { formatSolveTimeMs } from '../../lib/utils'
 import { api } from '../../lib/api'
 import { UserAvatar } from '../../components/UserAvatar'
-import { ConceptIcon } from '../../components/ConceptIcon'
+import { CONCEPT_ICONS, DATA_ICONS } from '../../lib/icons'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 import { ServerDataTable, type FetchParams } from '../../components/ServerDataTable'
 import { useUserFilterSpec } from '../../hooks/useUserFilterSpec'
@@ -39,6 +39,7 @@ const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
   {
     id: 'user',
     header: 'User',
+    meta: { className: 'px-2 py-1 text-xs', icon: DATA_ICONS.user },
     enableSorting: false,
     cell: ({ row }) => {
       const { displayName, avatarUrl } = row.original
@@ -48,20 +49,14 @@ const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
         <span className="inline-block h-4 w-4 rounded-full bg-muted" />
       )
     },
-    meta: { className: 'px-2 py-1 text-xs' },
   },
   {
     id: 'runLabel',
     accessorKey: 'runOrder',
-    header: () => (
-      <span className="inline-flex items-center gap-1">
-        <ConceptIcon concept="Run" className="h-3 w-3" />
-        Run
-      </span>
-    ),
+    header: 'Run',
+    meta: { className: 'px-2 py-1', icon: CONCEPT_ICONS.Run },
     enableSorting: true,
     cell: ({ row }) => row.original.runLabel,
-    meta: { className: 'px-2 py-1' },
   },
   {
     accessorKey: 'tryNumber',
@@ -101,14 +96,14 @@ const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
     sortUndefined: 'last',
     cell: ({ row }) =>
       row.original.timeSpentMs !== null ? formatSolveTimeMs(row.original.timeSpentMs) : '—',
-    meta: { className: 'px-2 py-1' },
+    meta: { className: 'px-2 py-1', icon: DATA_ICONS.time },
   },
   {
     accessorKey: 'startedAt',
     header: 'Date',
     enableSorting: true,
     cell: ({ row }) => (row.original.startedAt ? row.original.startedAt.slice(0, 10) : '—'),
-    meta: { className: 'px-2 py-1' },
+    meta: { className: 'px-2 py-1', icon: DATA_ICONS.started },
   },
 ]
 

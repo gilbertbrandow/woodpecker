@@ -7,7 +7,8 @@ import { AppSidebar } from './AppSidebar'
 import { Footer } from './Footer'
 import { ThemeToggle } from './ThemeToggle'
 import { useAuth } from '../context/auth'
-import { Menu, Play, Database, Library, CalendarDays, Puzzle, Flag } from 'lucide-react'
+import { Menu, Play } from 'lucide-react'
+import { CONCEPT_ICONS } from '../lib/icons'
 import { AppLogo } from './AppLogo'
 import { useActiveRun } from '../hooks/useActiveRun'
 import type { ActiveRun } from '../lib/api'
@@ -23,19 +24,11 @@ import {
   BreadcrumbSeparator,
 } from './ui/breadcrumb'
 
-const CONCEPT_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  Source: Database,
-  Subset: Library,
-  Schedule: CalendarDays,
-  Training: Puzzle,
-  Run: Flag,
-}
-
 
 function AppBreadcrumb(): React.ReactElement | null {
   const matches = useMatches()
   const { title, concept, dynamicParents } = useBreadcrumbContext()
-  const LeafIcon = concept ? CONCEPT_ICONS[concept] : null
+  const LeafIcon = concept ? CONCEPT_ICONS[concept as keyof typeof CONCEPT_ICONS] ?? null : null
 
   const crumbList = matches.map((m) => m.staticData?.crumb).filter(Boolean)
   const crumb = crumbList[crumbList.length - 1]

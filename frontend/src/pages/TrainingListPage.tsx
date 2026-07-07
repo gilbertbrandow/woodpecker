@@ -1,7 +1,7 @@
 import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { Link } from '@tanstack/react-router'
-import { Plus, Puzzle } from 'lucide-react'
+import { Plus, Swords } from 'lucide-react'
 import { useAuth } from '../context/auth'
 import { TrainingTable } from '../components/participations/TrainingTable'
 import { ConceptIcon } from '../components/ConceptIcon'
@@ -27,7 +27,7 @@ export function TrainingListPage(): React.ReactElement | null {
 
       <WhatIsThisDrawer
         triggerLabel="What is a Training?"
-        title={<><Puzzle className="h-4 w-4" />Training</>}
+        title={<><Swords className="h-4 w-4" />Training</>}
         description="A user's active instance of working through a Schedule. Any user can create a Training from any existing Schedule, whether their own or another user's. It is through a Training that the user actually solves puzzles, by working through the Runs defined by the Schedule."
       />
 

@@ -7,6 +7,7 @@ import { UserAvatar } from '../components/UserAvatar'
 import { Badge } from '../components/ui/badge'
 import { api, type AdminUser } from '../lib/api'
 import { formatDate } from '../lib/utils'
+import { DATA_ICONS } from '../lib/icons'
 
 const PAGE_SIZE = 20
 
@@ -14,6 +15,7 @@ const COLUMNS: ColumnDef<AdminUser>[] = [
   {
     accessorKey: 'displayName',
     header: 'User',
+    meta: { icon: DATA_ICONS.user },
     cell: ({ row }) => (
       <div className="flex items-center gap-2">
         <UserAvatar displayName={row.original.displayName} avatarUrl={row.original.avatarUrl} />
@@ -24,6 +26,7 @@ const COLUMNS: ColumnDef<AdminUser>[] = [
   {
     accessorKey: 'lichessUsername',
     header: 'Lichess username',
+    meta: { icon: DATA_ICONS.lichessUsername },
     cell: ({ row }) => (
       <span className="text-muted-foreground">{row.original.lichessUsername}</span>
     ),
@@ -31,6 +34,7 @@ const COLUMNS: ColumnDef<AdminUser>[] = [
   {
     accessorKey: 'createdAt',
     header: 'Joined',
+    meta: { icon: DATA_ICONS.started },
     cell: ({ row }) => (
       <span className="tabular-nums text-muted-foreground">
         {formatDate(row.original.createdAt)}
@@ -40,6 +44,7 @@ const COLUMNS: ColumnDef<AdminUser>[] = [
   {
     accessorKey: 'lastLoginAt',
     header: 'Last login',
+    meta: { icon: DATA_ICONS.lastLogin },
     cell: ({ row }) => (
       <span className="tabular-nums text-muted-foreground">
         {row.original.lastLoginAt ? formatDate(row.original.lastLoginAt) : '—'}
@@ -49,6 +54,7 @@ const COLUMNS: ColumnDef<AdminUser>[] = [
   {
     accessorKey: 'lastSeenAt',
     header: 'Last seen',
+    meta: { icon: DATA_ICONS.lastSeen },
     cell: ({ row }) => (
       <span className="tabular-nums text-muted-foreground">
         {row.original.lastSeenAt ? formatDate(row.original.lastSeenAt) : '—'}
@@ -58,6 +64,7 @@ const COLUMNS: ColumnDef<AdminUser>[] = [
   {
     id: 'role',
     header: 'Role',
+    meta: { icon: DATA_ICONS.role },
     cell: ({ row }) =>
       row.original.isSuperAdmin ? (
         <Badge className="text-xs">Admin</Badge>

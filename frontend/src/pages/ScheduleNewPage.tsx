@@ -8,6 +8,7 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { UserAvatar } from '../components/UserAvatar'
 import { DataTable } from '../components/DataTable'
+import { DATA_ICONS } from '../lib/icons'
 
 export function ScheduleNewPage(): React.ReactElement | null {
   const { user, loading } = useAuth()
@@ -67,6 +68,7 @@ export function ScheduleNewPage(): React.ReactElement | null {
       {
         id: 'owner',
         header: 'Owner',
+        meta: { icon: DATA_ICONS.user },
         enableSorting: false,
         cell: ({ row }) => (
           <UserAvatar
@@ -78,6 +80,7 @@ export function ScheduleNewPage(): React.ReactElement | null {
       {
         accessorKey: 'name',
         header: 'Name',
+        meta: { icon: DATA_ICONS.name },
         cell: ({ row }) => (
           <span className="font-medium">{row.original.name}</span>
         ),
@@ -85,6 +88,7 @@ export function ScheduleNewPage(): React.ReactElement | null {
       {
         id: 'puzzleCount',
         header: 'Puzzles',
+        meta: { icon: DATA_ICONS.puzzles },
         accessorFn: (row) => row.puzzleCount,
         cell: ({ row }) => (
           <span className="tabular-nums text-muted-foreground">{row.original.puzzleCount}</span>
@@ -93,6 +97,7 @@ export function ScheduleNewPage(): React.ReactElement | null {
       {
         id: 'lockedAt',
         header: 'Locked',
+        meta: { icon: DATA_ICONS.started },
         accessorFn: (row) => row.lockedAt ?? '',
         cell: ({ row }) => (
           <span className="text-muted-foreground">

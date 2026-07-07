@@ -9,6 +9,7 @@ import { Button } from '../components/ui/button'
 import { UserAvatar } from '../components/UserAvatar'
 import { DataTable } from '../components/DataTable'
 import { formatDuration } from '../components/schedules/DurationInput'
+import { CONCEPT_ICONS, DATA_ICONS } from '../lib/icons'
 
 export function TrainingNewPage(): React.ReactElement | null {
   const { user, loading } = useAuth()
@@ -65,6 +66,7 @@ export function TrainingNewPage(): React.ReactElement | null {
       {
         id: 'creator',
         header: 'Creator',
+        meta: { icon: DATA_ICONS.user },
         enableSorting: false,
         cell: ({ row }) => (
           <UserAvatar
@@ -76,6 +78,7 @@ export function TrainingNewPage(): React.ReactElement | null {
       {
         accessorKey: 'name',
         header: 'Name',
+        meta: { icon: DATA_ICONS.name },
         cell: ({ row }) => (
           <span className="font-medium">{row.original.name}</span>
         ),
@@ -83,6 +86,7 @@ export function TrainingNewPage(): React.ReactElement | null {
       {
         id: 'subsetName',
         header: 'Subset',
+        meta: { icon: CONCEPT_ICONS.Subset },
         accessorFn: (row) => row.subsetName,
         cell: ({ row }) => (
           <span className="text-muted-foreground">{row.original.subsetName}</span>
@@ -91,6 +95,7 @@ export function TrainingNewPage(): React.ReactElement | null {
       {
         id: 'runCount',
         header: 'Runs',
+        meta: { icon: CONCEPT_ICONS.Run },
         accessorFn: (row) => row.runCount,
         cell: ({ row }) => (
           <span className="tabular-nums text-muted-foreground">
@@ -101,6 +106,7 @@ export function TrainingNewPage(): React.ReactElement | null {
       {
         id: 'duration',
         header: 'Duration',
+        meta: { icon: DATA_ICONS.time },
         accessorFn: (row) => row.totalHours,
         cell: ({ row }) => (
           <span className="tabular-nums text-muted-foreground">

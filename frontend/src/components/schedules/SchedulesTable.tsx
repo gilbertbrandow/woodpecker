@@ -24,7 +24,7 @@ import { api } from "../../lib/api";
 import { useUserFilterSpec } from "../../hooks/useUserFilterSpec";
 import { formatDuration } from "./DurationInput";
 import { toast } from "../../lib/toast";
-import { ConceptIcon } from "../ConceptIcon";
+import { CONCEPT_ICONS, DATA_ICONS } from "../../lib/icons";
 
 const PAGE_SIZE = 20;
 
@@ -77,6 +77,7 @@ export function SchedulesTable({
         id: "creator",
         accessorFn: (row) => row.createdBy.displayName,
         header: "Creator",
+        meta: { icon: DATA_ICONS.user },
         enableSorting: false,
         cell: ({ row }) => (
           <UserAvatar
@@ -88,12 +89,14 @@ export function SchedulesTable({
       {
         accessorKey: "name",
         header: "Name",
+        meta: { icon: DATA_ICONS.name },
         cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
       },
       {
         id: "subset",
         accessorFn: (row) => row.subsetName,
-        header: () => <span className="flex items-center gap-1.5"><ConceptIcon concept="Subset" className="h-3.5 w-3.5 text-muted-foreground" />Subset</span>,
+        header: "Subset",
+        meta: { icon: CONCEPT_ICONS.Subset },
         enableSorting: false,
         cell: ({ row }) => (
           <Link
@@ -110,12 +113,14 @@ export function SchedulesTable({
       {
         accessorKey: "status",
         header: "Status",
+        meta: { icon: DATA_ICONS.status },
         enableSorting: false,
         cell: ({ row }) => <StatusBadge status={row.original.status} />,
       },
       {
         accessorKey: "runCount",
-        header: () => <span className="flex items-center gap-1.5"><ConceptIcon concept="Run" className="h-3.5 w-3.5 text-muted-foreground" />Runs</span>,
+        header: "Runs",
+        meta: { icon: CONCEPT_ICONS.Run },
         cell: ({ row }) => (
           <span className="tabular-nums text-muted-foreground">
             {row.original.runCount > 0 ? row.original.runCount : "—"}
@@ -125,6 +130,7 @@ export function SchedulesTable({
       {
         accessorKey: "totalHours",
         header: "Duration",
+        meta: { icon: DATA_ICONS.time },
         cell: ({ row }) => (
           <span className="tabular-nums text-muted-foreground">
             {row.original.totalHours > 0 ? formatDuration(row.original.totalHours) : "—"}
@@ -136,6 +142,7 @@ export function SchedulesTable({
         accessorFn: (row) =>
           row.lockedAt ? new Date(row.lockedAt).getTime() : new Date(row.createdAt).getTime(),
         header: "Date",
+        meta: { icon: DATA_ICONS.started },
         cell: ({ row }) => (
           <span className="text-muted-foreground">
             {formatDate(row.original.lockedAt ?? row.original.createdAt)}

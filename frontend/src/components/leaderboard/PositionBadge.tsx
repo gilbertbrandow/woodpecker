@@ -1,25 +1,20 @@
 import * as React from 'react'
 import { type Table } from '@tanstack/react-table'
+import cupGold from '../../assets/medals/cup-gold.svg'
+import cupSilver from '../../assets/medals/cup-silver.svg'
+import cupBronze from '../../assets/medals/cup-bronze.svg'
+
+const cupIcons: Record<1 | 2 | 3, string> = {
+  1: cupGold,
+  2: cupSilver,
+  3: cupBronze,
+}
 
 export function PositionBadge({ position }: { position: number }): React.ReactElement {
-  if (position === 1) {
+  if (position === 1 || position === 2 || position === 3) {
     return (
-      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-yellow-100 text-yellow-700 text-xs font-bold dark:bg-yellow-900/40 dark:text-yellow-400">
-        1
-      </span>
-    )
-  }
-  if (position === 2) {
-    return (
-      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-600 text-xs font-bold dark:bg-slate-800 dark:text-slate-300">
-        2
-      </span>
-    )
-  }
-  if (position === 3) {
-    return (
-      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-orange-100 text-orange-700 text-xs font-bold dark:bg-orange-900/40 dark:text-orange-400">
-        3
+      <span className="inline-flex h-7 w-7 items-center justify-center">
+        <img src={cupIcons[position]} alt={`${position}`} className="h-7 w-7" />
       </span>
     )
   }
@@ -31,5 +26,21 @@ export function PositionBadge({ position }: { position: number }): React.ReactEl
 }
 
 export function getGlobalPosition<T>(row: { id: string }, table: Table<T>): number {
-  return table.getSortedRowModel().rows.findIndex((r) => r.id === row.id) + 1
+  const { pageIndex, pageSize } = table.getState().pagination
+  const localIndex = table.getRowModel().rows.findIndex((r) => r.id === row.id)
+  const visualIndex = pageIndex * pageSize + localIndex
+
+  const primarySort = table.getState().sorting[0]
+  if (primarySort) {
+    const col = table.getColumn(primarySort.id)
+    // rankDesc: true = higher value is better (default); false = lower value is better (e.g. time)
+    const rankDesc = (col?.columnDef.meta as { rankDesc?: boolean } | undefined)?.rankDesc ?? true
+    const bestFirst = rankDesc === primarySort.desc
+    if (!bestFirst) {
+      const totalRows = table.getFilteredRowModel().rows.length
+      return totalRows - visualIndex
+    }
+  }
+
+  return visualIndex + 1
 }

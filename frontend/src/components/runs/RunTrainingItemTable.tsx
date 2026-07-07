@@ -2,6 +2,7 @@ import * as React from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
 import { ExternalLink, Play, Eye } from 'lucide-react'
+import { DATA_ICONS } from '../../lib/icons'
 import { StatusBadge } from '../StatusBadge'
 import { TrainingItemTypeBadge } from '../TrainingItemTypeBadge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
@@ -72,13 +73,14 @@ export function RunTrainingItemTable({ trainingItems, runIdStr, isActive }: RunT
     {
       id: 'sourceType',
       header: 'Type',
+      meta: { icon: DATA_ICONS.type },
       enableSorting: false,
       cell: ({ row }) => <TrainingItemTypeBadge source={row.original.source.sourceType} />,
     },
     {
       id: 'rating',
       header: 'Rating / Level',
-      meta: { className: 'min-w-24' },
+      meta: { className: 'min-w-24', icon: DATA_ICONS.rating },
       accessorFn: (row) =>
         row.source.sourceType === 'LICHESS_TACTIC' ? row.source.rating : null,
       cell: ({ row }) => {
@@ -99,14 +101,14 @@ export function RunTrainingItemTable({ trainingItems, runIdStr, isActive }: RunT
     {
       accessorKey: 'positionStatus',
       header: 'Status',
+      meta: { className: 'min-w-32', icon: DATA_ICONS.status },
       enableSorting: false,
-      meta: { className: 'min-w-32' },
       cell: ({ row }) => <StatusBadge status={row.original.positionStatus} />,
     },
     {
       accessorKey: 'timeMs',
       header: 'Time',
-      meta: { className: 'min-w-28' },
+      meta: { className: 'min-w-28', icon: DATA_ICONS.time },
       sortUndefined: 'last',
       cell: ({ row }) => (
         <span className="tabular-nums">
@@ -117,7 +119,7 @@ export function RunTrainingItemTable({ trainingItems, runIdStr, isActive }: RunT
     {
       accessorKey: 'tryCount',
       header: 'Tries',
-      meta: { className: 'min-w-20 text-right' },
+      meta: { className: 'min-w-20 text-right', icon: DATA_ICONS.tries },
       cell: ({ row }) => (
         <span className="tabular-nums">{row.original.tryCount > 0 ? row.original.tryCount : '—'}</span>
       ),

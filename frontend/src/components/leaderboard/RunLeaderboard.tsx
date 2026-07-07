@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
 import { DataTable, type FilterableColumn } from '../DataTable'
+import { DATA_ICONS, CONCEPT_ICONS } from '../../lib/icons'
 import { UserAvatar } from '../UserAvatar'
 import { StatusBadge, runStatusToStatusValue } from '../StatusBadge'
 import { formatDate, formatNumber, formatSolveTimeMs } from '../../lib/utils'
@@ -15,9 +16,10 @@ type Props = {
   runIndex?: number
   allowFiltering?: boolean
   compact?: boolean
-  currentUserDisplayName?: string
+  currentUserId?: number
   loading?: boolean
   tableId?: string
+  filtersSlot?: React.ReactNode
 }
 
 function formatDelta(delta: number | null): React.ReactElement {
@@ -36,16 +38,16 @@ function formatDelta(delta: number | null): React.ReactElement {
   )
 }
 
-
 export function RunLeaderboard({
   rows,
   scheduleId,
   runIndex,
   allowFiltering = false,
   compact = false,
-  currentUserDisplayName,
+  currentUserId,
   loading = false,
   tableId,
+  filtersSlot,
 }: Props): React.ReactElement {
   const navigate = useNavigate()
 
@@ -82,6 +84,7 @@ export function RunLeaderboard({
       id: 'position',
       enableSorting: false,
       header: '',
+      meta: { className: 'w-12' },
       cell: ({ row, table }) => (
         <PositionBadge position={getGlobalPosition(row, table)} />
       ),
@@ -91,12 +94,13 @@ export function RunLeaderboard({
       id: 'user',
       accessorFn: (r) => r.displayName,
       header: 'User',
+      meta: { icon: DATA_ICONS.user },
       enableSorting: false,
       cell: ({ row }) => (
         <span className="flex items-center gap-2">
           <UserAvatar displayName={row.original.displayName} avatarUrl={row.original.avatarUrl} />
           <span className="font-medium">{row.original.displayName}</span>
-          {currentUserDisplayName === row.original.displayName && (
+          {currentUserId === row.original.userId && (
             <span className="text-xs text-muted-foreground font-normal">you</span>
           )}
         </span>
@@ -107,6 +111,7 @@ export function RunLeaderboard({
       id: 'schedule',
       accessorFn: (r) => String(r.scheduleId),
       header: 'Schedule',
+      meta: { icon: CONCEPT_ICONS.Schedule },
       enableSorting: false,
       filterFn: (row, id, val: string[]) => !val.length || val.includes(row.getValue(id) as string),
       cell: ({ row }) => (
@@ -125,6 +130,7 @@ export function RunLeaderboard({
       id: 'runNumber',
       accessorFn: (r) => String(r.runIndex + 1),
       header: 'Run',
+      meta: { icon: CONCEPT_ICONS.Run },
       enableSorting: false,
       filterFn: (row, id, val: string[]) => !val.length || val.includes(row.getValue(id) as string),
       cell: ({ row }) => (
@@ -136,6 +142,7 @@ export function RunLeaderboard({
       id: 'accuracyPct',
       accessorFn: (r) => r.accuracyPct ?? -1,
       header: 'Accuracy',
+      meta: { icon: DATA_ICONS.accuracy },
       enableSorting: true,
       cell: ({ row }) =>
         row.original.accuracyPct !== null ? (
@@ -149,18 +156,34 @@ export function RunLeaderboard({
       id: 'deltaAccuracyPct',
       accessorFn: (r) => r.deltaAccuracyPct ?? -Infinity,
       header: 'Δ accuracy',
+      meta: { icon: DATA_ICONS.delta },
       enableSorting: true,
       cell: ({ row }) => formatDelta(row.original.deltaAccuracyPct),
     }
 
+    const avgRatingColumn: ColumnDef<LeaderboardRun> = {
+      id: 'avgRating',
+      accessorFn: (r) => r.avgRating ?? -1,
+      header: 'Avg rating',
+      meta: { icon: DATA_ICONS.rating },
+      enableSorting: true,
+      cell: ({ row }) =>
+        row.original.avgRating !== null ? (
+          <span className="tabular-nums">{Math.round(row.original.avgRating)}</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    }
+
     function makeTimeColumn(
       id: 'avgSolveTimeMs' | 'avgTimeSolvedMs' | 'avgTimeFailedMs',
-      header: string,
+      label: string,
     ): ColumnDef<LeaderboardRun> {
       return {
         id,
         accessorFn: (r) => r[id] ?? Infinity,
-        header,
+        header: label,
+        meta: { rankDesc: false, icon: DATA_ICONS.time },
         enableSorting: true,
         cell: ({ row }) => {
           const v = row.original[id]
@@ -174,13 +197,14 @@ export function RunLeaderboard({
     const avgSolveTimeColumn = makeTimeColumn('avgSolveTimeMs', 'Avg time')
 
     if (compact) {
-      return [positionColumn, userColumn, accuracyColumn, deltaColumn, avgSolveTimeColumn]
+      return [positionColumn, userColumn, accuracyColumn, deltaColumn, avgRatingColumn, avgSolveTimeColumn]
     }
 
     const statusColumn: ColumnDef<LeaderboardRun> = {
       id: 'status',
       accessorKey: 'status',
       header: 'Status',
+      meta: { icon: DATA_ICONS.status },
       enableSorting: false,
       cell: ({ row }) => (
         <StatusBadge status={runStatusToStatusValue(row.original.status)} />
@@ -191,7 +215,8 @@ export function RunLeaderboard({
       id: 'startedAt',
       accessorFn: (r) => new Date(r.startedAt).getTime(),
       header: 'Started',
-      enableSorting: true,
+      meta: { icon: DATA_ICONS.started },
+      enableSorting: false,
       cell: ({ row }) => (
         <span className="text-muted-foreground">{formatDate(row.original.startedAt)}</span>
       ),
@@ -204,6 +229,7 @@ export function RunLeaderboard({
       id: 'resolvedCount',
       accessorFn: (r) => r.resolvedCount,
       header: 'Attempts completed',
+      meta: { icon: DATA_ICONS.attempts },
       enableSorting: true,
       cell: ({ row }) => (
         <span className="tabular-nums">
@@ -221,21 +247,22 @@ export function RunLeaderboard({
       startedColumn,
       accuracyColumn,
       deltaColumn,
+      avgRatingColumn,
       avgSolveTimeColumn,
       avgTimeSolvedColumn,
       avgTimeFailedColumn,
       resolvedColumn,
     ]
-  }, [scheduleId, runIndex, compact, currentUserDisplayName])
+  }, [scheduleId, runIndex, compact, currentUserId])
 
   return (
     <DataTable
       tableId={tableId}
       columns={columns}
       data={rows}
-      globalFilterPlaceholder="Search leaderboard…"
       filterableColumns={filterableColumns}
-      hideSearch={compact}
+      filtersSlot={compact ? undefined : filtersSlot}
+      hideSearch
       pageSize={compact ? 5 : 20}
       initialSorting={[{ id: 'accuracyPct', desc: true }]}
       loading={loading}
@@ -249,7 +276,7 @@ export function RunLeaderboard({
               })
       }
       getRowClassName={(r) =>
-        currentUserDisplayName === r.displayName ? 'bg-muted/50' : ''
+        currentUserId === r.userId ? 'bg-muted/50' : ''
       }
       emptyMessage="No runs match your filters."
     />

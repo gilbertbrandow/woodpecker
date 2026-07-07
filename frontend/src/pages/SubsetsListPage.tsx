@@ -1,7 +1,7 @@
 import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { Link } from '@tanstack/react-router'
-import { Plus, Library } from 'lucide-react'
+import { Plus, LibraryBig } from 'lucide-react'
 import { useAuth } from '../context/auth'
 import { SubsetsTable } from '../components/subsets/SubsetsTable'
 import { ConceptIcon } from '../components/ConceptIcon'
@@ -27,7 +27,7 @@ export function SubsetsListPage(): React.ReactElement | null {
 
       <WhatIsThisDrawer
         triggerLabel="What is a Subset?"
-        title={<><Library className="h-4 w-4" />Subset</>}
+        title={<><LibraryBig className="h-4 w-4" />Subset</>}
         description="A user-curated, fixed collection of puzzles drawn from any Source. Any user can create a Subset by configuring a source composition with filters, filling it from that configuration, then locking it. Once locked it is public and visible to all users and available to be used in a Schedule."
       />
 
