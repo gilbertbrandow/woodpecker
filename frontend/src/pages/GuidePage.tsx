@@ -1,7 +1,7 @@
 import { PageWrapper } from '../components/PageWrapper'
 import { UserAvatar } from '../components/UserAvatar'
 import * as React from 'react'
-import { Database, Library, CalendarDays, Puzzle, Flag } from 'lucide-react'
+import { Database, LibraryBig, CalendarDays, Swords, Flag } from 'lucide-react'
 
 type FlowStep = {
   icon: React.ComponentType<{ className?: string }>
@@ -22,9 +22,9 @@ const FLOWS: Flow[] = [
     avatarUrl: 'default:bq:crimson:alpha',
     context: 'Creates her own Subset with exactly the puzzles she wants and sets up a Schedule that works for her.',
     steps: [
-      { icon: Library, label: 'Creates "Alice\'s Subset"', detail: '250 puzzles: 70% Lichess Tactics (rating 1800–2200), 20% Scraped Positional (medium difficulty), 10% Decoys. Locks it.' },
+      { icon: LibraryBig, label: 'Creates "Alice\'s Subset"', detail: '250 puzzles: 70% Lichess Tactics (rating 1800–2200), 20% Scraped Positional (medium difficulty), 10% Decoys. Locks it.' },
       { icon: CalendarDays, label: 'Creates "Alice\'s Schedule"', detail: 'Uses "Alice\'s Subset". 4 runs with tightening time limits: 1 week, 4 days, 2 days, 1 day. 1 day break between each run. Random order of puzzles each run.' },
-      { icon: Puzzle, label: 'Starts new training', detail: 'Using "Alice\'s Schedule"' },
+      { icon: Swords, label: 'Starts new training', detail: 'Using "Alice\'s Schedule"' },
       { icon: Flag, label: 'Runs', detail: 'Run 1 created as soon as training start, others after completion.' },
     ],
   },
@@ -33,7 +33,7 @@ const FLOWS: Flow[] = [
     avatarUrl: 'default:bk:navy:merida',
     context: 'Uses Alice\'s Subset and Schedule by simply starting a Training from Alice\'s existing Schedule.',
     steps: [
-      { icon: Puzzle, label: 'Starts new training', detail: 'Using "Alice\'s Schedule"' },
+      { icon: Swords, label: 'Starts new training', detail: 'Using "Alice\'s Schedule"' },
       { icon: Flag, label: 'Runs', detail: 'Run 1 created as soon as training start, others after completion.' },
     ],
   },
@@ -43,7 +43,7 @@ const FLOWS: Flow[] = [
     context: 'Wants to train on Alice\'s Subset but prefers her own Schedule with different run lengths and ordering.',
     steps: [
       { icon: CalendarDays, label: 'Creates "Carol\'s Schedule"', detail: 'Uses "Alice\'s Subset". 5 runs with tightening time limits: 2 weeks, 1 week, 4 days, 2 days, 1 day. 1 day break between each run. Puzzles ordered by rating each run.' },
-      { icon: Puzzle, label: 'Starts new training', detail: 'Using "Carol\'s Schedule"' },
+      { icon: Swords, label: 'Starts new training', detail: 'Using "Carol\'s Schedule"' },
       { icon: Flag, label: 'Runs', detail: 'Run 1 created as soon as training start, others after completion.' },
     ],
   },
@@ -63,7 +63,7 @@ const CONCEPTS: Concept[] = [
       'A named external puzzle database and the origin of all puzzles that can be included in a Subset. Each source defines its own solving conditions, what constitutes a correct solution is source-specific, not universal.',
   },
   {
-    icon: Library,
+    icon: LibraryBig,
     title: 'Subsets',
     description:
       'A user-curated, fixed collection of puzzles drawn from any Source. Any user can create a Subset by configuring a source composition with filters, filling it from that configuration, then locking it. Once locked it is public and visible to all users and available to be used in a Schedule.',
@@ -75,7 +75,7 @@ const CONCEPTS: Concept[] = [
       'A training plan created by any user around a locked Subset. The user configures how many Runs to perform and, for each, the time limit and the suggested break before the next. Additional settings control the puzzle order across Runs and whether failed puzzles are retried within the same Run.',
   },
   {
-    icon: Puzzle,
+    icon: Swords,
     title: 'Trainings',
     description:
       'A user\'s active instance of working through a Schedule. Any user can create a Training from any existing Schedule, whether their own or another user\'s. It is through a Training that the user actually solves puzzles, by working through the Runs defined by the Schedule.',

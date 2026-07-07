@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useMemo } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { User, CalendarDays, Flag, Clock, Target, TrendingUp, Activity, ListChecks, ChartColumn } from 'lucide-react'
+import { User, Calendar, CalendarDays, Flag, Clock, Target, TrendingUp, Activity, ListChecks, ChartColumn } from 'lucide-react'
 import { DataTable, type FilterableColumn } from '../DataTable'
 import { UserAvatar } from '../UserAvatar'
 import { StatusBadge, runStatusToStatusValue } from '../StatusBadge'
@@ -216,7 +216,7 @@ export function RunLeaderboard({
     const startedColumn: ColumnDef<LeaderboardRun> = {
       id: 'startedAt',
       accessorFn: (r) => new Date(r.startedAt).getTime(),
-      header: () => <H icon={CalendarDays}>Started</H>,
+      header: () => <H icon={Calendar}>Started</H>,
       enableSorting: false,
       cell: ({ row }) => (
         <span className="text-muted-foreground">{formatDate(row.original.startedAt)}</span>

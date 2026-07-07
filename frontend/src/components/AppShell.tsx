@@ -7,7 +7,7 @@ import { AppSidebar } from './AppSidebar'
 import { Footer } from './Footer'
 import { ThemeToggle } from './ThemeToggle'
 import { useAuth } from '../context/auth'
-import { Menu, Play, Database, Library, CalendarDays, Puzzle, Flag } from 'lucide-react'
+import { Menu, Play, Database, LibraryBig, CalendarDays, Swords, Flag } from 'lucide-react'
 import { AppLogo } from './AppLogo'
 import { useActiveRun } from '../hooks/useActiveRun'
 import type { ActiveRun } from '../lib/api'
@@ -25,9 +25,9 @@ import {
 
 const CONCEPT_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   Source: Database,
-  Subset: Library,
+  Subset: LibraryBig,
   Schedule: CalendarDays,
-  Training: Puzzle,
+  Training: Swords,
   Run: Flag,
 }
 
