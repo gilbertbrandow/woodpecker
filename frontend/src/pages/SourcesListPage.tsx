@@ -10,7 +10,7 @@ import { DataTable } from '../components/DataTable'
 import { type ColumnDef } from '@tanstack/react-table'
 import { type SourceListItem, api } from '../lib/api'
 import { DATA_ICONS } from '../lib/icons'
-import { formatDate } from '../lib/utils'
+import { formatDate, formatNumber } from '../lib/utils'
 
 const SOURCE_ROUTES: Record<string, string> = {
   LICHESS_TACTIC: '/app/sources/lichess-tactics',
@@ -38,7 +38,7 @@ const columns: ColumnDef<SourceListItem>[] = [
     meta: { icon: DATA_ICONS.puzzles },
     cell: ({ row }) => (
       <span className="tabular-nums text-muted-foreground">
-        {row.original.puzzleCount.toLocaleString()}
+        {formatNumber(row.original.puzzleCount)}
       </span>
     ),
   },
