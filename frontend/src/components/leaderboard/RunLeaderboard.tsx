@@ -2,8 +2,8 @@ import * as React from 'react'
 import { useMemo } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { User, Calendar, CalendarDays, Flag, Clock, Target, TrendingUp, Activity, ListChecks, ChartColumn } from 'lucide-react'
 import { DataTable, type FilterableColumn } from '../DataTable'
+import { DATA_ICONS, CONCEPT_ICONS } from '../../lib/icons'
 import { UserAvatar } from '../UserAvatar'
 import { StatusBadge, runStatusToStatusValue } from '../StatusBadge'
 import { formatDate, formatNumber, formatSolveTimeMs } from '../../lib/utils'
@@ -34,15 +34,6 @@ function formatDelta(delta: number | null): React.ReactElement {
   return (
     <span className={`tabular-nums text-xs ${color}`}>
       {sign}{delta.toFixed(1)}%
-    </span>
-  )
-}
-
-function H({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>, children: React.ReactNode }): React.ReactElement {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <Icon className="h-3.5 w-3.5" />
-      {children}
     </span>
   )
 }
@@ -102,7 +93,8 @@ export function RunLeaderboard({
     const userColumn: ColumnDef<LeaderboardRun> = {
       id: 'user',
       accessorFn: (r) => r.displayName,
-      header: () => <H icon={User}>User</H>,
+      header: 'User',
+      meta: { icon: DATA_ICONS.user },
       enableSorting: false,
       cell: ({ row }) => (
         <span className="flex items-center gap-2">
@@ -118,7 +110,8 @@ export function RunLeaderboard({
     const scheduleColumn: ColumnDef<LeaderboardRun> = {
       id: 'schedule',
       accessorFn: (r) => String(r.scheduleId),
-      header: () => <H icon={CalendarDays}>Schedule</H>,
+      header: 'Schedule',
+      meta: { icon: CONCEPT_ICONS.Schedule },
       enableSorting: false,
       filterFn: (row, id, val: string[]) => !val.length || val.includes(row.getValue(id) as string),
       cell: ({ row }) => (
@@ -136,7 +129,8 @@ export function RunLeaderboard({
     const runNumberColumn: ColumnDef<LeaderboardRun> = {
       id: 'runNumber',
       accessorFn: (r) => String(r.runIndex + 1),
-      header: () => <H icon={Flag}>Run</H>,
+      header: 'Run',
+      meta: { icon: CONCEPT_ICONS.Run },
       enableSorting: false,
       filterFn: (row, id, val: string[]) => !val.length || val.includes(row.getValue(id) as string),
       cell: ({ row }) => (
@@ -147,7 +141,8 @@ export function RunLeaderboard({
     const accuracyColumn: ColumnDef<LeaderboardRun> = {
       id: 'accuracyPct',
       accessorFn: (r) => r.accuracyPct ?? -1,
-      header: () => <H icon={Target}>Accuracy</H>,
+      header: 'Accuracy',
+      meta: { icon: DATA_ICONS.accuracy },
       enableSorting: true,
       cell: ({ row }) =>
         row.original.accuracyPct !== null ? (
@@ -160,7 +155,8 @@ export function RunLeaderboard({
     const deltaColumn: ColumnDef<LeaderboardRun> = {
       id: 'deltaAccuracyPct',
       accessorFn: (r) => r.deltaAccuracyPct ?? -Infinity,
-      header: () => <H icon={TrendingUp}>Δ accuracy</H>,
+      header: 'Δ accuracy',
+      meta: { icon: DATA_ICONS.delta },
       enableSorting: true,
       cell: ({ row }) => formatDelta(row.original.deltaAccuracyPct),
     }
@@ -168,7 +164,8 @@ export function RunLeaderboard({
     const avgRatingColumn: ColumnDef<LeaderboardRun> = {
       id: 'avgRating',
       accessorFn: (r) => r.avgRating ?? -1,
-      header: () => <H icon={ChartColumn}>Avg rating</H>,
+      header: 'Avg rating',
+      meta: { icon: DATA_ICONS.rating },
       enableSorting: true,
       cell: ({ row }) =>
         row.original.avgRating !== null ? (
@@ -185,8 +182,8 @@ export function RunLeaderboard({
       return {
         id,
         accessorFn: (r) => r[id] ?? Infinity,
-        header: () => <H icon={Clock}>{label}</H>,
-        meta: { rankDesc: false },
+        header: label,
+        meta: { rankDesc: false, icon: DATA_ICONS.time },
         enableSorting: true,
         cell: ({ row }) => {
           const v = row.original[id]
@@ -206,7 +203,8 @@ export function RunLeaderboard({
     const statusColumn: ColumnDef<LeaderboardRun> = {
       id: 'status',
       accessorKey: 'status',
-      header: () => <H icon={Activity}>Status</H>,
+      header: 'Status',
+      meta: { icon: DATA_ICONS.status },
       enableSorting: false,
       cell: ({ row }) => (
         <StatusBadge status={runStatusToStatusValue(row.original.status)} />
@@ -216,7 +214,8 @@ export function RunLeaderboard({
     const startedColumn: ColumnDef<LeaderboardRun> = {
       id: 'startedAt',
       accessorFn: (r) => new Date(r.startedAt).getTime(),
-      header: () => <H icon={Calendar}>Started</H>,
+      header: 'Started',
+      meta: { icon: DATA_ICONS.started },
       enableSorting: false,
       cell: ({ row }) => (
         <span className="text-muted-foreground">{formatDate(row.original.startedAt)}</span>
@@ -229,7 +228,8 @@ export function RunLeaderboard({
     const resolvedColumn: ColumnDef<LeaderboardRun> = {
       id: 'resolvedCount',
       accessorFn: (r) => r.resolvedCount,
-      header: () => <H icon={ListChecks}>Attempts completed</H>,
+      header: 'Attempts completed',
+      meta: { icon: DATA_ICONS.attempts },
       enableSorting: true,
       cell: ({ row }) => (
         <span className="tabular-nums">

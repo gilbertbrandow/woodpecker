@@ -1,13 +1,13 @@
 import * as React from 'react'
 import { useMemo } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
-import { User, Puzzle, ChartColumn, Target, Clock, Zap, Compass } from 'lucide-react'
 import { DataTable } from '../DataTable'
 import { UserAvatar } from '../UserAvatar'
 import { formatSolveTimeMs } from '../../lib/utils'
 import type { WeeklyLeaderboardRow } from '../../lib/api'
 import { PositionBadge, getGlobalPosition } from './PositionBadge'
 import { ScarecrowIcon } from '../TrainingItemTypeBadge'
+import { DATA_ICONS } from '../../lib/icons'
 
 type Props = {
   rows: WeeklyLeaderboardRow[]
@@ -15,15 +15,6 @@ type Props = {
   loading?: boolean
   tableId?: string
   filtersSlot?: React.ReactNode
-}
-
-function H({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>, children: React.ReactNode }): React.ReactElement {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <Icon className="h-3.5 w-3.5" />
-      {children}
-    </span>
-  )
 }
 
 export function WeeklyLeaderboard({ rows, currentUserId, loading = false, tableId, filtersSlot }: Props): React.ReactElement {
@@ -41,7 +32,8 @@ export function WeeklyLeaderboard({ rows, currentUserId, loading = false, tableI
       {
         id: 'user',
         accessorFn: (r) => r.displayName,
-        header: () => <H icon={User}>User</H>,
+        header: 'User',
+        meta: { icon: DATA_ICONS.user },
         enableSorting: false,
         cell: ({ row }) => (
           <span className="flex items-center gap-2">
@@ -56,7 +48,8 @@ export function WeeklyLeaderboard({ rows, currentUserId, loading = false, tableI
       {
         id: 'puzzlesAttempted',
         accessorFn: (r) => r.puzzlesAttempted,
-        header: () => <H icon={Puzzle}>Puzzles</H>,
+        header: 'Puzzles',
+        meta: { icon: DATA_ICONS.puzzles },
         enableSorting: true,
         cell: ({ row }) => (
           <span className="tabular-nums font-medium">{row.original.puzzlesAttempted}</span>
@@ -65,7 +58,8 @@ export function WeeklyLeaderboard({ rows, currentUserId, loading = false, tableI
       {
         id: 'lichessTacticPct',
         accessorFn: (r) => r.lichessTacticPct ?? -1,
-        header: () => <H icon={Zap}>Tactical</H>,
+        header: 'Tactical',
+        meta: { icon: DATA_ICONS.tactical },
         enableSorting: true,
         cell: ({ row }) =>
           row.original.lichessTacticPct !== null ? (
@@ -77,7 +71,8 @@ export function WeeklyLeaderboard({ rows, currentUserId, loading = false, tableI
       {
         id: 'scrapedPositionalPct',
         accessorFn: (r) => r.scrapedPositionalPct ?? -1,
-        header: () => <H icon={Compass}>Positional</H>,
+        header: 'Positional',
+        meta: { icon: DATA_ICONS.positional },
         enableSorting: true,
         cell: ({ row }) =>
           row.original.scrapedPositionalPct !== null ? (
@@ -89,7 +84,8 @@ export function WeeklyLeaderboard({ rows, currentUserId, loading = false, tableI
       {
         id: 'decoyPct',
         accessorFn: (r) => r.decoyPct ?? -1,
-        header: () => <H icon={ScarecrowIcon}>Decoy</H>,
+        header: 'Decoy',
+        meta: { icon: ScarecrowIcon },
         enableSorting: true,
         cell: ({ row }) =>
           row.original.decoyPct !== null ? (
@@ -101,7 +97,8 @@ export function WeeklyLeaderboard({ rows, currentUserId, loading = false, tableI
       {
         id: 'avgRating',
         accessorFn: (r) => r.avgRating ?? -1,
-        header: () => <H icon={ChartColumn}>Avg rating</H>,
+        header: 'Avg rating',
+        meta: { icon: DATA_ICONS.rating },
         enableSorting: true,
         cell: ({ row }) =>
           row.original.avgRating !== null ? (
@@ -113,7 +110,8 @@ export function WeeklyLeaderboard({ rows, currentUserId, loading = false, tableI
       {
         id: 'avgAccuracyPct',
         accessorFn: (r) => r.avgAccuracyPct ?? -1,
-        header: () => <H icon={Target}>Accuracy</H>,
+        header: 'Accuracy',
+        meta: { icon: DATA_ICONS.accuracy },
         enableSorting: true,
         cell: ({ row }) =>
           row.original.avgAccuracyPct !== null ? (
@@ -125,8 +123,8 @@ export function WeeklyLeaderboard({ rows, currentUserId, loading = false, tableI
       {
         id: 'avgSolveTimeMs',
         accessorFn: (r) => r.avgSolveTimeMs ?? Infinity,
-        header: () => <H icon={Clock}>Avg solve time</H>,
-        meta: { rankDesc: false },
+        header: 'Avg solve time',
+        meta: { rankDesc: false, icon: DATA_ICONS.time },
         enableSorting: true,
         cell: ({ row }) =>
           row.original.avgSolveTimeMs !== null ? (

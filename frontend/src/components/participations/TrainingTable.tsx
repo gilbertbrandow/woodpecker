@@ -19,7 +19,7 @@ import { UserAvatar } from "../UserAvatar";
 import { ServerDataTable } from "../ServerDataTable";
 import { api, type AllTrainingSummary } from "../../lib/api";
 import { useUserFilterSpec } from "../../hooks/useUserFilterSpec";
-import { ConceptIcon } from "../ConceptIcon";
+import { CONCEPT_ICONS, DATA_ICONS } from "../../lib/icons";
 
 const PAGE_SIZE = 20;
 
@@ -55,6 +55,7 @@ export function TrainingTable({
         id: "user",
         accessorFn: (row) => row.user.displayName,
         header: "User",
+        meta: { icon: DATA_ICONS.user },
         enableSorting: false,
         cell: ({ row }) => (
           <UserAvatar
@@ -66,6 +67,7 @@ export function TrainingTable({
       {
         accessorKey: "status",
         header: "Status",
+        meta: { icon: DATA_ICONS.status },
         enableSorting: false,
         cell: ({ row }) => (
           <StatusBadge
@@ -80,6 +82,7 @@ export function TrainingTable({
         accessorFn: (row) =>
           row.totalPuzzles > 0 ? row.completedPuzzles / row.totalPuzzles : 0,
         header: "Progress",
+        meta: { icon: DATA_ICONS.progress },
         cell: ({ row }) => {
           const pct =
             row.original.totalPuzzles > 0
@@ -101,7 +104,8 @@ export function TrainingTable({
             {
               id: "schedule",
               accessorFn: (row: AllTrainingSummary) => row.scheduleName,
-              header: () => <span className="flex items-center gap-1.5"><ConceptIcon concept="Schedule" className="h-3.5 w-3.5 text-muted-foreground" />Schedule</span>,
+              header: "Schedule",
+              meta: { icon: CONCEPT_ICONS.Schedule },
               cell: ({ row }: { row: { original: AllTrainingSummary } }) => (
                 <Link
                   to="/app/schedules/$scheduleId"
@@ -120,6 +124,7 @@ export function TrainingTable({
         id: "startedAt",
         accessorFn: (row) => new Date(row.startedAt).getTime(),
         header: "Started",
+        meta: { icon: DATA_ICONS.started },
         cell: ({ row }) => (
           <span className="text-muted-foreground">
             {formatDate(row.original.startedAt)}
@@ -131,6 +136,7 @@ export function TrainingTable({
         accessorFn: (row) =>
           row.completedAt ? new Date(row.completedAt).getTime() : 0,
         header: "Finished",
+        meta: { icon: DATA_ICONS.finished },
         cell: ({ row }) => (
           <span className="text-muted-foreground">
             {row.original.completedAt ? formatDate(row.original.completedAt) : "—"}

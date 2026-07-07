@@ -10,11 +10,23 @@ import {
   ChartColumn,
   Clock,
   Calendar,
+  CalendarCheck,
   Puzzle,
   ListChecks,
   Activity,
   Zap,
   Compass,
+  BarChart2,
+  Coffee,
+  Repeat,
+  Tag,
+  LogIn,
+  Eye,
+  Signature,
+  ShieldUser,
+  Mail,
+  CalendarClock,
+  UserKey,
 } from 'lucide-react'
 
 export const CONCEPT_ICONS = {
@@ -49,4 +61,17 @@ export const DATA_ICONS = {
   // Puzzle-type breakdown
   tactical:   Zap,
   positional: Compass,
+  // Column-specific
+  finished:   CalendarCheck,
+  progress:   BarChart2,
+  breakTime:  Coffee,
+  tries:      Repeat,
+  type:       Tag,
+  lastLogin:       LogIn,
+  lastSeen:        Eye,
+  name:            Signature,
+  lichessUsername: ShieldUser,
+  email:           Mail,
+  lastAttempt:     CalendarClock,
+  role:            UserKey,
 } as const

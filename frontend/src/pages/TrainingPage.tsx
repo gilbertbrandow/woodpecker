@@ -54,6 +54,7 @@ import { formatDate, formatStartedAt } from '../lib/utils'
 import { TrainingProgressCard } from '../components/TrainingProgressCard'
 import { CurrentTrainingStatus } from '../components/CurrentTrainingStatus'
 import { ConceptIcon } from '../components/ConceptIcon'
+import { CONCEPT_ICONS, DATA_ICONS } from '../lib/icons'
 
 const ACCURACY_CONFIG: ChartConfig = {
   bar: { label: 'Accuracy %', color: 'hsl(var(--chart-1))' },
@@ -270,7 +271,8 @@ export function TrainingPage(): React.ReactElement | null {
     return [
       {
         id: 'index',
-        header: () => <span className="flex items-center gap-1.5"><ConceptIcon concept="Run" className="h-3.5 w-3.5 text-muted-foreground" />Run</span>,
+        header: 'Run',
+        meta: { icon: CONCEPT_ICONS.Run },
         enableSorting: false,
         cell: ({ row }) => (
           <span className="tabular-nums text-sm text-muted-foreground">Run {row.original.index + 1}</span>
@@ -279,6 +281,7 @@ export function TrainingPage(): React.ReactElement | null {
       {
         id: 'status',
         header: 'Status',
+        meta: { icon: DATA_ICONS.status },
         enableSorting: false,
         cell: ({ row }) => {
           const { slotStatus } = row.original
@@ -291,6 +294,7 @@ export function TrainingPage(): React.ReactElement | null {
       {
         id: 'progress',
         header: 'Progress',
+        meta: { icon: DATA_ICONS.progress },
         enableSorting: false,
         cell: ({ row }) => (
           <ProgressBar value={row.original.progressValue} tooltipLabel={row.original.progressTooltip} className="w-28" />
@@ -299,6 +303,7 @@ export function TrainingPage(): React.ReactElement | null {
       {
         id: 'duration',
         header: 'Duration',
+        meta: { icon: DATA_ICONS.time },
         enableSorting: false,
         cell: ({ row }) => (
           <span className="text-sm text-muted-foreground">{formatDuration(row.original.targetHours)}</span>
@@ -307,6 +312,7 @@ export function TrainingPage(): React.ReactElement | null {
       {
         id: 'break',
         header: 'Break',
+        meta: { icon: DATA_ICONS.breakTime },
         enableSorting: false,
         cell: ({ row }) => (
           <span className="text-sm text-muted-foreground">
@@ -319,6 +325,7 @@ export function TrainingPage(): React.ReactElement | null {
       {
         id: 'startedAt',
         header: 'Started',
+        meta: { icon: DATA_ICONS.started },
         enableSorting: false,
         cell: ({ row }) => (
           <span className="text-sm text-muted-foreground">
@@ -331,6 +338,7 @@ export function TrainingPage(): React.ReactElement | null {
       {
         id: 'completedAt',
         header: 'Completed',
+        meta: { icon: DATA_ICONS.finished },
         enableSorting: false,
         cell: ({ row }) => (
           <span className="text-sm text-muted-foreground">

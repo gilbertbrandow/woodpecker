@@ -9,6 +9,7 @@ import { ServerDataTable } from '../components/ServerDataTable'
 import { AdminUserCapBanner } from '../components/AdminUserCapBanner'
 import { api, type AdminWaitlistEntry } from '../lib/api'
 import { formatDate } from '../lib/utils'
+import { DATA_ICONS } from '../lib/icons'
 import { toast } from '../lib/toast'
 import {
   AlertDialog,
@@ -50,6 +51,7 @@ export function AdminWaitlistPage(): React.ReactElement {
       {
         accessorKey: 'lichessUsername',
         header: 'Lichess username',
+        meta: { icon: DATA_ICONS.lichessUsername },
         cell: ({ row }) => (
           <span className="font-medium">{row.original.lichessUsername}</span>
         ),
@@ -57,6 +59,7 @@ export function AdminWaitlistPage(): React.ReactElement {
       {
         id: 'status',
         header: 'Status',
+        meta: { icon: DATA_ICONS.status },
         enableSorting: false,
         cell: ({ row }) =>
           row.original.isWhitelisted ? (
@@ -72,6 +75,7 @@ export function AdminWaitlistPage(): React.ReactElement {
       {
         accessorKey: 'email',
         header: 'Email',
+        meta: { icon: DATA_ICONS.email },
         cell: ({ row }) => (
           <span className="text-muted-foreground">{row.original.email ?? '—'}</span>
         ),
@@ -79,6 +83,7 @@ export function AdminWaitlistPage(): React.ReactElement {
       {
         accessorKey: 'createdAt',
         header: 'Joined',
+        meta: { icon: DATA_ICONS.started },
         cell: ({ row }) => (
           <span className="tabular-nums text-muted-foreground">
             {formatDate(row.original.createdAt)}
@@ -88,6 +93,7 @@ export function AdminWaitlistPage(): React.ReactElement {
       {
         accessorKey: 'updatedAt',
         header: 'Last attempt',
+        meta: { icon: DATA_ICONS.lastAttempt },
         cell: ({ row }) => (
           <span className="tabular-nums text-muted-foreground">
             {formatDate(row.original.updatedAt)}

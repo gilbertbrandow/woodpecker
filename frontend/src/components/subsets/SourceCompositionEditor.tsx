@@ -43,6 +43,7 @@ import { SubsetIdentifier, formatLockedDate } from "./SubsetIdentifier";
 import { UserAvatar } from "../UserAvatar";
 import { DataTable } from "../DataTable";
 import type { ColumnDef } from "@tanstack/react-table";
+import { DATA_ICONS } from "../../lib/icons";
 import { cn } from "../../lib/utils";
 
 const RATING_DEFAULT: RatingValue = {
@@ -457,6 +458,7 @@ function ExcludedSubsetsTable({
       {
         id: "creator",
         header: "Creator",
+        meta: { icon: DATA_ICONS.user },
         enableSorting: false,
         cell: ({ row }) => (
           <UserAvatar
@@ -468,6 +470,7 @@ function ExcludedSubsetsTable({
       {
         accessorKey: "name",
         header: "Name",
+        meta: { icon: DATA_ICONS.name },
         enableSorting: false,
         cell: ({ row }) => (
           <span className="font-medium">{row.original.name}</span>
@@ -476,6 +479,7 @@ function ExcludedSubsetsTable({
       {
         accessorKey: "puzzleCount",
         header: "Puzzles",
+        meta: { icon: DATA_ICONS.puzzles },
         enableSorting: false,
         cell: ({ row }) => (
           <span className="tabular-nums text-muted-foreground">
@@ -486,6 +490,7 @@ function ExcludedSubsetsTable({
       {
         accessorKey: "lockedAt",
         header: "Locked at",
+        meta: { icon: DATA_ICONS.started },
         enableSorting: false,
         cell: ({ row }) => (
           <span className="text-muted-foreground">
