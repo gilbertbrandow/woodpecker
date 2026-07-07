@@ -172,15 +172,15 @@ def get_run_board(
     return result
 
 
-def get_weekly_board(schedule_id: int | None = None) -> list[dict[str, object]]:
+def get_weekly_board(schedule_ids: list[int] | None = None) -> list[dict[str, object]]:
     params: dict[str, object] = {}
     weekly_schedule_where = ""
     active_schedule_where = ""
 
-    if schedule_id is not None:
-        weekly_schedule_where = "AND t.schedule_id = :schedule_id"
-        active_schedule_where = "WHERE t.schedule_id = :schedule_id"
-        params["schedule_id"] = schedule_id
+    if schedule_ids:
+        weekly_schedule_where = "AND t.schedule_id = ANY(:schedule_ids)"
+        active_schedule_where = "WHERE t.schedule_id = ANY(:schedule_ids)"
+        params["schedule_ids"] = schedule_ids
 
     rows = db.session.execute(
         sa.text(f"""
