@@ -33,16 +33,6 @@ const columns: ColumnDef<SourceListItem>[] = [
     cell: ({ row }) => <TrainingItemTypeBadge source={row.original.sourceType} />,
   },
   {
-    accessorKey: 'puzzleCount',
-    header: 'Puzzles',
-    meta: { icon: DATA_ICONS.puzzles },
-    cell: ({ row }) => (
-      <span className="tabular-nums text-muted-foreground">
-        {formatNumber(row.original.puzzleCount)}
-      </span>
-    ),
-  },
-  {
     accessorKey: 'firstImported',
     header: 'First imported',
     meta: { icon: DATA_ICONS.started },
@@ -59,6 +49,16 @@ const columns: ColumnDef<SourceListItem>[] = [
     cell: ({ row }) => (
       <span className="text-muted-foreground">
         {row.original.lastSynced ? formatDate(row.original.lastSynced) : '—'}
+      </span>
+    ),
+  },
+  {
+    accessorKey: 'puzzleCount',
+    header: 'Puzzles',
+    meta: { icon: DATA_ICONS.puzzles, className: 'text-right' },
+    cell: ({ row }) => (
+      <span className="tabular-nums text-muted-foreground">
+        {formatNumber(row.original.puzzleCount)}
       </span>
     ),
   },
