@@ -1289,10 +1289,10 @@ export const api = {
       const qs = p.toString()
       return request<{ runs: LeaderboardRun[] }>(`/leaderboard${qs ? `?${qs}` : ''}`).then((r) => r.runs)
     },
-    getWeekly: (scheduleId?: number): Promise<WeeklyLeaderboardRow[]> =>
-      request<{ rows: WeeklyLeaderboardRow[] }>(
-        `/leaderboard/weekly${scheduleId !== undefined ? `?scheduleId=${scheduleId}` : ''}`,
-      ).then((r) => r.rows),
+    getWeekly: (scheduleIds?: number[]): Promise<WeeklyLeaderboardRow[]> => {
+      const qs = scheduleIds?.length ? scheduleIds.map((id) => `scheduleId=${id}`).join('&') : ''
+      return request<{ rows: WeeklyLeaderboardRow[] }>(`/leaderboard/weekly${qs ? `?${qs}` : ''}`).then((r) => r.rows)
+    },
   },
   sources: {
     lichessTactics: {

@@ -19,6 +19,7 @@ type Props = {
   currentUserId?: number
   loading?: boolean
   tableId?: string
+  filtersSlot?: React.ReactNode
 }
 
 function formatDelta(delta: number | null): React.ReactElement {
@@ -55,6 +56,7 @@ export function RunLeaderboard({
   currentUserId,
   loading = false,
   tableId,
+  filtersSlot,
 }: Props): React.ReactElement {
   const navigate = useNavigate()
 
@@ -258,9 +260,9 @@ export function RunLeaderboard({
       tableId={tableId}
       columns={columns}
       data={rows}
-      globalFilterPlaceholder="Search leaderboard…"
       filterableColumns={filterableColumns}
-      hideSearch={compact}
+      filtersSlot={compact ? undefined : filtersSlot}
+      hideSearch
       pageSize={compact ? 5 : 20}
       initialSorting={[{ id: 'accuracyPct', desc: true }]}
       loading={loading}

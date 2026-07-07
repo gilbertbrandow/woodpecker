@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react'
 import { api, type WeeklyLeaderboardRow } from '../lib/api'
 
 type Opts = {
-  scheduleId?: number
+  scheduleIds?: number[]
   enabled?: boolean
 }
 
-export function useWeeklyLeaderboard({ scheduleId, enabled = true }: Opts): {
+export function useWeeklyLeaderboard({ scheduleIds, enabled = true }: Opts): {
   rows: WeeklyLeaderboardRow[]
   loading: boolean
   error: boolean
@@ -15,16 +15,19 @@ export function useWeeklyLeaderboard({ scheduleId, enabled = true }: Opts): {
   const [loading, setLoading] = useState(enabled)
   const [error, setError] = useState(false)
 
+  const scheduleIdsKey = scheduleIds?.join(',') ?? ''
+
   useEffect(() => {
     if (!enabled) return
     setLoading(true)
     setError(false)
     api.leaderboard
-      .getWeekly(scheduleId)
+      .getWeekly(scheduleIds?.length ? scheduleIds : undefined)
       .then(setRows)
       .catch(() => setError(true))
       .finally(() => setLoading(false))
-  }, [enabled, scheduleId])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, scheduleIdsKey])
 
   return { rows, loading, error }
 }

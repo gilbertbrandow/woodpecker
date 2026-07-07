@@ -14,6 +14,7 @@ type Props = {
   currentUserId?: number
   loading?: boolean
   tableId?: string
+  filtersSlot?: React.ReactNode
 }
 
 function H({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>, children: React.ReactNode }): React.ReactElement {
@@ -25,7 +26,7 @@ function H({ icon: Icon, children }: { icon: React.ComponentType<{ className?: s
   )
 }
 
-export function WeeklyLeaderboard({ rows, currentUserId, loading = false, tableId }: Props): React.ReactElement {
+export function WeeklyLeaderboard({ rows, currentUserId, loading = false, tableId, filtersSlot }: Props): React.ReactElement {
   const columns = useMemo<ColumnDef<WeeklyLeaderboardRow>[]>(
     () => [
       {
@@ -144,6 +145,7 @@ export function WeeklyLeaderboard({ rows, currentUserId, loading = false, tableI
       columns={columns}
       data={rows}
       hideSearch
+      filtersSlot={filtersSlot}
       pageSize={20}
       initialSorting={[{ id: 'puzzlesAttempted', desc: true }]}
       loading={loading}
