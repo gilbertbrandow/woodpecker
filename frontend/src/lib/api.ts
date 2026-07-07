@@ -533,7 +533,7 @@ export type WeeklyLeaderboardRow = {
   userId: number
   displayName: string
   avatarUrl: string | null
-  puzzlesSolved: number
+  puzzlesAttempted: number
   avgRating: number | null
   avgAccuracyPct: number | null
   avgSolveTimeMs: number | null

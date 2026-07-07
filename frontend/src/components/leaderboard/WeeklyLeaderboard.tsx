@@ -52,12 +52,12 @@ export function WeeklyLeaderboard({ rows, currentUserId, loading = false, tableI
         ),
       },
       {
-        id: 'puzzlesSolved',
-        accessorFn: (r) => r.puzzlesSolved,
-        header: () => <H icon={Puzzle}>Puzzles solved</H>,
+        id: 'puzzlesAttempted',
+        accessorFn: (r) => r.puzzlesAttempted,
+        header: () => <H icon={Puzzle}>Puzzles attempted</H>,
         enableSorting: true,
         cell: ({ row }) => (
-          <span className="tabular-nums font-medium">{row.original.puzzlesSolved}</span>
+          <span className="tabular-nums font-medium">{row.original.puzzlesAttempted}</span>
         ),
       },
       {
@@ -108,7 +108,7 @@ export function WeeklyLeaderboard({ rows, currentUserId, loading = false, tableI
       data={rows}
       hideSearch
       pageSize={20}
-      initialSorting={[{ id: 'puzzlesSolved', desc: true }]}
+      initialSorting={[{ id: 'puzzlesAttempted', desc: true }]}
       loading={loading}
       getRowClassName={(r) =>
         currentUserId === r.userId ? 'bg-muted/50' : ''
