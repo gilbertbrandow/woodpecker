@@ -200,7 +200,7 @@ def get_weekly_board(schedule_id: int | None = None) -> list[dict[str, object]]:
             FROM active_users au
             JOIN users u ON u.id = au.user_id
             LEFT JOIN weekly_stats ws ON ws.user_id = au.user_id
-            ORDER BY COALESCE(ws.puzzles_solved, 0) DESC, u.display_name
+            ORDER BY COALESCE(ws.resolved_count, 0) DESC, u.display_name
         """),
         params,
     ).all()
@@ -216,7 +216,7 @@ def get_weekly_board(schedule_id: int | None = None) -> list[dict[str, object]]:
             "userId": int(row.user_id),
             "displayName": row.display_name,
             "avatarUrl": row.avatar_url,
-            "puzzlesSolved": puzzles_solved,
+            "puzzlesAttempted": resolved,
             "avgRating": float(row.avg_rating) if row.avg_rating is not None else None,
             "avgAccuracyPct": accuracy_pct,
             "avgSolveTimeMs": float(row.avg_solve_time_ms) if row.avg_solve_time_ms is not None else None,
