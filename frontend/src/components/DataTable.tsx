@@ -25,7 +25,11 @@ import { MultiSelectFilter } from './ui/multi-select-filter'
 import { cn } from '../lib/utils'
 import { useTableUrlSync } from '../hooks/useTableUrlSync'
 
-type ColMeta = { className?: string }
+type ColMeta = {
+  className?: string
+  rankDesc?: boolean
+  icon?: React.ComponentType<{ className?: string }>
+}
 
 export type FilterableColumn = {
   id: string
@@ -293,15 +297,24 @@ export function DataTable<T>({
                 {hg.headers.map((h) => {
                   const canSort = h.column.getCanSort()
                   const sorted = h.column.getIsSorted()
+                  const colMeta = h.column.columnDef.meta as ColMeta | undefined
+                  const HeaderIcon = colMeta?.icon
+                  const renderedHeader = flexRender(h.column.columnDef.header, h.getContext())
+                  const headerNode = HeaderIcon ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <HeaderIcon className="h-3.5 w-3.5" />
+                      {renderedHeader}
+                    </span>
+                  ) : renderedHeader
                   return (
-                    <TableHead key={h.id} className={cn('whitespace-nowrap', (h.column.columnDef.meta as ColMeta | undefined)?.className)}>
+                    <TableHead key={h.id} className={cn('whitespace-nowrap', colMeta?.className)}>
                       {h.isPlaceholder ? null : canSort ? (
                         <button
                           type="button"
                           onClick={h.column.getToggleSortingHandler()}
                           className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
                         >
-                          {flexRender(h.column.columnDef.header, h.getContext())}
+                          {headerNode}
                           {sorted === 'asc' ? (
                             <ArrowUp className="h-3 w-3" />
                           ) : sorted === 'desc' ? (
@@ -311,7 +324,7 @@ export function DataTable<T>({
                           )}
                         </button>
                       ) : (
-                        flexRender(h.column.columnDef.header, h.getContext())
+                        headerNode
                       )}
                     </TableHead>
                   )

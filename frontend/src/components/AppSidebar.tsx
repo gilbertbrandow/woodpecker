@@ -1,7 +1,8 @@
 import * as React from 'react'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useSidebar } from './ui/sidebar'
-import { ChevronsUpDown, LayoutDashboard, LibraryBig, Database, CalendarDays, BookOpen, Compass, Settings, LogOut, Play, User, Trophy, Clock, Users, UserCheck, Swords } from 'lucide-react'
+import { ChevronsUpDown, LayoutDashboard, BookOpen, Compass, Settings, LogOut, Play, User, Trophy, Clock, Users, UserCheck } from 'lucide-react'
+import { CONCEPT_ICONS } from '../lib/icons'
 import { toast } from '../lib/toast'
 import { useAuth } from '../context/auth'
 import { parseAvatarValue } from '../lib/avatar'
@@ -43,13 +44,13 @@ type NavItem = {
 const ACTIVITY_ITEMS: NavItem[] = [
   { label: 'Dashboard', to: '/app', icon: LayoutDashboard },
   { label: 'Leaderboards', to: '/app/leaderboards', icon: Trophy },
-  { label: 'Training', to: '/app/training', icon: Swords, search: (prev) => ({ ...prev, userId: 'me' }) },
+  { label: 'Training', to: '/app/training', icon: CONCEPT_ICONS.Training, search: (prev) => ({ ...prev, userId: 'me' }) },
 ]
 
 const SETUP_ITEMS: NavItem[] = [
-  { label: 'Sources', to: '/app/sources', icon: Database },
-  { label: 'Subsets', to: '/app/subsets', icon: LibraryBig },
-  { label: 'Schedules', to: '/app/schedules', icon: CalendarDays },
+  { label: 'Sources', to: '/app/sources', icon: CONCEPT_ICONS.Source },
+  { label: 'Subsets', to: '/app/subsets', icon: CONCEPT_ICONS.Subset },
+  { label: 'Schedules', to: '/app/schedules', icon: CONCEPT_ICONS.Schedule },
 ]
 
 const FOOTER_ITEMS: NavItem[] = [
