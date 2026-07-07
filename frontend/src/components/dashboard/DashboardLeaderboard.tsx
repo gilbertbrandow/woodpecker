@@ -18,7 +18,7 @@ export function DashboardLeaderboard({ trainingId, runIndex }: Props): React.Rea
       runIndex={runIndex}
       compact
       loading={loading}
-      currentUserDisplayName={user?.displayName}
+      currentUserId={user?.id}
     />
   )
 }

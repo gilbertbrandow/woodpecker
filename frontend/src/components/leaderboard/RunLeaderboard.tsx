@@ -16,7 +16,7 @@ type Props = {
   runIndex?: number
   allowFiltering?: boolean
   compact?: boolean
-  currentUserDisplayName?: string
+  currentUserId?: number
   loading?: boolean
   tableId?: string
 }
@@ -52,7 +52,7 @@ export function RunLeaderboard({
   runIndex,
   allowFiltering = false,
   compact = false,
-  currentUserDisplayName,
+  currentUserId,
   loading = false,
   tableId,
 }: Props): React.ReactElement {
@@ -106,7 +106,7 @@ export function RunLeaderboard({
         <span className="flex items-center gap-2">
           <UserAvatar displayName={row.original.displayName} avatarUrl={row.original.avatarUrl} />
           <span className="font-medium">{row.original.displayName}</span>
-          {currentUserDisplayName === row.original.displayName && (
+          {currentUserId === row.original.userId && (
             <span className="text-xs text-muted-foreground font-normal">you</span>
           )}
         </span>
@@ -237,7 +237,7 @@ export function RunLeaderboard({
       avgTimeFailedColumn,
       resolvedColumn,
     ]
-  }, [scheduleId, runIndex, compact, currentUserDisplayName])
+  }, [scheduleId, runIndex, compact, currentUserId])
 
   return (
     <DataTable
@@ -260,7 +260,7 @@ export function RunLeaderboard({
               })
       }
       getRowClassName={(r) =>
-        currentUserDisplayName === r.displayName ? 'bg-muted/50' : ''
+        currentUserId === r.userId ? 'bg-muted/50' : ''
       }
       emptyMessage="No runs match your filters."
     />

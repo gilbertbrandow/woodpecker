@@ -68,7 +68,7 @@ export function LeaderboardPage(): React.ReactElement | null {
         <WeeklyLeaderboard
           tableId="weekly"
           rows={weeklyRows}
-          currentUserDisplayName={user.displayName}
+          currentUserId={user.id}
           loading={weeklyLoading}
         />
       </section>
@@ -86,6 +86,7 @@ export function LeaderboardPage(): React.ReactElement | null {
           scheduleId={selectedScheduleId}
           allowFiltering
           loading={runLoading}
+          currentUserId={user.id}
         />
       </section>
     </PageWrapper>

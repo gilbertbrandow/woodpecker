@@ -10,7 +10,7 @@ import { PositionBadge, getGlobalPosition } from './PositionBadge'
 
 type Props = {
   rows: WeeklyLeaderboardRow[]
-  currentUserDisplayName?: string
+  currentUserId?: number
   loading?: boolean
   tableId?: string
 }
@@ -24,7 +24,7 @@ function H({ icon: Icon, children }: { icon: React.ComponentType<{ className?: s
   )
 }
 
-export function WeeklyLeaderboard({ rows, currentUserDisplayName, loading = false, tableId }: Props): React.ReactElement {
+export function WeeklyLeaderboard({ rows, currentUserId, loading = false, tableId }: Props): React.ReactElement {
   const columns = useMemo<ColumnDef<WeeklyLeaderboardRow>[]>(
     () => [
       {
@@ -45,7 +45,7 @@ export function WeeklyLeaderboard({ rows, currentUserDisplayName, loading = fals
           <span className="flex items-center gap-2">
             <UserAvatar displayName={row.original.displayName} avatarUrl={row.original.avatarUrl} />
             <span className="font-medium">{row.original.displayName}</span>
-            {currentUserDisplayName === row.original.displayName && (
+            {currentUserId === row.original.userId && (
               <span className="text-xs text-muted-foreground font-normal">you</span>
             )}
           </span>
@@ -98,7 +98,7 @@ export function WeeklyLeaderboard({ rows, currentUserDisplayName, loading = fals
           ),
       },
     ],
-    [currentUserDisplayName],
+    [currentUserId],
   )
 
   return (
@@ -111,7 +111,7 @@ export function WeeklyLeaderboard({ rows, currentUserDisplayName, loading = fals
       initialSorting={[{ id: 'puzzlesSolved', desc: true }]}
       loading={loading}
       getRowClassName={(r) =>
-        currentUserDisplayName === r.displayName ? 'bg-muted/50' : ''
+        currentUserId === r.userId ? 'bg-muted/50' : ''
       }
       emptyMessage="No activity in the last 7 days."
     />

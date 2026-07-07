@@ -780,7 +780,7 @@ export function SchedulePage(): React.ReactElement | null {
                     scheduleId={id}
                     allowFiltering
                     loading={leaderboardLoading}
-                    currentUserDisplayName={user?.displayName}
+                    currentUserId={user?.id}
                   />
                 </div>
               </CollapsibleContent>
