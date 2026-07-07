@@ -39,10 +39,27 @@ def get_run_board(
                         WHERE pa.run_training_item_id = rp.id
                           AND pa.status != 'in_progress'
                     ))                                                    AS resolved_count,
+                    AVG(
+                        CASE ti.source_type::text
+                            WHEN 'LICHESS_TACTIC'     THEN lt.rating
+                            WHEN 'SCRAPED_POSITIONAL' THEN
+                                CASE spd.value
+                                    WHEN 1 THEN 1500
+                                    WHEN 2 THEN 1800
+                                    WHEN 3 THEN 2000
+                                    WHEN 4 THEN 2200
+                                END
+                            ELSE NULL
+                        END
+                    )                                                     AS avg_rating,
                     AVG(la.time_spent_ms)                                AS avg_solve_time_ms,
                     AVG(first_solve.time_spent_ms)                       AS avg_time_solved_ms,
                     AVG(last_failed.time_spent_ms)                       AS avg_time_failed_ms
                 FROM run_training_items rp
+                JOIN training_items ti ON ti.id = rp.training_item_id
+                LEFT JOIN lichess_tactics lt  ON lt.training_item_id = rp.training_item_id
+                LEFT JOIN scraped_positional_puzzles spp ON spp.training_item_id = rp.training_item_id
+                LEFT JOIN scraped_positional_difficulties spd ON spd.id = spp.difficulty_id
                 LEFT JOIN LATERAL (
                     SELECT pa.time_spent_ms
                     FROM training_attempts pa
@@ -84,6 +101,7 @@ def get_run_board(
                 COALESCE(rs.first_solved_count, 0)  AS first_solved_count,
                 COALESCE(rs.resolved_count, 0)       AS resolved_count,
                 COALESCE(rs.total_puzzles, 0)        AS total_puzzles,
+                rs.avg_rating,
                 rs.avg_solve_time_ms,
                 rs.avg_time_solved_ms,
                 rs.avg_time_failed_ms,
@@ -145,6 +163,7 @@ def get_run_board(
             "resolvedCount": resolved,
             "totalPuzzles": int(row.total_puzzles),
             "accuracyPct": accuracy_pct,
+            "avgRating": float(row.avg_rating) if row.avg_rating is not None else None,
             "avgSolveTimeMs": float(row.avg_solve_time_ms) if row.avg_solve_time_ms is not None else None,
             "avgTimeSolvedMs": float(row.avg_time_solved_ms) if row.avg_time_solved_ms is not None else None,
             "avgTimeFailedMs": float(row.avg_time_failed_ms) if row.avg_time_failed_ms is not None else None,
@@ -171,13 +190,28 @@ def get_weekly_board(schedule_id: int | None = None) -> list[dict[str, object]]:
                     COUNT(DISTINCT rp.id) FILTER (WHERE pa.status = 'solved' AND pa.try_number = 1)
                                                 AS puzzles_solved,
                     COUNT(DISTINCT rp.id)       AS resolved_count,
-                    AVG(lt.rating)              AS avg_rating,
+                    AVG(
+                        CASE ti.source_type::text
+                            WHEN 'LICHESS_TACTIC'     THEN lt.rating
+                            WHEN 'SCRAPED_POSITIONAL' THEN
+                                CASE spd.value
+                                    WHEN 1 THEN 1500
+                                    WHEN 2 THEN 1800
+                                    WHEN 3 THEN 2000
+                                    WHEN 4 THEN 2200
+                                END
+                            ELSE NULL
+                        END
+                    )                           AS avg_rating,
                     AVG(pa.time_spent_ms)       AS avg_solve_time_ms
                 FROM training_attempts pa
                 JOIN run_training_items rp ON rp.id = pa.run_training_item_id
                 JOIN runs r       ON r.id = rp.run_id
                 JOIN trainings t  ON t.id = r.training_id
-                LEFT JOIN lichess_tactics lt ON lt.training_item_id = rp.training_item_id
+                JOIN training_items ti ON ti.id = rp.training_item_id
+                LEFT JOIN lichess_tactics lt  ON lt.training_item_id = rp.training_item_id
+                LEFT JOIN scraped_positional_puzzles spp ON spp.training_item_id = rp.training_item_id
+                LEFT JOIN scraped_positional_difficulties spd ON spd.id = spp.difficulty_id
                 WHERE pa.completed_at >= NOW() - INTERVAL '7 days'
                   AND pa.status != 'in_progress'
                   {weekly_schedule_where}
