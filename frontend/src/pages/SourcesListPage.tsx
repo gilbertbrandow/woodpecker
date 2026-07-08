@@ -11,19 +11,16 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { type SourceListItem, api } from '../lib/api'
 import { DATA_ICONS } from '../lib/icons'
 import { formatDate, formatNumber } from '../lib/utils'
-
-const SOURCE_ROUTES: Record<string, string> = {
-  LICHESS_TACTIC: '/app/sources/lichess-tactics',
-  SCRAPED_POSITIONAL: '/app/sources/scraped-positional-puzzles',
-  DECOY: '/app/sources/decoys',
-}
+import { SOURCE_NAMES, SOURCE_ROUTES } from '../lib/sources'
+import { useApiData } from '../hooks/useApiData'
 
 const columns: ColumnDef<SourceListItem>[] = [
   {
-    accessorKey: 'name',
+    id: 'name',
     header: 'Name',
     meta: { icon: DATA_ICONS.name },
-    cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+    accessorFn: (row) => SOURCE_NAMES[row.sourceType],
+    cell: ({ row }) => <span className="font-medium">{SOURCE_NAMES[row.original.sourceType]}</span>,
   },
   {
     accessorKey: 'sourceType',
@@ -67,15 +64,8 @@ const columns: ColumnDef<SourceListItem>[] = [
 export function SourcesListPage(): React.ReactElement | null {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [sources, setSources] = React.useState<SourceListItem[]>([])
-  const [loading, setLoading] = React.useState(true)
-
-  React.useEffect(() => {
-    api.sources.list()
-      .then(({ sources: items }) => setSources(items))
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
+  const { data, loading } = useApiData(api.sources.list)
+  const sources = data?.sources ?? []
 
   if (!user) return null
 

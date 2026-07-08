@@ -305,7 +305,6 @@ export type TrainingItemSource = 'LICHESS_TACTIC' | 'DECOY' | 'SCRAPED_POSITIONA
 
 export type SourceListItem = {
   sourceType: TrainingItemSource
-  name: string
   puzzleCount: number
   firstImported: string | null
   lastSynced: string | null
