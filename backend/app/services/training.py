@@ -64,10 +64,11 @@ def training_full_dict(training: Training) -> dict[str, object]:
         {
             "runIndex": r.run_index,
             "targetAccuracy": r.target_accuracy,
-            "targetSolveSeconds": r.target_solve_seconds,
+            "targetMinSolveSeconds": r.target_min_solve_seconds,
+            "targetMaxSolveSeconds": r.target_max_solve_seconds,
         }
         for r in runs
-        if r.target_accuracy is not None or r.target_solve_seconds is not None
+        if r.target_accuracy is not None or r.target_max_solve_seconds is not None
     ]
 
     if training.aborted_at is not None:
@@ -280,14 +281,22 @@ def set_run_target(
     user_id: int,
     run_index: int,
     target_accuracy: float | None,
-    target_solve_seconds: int | None,
+    target_min_solve_seconds: int | None,
+    target_max_solve_seconds: int | None,
 ) -> Run:
     _get_owned_training(training_id, user_id)
 
     if target_accuracy is not None and not (0.0 <= target_accuracy <= 100.0):
         raise ValidationError("Invalid target accuracy", "The target accuracy must be between 0 and 100.")
-    if target_solve_seconds is not None and target_solve_seconds < 1:
-        raise ValidationError("Invalid solve time", "The target solve time must be at least 1 second.")
+    if target_max_solve_seconds is not None and target_max_solve_seconds < 1:
+        raise ValidationError("Invalid solve time", "The target maximum solve time must be at least 1 second.")
+    if target_min_solve_seconds is not None:
+        if target_max_solve_seconds is None:
+            raise ValidationError("Invalid solve time", "A minimum solve time requires a maximum solve time to be set.")
+        if target_min_solve_seconds < 1:
+            raise ValidationError("Invalid solve time", "The target minimum solve time must be at least 1 second.")
+        if target_min_solve_seconds >= target_max_solve_seconds:
+            raise ValidationError("Invalid solve time", "The target minimum solve time must be less than the maximum.")
 
     run = db.session.scalar(
         sa.select(Run).where(
@@ -298,7 +307,8 @@ def set_run_target(
     if run is None:
         raise NotFoundError("Run not found", "The requested run does not exist.")
     run.target_accuracy = target_accuracy
-    run.target_solve_seconds = target_solve_seconds
+    run.target_min_solve_seconds = target_min_solve_seconds
+    run.target_max_solve_seconds = target_max_solve_seconds
     db.session.commit()
     return run
 
