@@ -202,8 +202,11 @@ def _run_puzzle_attempt_view_dict(run_puzzle: RunTrainingItem) -> dict[str, obje
         sorted_attempts, in_progress_attempt.try_number, total_queue
     )
 
-    target_solve_tenths: int | None = (
-        run.target_solve_seconds * 10 if run.target_solve_seconds is not None else None
+    target_min_solve_tenths: int | None = (
+        run.target_min_solve_seconds * 10 if run.target_min_solve_seconds is not None else None
+    )
+    target_max_solve_tenths: int | None = (
+        run.target_max_solve_seconds * 10 if run.target_max_solve_seconds is not None else None
     )
 
     return {
@@ -236,7 +239,8 @@ def _run_puzzle_attempt_view_dict(run_puzzle: RunTrainingItem) -> dict[str, obje
             "countsTowardsAverageTime": attempt_type_data["countsTowardsAverageTime"],
         },
         "timer": {
-            "targetSolveTenths": target_solve_tenths,
+            "targetMinSolveTenths": target_min_solve_tenths,
+            "targetMaxSolveTenths": target_max_solve_tenths,
         },
         "sessionAttempts": [
             _session_attempt_strip_item(a, total_queue)
@@ -683,7 +687,8 @@ def run_dict(run: Run, tz: str = "UTC") -> dict[str, object]:
         "inProgressCount": counts.get("in_progress", 0) + counts.get("not_started", 0),
         "currentRunTrainingItemId": _current_run_puzzle_id(run.id, total_queue),
         "targetAccuracy": run.target_accuracy,
-        "targetSolveSeconds": run.target_solve_seconds,
+        "targetMinSolveSeconds": run.target_min_solve_seconds,
+        "targetMaxSolveSeconds": run.target_max_solve_seconds,
         "paceChart": _pace_chart_data(run, run_puzzles, config, tz),
     }
 
@@ -1377,8 +1382,11 @@ def _build_run_puzzle_overview(
     tries_in_window = sum(1 for a in sorted_attempts if a.try_number <= total_queue)
     tries_remaining = max(0, total_queue - tries_in_window) if not position_resolved else 0
 
-    target_solve_tenths: int | None = (
-        run.target_solve_seconds * 10 if run.target_solve_seconds is not None else None
+    target_min_solve_tenths: int | None = (
+        run.target_min_solve_seconds * 10 if run.target_min_solve_seconds is not None else None
+    )
+    target_max_solve_tenths: int | None = (
+        run.target_max_solve_seconds * 10 if run.target_max_solve_seconds is not None else None
     )
 
     return {
@@ -1418,7 +1426,8 @@ def _build_run_puzzle_overview(
         ),
         "actions": _compute_overview_actions(run, payload.metadata),
         "timer": {
-            "targetSolveTenths": target_solve_tenths,
+            "targetMinSolveTenths": target_min_solve_tenths,
+            "targetMaxSolveTenths": target_max_solve_tenths,
         },
         "runCompleteOverlay": _compute_run_complete_overlay(
             run, all_run_puzzles, total_queue, run_just_completed, completing_attempt_id,

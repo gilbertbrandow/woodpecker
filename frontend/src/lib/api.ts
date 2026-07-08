@@ -355,7 +355,8 @@ export type ScheduleInsightPoint = {
 export type RunTarget = {
   runIndex: number
   targetAccuracy: number | null
-  targetSolveSeconds: number | null
+  targetMinSolveSeconds: number | null
+  targetMaxSolveSeconds: number | null
 }
 
 export type TrainingRunInsight = {
@@ -827,7 +828,8 @@ export type RunTrainingItemOverview = {
     nextTrainingItem: { enabled: boolean; disabledReason: string | null }
   }
   timer: {
-    targetSolveTenths: number | null
+    targetMinSolveTenths: number | null
+    targetMaxSolveTenths: number | null
   }
   runCompleteOverlay: {
     completedByAttemptId: number
@@ -883,7 +885,8 @@ export type RunTrainingItemAttemptView = {
     countsTowardsAverageTime: boolean
   }
   timer: {
-    targetSolveTenths: number | null
+    targetMinSolveTenths: number | null
+    targetMaxSolveTenths: number | null
   }
   sessionAttempts: SessionAttemptStripItemView[]
 }
@@ -1195,7 +1198,7 @@ export const api = {
     setRunTarget: (
       trainingId: number,
       runIndex: number,
-      target: { targetAccuracy: number | null; targetSolveSeconds: number | null },
+      target: { targetAccuracy: number | null; targetMinSolveSeconds: number | null; targetMaxSolveSeconds: number | null },
     ): Promise<RunTarget> =>
       request(`/training/${trainingId}/run-targets/${runIndex}`, {
         method: 'PUT',

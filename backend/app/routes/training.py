@@ -61,12 +61,15 @@ def get_training(training_id: int) -> tuple[Response, int] | Response:
 def set_run_target(training_id: int, run_index: int) -> tuple[Response, int] | Response:
     data: dict[str, object] = request.get_json(silent=True) or {}
     target_accuracy_raw = data.get("targetAccuracy")
-    target_solve_seconds_raw = data.get("targetSolveSeconds")
+    target_min_solve_seconds_raw = data.get("targetMinSolveSeconds")
+    target_max_solve_seconds_raw = data.get("targetMaxSolveSeconds")
 
     if target_accuracy_raw is not None and not isinstance(target_accuracy_raw, (int, float)):
         return jsonify({"error": "targetAccuracy must be a number or null"}), 400
-    if target_solve_seconds_raw is not None and not isinstance(target_solve_seconds_raw, int):
-        return jsonify({"error": "targetSolveSeconds must be an integer or null"}), 400
+    if target_min_solve_seconds_raw is not None and not isinstance(target_min_solve_seconds_raw, int):
+        return jsonify({"error": "targetMinSolveSeconds must be an integer or null"}), 400
+    if target_max_solve_seconds_raw is not None and not isinstance(target_max_solve_seconds_raw, int):
+        return jsonify({"error": "targetMaxSolveSeconds must be an integer or null"}), 400
 
     target_accuracy = float(target_accuracy_raw) if target_accuracy_raw is not None else None
     target = training_svc.set_run_target(
@@ -74,12 +77,14 @@ def set_run_target(training_id: int, run_index: int) -> tuple[Response, int] | R
         session["user_id"],
         run_index,
         target_accuracy,
-        target_solve_seconds_raw if isinstance(target_solve_seconds_raw, int) else None,
+        target_min_solve_seconds_raw if isinstance(target_min_solve_seconds_raw, int) else None,
+        target_max_solve_seconds_raw if isinstance(target_max_solve_seconds_raw, int) else None,
     )
     return jsonify({
         "runIndex": target.run_index,
         "targetAccuracy": target.target_accuracy,
-        "targetSolveSeconds": target.target_solve_seconds,
+        "targetMinSolveSeconds": target.target_min_solve_seconds,
+        "targetMaxSolveSeconds": target.target_max_solve_seconds,
     })
 
 

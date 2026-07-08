@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Clock, CheckCircle2, XCircle, RotateCcw, ExternalLink, SkipForward } from 'lucide-react'
+import { Clock, CheckCircle2, XCircle, RotateCcw, ExternalLink, SkipForward, ClockArrowUp, ClockArrowDown } from 'lucide-react'
 import { Button, buttonVariants } from '../../components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 import { cn } from '../../lib/utils'
@@ -19,7 +19,7 @@ type FocusModeProps = {
 type FailedModeProps = {
   mode: 'failed'
   timerText: string
-  failedMetTargetTime: boolean | null
+  timeTargetState: 'fast' | 'in_window' | 'missed' | null
   inputBlocked: boolean
   onHint: () => void
   onSolution: () => void
@@ -31,7 +31,7 @@ type FailedModeProps = {
 type OverviewModeProps = {
   mode: 'overview'
   timerText: string
-  metTargetTime: boolean | null
+  timeTargetState: 'fast' | 'in_window' | 'missed' | null
   displayedAttempt: OverviewAttemptView | null
   analyzeUrl: string | null
   nextDisabledReason: string | null
@@ -58,21 +58,23 @@ export function MobileActionsBar(props: MobileActionsBarProps): React.ReactEleme
   }
 
   if (props.mode === 'failed') {
-    const { timerText, failedMetTargetTime, inputBlocked, onHint, onSolution, lastMoveResult, turnToMove, kingPieceUrl } = props
+    const { timerText, timeTargetState, inputBlocked, onHint, onSolution, lastMoveResult, turnToMove, kingPieceUrl } = props
+    const timeClasses =
+      timeTargetState === 'fast'
+        ? 'border-stone-400/30 bg-stone-500/10 text-stone-600 dark:text-stone-400'
+        : timeTargetState === 'in_window'
+          ? 'border-green-600/20 bg-green-500/15 text-green-700 dark:text-green-400'
+          : 'border-amber-600/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+    const timeLabel = timeTargetState === 'fast' ? 'Hasty' : timeTargetState === 'in_window' ? 'Time' : 'Too slow'
+    const TimeIcon = timeTargetState === 'fast' ? ClockArrowUp : timeTargetState === 'missed' ? ClockArrowDown : Clock
     return (
       <div className="mt-3 flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <span className="tabular-nums text-sm font-medium">{timerText}</span>
-          {failedMetTargetTime !== null && (
-            <span
-              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
-                failedMetTargetTime
-                  ? 'border-green-600/20 bg-green-500/15 text-green-700 dark:text-green-400'
-                  : 'border-amber-600/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
-              }`}
-            >
-              <Clock className="h-3 w-3" />
-              {failedMetTargetTime ? 'Time met' : 'Time missed'}
+          {timeTargetState !== null && (
+            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${timeClasses}`}>
+              <TimeIcon className="h-3 w-3" />
+              {timeLabel}
             </span>
           )}
           <span className="inline-flex items-center gap-1 rounded-full border border-red-600/20 bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
@@ -99,29 +101,35 @@ export function MobileActionsBar(props: MobileActionsBarProps): React.ReactEleme
   }
 
   // overview mode
-  const { timerText, metTargetTime, displayedAttempt, analyzeUrl, nextDisabledReason, isLoadingNextPuzzle, onRetake, onNextPuzzle } = props
+  const { timerText, timeTargetState, displayedAttempt, analyzeUrl, nextDisabledReason, isLoadingNextPuzzle, onRetake, onNextPuzzle } = props
   const isSolved = displayedAttempt?.status === 'solved'
+  const timeClasses =
+    timeTargetState === 'fast'
+      ? 'border-stone-400/30 bg-stone-500/10 text-stone-600 dark:text-stone-400'
+      : timeTargetState === 'in_window'
+        ? 'border-green-600/20 bg-green-500/15 text-green-700 dark:text-green-400'
+        : 'border-amber-600/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+  const timeLabel = timeTargetState === 'fast' ? 'Hasty' : timeTargetState === 'in_window' ? 'Time' : 'Too slow'
+  const TimeIcon = timeTargetState === 'fast' ? ClockArrowUp : timeTargetState === 'missed' ? ClockArrowDown : Clock
+  const timeTooltip =
+    timeTargetState === 'fast'
+      ? 'Solved puzzle faster than target'
+      : timeTargetState === 'in_window'
+        ? 'Completed within target time'
+        : 'Solved puzzle slower than target'
   return (
     <div className="mt-3 flex flex-col gap-2 pb-3">
       <div className="flex items-center gap-2">
         <span className="tabular-nums text-sm font-medium">{timerText}</span>
-        {metTargetTime !== null && (
+        {timeTargetState !== null && (
           <Tooltip delayDuration={100}>
             <TooltipTrigger asChild>
-              <span
-                className={`inline-flex cursor-default items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
-                  metTargetTime
-                    ? 'border-green-600/20 bg-green-500/15 text-green-700 dark:text-green-400'
-                    : 'border-amber-600/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
-                }`}
-              >
-                <Clock className="h-3 w-3" />
-                Time
+              <span className={`inline-flex cursor-default items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${timeClasses}`}>
+                <TimeIcon className="h-3 w-3" />
+                {timeLabel}
               </span>
             </TooltipTrigger>
-            <TooltipContent>
-              {metTargetTime ? 'Completed within target time' : 'Target time missed'}
-            </TooltipContent>
+            <TooltipContent>{timeTooltip}</TooltipContent>
           </Tooltip>
         )}
         {displayedAttempt !== null && (

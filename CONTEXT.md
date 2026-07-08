@@ -43,8 +43,12 @@ A user's active engagement with one Schedule. At most one non-terminal Training 
 _Avoid_: session, training session
 
 **Run**:
-One complete cycle through all TrainingItems in the Schedule's Subset. Belongs to a Training and is indexed within it by `run_index`. Each Run carries its own target accuracy and time limits.
+One complete cycle through all TrainingItems in the Schedule's Subset. Belongs to a Training and is indexed within it by `run_index`. Each Run carries its own target accuracy and Target Solve Window.
 _Avoid_: session, cycle
+
+**Target Solve Window**:
+An optional per-Run time range (min and max, in seconds) expressing the user's soft goal for how long each TrainingItem should take; neither bound is enforced or penalised. A min is only valid when a max is also set.
+_Avoid_: solve time target, time limit, optimal span
 
 **Break**:
 The suggested rest period between two consecutive Runs in a Training. Duration is defined by `break_after_hours` on the preceding RunDefinition in the Schedule config. A Break is a planning aid — the system surfaces whether the user is within or past the expected Break window, but never blocks a new Run from starting early or late.

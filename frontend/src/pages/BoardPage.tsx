@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useAuth } from '../context/auth'
-import { Clock, CheckCircle2, XCircle } from 'lucide-react'
+import { Clock, CheckCircle2, XCircle, ClockArrowUp, ClockArrowDown } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
 import { Button } from '../components/ui/button'
 import { UserAvatar } from '../components/UserAvatar'
@@ -219,7 +219,7 @@ export function BoardPage(): React.ReactElement | null {
   }, [baseDisplayBoard, spectateState, ctrl.mode, selectedPly])
 
   const lastOverviewTimerTextRef = React.useRef(ZERO_TIMER)
-  const lastOverviewMetTargetTimeRef = React.useRef<boolean | null>(null)
+  const lastOverviewMetTargetTimeRef = React.useRef<'fast' | 'in_window' | 'missed' | null>(null)
   const lastSelectedAttemptRef = React.useRef<(typeof allAttempts)[number] | null>(null)
 
   React.useEffect(() => {
@@ -245,11 +245,15 @@ export function BoardPage(): React.ReactElement | null {
       ? 0
       : Math.round(selectedAttempt.timeSpentMs / 100)
 
-  const overviewMetTargetTime = (() => {
-    const tenths = overviewData?.timer.targetSolveTenths ?? null
+  const overviewMetTargetTime = ((): 'fast' | 'in_window' | 'missed' | null => {
+    const maxTenths = overviewData?.timer.targetMaxSolveTenths ?? null
+    const minTenths = overviewData?.timer.targetMinSolveTenths ?? null
     if (selectedAttempt === null || selectedAttempt.timeSpentMs === null) return null
-    if (tenths === null || tenths <= 0) return null
-    return Math.round(selectedAttempt.timeSpentMs / 100) <= tenths
+    if (maxTenths === null || maxTenths <= 0) return null
+    const elapsedTenths = Math.round(selectedAttempt.timeSpentMs / 100)
+    if (elapsedTenths > maxTenths) return 'missed'
+    if (minTenths !== null && minTenths > 0 && elapsedTenths < minTenths) return 'fast'
+    return 'in_window'
   })()
 
   const currentOverviewTimerText = formatTimer(frozenTimerTenths, showTenths)
@@ -261,17 +265,20 @@ export function BoardPage(): React.ReactElement | null {
   if (selectedAttempt !== null) lastSelectedAttemptRef.current = selectedAttempt
   const displayedAttempt = selectedAttempt ?? lastSelectedAttemptRef.current
 
-  const failedMetTargetTime =
-    ctrl.mode === 'failed' &&
-    ctrl.timer.targetSolveTenths !== null &&
-    ctrl.timer.targetSolveTenths > 0
-      ? ctrl.timer.elapsedTenths <= ctrl.timer.targetSolveTenths
-      : null
+  const failedTimeTargetState = ((): 'fast' | 'in_window' | 'missed' | null => {
+    if (ctrl.mode !== 'failed') return null
+    const { targetMaxSolveTenths, targetMinSolveTenths, elapsedTenths } = ctrl.timer
+    if (targetMaxSolveTenths === null || targetMaxSolveTenths <= 0) return null
+    if (elapsedTenths > targetMaxSolveTenths) return 'missed'
+    if (targetMinSolveTenths !== null && targetMinSolveTenths > 0 && elapsedTenths < targetMinSolveTenths) return 'fast'
+    return 'in_window'
+  })()
 
   const timerText =
     ctrl.mode === 'overview' ? displayedOverviewTimerText : formatTimer(ctrl.timer.elapsedTenths, showTenths)
   const timerElapsedTenths = ctrl.mode === 'overview' ? frozenTimerTenths : ctrl.timer.elapsedTenths
-  const timerTargetSolveTenths = ctrl.mode === 'focus' ? ctrl.timer.targetSolveTenths : null
+  const timerTargetMinSolveTenths = ctrl.mode === 'focus' ? ctrl.timer.targetMinSolveTenths : null
+  const timerTargetMaxSolveTenths = ctrl.mode === 'focus' ? ctrl.timer.targetMaxSolveTenths : null
 
   const isSolvedAttempt = spectateState !== null
     ? spectateState.view.board?.result === 'correct'
@@ -282,28 +289,42 @@ export function BoardPage(): React.ReactElement | null {
   const selectedRunProgressDelta = selectedAttempt?.impact?.runProgressDeltaPct ?? null
   const selectedTrainingProgressDelta = selectedAttempt?.impact?.trainingProgressDeltaPct ?? null
 
+  const timeTargetBadge = (state: 'fast' | 'in_window' | 'missed' | null) => {
+    if (state === null) return null
+    const classes =
+      state === 'fast'
+        ? 'border-stone-400/30 bg-stone-500/10 text-stone-600 dark:text-stone-400'
+        : state === 'in_window'
+          ? 'border-green-600/20 bg-green-500/15 text-green-700 dark:text-green-400'
+          : 'border-amber-600/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+    const label = state === 'fast' ? 'Hasty' : state === 'in_window' ? 'Time' : 'Too slow'
+    const icon =
+      state === 'fast' ? <ClockArrowUp className="h-3 w-3" /> :
+      state === 'missed' ? <ClockArrowDown className="h-3 w-3" /> :
+      <Clock className="h-3 w-3" />
+    const tooltip =
+      state === 'fast'
+        ? 'Solved puzzle faster than target'
+        : state === 'in_window'
+          ? 'Completed within target time'
+          : 'Solved puzzle slower than target'
+    return (
+      <Tooltip delayDuration={100}>
+        <TooltipTrigger asChild>
+          <span className={`inline-flex cursor-default items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${classes}`}>
+            {icon}
+            {label}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{tooltip}</TooltipContent>
+      </Tooltip>
+    )
+  }
+
   const timerRightSlot =
     ctrl.mode === 'focus' ? undefined : ctrl.mode === 'failed' ? (
       <>
-        {failedMetTargetTime !== null && (
-          <Tooltip delayDuration={100}>
-            <TooltipTrigger asChild>
-              <span
-                className={`inline-flex cursor-default items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
-                  failedMetTargetTime
-                    ? 'border-green-600/20 bg-green-500/15 text-green-700 dark:text-green-400'
-                    : 'border-amber-600/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
-                }`}
-              >
-                <Clock className="h-3 w-3" />
-                Time
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>
-              {failedMetTargetTime ? 'Completed within target time' : 'Target time missed'}
-            </TooltipContent>
-          </Tooltip>
-        )}
+        {timeTargetBadge(failedTimeTargetState)}
         <Tooltip delayDuration={100}>
           <TooltipTrigger asChild>
             <span className="inline-flex cursor-default items-center gap-1 rounded-full border border-red-600/20 bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
@@ -316,25 +337,7 @@ export function BoardPage(): React.ReactElement | null {
       </>
     ) : (
       <>
-        {displayedOverviewMetTargetTime !== null && (
-          <Tooltip delayDuration={100}>
-            <TooltipTrigger asChild>
-              <span
-                className={`inline-flex cursor-default items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
-                  displayedOverviewMetTargetTime
-                    ? 'border-green-600/20 bg-green-500/15 text-green-700 dark:text-green-400'
-                    : 'border-amber-600/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
-                }`}
-              >
-                <Clock className="h-3 w-3" />
-                Time
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>
-              {displayedOverviewMetTargetTime ? 'Completed within target time' : 'Target time missed'}
-            </TooltipContent>
-          </Tooltip>
-        )}
+        {timeTargetBadge(displayedOverviewMetTargetTime)}
         {displayedAttempt !== null && (
           <Tooltip delayDuration={100}>
             <TooltipTrigger asChild>
@@ -372,15 +375,26 @@ export function BoardPage(): React.ReactElement | null {
   const timerBar =
     ctrl.mode === 'focus' && ctrl.session.allPliesPlayed.length > 0
       ? (() => {
-          const { elapsedTenths, targetSolveTenths } = ctrl.timer
-          if (targetSolveTenths === null || targetSolveTenths <= 0 || elapsedTenths >= targetSolveTenths) return null
-          const leftPct = Math.max(0, Math.min(100, ((targetSolveTenths - elapsedTenths) / targetSolveTenths) * 100))
+          const { elapsedTenths, targetMinSolveTenths, targetMaxSolveTenths } = ctrl.timer
+          if (targetMaxSolveTenths === null || targetMaxSolveTenths <= 0 || elapsedTenths >= targetMaxSolveTenths) return null
+
+          if (targetMinSolveTenths !== null && targetMinSolveTenths > 0 && elapsedTenths < targetMinSolveTenths) {
+            const leftPct = Math.max(0, Math.min(100, (elapsedTenths / targetMinSolveTenths) * 100))
+            return {
+              leftPct,
+              color: 'hsl(220 15% 55%)',
+              tooltipText: `Minimum target time: ${formatTargetSolveTime(targetMinSolveTenths)}. Take your time before moving.`,
+            }
+          }
+
+          const rangeStart = targetMinSolveTenths !== null && targetMinSolveTenths > 0 ? targetMinSolveTenths : 0
+          const leftPct = Math.max(0, Math.min(100, ((targetMaxSolveTenths - elapsedTenths) / (targetMaxSolveTenths - rangeStart)) * 100))
           const hue =
             leftPct >= 60 ? 60 + ((leftPct - 60) / 40) * 60 : leftPct >= 20 ? ((leftPct - 20) / 40) * 60 : 0
           return {
             leftPct,
             color: `hsl(${hue} 55% 48%)`,
-            tooltipText: `Target solve time: ${formatTargetSolveTime(targetSolveTenths)}. This bar shows how much of that time is remaining.`,
+            tooltipText: `Maximum target time: ${formatTargetSolveTime(targetMaxSolveTenths)}. This bar shows how much of that time is remaining.`,
           }
         })()
       : null
@@ -424,7 +438,7 @@ export function BoardPage(): React.ReactElement | null {
       <MobileActionsBar
         mode="failed"
         timerText={timerText}
-        failedMetTargetTime={failedMetTargetTime}
+        timeTargetState={failedTimeTargetState}
         inputBlocked={ctrl.inputBlocked}
         onHint={ctrl.actions.handleShowHint}
         onSolution={ctrl.actions.handleShowSolution}
@@ -436,7 +450,7 @@ export function BoardPage(): React.ReactElement | null {
       <MobileActionsBar
         mode="overview"
         timerText={displayedOverviewTimerText}
-        metTargetTime={displayedOverviewMetTargetTime}
+        timeTargetState={displayedOverviewMetTargetTime}
         displayedAttempt={displayedAttempt}
         analyzeUrl={overviewData.actions.analyze.url}
         nextDisabledReason={overviewData.actions.nextTrainingItem.disabledReason}
@@ -505,7 +519,8 @@ export function BoardPage(): React.ReactElement | null {
       <TimerCard
         timerText={timerText}
         elapsedTenths={timerElapsedTenths}
-        targetSolveTenths={timerTargetSolveTenths}
+        targetMinSolveTenths={timerTargetMinSolveTenths}
+        targetMaxSolveTenths={timerTargetMaxSolveTenths}
         rightSlot={timerRightSlot}
       />
       {sourceForMetaCard !== null && (

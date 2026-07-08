@@ -36,7 +36,8 @@ export type { Mode, Orientation, PendingPromotion, MoveFeedbackResult, BoardStat
 
 export type TimerState = {
   elapsedTenths: number
-  targetSolveTenths: number | null
+  targetMinSolveTenths: number | null
+  targetMaxSolveTenths: number | null
 }
 
 export type OverviewState = {
@@ -132,7 +133,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const [pendingPromotion, setPendingPromotion] = useState<PendingPromotion | null>(null)
   const [hintSquare, setHintSquare] = useState<string | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
-  const [targetSolveTenths, setTargetSolveTenths] = useState<number | null>(null)
+  const [targetMinSolveTenths, setTargetMinSolveTenths] = useState<number | null>(null)
+  const [targetMaxSolveTenths, setTargetMaxSolveTenths] = useState<number | null>(null)
   const [boardKey, setBoardKey] = useState(0)
   const [isLoadingNextPuzzle, setIsLoadingNextPuzzle] = useState(false)
   const [runJustCompleted, setRunJustCompleted] = useState(false)
@@ -389,7 +391,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
         }
 
         const data = attemptResponse.attemptView
-        setTargetSolveTenths(data.timer.targetSolveTenths)
+        setTargetMinSolveTenths(data.timer.targetMinSolveTenths)
+        setTargetMaxSolveTenths(data.timer.targetMaxSolveTenths)
         applyFreshActiveState(data)
       } catch {
         if (requestId !== loadRequestIdRef.current) {
@@ -752,7 +755,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       }
 
       clearOverviewState()
-      setTargetSolveTenths(av.timer.targetSolveTenths)
+      setTargetMinSolveTenths(av.timer.targetMinSolveTenths)
+      setTargetMaxSolveTenths(av.timer.targetMaxSolveTenths)
       applyFreshActiveState(av)
       setBoardKey((k) => k + 1)
 
@@ -781,7 +785,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       }
 
       clearOverviewState()
-      setTargetSolveTenths(data.timer.targetSolveTenths)
+      setTargetMinSolveTenths(data.timer.targetMinSolveTenths)
+      setTargetMaxSolveTenths(data.timer.targetMaxSolveTenths)
       applyFreshActiveState(data)
       setBoardKey((k) => k + 1)
 
@@ -827,7 +832,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     },
     timer: {
       elapsedTenths: elapsedSeconds,
-      targetSolveTenths,
+      targetMinSolveTenths,
+      targetMaxSolveTenths,
     },
     session: { attemptHistory, movesPlayed, allPliesPlayed, failedRetryPlies, liveFocusStatus },
     overview: { data: overview },
