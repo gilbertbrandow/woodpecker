@@ -4,8 +4,15 @@ from app.decorators import login_required
 from app.services import decoy_source as decoy_svc
 from app.services import lichess_tactics_source as svc
 from app.services import scraped_positional_source as pos_svc
+from app.services import sources as sources_svc
 
 sources_bp = Blueprint("sources", __name__, url_prefix="/sources")
+
+
+@sources_bp.get("/")
+@login_required
+def list_sources() -> Response:
+    return jsonify({"sources": sources_svc.list_sources()})
 
 
 @sources_bp.get("/lichess-tactics/items")

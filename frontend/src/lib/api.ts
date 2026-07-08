@@ -303,6 +303,13 @@ export type Opening = {
 
 export type TrainingItemSource = 'LICHESS_TACTIC' | 'DECOY' | 'SCRAPED_POSITIONAL'
 
+export type SourceListItem = {
+  sourceType: TrainingItemSource
+  puzzleCount: number
+  firstImported: string | null
+  lastSynced: string | null
+}
+
 export type TrainingItem = {
   id: number
   sourceType: TrainingItemSource
@@ -1295,6 +1302,7 @@ export const api = {
     },
   },
   sources: {
+    list: (): Promise<{ sources: SourceListItem[] }> => request('/sources/'),
     lichessTactics: {
       sourceRunMetadata: (): Promise<{ metadata: LichessTacticsSourceRunMetadata | null }> =>
         request('/sources/lichess-tactics/source-run-metadata'),

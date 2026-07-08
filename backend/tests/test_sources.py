@@ -90,11 +90,119 @@ def _make_metadata_row(session, run, *, theme_counts_json=None, rating_bucket_co
 # ── Auth protection ────────────────────────────────────────────────────────────
 
 class TestSourcesAuthProtection:
+    def test_list_requires_login(self, client: FlaskClient) -> None:
+        assert client.get("/sources/").status_code == 401
+
     def test_items_requires_login(self, client: FlaskClient) -> None:
         assert client.get("/sources/lichess-tactics/items").status_code == 401
 
     def test_source_run_metadata_requires_login(self, client: FlaskClient) -> None:
         assert client.get("/sources/lichess-tactics/source-run-metadata").status_code == 401
+
+
+# ── Sources list ───────────────────────────────────────────────────────────────
+
+@pytest.mark.integration
+class TestSourcesList:
+    def test_always_returns_all_three_sources(self, client: FlaskClient, db_session) -> None:
+        _login(client, _make_user(db_session).id)
+
+        body = client.get("/sources/").get_json()
+
+        assert len(body["sources"]) == 3
+        source_types = {s["sourceType"] for s in body["sources"]}
+        assert source_types == {"LICHESS_TACTIC", "SCRAPED_POSITIONAL", "DECOY"}
+
+    def test_nulls_when_no_import_runs(self, client: FlaskClient, db_session) -> None:
+        _login(client, _make_user(db_session).id)
+
+        body = client.get("/sources/").get_json()
+
+        for source in body["sources"]:
+            assert source["firstImported"] is None
+            assert source["lastSynced"] is None
+            assert source["puzzleCount"] == 0
+
+    def test_puzzle_count_reflects_training_items(self, client: FlaskClient, db_session) -> None:
+        _login(client, _make_user(db_session).id)
+        run = _make_source_run(db_session)
+        _make_tactic(db_session, "lst001", source_run=run)
+        _make_tactic(db_session, "lst002", source_run=run)
+
+        body = client.get("/sources/").get_json()
+
+        lichess = next(s for s in body["sources"] if s["sourceType"] == "LICHESS_TACTIC")
+        assert lichess["puzzleCount"] == 2
+
+    def test_first_imported_is_earliest_started_at(self, client: FlaskClient, db_session) -> None:
+        from app.models.source_import_run import SourceImportRun, SourceImportSource, SourceImportOperation, SourceImportStatus
+
+        _login(client, _make_user(db_session).id)
+        early = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        late = datetime(2024, 6, 1, tzinfo=timezone.utc)
+
+        for started_at in (late, early):
+            run = SourceImportRun(
+                source=SourceImportSource.LICHESS_TACTICS,
+                operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
+                status=SourceImportStatus.SUCCEEDED,
+                started_at=started_at,
+                finished_at=started_at,
+            )
+            db_session.add(run)
+        db_session.flush()
+
+        body = client.get("/sources/").get_json()
+
+        lichess = next(s for s in body["sources"] if s["sourceType"] == "LICHESS_TACTIC")
+        assert lichess["firstImported"].startswith("2024-01-01")
+
+    def test_last_synced_ignores_failed_runs(self, client: FlaskClient, db_session) -> None:
+        from app.models.source_import_run import SourceImportRun, SourceImportSource, SourceImportOperation, SourceImportStatus
+
+        _login(client, _make_user(db_session).id)
+        succeeded_at = datetime(2024, 3, 1, tzinfo=timezone.utc)
+        failed_at = datetime(2024, 9, 1, tzinfo=timezone.utc)
+
+        db_session.add(SourceImportRun(
+            source=SourceImportSource.LICHESS_TACTICS,
+            operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
+            status=SourceImportStatus.SUCCEEDED,
+            started_at=succeeded_at,
+            finished_at=succeeded_at,
+        ))
+        db_session.add(SourceImportRun(
+            source=SourceImportSource.LICHESS_TACTICS,
+            operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
+            status=SourceImportStatus.FAILED,
+            started_at=failed_at,
+            finished_at=failed_at,
+        ))
+        db_session.flush()
+
+        body = client.get("/sources/").get_json()
+
+        lichess = next(s for s in body["sources"] if s["sourceType"] == "LICHESS_TACTIC")
+        assert lichess["lastSynced"].startswith("2024-03-01")
+
+    def test_last_synced_null_when_only_failed_runs(self, client: FlaskClient, db_session) -> None:
+        from app.models.source_import_run import SourceImportRun, SourceImportSource, SourceImportOperation, SourceImportStatus
+
+        _login(client, _make_user(db_session).id)
+        db_session.add(SourceImportRun(
+            source=SourceImportSource.LICHESS_TACTICS,
+            operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
+            status=SourceImportStatus.FAILED,
+            started_at=datetime.now(timezone.utc),
+            finished_at=datetime.now(timezone.utc),
+        ))
+        db_session.flush()
+
+        body = client.get("/sources/").get_json()
+
+        lichess = next(s for s in body["sources"] if s["sourceType"] == "LICHESS_TACTIC")
+        assert lichess["lastSynced"] is None
+        assert lichess["firstImported"] is not None
 
 
 # ── Items list ─────────────────────────────────────────────────────────────────
