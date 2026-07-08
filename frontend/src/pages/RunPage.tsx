@@ -163,29 +163,55 @@ function ConfigureTab({
 }): React.ReactElement {
   const runTarget = participation?.runTargets.find((t) => t.runIndex === run.runIndex)
   const [accuracy, setAccuracy] = useState<number | null>(runTarget?.targetAccuracy ?? null)
-  const [solveSeconds, setSolveSeconds] = useState<number | null>(runTarget?.targetSolveSeconds ?? null)
+  const [minSolveSeconds, setMinSolveSeconds] = useState<number | null>(runTarget?.targetMinSolveSeconds ?? null)
+  const [maxSolveSeconds, setMaxSolveSeconds] = useState<number | null>(runTarget?.targetMaxSolveSeconds ?? null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     setAccuracy(runTarget?.targetAccuracy ?? null)
-    setSolveSeconds(runTarget?.targetSolveSeconds ?? null)
+    setMinSolveSeconds(runTarget?.targetMinSolveSeconds ?? null)
+    setMaxSolveSeconds(runTarget?.targetMaxSolveSeconds ?? null)
   }, [runTarget])
 
   const isActive = run.status === 'active'
 
-  const saveTarget = async (accuracyVal: number | null, solveSecondsVal: number | null): Promise<void> => {
+  const saveTarget = async (
+    accuracyVal: number | null,
+    minVal: number | null,
+    maxVal: number | null,
+  ): Promise<void> => {
     if (saving) return
     setSaving(true)
     try {
       await api.training.setRunTarget(run.trainingId, run.runIndex, {
         targetAccuracy: accuracyVal,
-        targetSolveSeconds: solveSecondsVal,
+        targetMinSolveSeconds: minVal,
+        targetMaxSolveSeconds: maxVal,
       })
       toast.success('Targets saved', { description: 'Your goals for this run have been updated.' })
     } catch {
     } finally {
       setSaving(false)
     }
+  }
+
+  const solveTimeLabel = (() => {
+    if (maxSolveSeconds === null || maxSolveSeconds === 0) return '—'
+    if (minSolveSeconds === null || minSolveSeconds === 0) return `${formatSolveTime(maxSolveSeconds)} m:s`
+    return `${formatSolveTime(minSolveSeconds)} – ${formatSolveTime(maxSolveSeconds)} m:s`
+  })()
+
+  const handleSolveTimeChange = ([v1, v2]: (number | undefined)[]) => {
+    const newMax = v2 === 0 ? null : (v2 ?? null)
+    const newMin = (!v1 || newMax === null || v1 >= (v2 ?? 0)) ? null : v1
+    setMinSolveSeconds(newMin)
+    setMaxSolveSeconds(newMax)
+  }
+
+  const handleSolveTimeCommit = ([v1, v2]: (number | undefined)[]) => {
+    const newMax = v2 === 0 ? null : (v2 ?? null)
+    const newMin = (!v1 || newMax === null || v1 >= (v2 ?? 0)) ? null : v1
+    void saveTarget(accuracy, newMin, newMax)
   }
 
   return (
@@ -208,7 +234,7 @@ function ConfigureTab({
           step={1}
           value={[accuracy ?? 0]}
           onValueChange={([v]) => setAccuracy(v ?? 0)}
-          onValueCommit={([v]) => void saveTarget(v ?? 0, solveSeconds)}
+          onValueCommit={([v]) => void saveTarget(v ?? 0, minSolveSeconds, maxSolveSeconds)}
           disabled={!isActive || saving || !isOwner}
           className={accuracy === null ? 'opacity-40' : ''}
         />
@@ -223,22 +249,22 @@ function ConfigureTab({
           <div className="flex flex-col gap-0.5">
             <span className="text-sm font-medium">Solve time</span>
             <span className="text-xs text-muted-foreground">
-              Target average time to solve each puzzle
+              Target time window per puzzle — drag left thumb to set minimum, right for maximum
             </span>
           </div>
           <span className="shrink-0 tabular-nums text-sm font-medium">
-            {solveSeconds !== null ? `${formatSolveTime(solveSeconds)} m:s` : '—'}
+            {solveTimeLabel}
           </span>
         </div>
         <Slider
           min={0}
           max={600}
           step={5}
-          value={[solveSeconds ?? 0]}
-          onValueChange={([v]) => setSolveSeconds(v ?? 0)}
-          onValueCommit={([v]) => void saveTarget(accuracy, v ?? 0)}
+          value={[minSolveSeconds ?? 0, maxSolveSeconds ?? 0]}
+          onValueChange={handleSolveTimeChange}
+          onValueCommit={handleSolveTimeCommit}
           disabled={!isActive || saving || !isOwner}
-          className={solveSeconds === null ? 'opacity-40' : ''}
+          className={(minSolveSeconds === null && maxSolveSeconds === null) ? 'opacity-40' : ''}
         />
         <div className="flex justify-between text-xs text-muted-foreground">
           <span>0:00</span>

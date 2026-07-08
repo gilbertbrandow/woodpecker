@@ -30,7 +30,7 @@ function makeOverviewData(attempts: OverviewAttemptView[], selectedAttemptId: nu
     stats: { runIndex: 0, accuracy: { valuePct: null, deltaPct: null, solvedCount: 0, resolvedCount: 0 }, averageSolveTime: { valueMs: null, deltaMs: null, timeCount: 0 } },
     progress: { runProgress: { label: '', value: 0, tooltipLabel: '', delta: null }, trainingProgress: null },
     actions: { runStatus: 'active', retake: { enabled: true }, analyze: { enabled: false, url: null }, nextTrainingItem: { enabled: true, disabledReason: null } },
-    timer: { targetSolveTenths: null },
+    timer: { targetMinSolveTenths: null, targetMaxSolveTenths: null },
     runCompleteOverlay: null,
   } as RunTrainingItemOverview
 }
