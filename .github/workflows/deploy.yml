@@ -139,6 +139,7 @@ jobs:
             # Install AWS CLI if not present — needed for operator restore commands on the EC2 host
             if ! command -v aws &>/dev/null; then
               echo "Installing AWS CLI..."
+              sudo apt-get install -y unzip
               curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
               unzip -q /tmp/awscliv2.zip -d /tmp/
               sudo /tmp/aws/install
@@ -163,3 +164,4 @@ jobs:
               sleep 2
             done
             docker compose -f docker-compose.yml -f docker-compose-prod.yml exec -T backend flask --app app db upgrade
+            docker image prune -af

@@ -77,13 +77,20 @@ resource "aws_security_group" "woodpecker" {
 resource "aws_instance" "woodpecker" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.instance_type
+  availability_zone      = var.availability_zone
   key_name               = aws_key_pair.woodpecker.key_name
   vpc_security_group_ids = [aws_security_group.woodpecker.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_backup.name
 
   root_block_device {
-    volume_type = "gp3"
-    volume_size = 30
+    volume_type           = "gp3"
+    volume_size           = 15
+    delete_on_termination = false
+  }
+
+  lifecycle {
+    ignore_changes  = [ami, user_data]
+    prevent_destroy = true
   }
 
   user_data = <<-EOF
@@ -102,6 +109,14 @@ resource "aws_instance" "woodpecker" {
     systemctl start docker
     mkdir -p /opt/woodpecker/deploy/nginx
     mkdir -p /var/www/certbot
+    chown -R ubuntu:ubuntu /opt/woodpecker
+    mkdir -p /etc/letsencrypt/renewal-hooks/deploy
+    cat > /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh << 'HOOK'
+    #!/bin/bash
+    cd /opt/woodpecker
+    docker compose -f docker-compose.yml -f docker-compose-prod.yml restart nginx
+    HOOK
+    chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh
   EOF
 
   tags = {
@@ -120,6 +135,30 @@ resource "aws_eip" "woodpecker" {
 resource "aws_eip_association" "woodpecker" {
   instance_id   = aws_instance.woodpecker.id
   allocation_id = aws_eip.woodpecker.id
+}
+
+# ── Dedicated pgdata EBS volume ────────────────────────────────────────────────
+# Separate from the root volume so DB data survives instance termination.
+# NEVER remove prevent_destroy unless you intend to permanently destroy all data.
+
+resource "aws_ebs_volume" "pgdata" {
+  availability_zone = var.availability_zone
+  size              = 5
+  type              = "gp3"
+
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  tags = {
+    Name = "${var.project}-pgdata"
+  }
+}
+
+resource "aws_volume_attachment" "pgdata" {
+  device_name = "/dev/sdf"
+  volume_id   = aws_ebs_volume.pgdata.id
+  instance_id = aws_instance.woodpecker.id
 }
 
 resource "aws_s3_bucket" "backups" {
@@ -208,4 +247,43 @@ resource "aws_iam_role_policy_attachment" "ec2_backup" {
 resource "aws_iam_instance_profile" "ec2_backup" {
   name = "${var.project}-ec2-backup-profile"
   role = aws_iam_role.ec2_backup.name
+}
+
+# ── CloudWatch alerting ────────────────────────────────────────────────────────
+# Requires alert_email to be set in terraform.tfvars.
+# After `terraform apply`, confirm the subscription email AWS sends to that address.
+
+locals {
+  enable_alerts = var.alert_email != ""
+}
+
+resource "aws_sns_topic" "alerts" {
+  count = local.enable_alerts ? 1 : 0
+  name  = "${var.project}-alerts"
+}
+
+resource "aws_sns_topic_subscription" "email" {
+  count     = local.enable_alerts ? 1 : 0
+  topic_arn = aws_sns_topic.alerts[0].arn
+  protocol  = "email"
+  endpoint  = var.alert_email
+}
+
+resource "aws_cloudwatch_metric_alarm" "cpu_credit_low" {
+  count               = local.enable_alerts ? 1 : 0
+  alarm_name          = "${var.project}-cpu-credit-low"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "CPUCreditBalance"
+  namespace           = "AWS/EC2"
+  period              = 300
+  statistic           = "Average"
+  threshold           = 20
+  alarm_description   = "t3.micro CPU credit balance is low — throttling imminent. Consider resizing to t3.small."
+  alarm_actions       = [aws_sns_topic.alerts[0].arn]
+  ok_actions          = [aws_sns_topic.alerts[0].arn]
+
+  dimensions = {
+    InstanceId = aws_instance.woodpecker.id
+  }
 }
