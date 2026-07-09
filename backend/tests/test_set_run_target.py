@@ -1,4 +1,5 @@
 import pytest
+from typing import cast
 from tests.conftest import _seed_world  # type: ignore[import]
 from app.exceptions import ValidationError
 
@@ -15,8 +16,8 @@ def test_set_run_target_max_only(db_session) -> None:  # type: ignore[misc]
     from app.services import training as svc
 
     run = svc.set_run_target(
-        _get_training_id(db_session, int(world["run_id"])),
-        int(world["user_id"]),
+        _get_training_id(db_session, cast(int, world["run_id"])),
+        cast(int, world["user_id"]),
         0,
         None,
         None,
@@ -31,8 +32,8 @@ def test_set_run_target_min_and_max(db_session) -> None:  # type: ignore[misc]
     from app.services import training as svc
 
     run = svc.set_run_target(
-        _get_training_id(db_session, int(world["run_id"])),
-        int(world["user_id"]),
+        _get_training_id(db_session, cast(int, world["run_id"])),
+        cast(int, world["user_id"]),
         0,
         None,
         10,
@@ -48,8 +49,8 @@ def test_set_run_target_max_too_small(db_session) -> None:  # type: ignore[misc]
 
     with pytest.raises(ValidationError):
         svc.set_run_target(
-            _get_training_id(db_session, int(world["run_id"])),
-            int(world["user_id"]),
+            _get_training_id(db_session, cast(int, world["run_id"])),
+            cast(int, world["user_id"]),
             0,
             None,
             None,
@@ -63,8 +64,8 @@ def test_set_run_target_min_without_max(db_session) -> None:  # type: ignore[mis
 
     with pytest.raises(ValidationError, match="minimum solve time requires a maximum"):
         svc.set_run_target(
-            _get_training_id(db_session, int(world["run_id"])),
-            int(world["user_id"]),
+            _get_training_id(db_session, cast(int, world["run_id"])),
+            cast(int, world["user_id"]),
             0,
             None,
             10,
@@ -78,8 +79,8 @@ def test_set_run_target_min_too_small(db_session) -> None:  # type: ignore[misc]
 
     with pytest.raises(ValidationError, match="minimum solve time must be at least"):
         svc.set_run_target(
-            _get_training_id(db_session, int(world["run_id"])),
-            int(world["user_id"]),
+            _get_training_id(db_session, cast(int, world["run_id"])),
+            cast(int, world["user_id"]),
             0,
             None,
             0,
@@ -93,8 +94,8 @@ def test_set_run_target_min_equals_max(db_session) -> None:  # type: ignore[misc
 
     with pytest.raises(ValidationError, match="minimum solve time must be less than"):
         svc.set_run_target(
-            _get_training_id(db_session, int(world["run_id"])),
-            int(world["user_id"]),
+            _get_training_id(db_session, cast(int, world["run_id"])),
+            cast(int, world["user_id"]),
             0,
             None,
             30,
@@ -108,8 +109,8 @@ def test_set_run_target_min_greater_than_max(db_session) -> None:  # type: ignor
 
     with pytest.raises(ValidationError, match="minimum solve time must be less than"):
         svc.set_run_target(
-            _get_training_id(db_session, int(world["run_id"])),
-            int(world["user_id"]),
+            _get_training_id(db_session, cast(int, world["run_id"])),
+            cast(int, world["user_id"]),
             0,
             None,
             60,
