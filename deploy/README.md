@@ -202,16 +202,13 @@ make -C deploy pgdata-migrate            # formats, mounts, copies pgdata, resta
 
 ### Fresh instance setup (disaster recovery)
 
-On a brand-new EC2 instance the EBS volume is already formatted (from the prior instance). After attaching it via `terraform apply`, mount it before starting Docker:
+After `terraform apply` creates a new instance and attaches the pgdata EBS volume, a single command handles the rest — mounting the volume, obtaining the TLS certificate, and pushing the nginx config:
 
 ```bash
-sudo mkdir -p /mnt/woodpecker-data
-UUID=$(sudo blkid -s UUID -o value /dev/nvme1n1)
-echo "UUID=$UUID /mnt/woodpecker-data ext4 defaults,nofail 0 2" | sudo tee -a /etc/fstab
-sudo mount -a
+make -C deploy instance-bootstrap
 ```
 
-Then proceed with the normal certbot + nginx config setup before running the deploy.
+Requires `DOMAIN_NAME` and `CERTBOT_EMAIL` in `~/.woodpecker-prod-env`. Once it completes, publish a GitHub release to deploy the application.
 
 ## Monitoring
 
@@ -257,6 +254,8 @@ EC2_HOST=your-ec2-host
 PROD_DB_PASSWORD=your-db-password
 BACKUP_BUCKET=your-backup-bucket-name
 AWS_REGION=eu-west-1
+DOMAIN_NAME=woodpeckerchess.com
+CERTBOT_EMAIL=your-email@example.com
 EOF
 chmod 600 ~/.woodpecker-prod-env
 ```

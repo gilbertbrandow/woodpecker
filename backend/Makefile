@@ -22,4 +22,7 @@ dev-session:
 	DATABASE_URL="postgresql://$${POSTGRES_USER:-woodpecker}:$${POSTGRES_PASSWORD:-woodpecker}@localhost:5432/$${POSTGRES_DB:-woodpecker}" \
 	.venv/bin/python scripts/dev_session.py $(USERNAME)
 
-.PHONY: setup lint test test-integration test-all dev-session
+migrate:
+	.venv/bin/flask db upgrade
+
+.PHONY: setup lint test test-integration test-all dev-session migrate
