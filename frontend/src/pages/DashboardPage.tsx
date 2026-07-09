@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid } from 'recharts'
-import { Target } from 'lucide-react'
+import { Swords, BookOpenText } from 'lucide-react'
 import { dashboardRoute } from '../router'
 import { api, type DashboardData, type DashboardStatusCard, type DashboardPrimaryAction, type DashboardRunAccuracy } from '../lib/api'
 import { PageWrapper } from '../components/PageWrapper'
@@ -307,22 +307,19 @@ function DashboardSkeleton(): React.ReactElement {
 
 function EmptyState(): React.ReactElement {
   return (
-    <div className="flex flex-col items-center justify-center gap-6 py-20 text-center max-w-sm mx-auto">
-      <div className="rounded-full bg-muted p-4">
-        <Target className="h-8 w-8 text-muted-foreground" />
-      </div>
+    <div className="flex flex-col items-center gap-6 text-center max-w-sm">
       <div className="space-y-2">
         <p className="text-base font-semibold">No active trainings</p>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Join a schedule to start a training. You'll work through the same puzzle set across multiple runs — each pass building sharper pattern recognition.
+          Start a training to track your progress here. Pick an existing schedule with a ready-made puzzle set, or build your own subset and schedule from scratch.
         </p>
       </div>
       <div className="flex gap-2">
-        <Link to="/app/schedules">
-          <Button size="sm">Browse schedules</Button>
+        <Link to="/app/training/new">
+          <Button size="sm"><Swords className="h-3.5 w-3.5" />Start training</Button>
         </Link>
-        <Link to="/app/schedules/new">
-          <Button variant="outline" size="sm">Create schedule</Button>
+        <Link to="/app/guide">
+          <Button variant="outline" size="sm"><BookOpenText className="h-3.5 w-3.5" />How does it work?</Button>
         </Link>
       </div>
     </div>
@@ -390,7 +387,7 @@ export function DashboardPage(): React.ReactElement {
 
   if (!data || data.trainings.length === 0) {
     return (
-      <PageWrapper>
+      <PageWrapper className="flex flex-col items-center justify-center flex-1">
         <EmptyState />
       </PageWrapper>
     )
