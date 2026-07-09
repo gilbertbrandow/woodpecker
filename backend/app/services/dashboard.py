@@ -10,6 +10,7 @@ from app.models.training import Training
 from app.services.schedule_config import ScheduleConfig
 from app.services.training import get_training_progress
 from app.services.training_state import end_of_today_utc
+from app.services import leaderboard as leaderboard_svc
 
 
 # ---------------------------------------------------------------------------
@@ -135,20 +136,22 @@ def _compute_status_card(
     tz_str: str,
     all_stats: dict[int, dict] | None = None,
 ) -> dict:
+    total_runs = len(schedule_cfg.runs)
+
     # Highest precedence: training terminal states
     if training.completed_at is not None:
-        return {"state": "training_completed", "primaryAction": None}
+        return {"state": "training_completed", "totalRuns": total_runs, "primaryAction": None}
 
     if training.aborted_at is not None:
         if selected_run is not None and selected_run.completed_at is not None:
-            return {"state": "run_completed", "runIndex": selected_run.run_index, "completedAt": selected_run.completed_at.isoformat(), "primaryAction": None}
-        return {"state": "training_aborted", "primaryAction": None}
+            return {"state": "run_completed", "runIndex": selected_run.run_index, "totalRuns": total_runs, "completedAt": selected_run.completed_at.isoformat(), "primaryAction": None}
+        return {"state": "training_aborted", "totalRuns": total_runs, "primaryAction": None}
 
     # Virtual Run 1 (no runs yet)
     if selected_run is None:
         return {
             "state": "not_started",
-            "totalRuns": len(schedule_cfg.runs),
+            "totalRuns": total_runs,
             "primaryAction": {"type": "start_run", "trainingId": training.id, "runIndex": 0},
         }
 
@@ -194,6 +197,7 @@ def _compute_status_card(
             return {
                 "state": "active_run_overdue",
                 "runIndex": run_index,
+                "totalRuns": total_runs,
                 "runId": selected_run.id,
                 "runStartedAt": selected_run.started_at.isoformat(),
                 "runDeadlineAt": deadline.isoformat(),
@@ -223,6 +227,7 @@ def _compute_status_card(
         return {
             "state": state,
             "runIndex": run_index,
+            "totalRuns": total_runs,
             "runId": selected_run.id,
             "runStartedAt": selected_run.started_at.isoformat(),
             "runDeadlineAt": deadline.isoformat(),
@@ -241,7 +246,7 @@ def _compute_status_card(
 
     assert selected_run.completed_at is not None
     if not is_latest:
-        return {"state": "run_completed", "runIndex": selected_run.run_index, "completedAt": selected_run.completed_at.isoformat(), "primaryAction": None}
+        return {"state": "run_completed", "runIndex": selected_run.run_index, "totalRuns": total_runs, "completedAt": selected_run.completed_at.isoformat(), "primaryAction": None}
 
     # Latest completed run — check break
     run_def = schedule_cfg.runs[selected_run.run_index] if selected_run.run_index < len(schedule_cfg.runs) else None
@@ -250,7 +255,7 @@ def _compute_status_card(
 
     if next_run_index >= len(schedule_cfg.runs):
         # All runs done but training not marked complete yet (edge case)
-        return {"state": "run_completed", "runIndex": selected_run.run_index, "completedAt": selected_run.completed_at.isoformat(), "primaryAction": None}
+        return {"state": "run_completed", "runIndex": selected_run.run_index, "totalRuns": total_runs, "completedAt": selected_run.completed_at.isoformat(), "primaryAction": None}
 
     break_ends_at = selected_run.completed_at + timedelta(hours=break_hours)
 
@@ -258,6 +263,8 @@ def _compute_status_card(
         remaining_ms = int((break_ends_at - now).total_seconds() * 1000)
         return {
             "state": "scheduled_break",
+            "runIndex": selected_run.run_index,
+            "totalRuns": total_runs,
             "nextRunIndex": next_run_index,
             "breakEndsAt": break_ends_at.isoformat(),
             "breakRemainingMs": remaining_ms,
@@ -267,6 +274,7 @@ def _compute_status_card(
     elapsed_ms = max(0, int((now - break_ends_at).total_seconds() * 1000))
     return {
         "state": "overdue_to_start_next_run",
+        "totalRuns": total_runs,
         "nextRunIndex": next_run_index,
         "breakEndsAt": break_ends_at.isoformat(),
         "elapsedSinceBreakEndMs": elapsed_ms,
@@ -359,6 +367,7 @@ def get_dashboard(
             "metricCards": None,
             "runsAccuracy": [],
             "progressCard": None,
+            "leaderboard": [],
         }
 
     # --- Resolve training ---
@@ -388,6 +397,7 @@ def get_dashboard(
             "metricCards": None,
             "runsAccuracy": [],
             "progressCard": None,
+            "leaderboard": [],
         }
     schedule_cfg = ScheduleConfig.from_dict(schedule.config)
     run_count = len(schedule_cfg.runs)
@@ -460,6 +470,13 @@ def get_dashboard(
     except Exception:
         progress_card = None
 
+    # --- Leaderboard (first page bundled to avoid waterfall on the frontend) ---
+    leaderboard = leaderboard_svc.get_run_board(
+        schedule_id=resolved["scheduleId"],
+        run_index=run_index,
+        exclude_aborted=True,
+    )
+
     return {
         "selectedTrainingId": resolved_training_id,
         "selectedRunIndex": run_index,
@@ -469,6 +486,7 @@ def get_dashboard(
         "metricCards": metric_cards,
         "runsAccuracy": runs_accuracy,
         "progressCard": progress_card,
+        "leaderboard": leaderboard,
     }
 
 

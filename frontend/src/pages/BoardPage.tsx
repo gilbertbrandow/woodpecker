@@ -337,7 +337,7 @@ export function BoardPage(): React.ReactElement | null {
       </>
     ) : (
       <>
-        {timeTargetBadge(displayedOverviewMetTargetTime)}
+        {timeTargetBadge(spectateState !== null ? null : displayedOverviewMetTargetTime)}
         {displayedAttempt !== null && (
           <Tooltip delayDuration={100}>
             <TooltipTrigger asChild>
@@ -450,7 +450,7 @@ export function BoardPage(): React.ReactElement | null {
       <MobileActionsBar
         mode="overview"
         timerText={displayedOverviewTimerText}
-        timeTargetState={displayedOverviewMetTargetTime}
+        timeTargetState={spectateState !== null ? null : displayedOverviewMetTargetTime}
         displayedAttempt={displayedAttempt}
         analyzeUrl={overviewData.actions.analyze.url}
         nextDisabledReason={overviewData.actions.nextTrainingItem.disabledReason}

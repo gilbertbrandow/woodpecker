@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Check, X, CircleOff } from 'lucide-react'
+import { Check, X, CircleOff, CheckCheck } from 'lucide-react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { formatSolveTimeMs } from '../../lib/utils'
 import { api } from '../../lib/api'
@@ -38,8 +38,15 @@ const RESULT_OPTIONS = [
 const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
   {
     id: 'user',
-    header: 'User',
-    meta: { className: 'px-2 py-1 text-xs', icon: DATA_ICONS.user },
+    header: () => (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex"><DATA_ICONS.user className="h-3.5 w-3.5" /></span>
+        </TooltipTrigger>
+        <TooltipContent>User</TooltipContent>
+      </Tooltip>
+    ),
+    meta: { className: 'px-2 py-1 text-xs' },
     enableSorting: false,
     cell: ({ row }) => {
       const { displayName, avatarUrl } = row.original
@@ -61,7 +68,7 @@ const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
   {
     accessorKey: 'tryNumber',
     header: 'Try',
-    enableSorting: true,
+    enableSorting: false,
     cell: ({ row }) =>
       row.original.countsTowardsTraining ? (
         `#${row.original.tryNumber}`
@@ -75,11 +82,18 @@ const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
           <TooltipContent>This attempt did not count towards score.</TooltipContent>
         </Tooltip>
       ),
-    meta: { className: 'px-2 py-1' },
+    meta: { className: 'px-2 py-1', icon: DATA_ICONS.tries },
   },
   {
     accessorKey: 'result',
-    header: 'Result',
+    header: () => (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex"><CheckCheck className="h-3.5 w-3.5" /></span>
+        </TooltipTrigger>
+        <TooltipContent>Result</TooltipContent>
+      </Tooltip>
+    ),
     enableSorting: false,
     cell: ({ row }) =>
       row.original.result === 'solved' ? (
