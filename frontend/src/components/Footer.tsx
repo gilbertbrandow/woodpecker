@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { BookOpen } from 'lucide-react'
+import { BookMarked } from 'lucide-react'
 
 const GITHUB_URL = 'https://github.com/gilbertbrandow/woodpecker'
 const BOOK_URL = 'https://www.amazon.se/-/en/Axel-Smith/dp/1784830542'
@@ -51,7 +51,7 @@ export function Footer({ className = '' }: FooterProps): React.ReactElement {
             className="flex items-center gap-1.5 transition-colors hover:text-foreground"
           >
             <span className="sm:hidden">Get the book</span>
-            <BookOpen className="h-3.5 w-3.5" />
+            <BookMarked className="h-3.5 w-3.5" />
           </a>
         </div>
       </div>

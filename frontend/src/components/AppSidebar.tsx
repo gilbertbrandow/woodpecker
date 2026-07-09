@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useSidebar } from './ui/sidebar'
-import { ChevronsUpDown, LayoutDashboard, BookOpen, Compass, Settings, LogOut, Play, User, Trophy, Clock, Users, UserCheck } from 'lucide-react'
+import { ChevronsUpDown, LayoutDashboard, ScrollText, BookOpenText, Settings, LogOut, Play, User, Trophy, Clock, Users, UserCheck } from 'lucide-react'
 import { CONCEPT_ICONS } from '../lib/icons'
 import { toast } from '../lib/toast'
 import { useAuth } from '../context/auth'
@@ -54,8 +54,8 @@ const SETUP_ITEMS: NavItem[] = [
 ]
 
 const FOOTER_ITEMS: NavItem[] = [
-  { label: 'About the method', to: '/app/about', icon: BookOpen },
-  { label: 'How does it work?', to: '/app/guide', icon: Compass },
+  { label: 'About the method', to: '/app/about', icon: ScrollText },
+  { label: 'How does it work?', to: '/app/guide', icon: BookOpenText },
 ]
 
 const ADMIN_ITEMS: NavItem[] = [
