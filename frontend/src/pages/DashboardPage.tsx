@@ -2,6 +2,7 @@ import * as React from 'react'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid } from 'recharts'
+import { Target } from 'lucide-react'
 import { dashboardRoute } from '../router'
 import { api, type DashboardData, type DashboardStatusCard, type DashboardPrimaryAction, type DashboardRunAccuracy } from '../lib/api'
 import { PageWrapper } from '../components/PageWrapper'
@@ -10,9 +11,9 @@ import { DashboardLeaderboard } from '../components/dashboard/DashboardLeaderboa
 import { TrainingRunPicker } from '../components/dashboard/TrainingRunPicker'
 import { StatusBadge, trainingStateToStatusValue } from '../components/StatusBadge'
 import { Button } from '../components/ui/button'
+import { Skeleton } from '../components/ui/skeleton'
 import { ChartContainer, ChartTooltip, type ChartConfig } from '../components/ui/chart'
 import { cn, formatSolveTimeMs } from '../lib/utils'
-import { Loader2 } from 'lucide-react'
 
 const ACCURACY_CONFIG: ChartConfig = {
   value: { label: 'Accuracy %', color: 'hsl(var(--chart-1))' },
@@ -68,38 +69,42 @@ function statusCardTitle(card: DashboardStatusCard): string {
     case 'active_run_on_track':
     case 'active_run_behind':
     case 'active_run_overdue':          return `Run #${(card.runIndex ?? 0) + 1}`
-    case 'scheduled_break':             return 'Break'
+    case 'scheduled_break':             return 'On a break'
     case 'overdue_to_start_next_run':   return `Ready for Run #${(card.nextRunIndex ?? 0) + 1}`
   }
 }
 
-function statusCardSubtitle(card: DashboardStatusCard): string | null {
+function statusCardBody(card: DashboardStatusCard): string {
+  const runNum = (card.runIndex ?? 0) + 1
+  const totalRuns = card.totalRuns ?? 0
+  const resolved = card.resolvedCount ?? 0
+  const total = card.totalItems ?? 0
+  const before = card.puzzlesToSolveBeforeTomorrow ?? 0
+  const nextRunNum = (card.nextRunIndex ?? 0) + 1
+
   switch (card.state) {
-    case 'run_completed':
-      return card.completedAt
-        ? `Completed ${new Date(card.completedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`
-        : null
     case 'not_started':
-      return `${card.totalRuns ?? 0} run${(card.totalRuns ?? 0) !== 1 ? 's' : ''} in this training`
+      return `You haven't started yet. Work your way through all the puzzles in each of the ${totalRuns} run${totalRuns !== 1 ? 's' : ''} to complete your training.`
     case 'active_run_ahead':
+      return `You're on Run ${runNum} of ${totalRuns}. You've resolved ${resolved} of ${total} puzzles and you're ahead of pace — great work.`
     case 'active_run_on_track':
-    case 'active_run_behind': {
-      const resolved = card.resolvedCount ?? 0
-      const total = card.totalItems ?? 0
-      const before = card.puzzlesToSolveBeforeTomorrow ?? 0
-      return `${resolved} / ${total} puzzles resolved${before > 0 ? ` · ${before} more before tomorrow` : ''}`
+      return `You're on Run ${runNum} of ${totalRuns}. You've resolved ${resolved} of ${total} puzzles and you're right on schedule.`
+    case 'active_run_behind':
+      return `You're on Run ${runNum} of ${totalRuns}. You've resolved ${resolved} of ${total} puzzles. You're a little behind — try to get ${before} more done today to stay on track.`
+    case 'active_run_overdue':
+      return `You're on Run ${runNum} of ${totalRuns}. You've resolved ${resolved} of ${total} puzzles. This run is overdue — keep pushing to finish.`
+    case 'scheduled_break': {
+      const completedRunNum = card.nextRunIndex ?? 1
+      return `Run ${completedRunNum} of ${totalRuns} is done. You're on a scheduled break before Run ${nextRunNum}. Rest up — you have ${formatMs(card.breakRemainingMs ?? 0)} remaining.`
     }
-    case 'active_run_overdue': {
-      const resolved = card.resolvedCount ?? 0
-      const total = card.totalItems ?? 0
-      return `${resolved} / ${total} puzzles resolved`
-    }
-    case 'scheduled_break':
-      return `${formatMs(card.breakRemainingMs ?? 0)} remaining`
     case 'overdue_to_start_next_run':
-      return `Break ended ${formatMs(card.elapsedSinceBreakEndMs ?? 0)} ago`
-    default:
-      return null
+      return `Your break ended ${formatMs(card.elapsedSinceBreakEndMs ?? 0)} ago. Run ${nextRunNum} of ${totalRuns} is ready — jump back in whenever you're ready.`
+    case 'run_completed':
+      return `Run ${runNum} of ${totalRuns} is complete. Well done — start your next run after your scheduled break.`
+    case 'training_completed':
+      return `You've finished all ${totalRuns} run${totalRuns !== 1 ? 's' : ''}. Your training is complete — great job seeing it through.`
+    case 'training_aborted':
+      return 'This training was aborted. You can start a new training from the same schedule if you want to try again.'
   }
 }
 
@@ -131,7 +136,7 @@ function StatusCard({
 }): React.ReactElement {
   const navigate = useNavigate()
   const title = statusCardTitle(card)
-  const subtitle = statusCardSubtitle(card)
+  const body = statusCardBody(card)
   const action = card.primaryAction
 
   function handleAction(): void {
@@ -144,28 +149,24 @@ function StatusCard({
   }
 
   return (
-    <div className="rounded-md border bg-card px-4 py-3 h-full flex flex-col justify-between gap-3">
+    <div className="rounded-md border bg-card px-5 py-4 h-full flex flex-col gap-4 min-h-40">
       <div className="flex flex-wrap items-center gap-2">
         <p className="font-medium text-sm text-foreground">{title}</p>
         <StatusBadge status={statusCardBadge(card.state)} />
       </div>
-      <div className="flex flex-col gap-2">
-        {subtitle && (
-          <p className="text-xs text-muted-foreground">{subtitle}</p>
-        )}
-        {action && (
-          <div>
-            <Button
-              size="sm"
-              disabled={startingRun}
-              onClick={handleAction}
-              className="h-7 px-3 text-xs bg-foreground text-background hover:bg-foreground/90"
-            >
-              {startingRun && action.type === 'start_run' ? 'Starting…' : primaryActionLabel(action)}
-            </Button>
-          </div>
-        )}
-      </div>
+      <p className="text-sm text-muted-foreground leading-relaxed flex-1">{body}</p>
+      {action && (
+        <div>
+          <Button
+            size="sm"
+            disabled={startingRun}
+            onClick={handleAction}
+            className="h-7 px-3 text-xs bg-foreground text-background hover:bg-foreground/90"
+          >
+            {startingRun && action.type === 'start_run' ? 'Starting…' : primaryActionLabel(action)}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
@@ -270,16 +271,52 @@ function AccuracyChart({ runsAccuracy }: { runsAccuracy: DashboardRunAccuracy[] 
 }
 
 // ---------------------------------------------------------------------------
+// Skeleton loading state
+// ---------------------------------------------------------------------------
+
+function DashboardSkeleton(): React.ReactElement {
+  return (
+    <PageWrapper className="flex flex-col gap-6 max-w-none flex-1 min-h-0">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Skeleton className="h-5 w-24" />
+        <Skeleton className="h-8 w-64" />
+      </div>
+      <div className="flex flex-col gap-6 xl:flex-row xl:items-stretch xl:gap-8 flex-1 min-h-0">
+        <div className="flex flex-col gap-4 min-w-0 flex-1">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Skeleton className="sm:col-span-2 min-h-40 rounded-md" />
+            <div className="grid grid-cols-2 sm:grid-cols-1 gap-4">
+              <Skeleton className="h-24 rounded-md" />
+              <Skeleton className="h-24 rounded-md" />
+            </div>
+          </div>
+          <Skeleton className="flex-1 min-h-72 rounded-md" />
+        </div>
+        <div className="w-full xl:w-[40rem] shrink-0 flex flex-col gap-4">
+          <Skeleton className="flex-1 min-h-48 rounded-md" />
+          <Skeleton className="min-h-48 rounded-md" />
+        </div>
+      </div>
+    </PageWrapper>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Empty state
 // ---------------------------------------------------------------------------
 
 function EmptyState(): React.ReactElement {
   return (
-    <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
-      <p className="text-base font-medium">No trainings yet</p>
-      <p className="text-sm text-muted-foreground max-w-xs">
-        Start by browsing available schedules or creating your own.
-      </p>
+    <div className="flex flex-col items-center justify-center gap-6 py-20 text-center max-w-sm mx-auto">
+      <div className="rounded-full bg-muted p-4">
+        <Target className="h-8 w-8 text-muted-foreground" />
+      </div>
+      <div className="space-y-2">
+        <p className="text-base font-semibold">No active trainings</p>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Join a schedule to start a training. You'll work through the same puzzle set across multiple runs — each pass building sharper pattern recognition.
+        </p>
+      </div>
       <div className="flex gap-2">
         <Link to="/app/schedules">
           <Button size="sm">Browse schedules</Button>
@@ -303,6 +340,8 @@ export function DashboardPage(): React.ReactElement {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [startingRun, setStartingRun] = useState(false)
+  const [pickerTrainingId, setPickerTrainingId] = useState<number | null>(null)
+  const [pickerRunIndex, setPickerRunIndex] = useState<number | null>(null)
 
   const fetchDashboard = useCallback(
     (trainingId?: number, runIndex?: number) => {
@@ -311,6 +350,8 @@ export function DashboardPage(): React.ReactElement {
         .get({ trainingId, runIndex })
         .then((d) => {
           setData(d)
+          setPickerTrainingId(d.selectedTrainingId)
+          setPickerRunIndex(d.selectedRunIndex)
           // Replace URL with resolved params
           if (d.selectedTrainingId !== null && d.selectedRunIndex !== null) {
             void navigate({
@@ -344,13 +385,7 @@ export function DashboardPage(): React.ReactElement {
   }
 
   if (loading && !data) {
-    return (
-      <PageWrapper>
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-        </div>
-      </PageWrapper>
-    )
+    return <DashboardSkeleton />
   }
 
   if (!data || data.trainings.length === 0) {
@@ -390,23 +425,30 @@ export function DashboardPage(): React.ReactElement {
       {/* Header row: title + selectors */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-base font-semibold">Dashboard</h1>
-        <TrainingRunPicker
-          trainings={trainings}
-          runSlots={runSlots}
-          selectedTrainingId={selectedTrainingId}
-          selectedRunIndex={selectedRunIndex}
-          onSelect={(trainingId, runIndex) => fetchDashboard(trainingId, runIndex)}
-        />
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground hidden sm:block">Viewing</span>
+          <TrainingRunPicker
+            trainings={trainings}
+            runSlots={runSlots}
+            selectedTrainingId={pickerTrainingId}
+            selectedRunIndex={pickerRunIndex}
+            onSelect={(trainingId, runIndex) => {
+              setPickerTrainingId(trainingId)
+              setPickerRunIndex(runIndex ?? null)
+              fetchDashboard(trainingId, runIndex)
+            }}
+          />
+        </div>
       </div>
 
       {/* Main layout: content + leaderboard rail */}
-      <div className="flex flex-col gap-6 xl:flex-row xl:items-stretch xl:gap-8 flex-1 min-h-0">
+      <div className={cn('flex flex-col gap-6 xl:flex-row xl:items-stretch xl:gap-8 flex-1 min-h-0 transition-opacity duration-150', loading && 'opacity-50 pointer-events-none')}>
         {/* Left: cards */}
         <div className="flex flex-col gap-4 min-w-0 flex-1">
-          {/* Top row: status + metric cards */}
+          {/* Top: status card (2/3 width) + stacked metric cards (1/3 width) */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {statusCard && (
-              <div className="sm:col-span-1">
+              <div className="sm:col-span-2">
                 <StatusCard
                   card={statusCard}
                   onStartRun={(tid, ri) => { void handleStartRun(tid, ri) }}
@@ -414,19 +456,21 @@ export function DashboardPage(): React.ReactElement {
                 />
               </div>
             )}
-            <MetricCard
-              label="Accuracy"
-              value={accuracyValue}
-              delta={accuracyDelta}
-              deltaLabel="vs prev run"
-            />
-            <MetricCard
-              label="Avg solve time"
-              value={solveTimeValue}
-              delta={solveTimeDelta}
-              deltaLabel="vs prev run"
-              lowerIsBetter
-            />
+            <div className="grid grid-cols-2 sm:grid-cols-1 gap-4">
+              <MetricCard
+                label="Accuracy"
+                value={accuracyValue}
+                delta={accuracyDelta}
+                deltaLabel="vs prev run"
+              />
+              <MetricCard
+                label="Avg solve time"
+                value={solveTimeValue}
+                delta={solveTimeDelta}
+                deltaLabel="vs prev run"
+                lowerIsBetter
+              />
+            </div>
           </div>
 
           {/* Training progress card */}
@@ -439,6 +483,7 @@ export function DashboardPage(): React.ReactElement {
             <DashboardLeaderboard
               trainingId={selectedTrainingId}
               runIndex={selectedRunIndex}
+              initialRows={data.leaderboard}
             />
             {runsAccuracy.length > 0 && (
               <AccuracyChart runsAccuracy={runsAccuracy} />
