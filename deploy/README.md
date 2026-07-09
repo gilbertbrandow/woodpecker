@@ -15,7 +15,7 @@ Monthly AWS costs reported by the `aws-cost-report` workflow. Updated automatica
 Single EC2 t3.micro in eu-west-1 behind an Elastic IP. Chosen for simplicity and cost (~$10/month).
 
 ```text
-woodpeckerchess.com → 54.216.71.166 (Elastic IP) → EC2 t3.micro (Ubuntu 24.04, 30 GB gp3 root + 10 GB gp3 pgdata)
+woodpeckerchess.com → 54.216.71.166 (Elastic IP) → EC2 t3.micro (Ubuntu 24.04, 15 GB gp3 root + 5 GB gp3 pgdata)
 ```
 
 All AWS resources are in `deploy/terraform/`. State is local (`terraform.tfstate` — gitignored). To change infra: edit `.tf` files, then `cd deploy/terraform && terraform apply`.
@@ -189,16 +189,7 @@ rm /tmp/restore.sql.gz
 
 ## pgdata EBS volume
 
-Postgres data lives on a **dedicated 10 GB gp3 EBS volume** (`woodpecker-pgdata`) mounted at `/mnt/woodpecker-data` on the host. The DB container uses it via a bind mount (`/mnt/woodpecker-data/pgdata:/var/lib/postgresql/data`). This volume is managed separately from the EC2 root volume — it has `prevent_destroy = true` in Terraform and `delete_on_termination = false` on the root volume — so accidental instance termination cannot destroy the database.
-
-### One-time migration (run once after `terraform apply` attaches the volume)
-
-```bash
-cd deploy/terraform && terraform apply   # creates + attaches the EBS volume
-make -C deploy pgdata-migrate            # formats, mounts, copies pgdata, restarts services
-```
-
-`pgdata-migrate` stops the DB briefly (~30 s), copies data from the old Docker named volume to the EBS mount, then restarts everything with the new bind-mount config. The named volume (`woodpecker_pgdata`) is left in place as a fallback until you confirm the site is healthy.
+Postgres data lives on a **dedicated 5 GB gp3 EBS volume** (`woodpecker-pgdata`) mounted at `/mnt/woodpecker-data` on the host. The DB container uses it via a bind mount (`/mnt/woodpecker-data/pgdata:/var/lib/postgresql/data`). This volume is managed separately from the EC2 root volume — it has `prevent_destroy = true` in Terraform and `delete_on_termination = false` on the root volume — so accidental instance termination cannot destroy the database.
 
 ### Fresh instance setup (disaster recovery)
 
@@ -236,7 +227,7 @@ To check credit status manually: AWS Console → EC2 → select instance → Mon
 
 ### Disk
 
-Each deploy automatically prunes old Docker images after migrations succeed (`docker image prune -af` in `deploy.yml`). This keeps the 30 GB volume healthy by removing images from prior releases that are no longer running.
+Each deploy automatically prunes old Docker images after migrations succeed (`docker image prune -af` in `deploy.yml`). This keeps the 15 GB root volume healthy by removing images from prior releases that are no longer running.
 
 To check disk usage at any time:
 

@@ -79,7 +79,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.yml,docker-compose-prod.yml,docker-compose-db-tunnel.yml"
+          source: "docker-compose.yml,docker-compose-prod.yml,deploy/docker-compose-db-tunnel.yml"
           target: /opt/woodpecker
 
       - name: Copy scripts to EC2

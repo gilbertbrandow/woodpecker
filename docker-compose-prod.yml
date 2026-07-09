@@ -1,4 +1,8 @@
 services:
+  db:
+    volumes:
+      - /mnt/woodpecker-data/pgdata:/var/lib/postgresql/data
+
   backend:
     image: ghcr.io/${GHCR_OWNER}/woodpecker-backend:${IMAGE_TAG:-latest}
     build:
