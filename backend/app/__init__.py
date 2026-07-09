@@ -4,6 +4,7 @@ import sentry_sdk
 from datetime import datetime, timezone
 from flask import Flask, session
 from sentry_sdk.integrations.flask import FlaskIntegration
+from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from app.exceptions import AppError
 from app.extensions import db, cors, migrate
 from app.routes.health import health_bp
@@ -31,9 +32,9 @@ def _init_sentry() -> None:
         return
     sentry_sdk.init(
         dsn=dsn,
-        integrations=[FlaskIntegration()],
+        integrations=[FlaskIntegration(), SqlalchemyIntegration()],
         environment=os.environ.get("FLASK_ENV", "production"),
-        traces_sample_rate=0.0,
+        traces_sample_rate=0.1,
         send_default_pii=False,
         ignore_errors=[AppError],
     )

@@ -12,10 +12,10 @@ Monthly AWS costs reported by the `aws-cost-report` workflow. Updated automatica
 
 ## Infrastructure
 
-Single EC2 t3.micro in eu-west-1 behind an Elastic IP. Chosen for simplicity and cost (~$10/month); scaling path is stop → resize → start, no data loss.
+Single EC2 t3.micro in eu-west-1 behind an Elastic IP. Chosen for simplicity and cost (~$10/month).
 
 ```text
-woodpeckerchess.com → 54.216.71.166 (Elastic IP) → EC2 t3.micro (Ubuntu 24.04, 30 GB gp3)
+woodpeckerchess.com → 54.216.71.166 (Elastic IP) → EC2 t3.micro (Ubuntu 24.04, 15 GB gp3 root + 5 GB gp3 pgdata)
 ```
 
 All AWS resources are in `deploy/terraform/`. State is local (`terraform.tfstate` — gitignored). To change infra: edit `.tf` files, then `cd deploy/terraform && terraform apply`.
@@ -23,6 +23,20 @@ All AWS resources are in `deploy/terraform/`. State is local (`terraform.tfstate
 **Do not resize the instance via Terraform** — it would destroy and recreate it. Use the AWS console instead: stop → Actions → Change instance type → start.
 
 Route 53 hosts `woodpeckerchess.com` (A record → EIP) and `www` (CNAME → apex).
+
+### Scaling path
+
+The t3.micro handles the current load comfortably. When it no longer does, signals and actions:
+
+| Signal | Action |
+| --- | --- |
+| `CPUCreditBalance` CloudWatch alarm fires | Stop EC2 → AWS console: change type to t3.small → Start |
+| Backend OOM / memory pressure | Same resize; t3.small = 2 GB RAM |
+| P95 API latency > 2 s at low concurrency | Check Sentry traces for slow queries first; resize if DB-bound |
+
+After resizing to t3.small, increase Gunicorn from 1 to 2 workers in `docker-compose-prod.yml`. This doubles concurrent request capacity within the same instance.
+
+**Do not resize via Terraform** — changing `instance_type` would destroy and recreate the instance, and `prevent_destroy = true` blocks this anyway. Use the AWS console instead: stop → Actions → Change instance type → start. In-place, no data risk, ~5 min downtime.
 
 ## Services
 
@@ -33,7 +47,7 @@ Four long-running Docker containers managed by Docker Compose at `/opt/woodpecke
 | nginx:1.27 | TLS termination, reverse proxy (ports 80 + 443) |
 | frontend | nginx serving static React build |
 | backend | Gunicorn · Flask · 1 worker · 4 threads |
-| db | Postgres 16 · named volume `pgdata` |
+| db | Postgres 16 · bind-mounted from `/mnt/woodpecker-data/pgdata` (dedicated EBS volume) |
 | backup | Ephemeral — runs daily at 02:00 UTC via systemd, exits when done |
 
 `/api/*` → backend:8000. Everything else → frontend:80. Postgres is internal only.
@@ -173,6 +187,54 @@ docker compose -f docker-compose.yml -f docker-compose-prod.yml start backend
 rm /tmp/restore.sql.gz
 ```
 
+## pgdata EBS volume
+
+Postgres data lives on a **dedicated 5 GB gp3 EBS volume** (`woodpecker-pgdata`) mounted at `/mnt/woodpecker-data` on the host. The DB container uses it via a bind mount (`/mnt/woodpecker-data/pgdata:/var/lib/postgresql/data`). This volume is managed separately from the EC2 root volume — it has `prevent_destroy = true` in Terraform and `delete_on_termination = false` on the root volume — so accidental instance termination cannot destroy the database.
+
+### Fresh instance setup (disaster recovery)
+
+After `terraform apply` creates a new instance and attaches the pgdata EBS volume, a single command handles the rest — mounting the volume, obtaining the TLS certificate, and pushing the nginx config:
+
+```bash
+make -C deploy instance-bootstrap
+```
+
+Requires `DOMAIN_NAME` and `CERTBOT_EMAIL` in `~/.woodpecker-prod-env`. Once it completes, publish a GitHub release to deploy the application.
+
+## Monitoring
+
+### Sentry (application layer)
+
+Errors and performance traces are sent to [woodpecker-n0.sentry.io](https://woodpecker-n0.sentry.io). The backend uses `FlaskIntegration` (request/response lifecycle) and `SqlalchemyIntegration` (every DB query within a sampled request). Tracing is set to 10% sampling (`traces_sample_rate=0.1`) — sufficient to catch slow endpoints while staying within Sentry's free-tier limit of 10 K transactions/month.
+
+**What to look at in Sentry → Performance:**
+- P75/P95 per endpoint — `GET /leaderboard/weekly` is the most complex query and will surface first under load
+- DB query spans — each trace shows individual SQL statements with timing; slow scans appear here before they become user-visible
+
+Check current transaction usage at `woodpecker-n0.sentry.io/settings/billing/`. If usage approaches 10 K/month, raise the sample rate threshold or upgrade to the Team plan (~$26/month for 100 K transactions).
+
+### CloudWatch (infrastructure layer)
+
+The t3.micro has a burst CPU credit balance. When credits run out the CPU is hard-capped at 10% — requests slow down silently with no error. A CloudWatch alarm fires when `CPUCreditBalance < 20` for two consecutive 5-minute periods, giving roughly 10 minutes to act before throttling becomes severe.
+
+The alarm and SNS email subscription are managed by Terraform (`deploy/terraform/main.tf`). To enable:
+
+1. Set `alert_email` in `deploy/terraform/terraform.tfvars`
+2. Run `cd deploy/terraform && terraform apply`
+3. Confirm the subscription email AWS sends to that address — alerts are inactive until confirmed
+
+To check credit status manually: AWS Console → EC2 → select instance → Monitoring tab → **CPUCreditBalance**.
+
+### Disk
+
+Each deploy automatically prunes old Docker images after migrations succeed (`docker image prune -af` in `deploy.yml`). This keeps the 15 GB root volume healthy by removing images from prior releases that are no longer running.
+
+To check disk usage at any time:
+
+```bash
+ssh ubuntu@54.216.71.166 "df -h && docker system df"
+```
+
 ## Database access
 
 Operator credentials live in `~/.woodpecker-prod-env` outside the repo (chmod 600, never committed). Create it manually:
@@ -183,6 +245,8 @@ EC2_HOST=your-ec2-host
 PROD_DB_PASSWORD=your-db-password
 BACKUP_BUCKET=your-backup-bucket-name
 AWS_REGION=eu-west-1
+DOMAIN_NAME=woodpeckerchess.com
+CERTBOT_EMAIL=your-email@example.com
 EOF
 chmod 600 ~/.woodpecker-prod-env
 ```

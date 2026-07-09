@@ -23,3 +23,15 @@ variable "domain_name" {
   description = "Your domain (e.g. woodpecker.example.com). Leave empty to skip DNS setup."
   default     = ""
 }
+
+variable "alert_email" {
+  type        = string
+  description = "Email address for CloudWatch infrastructure alerts (e.g. CPU credit low). Leave empty to skip alarm setup."
+  default     = ""
+}
+
+variable "availability_zone" {
+  type        = string
+  description = "AZ for the EC2 instance and pgdata EBS volume. Must match — EBS volumes cannot be moved between AZs."
+  default     = "eu-west-1a"
+}
