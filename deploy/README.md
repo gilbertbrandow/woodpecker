@@ -36,7 +36,7 @@ The t3.micro handles the current load comfortably. When it no longer does, signa
 
 After resizing to t3.small, increase Gunicorn from 1 to 2 workers in `docker-compose-prod.yml`. This doubles concurrent request capacity within the same instance.
 
-**Do not resize via Terraform.** Always use the AWS console: stop → Actions → Change instance type → start. No data loss, ~5 min downtime.
+**Do not resize via Terraform** — changing `instance_type` would destroy and recreate the instance, and `prevent_destroy = true` blocks this anyway. Use the AWS console instead: stop → Actions → Change instance type → start. In-place, no data risk, ~5 min downtime.
 
 ## Services
 
