@@ -15,7 +15,7 @@ Monthly AWS costs reported by the `aws-cost-report` workflow. Updated automatica
 Single EC2 t3.micro in eu-west-1 behind an Elastic IP. Chosen for simplicity and cost (~$10/month).
 
 ```text
-woodpeckerchess.com → 54.216.71.166 (Elastic IP) → EC2 t3.micro (Ubuntu 24.04, 15 GB gp3 root + 5 GB gp3 pgdata)
+woodpeckerchess.com → <EC2_ELASTIC_IP> (Elastic IP) → EC2 t3.micro (Ubuntu 24.04, 15 GB gp3 root + 5 GB gp3 pgdata)
 ```
 
 All AWS resources are in `deploy/terraform/`. State is local (`terraform.tfstate` — gitignored). To change infra: edit `.tf` files, then `cd deploy/terraform && terraform apply`.
@@ -78,7 +78,7 @@ The nginx config on the server (`/opt/woodpecker/deploy/nginx/default.conf`) is 
 
 | Secret | Value |
 | ------ | ----- |
-| `EC2_HOST` | `54.216.71.166` |
+| `EC2_HOST` | Elastic IP from AWS console (or `terraform output -raw eip_public_ip`) |
 | `EC2_SSH_KEY` | Private key for `woodpecker-key` |
 | `GHCR_TOKEN` | GitHub PAT with `write:packages` |
 | `BACKUP_BUCKET` | Output of `cd deploy/terraform && terraform output -raw backup_bucket_name` |
@@ -93,8 +93,8 @@ To update the nginx config:
 
 ```bash
 sed 's/<domain>/woodpeckerchess.com/g' deploy/nginx/https.conf > /tmp/nginx-ssl.conf
-scp /tmp/nginx-ssl.conf ubuntu@54.216.71.166:/opt/woodpecker/deploy/nginx/default.conf
-ssh ubuntu@54.216.71.166 "cd /opt/woodpecker && docker compose -f docker-compose.yml -f docker-compose-prod.yml restart nginx"
+scp /tmp/nginx-ssl.conf ubuntu@$EC2_HOST:/opt/woodpecker/deploy/nginx/default.conf
+ssh ubuntu@$EC2_HOST "cd /opt/woodpecker && docker compose -f docker-compose.yml -f docker-compose-prod.yml restart nginx"
 ```
 
 ## Backups
@@ -115,7 +115,7 @@ The backup container reports check-ins to Sentry Cron Monitors (`woodpecker-back
 ### Checking backup status
 
 ```bash
-ssh ubuntu@54.216.71.166
+ssh ubuntu@$EC2_HOST
 
 # Is the timer active and when does it next fire?
 systemctl list-timers woodpecker-backup.timer
@@ -131,7 +131,7 @@ aws s3 ls s3://${BACKUP_BUCKET}/ --recursive
 ### Running a backup manually
 
 ```bash
-ssh ubuntu@54.216.71.166
+ssh ubuntu@$EC2_HOST
 sudo systemctl start woodpecker-backup.service
 journalctl -u woodpecker-backup.service -f
 ```
@@ -170,7 +170,7 @@ This does **not** touch the production database or your normal local dev databas
 ### Restoring from backup (production disaster recovery)
 
 ```bash
-ssh ubuntu@54.216.71.166
+ssh ubuntu@$EC2_HOST
 
 # Find the backup to restore
 source /opt/woodpecker/.env
@@ -232,7 +232,7 @@ Each deploy automatically prunes old Docker images after migrations succeed (`do
 To check disk usage at any time:
 
 ```bash
-ssh ubuntu@54.216.71.166 "df -h && docker system df"
+ssh ubuntu@$EC2_HOST "df -h && docker system df"
 ```
 
 ## Database access
@@ -273,7 +273,7 @@ GUI tools (Beekeeper, TablePlus, etc.): run `db-tunnel-start`, connect to `local
 ## Rollback
 
 ```bash
-ssh ubuntu@54.216.71.166
+ssh ubuntu@$EC2_HOST
 cd /opt/woodpecker
 IMAGE_TAG=v1.2.2 docker compose -f docker-compose.yml -f docker-compose-prod.yml up -d
 docker compose -f docker-compose.yml -f docker-compose-prod.yml exec -T backend flask --app app db downgrade -1
