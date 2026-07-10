@@ -5,7 +5,7 @@
 All user-facing errors must be raised as `AppError` subclasses from `app/exceptions.py`. Never use raw Python builtins for errors that map to HTTP responses.
 
 | Class | HTTP | When to raise |
-|-------|------|---------------|
+| ------- | ------ | --------------- |
 | `ValidationError` | 422 | User-supplied input fails semantic validation |
 | `NotFoundError` | 404 | A resource the user requested does not exist |
 | `ConflictError` | 409 | The action conflicts with current resource state |

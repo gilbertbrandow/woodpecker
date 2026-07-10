@@ -13,7 +13,7 @@ If either file doesn't exist, proceed silently. Don't flag their absence; don't 
 
 This is a **single-context repo**:
 
-```
+```text
 /
 ├── CONTEXT.md          ← domain glossary
 ├── docs/adr/           ← architectural decisions

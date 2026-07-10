@@ -11,6 +11,7 @@ A filter's `id` (for `filterableColumns`) or `key` (for `syncedFilters`) must ma
 **`filterableColumns`** — for filters whose UI (a `MultiSelectFilter` dropdown) DataTable renders itself. DataTable owns the full lifecycle: URL read on mount, URL write on change, URL clear on "Clear filters". The wrapper receives change notifications via `onFilterChange` and uses them to update its own state for API calls.
 
 **`syncedFilters`** — for filters whose UI the wrapper renders in `filtersSlot` (e.g. `UserSelector`, a custom search input's companion state). The wrapper holds the filter value as React state and passes `{ key, value, onChange }` descriptors to DataTable. DataTable then:
+
 - Writes the values to URL whenever they change (detected via serialised snapshot).
 - On first render, writes the initial values — this is how defaults that exist in state before the URL is consulted (e.g. a pre-selected user from auth context) get persisted to the URL.
 - Calls `onChange([])` and clears the URL key when "Clear filters" is clicked.
@@ -39,6 +40,7 @@ The hook reads IDs from URL on mount, resolves any it can instantly (e.g. the cu
 `hadInitialIds` is `true` when the URL contained IDs on mount. Wrappers use this to decide whether to apply component-level defaults — e.g. TrainingTable defaults to the current user only when `!hadInitialIds`, so a shared URL with explicit IDs is always honoured.
 
 Bulk-fetch endpoints exist for all entity types that appear in URL filters:
+
 - `GET /users/by-ids?ids=1,2,3` → `SelectableUser[]`
 - `GET /schedules/by-ids?ids=1,2,3` → `SelectableSchedule[]`
 
