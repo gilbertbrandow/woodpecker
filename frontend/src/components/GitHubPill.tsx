@@ -15,3 +15,4 @@ export function GitHubPill(): React.ReactElement {
     </a>
   )
 }
+const x: string = 123
