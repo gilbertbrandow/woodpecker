@@ -15,4 +15,4 @@ types-requests
 types-Flask-Cors
 types-Flask-Migrate
 mypy==2.2.0
-ruff==0.15.20
+ruff==0.15.21
