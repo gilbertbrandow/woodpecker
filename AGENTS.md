@@ -72,13 +72,14 @@ Use `make` targets at the repo root — run `make` or inspect the `Makefile` for
 Error handling is a cross-cutting concern with a deliberate contract. The backend returns `{"title": "...", "detail": "..."}` on every error; the frontend's `request()` intercepts every API error and owns all side effects. Neither side should re-surface errors that the other already handles.
 
 Platform-specific rules live in the sub-guides:
+
 - [`backend/AGENTS.md`](backend/AGENTS.md) — exception hierarchy, what to raise, what Sentry captures
 - [`frontend/AGENTS.md`](frontend/AGENTS.md) — toast import, call-site patterns, what not to do
 
 **Sentry environments:**
 
 | Side | DSN variable | Environment tag |
-|------|-------------|-----------------|
+| ------ | ------------- | ----------------- |
 | Backend | `SENTRY_DSN` | `FLASK_ENV` (defaults to `"production"`) |
 | Frontend | `VITE_SENTRY_DSN` | Vite `import.meta.env.MODE` |
 

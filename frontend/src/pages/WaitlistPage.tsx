@@ -6,6 +6,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useAuth } from '../context/auth'
 import { api } from '../lib/api'
 import { Button } from '../components/ui/button'
+import { GitHubPill } from '../components/GitHubPill'
 
 export function WaitlistPage(): React.ReactElement | null {
   const { user, onboarding, waitlisted, setWaitlisted, loading } = useAuth()
@@ -50,8 +51,9 @@ export function WaitlistPage(): React.ReactElement | null {
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-8 px-4">
-      <div className="flex flex-col items-center gap-3 text-center">
+    <div className="flex flex-1 flex-col items-center justify-center gap-10 px-4">
+      <div className="flex flex-col items-center gap-4 text-center">
+        <GitHubPill />
         <h1 className="text-2xl font-bold tracking-tight text-foreground">You're on the waitlist</h1>
         <p className="max-w-sm text-sm text-muted-foreground">
           We're limiting access while we get things running smoothly. You've been added to the waitlist.

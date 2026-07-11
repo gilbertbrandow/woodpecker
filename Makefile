@@ -1,3 +1,5 @@
+NVM = [ -f "$${NVM_DIR:-$$HOME/.nvm}/nvm.sh" ] && . "$${NVM_DIR:-$$HOME/.nvm}/nvm.sh" && nvm install $(shell cat frontend/.nvmrc) --no-progress || true
+
 DOCKER ?= docker
 COMPOSE = $(DOCKER) compose
 LOCAL_COMPOSE = $(COMPOSE) -f docker-compose.yml -f docker-compose-local.yml
@@ -61,6 +63,9 @@ lint:
 	$(MAKE) -C backend lint
 	$(MAKE) -C frontend lint
 	$(MAKE) -C pipeline lint
+	$(NVM) && npx --yes markdownlint-cli2 \
+		"*.md" "docs/**/*.md" "deploy/README.md" \
+		".github/**/*.md" "backend/AGENTS.md" "frontend/AGENTS.md" "pipeline/AGENTS.md" "pipeline/README.md" "pipeline/data/README.md"
 
 test:
 	$(LOCAL_COMPOSE) build --quiet backend frontend
@@ -79,3 +84,4 @@ test-all:
 	$(TEST_COMPOSE) down -v
 
 .PHONY: up up-build down logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade migrate-current migrate-history migrate-rollback seed-dev setup lint test test-integration test-all
+

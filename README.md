@@ -1,4 +1,20 @@
-# woodpecker
+# Woodpecker Chess Trainer
+
+Build a custom puzzle set from tactics, positional puzzles, and decoys. Create a Schedule and compete with others training the same Woodpecker cycles.
+
+![Solving a puzzle in Woodpecker](https://github.com/user-attachments/assets/e5dd4e7b-b8a0-4fed-bf6e-ed3b0a659844)
+
+## Insights & stay on track
+
+Get detailed insights into your accuracy and solve times across every Run and see how they develop cycle over cycle. Clear pointers tell you where you stand in your Schedule — whether to rest, push on, or pick up where you left off. See how your numbers stack up against others training the same cycles on the leaderboard.
+
+![Dashboard and leaderboard](https://github.com/user-attachments/assets/2b883ecf-2f8d-46ab-a085-d97f22b26799)
+
+## Build your own Subsets & Schedules
+
+Compose a puzzle set from Lichess Tactics, Scraped Positional puzzles, and Decoys — filtering by rating, difficulty, or theme. Then configure a Schedule: how many Runs, a time target per puzzle, and the break between Runs. Share your Schedule and anyone can train the same regimen.
+
+![Building a Subset and Schedule](https://github.com/user-attachments/assets/70a653bc-ea7d-412d-a111-521ba887ffc1)
 
 ## Local development
 

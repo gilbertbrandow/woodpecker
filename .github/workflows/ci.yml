@@ -8,6 +8,21 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  markdown-lint:
+    name: Markdown lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "26"
+
+      - name: lint
+        run: npx --yes markdownlint-cli2
+          "*.md" "docs/**/*.md" "deploy/README.md"
+          ".github/**/*.md" "backend/AGENTS.md" "frontend/AGENTS.md" "pipeline/AGENTS.md" "pipeline/README.md" "pipeline/data/README.md"
+
   backend-lint:
     name: Backend lint
     runs-on: ubuntu-latest

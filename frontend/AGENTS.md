@@ -16,6 +16,7 @@ The only legitimate exceptions are `main.tsx` (mounts `<Toaster />`) and `ToastP
 ### Call-site patterns
 
 **Mutation with success feedback:**
+
 ```typescript
 try {
   const result = await api.subsets.create(name)
@@ -27,6 +28,7 @@ try {
 ```
 
 **Mutation that must reset UI state on failure:**
+
 ```typescript
 setSubmitting(true)
 try {
@@ -38,6 +40,7 @@ try {
 ```
 
 **Mutation with no user feedback needed:**
+
 ```typescript
 try {
   await api.settings.update(payload)
@@ -59,7 +62,7 @@ try {
 ### Toast variant guide
 
 | Variant | When |
-|---------|------|
+| --------- | ------ |
 | `toast.success()` | Mutation completed — something was created, saved, deleted, or locked |
 | `toast.info()` | Something happened the user should know but didn't directly trigger (e.g. run started automatically) |
 | `toast.warning()` | Action completed but with a caveat (e.g. only 87 of 100 puzzles could be sourced) |
@@ -68,7 +71,7 @@ try {
 ### Module map
 
 | Module | Responsibility |
-|--------|---------------|
+| -------- | --------------- |
 | `src/lib/request.ts` | HTTP machinery: `request()`, `ApiError`, all error side-effects (toast, redirect, Sentry) |
 | `src/lib/api.ts` | API surface: typed method wrappers and all domain types. No branching logic. |
 | `src/lib/toast.tsx` | Toast wrapper: injects variant-matching icons, enforces the single import seam |

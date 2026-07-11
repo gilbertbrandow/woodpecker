@@ -4,6 +4,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useAuth } from '../context/auth'
 import { api } from '../lib/api'
 import { Button } from '../components/ui/button'
+import { GitHubPill } from '../components/GitHubPill'
 
 const DISPLAY_NAME_RE = /^[\w\s\-]+$/u
 
@@ -54,8 +55,9 @@ export function OnboardingPage(): React.ReactElement | null {
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-8 px-4">
-      <div className="flex flex-col items-center gap-3 text-center">
+    <div className="flex flex-1 flex-col items-center justify-center gap-10 px-4">
+      <div className="flex flex-col items-center gap-4 text-center">
+        <GitHubPill />
         <h1 className="text-3xl font-bold tracking-tight text-foreground">Welcome!</h1>
         <p className="max-w-sm text-sm text-muted-foreground">
           Choose a display name. This is how others will see you in leaderboards and training sessions.
