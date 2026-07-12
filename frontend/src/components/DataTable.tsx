@@ -10,8 +10,9 @@ import {
   type ColumnDef,
   type SortingState,
   type ColumnFiltersState,
+  type VisibilityState,
 } from '@tanstack/react-table'
-import { ArrowUp, ArrowDown, ArrowUpDown, Search, Loader2, ChevronLeft, ChevronRight, Undo2 } from 'lucide-react'
+import { ArrowUp, ArrowDown, ArrowUpDown, Search, Loader2, ChevronLeft, ChevronRight, Undo2, Columns3, RotateCcw } from 'lucide-react'
 import { Input } from './ui/input'
 import {
   Table,
@@ -22,6 +23,14 @@ import {
   TableCell,
 } from './ui/table'
 import { MultiSelectFilter } from './ui/multi-select-filter'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu'
 import { cn } from '../lib/utils'
 import { useTableUrlSync } from '../hooks/useTableUrlSync'
 
@@ -129,6 +138,8 @@ export function DataTable<T>({
     return init
   })
 
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(() => {
     const init: ColumnFiltersState = []
     filterableColumns.forEach((fc) => {
@@ -152,7 +163,9 @@ export function DataTable<T>({
       sorting,
       globalFilter,
       columnFilters,
+      columnVisibility,
     },
+    onColumnVisibilityChange: setColumnVisibility,
     onSortingChange: (updater) => {
       const next = typeof updater === 'function' ? updater(sorting) : updater
       setSorting(next)
@@ -276,16 +289,66 @@ export function DataTable<T>({
               onChange={(values) => handleFilterableColumnChange(fc.id, values)}
             />
           ))}
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Undo2 className="h-3 w-3" />
-              Clear filters
-            </button>
-          )}
+          {(() => {
+            const hideableCols = table.getAllColumns().filter((c) => c.getCanHide())
+            if (!hasActiveFilters && hideableCols.length === 0) return null
+            return (
+              <div className="ml-auto flex items-center gap-2">
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Undo2 className="h-3 w-3" />
+                    Clear filters
+                  </button>
+                )}
+                {hideableCols.length > 0 && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        <Columns3 className="h-3 w-3" />
+                        Columns
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
+                      {hideableCols.map((col) => {
+                        const header = col.columnDef.header
+                        const label = typeof header === 'string' && header.trim()
+                          ? header
+                          : col.id.charAt(0).toUpperCase() + col.id.slice(1)
+                        const ColIcon = (col.columnDef.meta as ColMeta | undefined)?.icon
+                        return (
+                          <DropdownMenuCheckboxItem
+                            key={col.id}
+                            checked={col.getIsVisible()}
+                            onCheckedChange={(val) => col.toggleVisibility(!!val)}
+                            onSelect={(e) => e.preventDefault()}
+                            className="text-xs"
+                          >
+                            {ColIcon && <ColIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                            {label}
+                          </DropdownMenuCheckboxItem>
+                        )
+                      })}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => table.resetColumnVisibility()}
+                        className="text-xs"
+                      >
+                        <RotateCcw className="mr-2 h-3 w-3" />
+                        Reset
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+            )
+          })()}
         </div>
       )}
 

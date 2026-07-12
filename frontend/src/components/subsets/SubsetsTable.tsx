@@ -114,6 +114,7 @@ export function SubsetsTable(): React.ReactElement {
         id: 'actions',
         header: '',
         enableSorting: false,
+        enableHiding: false,
         cell: ({ row }) => {
           const canDelete = row.original.ownedBy.id === user?.id && row.original.status !== 'locked'
           if (!canDelete) return null
@@ -165,7 +166,7 @@ export function SubsetsTable(): React.ReactElement {
       filters={[
         userFilterSpec,
         { type: 'multi', key: 'statuses', label: 'Status', options: STATUS_OPTIONS, icon: Activity },
-        { type: 'search', key: 'q', placeholder: 'Search subsets…' },
+        { type: 'search', key: 'q' },
       ]}
       fetchData={({ filters, page }) =>
         api.subsets.list({
