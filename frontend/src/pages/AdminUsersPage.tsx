@@ -76,7 +76,7 @@ const COLUMNS: ColumnDef<AdminUser>[] = [
 
 export function AdminUsersPage(): React.ReactElement {
   const filters = useMemo(
-    () => [{ type: 'search' as const, key: 'q', placeholder: 'Search by username…' }],
+    () => [{ type: 'search' as const, key: 'q' }],
     [],
   )
 

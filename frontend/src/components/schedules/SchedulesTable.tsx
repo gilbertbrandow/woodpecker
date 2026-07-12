@@ -205,7 +205,7 @@ export function SchedulesTable({
       filters={[
         userFilterSpec,
         { type: 'multi', key: 'statuses', label: 'Status', options: STATUS_OPTIONS, icon: Activity },
-        { type: 'search', key: 'q', placeholder: 'Search schedules…' },
+        { type: 'search', key: 'q' },
       ]}
       fetchData={({ filters, page }) =>
         api.schedules.list({

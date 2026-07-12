@@ -156,7 +156,7 @@ export function TrainingTable({
       filters={[
         userFilterSpec,
         { type: 'multi', key: 'status', label: 'statuses', options: STATUS_OPTIONS },
-        { type: 'search', key: 'q', placeholder: 'Search by schedule…' },
+        { type: 'search', key: 'q' },
       ]}
       fetchData={({ filters, page }) =>
         api.training.listAll({

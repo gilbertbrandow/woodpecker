@@ -47,8 +47,7 @@ const DEFAULT_OPERATOR: Record<FilterSpec['type'], string> = {
 // Helpers
 // ---------------------------------------------------------------------------
 function specLabel(spec: FilterSpec): string {
-  if (spec.type === 'search')
-    return (spec.placeholder ?? 'Search').replace(/[…\.]+$/, '').trim()
+  if (spec.type === 'search') return 'Search'
   if (spec.type === 'multi')
     return spec.label.charAt(0).toUpperCase() + spec.label.slice(1)
   const cs = spec as CustomFilterSpec<unknown>
@@ -214,7 +213,7 @@ export function FilterChipBar({
         <div className="p-2 w-52">
           <Input
             autoFocus
-            placeholder={spec.placeholder ?? 'Search…'}
+            placeholder="Search…"
             value={val}
             onChange={(e) => onSearchChange(spec.key, e.target.value)}
             className="h-7 text-xs"
@@ -300,7 +299,7 @@ export function FilterChipBar({
             ) : (
               <Funnel className="h-3 w-3" />
             )}
-            {showContainer ? 'Add filter' : 'Filter'}
+            {showContainer ? 'Add' : 'Filter'}
           </button>
         </PopoverTrigger>
 
@@ -383,25 +382,33 @@ export function FilterChipBar({
                 <Command>
                   <CommandList>
                     <CommandGroup heading="Operator">
-                      {operatorOptions.map((op) => (
-                        <CommandItem
-                          key={op.value}
-                          value={op.value}
-                          onSelect={() => {
-                            setOperators((prev) => ({ ...prev, [spec.key]: op.value }))
-                            setOperatorOpenKey(null)
-                          }}
-                          className="text-xs"
-                        >
-                          <Check
-                            className={cn(
-                              'mr-2 h-3.5 w-3.5',
-                              operator === op.value ? 'opacity-100' : 'opacity-0',
-                            )}
-                          />
-                          {op.label}
-                        </CommandItem>
-                      ))}
+                      {operatorOptions.map((op) => {
+                        const label =
+                          selectionCount > 1 && op.value === 'is'
+                            ? 'is any of'
+                            : selectionCount > 1 && op.value === 'is_not'
+                            ? 'is none of'
+                            : op.label
+                        return (
+                          <CommandItem
+                            key={op.value}
+                            value={op.value}
+                            onSelect={() => {
+                              setOperators((prev) => ({ ...prev, [spec.key]: op.value }))
+                              setOperatorOpenKey(null)
+                            }}
+                            className="text-xs"
+                          >
+                            <Check
+                              className={cn(
+                                'mr-2 h-3.5 w-3.5',
+                                operator === op.value ? 'opacity-100' : 'opacity-0',
+                              )}
+                            />
+                            {label}
+                          </CommandItem>
+                        )
+                      })}
                     </CommandGroup>
                   </CommandList>
                 </Command>

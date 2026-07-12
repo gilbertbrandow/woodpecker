@@ -15,7 +15,6 @@ import { useDebounce } from '../hooks/useDebounce'
 export type SearchFilterSpec = {
   type: 'search'
   key: string
-  placeholder?: string
 }
 
 export type MultiFilterSpec = {
@@ -397,10 +396,10 @@ export function ServerDataTable<T>({
         <div key={spec.key} className="relative">
           <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder={(spec as { placeholder?: string }).placeholder ?? 'Search…'}
+            placeholder="Search…"
             value={rawSearch[spec.key] ?? ''}
             onChange={(e) => handleSearchChange(spec.key, e.target.value)}
-            className="h-8 pl-7 text-xs focus-visible:ring-offset-0 sm:w-48"
+            className="h-8 pl-7 text-xs focus-visible:ring-offset-0 sm:w-36"
           />
         </div>
       ))}
