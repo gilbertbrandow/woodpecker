@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useState } from 'react'
-import { Filter, X, Check, ChevronDown, Search as SearchIcon, Undo2 } from 'lucide-react'
+import { Funnel, FunnelPlus, FunnelX, X, Check, ChevronDown, Search as SearchIcon } from 'lucide-react'
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover'
 import { Command, CommandList, CommandGroup, CommandItem } from './ui/command'
 import { Input } from './ui/input'
@@ -159,6 +159,12 @@ export function FilterChipBar({
 
   const getOperator = (spec: FilterSpec) => operators[spec.key] ?? DEFAULT_OPERATOR[spec.type]
 
+  const showContainer = hasActiveFilters || pendingKey !== null
+
+  const allFiltered = specs.every(
+    (spec) => chipSummary(spec, searchValues, multiValues, customValues) !== null,
+  )
+
   // When a filter is picked from the picker list
   const handleAddFilter = (spec: FilterSpec) => {
     setAddOpen(false)
@@ -273,19 +279,28 @@ export function FilterChipBar({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className={cn(
+      'flex flex-wrap items-center gap-1',
+      showContainer && 'h-7 rounded-lg border border-input bg-muted/50 p-px',
+    )}>
       {/* ── Filter picker button ─────────────────────────────────────── */}
-      <Popover open={addOpen} onOpenChange={setAddOpen}>
+      {!allFiltered && <Popover open={addOpen} onOpenChange={setAddOpen}>
         <PopoverTrigger asChild>
           <button
             type="button"
             className={cn(
-              'flex h-7 items-center gap-1.5 rounded-md border border-input px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+              showContainer
+                ? 'flex h-6 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-background hover:text-foreground'
+                : 'flex h-7 items-center gap-1.5 rounded-md border border-input px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
               addOpen && 'bg-accent text-foreground',
             )}
           >
-            <Filter className="h-3 w-3" />
-            Filter
+            {showContainer ? (
+              <FunnelPlus className="h-3 w-3" />
+            ) : (
+              <Funnel className="h-3 w-3" />
+            )}
+            {showContainer ? 'Add filter' : 'Filter'}
           </button>
         </PopoverTrigger>
 
@@ -316,7 +331,7 @@ export function FilterChipBar({
             </CommandList>
           </Command>
         </PopoverContent>
-      </Popover>
+      </Popover>}
 
       {/* ── Active filter chips ──────────────────────────────────────── */}
       {specs.map((spec) => {
@@ -342,7 +357,7 @@ export function FilterChipBar({
         return (
           <div
             key={spec.key}
-            className="flex h-7 items-stretch overflow-hidden rounded-md border border-input bg-background text-xs"
+            className="flex h-6 items-stretch overflow-hidden rounded-md border border-input bg-background text-xs"
           >
             {/* Type: icon + label */}
             <span className="flex items-center gap-1.5 border-r border-input px-2 text-muted-foreground">
@@ -430,9 +445,9 @@ export function FilterChipBar({
         <button
           type="button"
           onClick={onClearAll}
-          className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          className="flex h-6 items-center gap-1.5 rounded-md bg-destructive px-2 text-xs text-destructive-foreground transition-colors hover:bg-destructive/90"
         >
-          <Undo2 className="h-3 w-3" />
+          <FunnelX className="h-3 w-3" />
           Clear
         </button>
       )}
