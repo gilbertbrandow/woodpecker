@@ -34,19 +34,23 @@ type UserSelectorProps = {
   className?: string
 }
 
-export function UserSelector({
+// ---------------------------------------------------------------------------
+// Exported content component — renders the Command palette without a trigger.
+// Use this when embedding inside another Popover (e.g. a filter chip).
+// ---------------------------------------------------------------------------
+export function UserSelectorContent({
   value,
   onChange,
-  disabled = false,
-  className,
-}: UserSelectorProps): React.ReactElement {
+}: {
+  value: SelectableUser[]
+  onChange: (users: SelectableUser[]) => void
+}): React.ReactElement {
   const { user: authUser } = useAuth()
   const me: SelectableUser | null =
     authUser && authUser.status === 'active'
       ? { id: authUser.id, displayName: authUser.displayName, avatarUrl: authUser.avatarUrl }
       : null
 
-  const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SelectableUser[]>([])
   const [searching, setSearching] = useState(false)
@@ -83,9 +87,112 @@ export function UserSelector({
     [value, onChange],
   )
 
+  const isSearching = debouncedQuery.length >= 2
+
+  return (
+    <Command shouldFilter={false}>
+      <CommandInput
+        placeholder="Search users…"
+        value={query}
+        onValueChange={setQuery}
+      />
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-1 border-b px-2 py-2">
+          {value.map((u) => (
+            <span
+              key={u.id}
+              className="flex items-center overflow-hidden rounded-full bg-muted pr-2 text-xs"
+            >
+              <UserAvatar
+                displayName={u.displayName}
+                avatarUrl={u.avatarUrl}
+                className="h-5 w-5 shrink-0"
+              />
+              <span className="ml-1.5">{u.displayName}</span>
+              <button
+                type="button"
+                onClick={(e) => remove(u.id, e)}
+                className="ml-1 rounded-full hover:text-foreground"
+                aria-label={`Remove ${u.displayName}`}
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <CommandList>
+        {!isSearching ? (
+          me ? (
+            <CommandGroup heading="Quick">
+              <CommandItem
+                value={String(me.id)}
+                onSelect={() => toggle(me)}
+                className={cn(value.some((u) => u.id === me.id) && 'bg-accent')}
+              >
+                <UserAvatar
+                  displayName={me.displayName}
+                  avatarUrl={me.avatarUrl}
+                  className="mr-2 h-5 w-5"
+                />
+                <span className="flex-1">Me</span>
+                <span className="ml-2 text-xs text-muted-foreground">{me.displayName}</span>
+              </CommandItem>
+              <CommandEmpty>Type to search for other users.</CommandEmpty>
+            </CommandGroup>
+          ) : (
+            <CommandEmpty>Type to search for users.</CommandEmpty>
+          )
+        ) : searching ? (
+          <CommandEmpty>Searching…</CommandEmpty>
+        ) : results.length === 0 ? (
+          <CommandEmpty>No users found.</CommandEmpty>
+        ) : (
+          <CommandGroup>
+            {results.map((u) => {
+              const selected = value.some((v) => v.id === u.id)
+              return (
+                <CommandItem
+                  key={u.id}
+                  value={String(u.id)}
+                  onSelect={() => toggle(u)}
+                  className={cn(selected && 'bg-accent')}
+                >
+                  <UserAvatar
+                    displayName={u.displayName}
+                    avatarUrl={u.avatarUrl}
+                    className="mr-2 h-5 w-5"
+                  />
+                  {u.displayName}
+                </CommandItem>
+              )
+            })}
+          </CommandGroup>
+        )}
+      </CommandList>
+    </Command>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Full standalone component — trigger button + popover wrapping the content.
+// ---------------------------------------------------------------------------
+export function UserSelector({
+  value,
+  onChange,
+  disabled = false,
+  className,
+}: UserSelectorProps): React.ReactElement {
+  const { user: authUser } = useAuth()
+  const me: SelectableUser | null =
+    authUser && authUser.status === 'active'
+      ? { id: authUser.id, displayName: authUser.displayName, avatarUrl: authUser.avatarUrl }
+      : null
+
+  const [open, setOpen] = useState(false)
+
   const visibleAvatars = value.slice(0, MAX_VISIBLE_AVATARS)
   const overflowCount = value.length - MAX_VISIBLE_AVATARS
-  const isSearching = debouncedQuery.length >= 2
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -128,87 +235,7 @@ export function UserSelector({
       </PopoverTrigger>
 
       <PopoverContent className="w-72 p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder="Search users…"
-            value={query}
-            onValueChange={setQuery}
-          />
-          {value.length > 0 && (
-            <div className="flex flex-wrap gap-1 border-b px-2 py-2">
-              {value.map((u) => (
-                <span
-                  key={u.id}
-                  className="flex items-center overflow-hidden rounded-full bg-muted pr-2 text-xs"
-                >
-                  <UserAvatar
-                    displayName={u.displayName}
-                    avatarUrl={u.avatarUrl}
-                    className="h-5 w-5 shrink-0"
-                  />
-                  <span className="ml-1.5">{u.displayName}</span>
-                  <button
-                    type="button"
-                    onClick={(e) => remove(u.id, e)}
-                    className="ml-1 rounded-full hover:text-foreground"
-                    aria-label={`Remove ${u.displayName}`}
-                  >
-                    <X className="h-2.5 w-2.5" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-          <CommandList>
-            {!isSearching ? (
-              me ? (
-                <CommandGroup heading="Quick">
-                  <CommandItem
-                    value={String(me.id)}
-                    onSelect={() => toggle(me)}
-                    className={cn(value.some((u) => u.id === me.id) && 'bg-accent')}
-                  >
-                    <UserAvatar
-                      displayName={me.displayName}
-                      avatarUrl={me.avatarUrl}
-                      className="mr-2 h-5 w-5"
-                    />
-                    <span className="flex-1">Me</span>
-                    <span className="ml-2 text-xs text-muted-foreground">{me.displayName}</span>
-                  </CommandItem>
-                  <CommandEmpty>Type to search for other users.</CommandEmpty>
-                </CommandGroup>
-              ) : (
-                <CommandEmpty>Type to search for users.</CommandEmpty>
-              )
-            ) : searching ? (
-              <CommandEmpty>Searching…</CommandEmpty>
-            ) : results.length === 0 ? (
-              <CommandEmpty>No users found.</CommandEmpty>
-            ) : (
-              <CommandGroup>
-                {results.map((u) => {
-                  const selected = value.some((v) => v.id === u.id)
-                  return (
-                    <CommandItem
-                      key={u.id}
-                      value={String(u.id)}
-                      onSelect={() => toggle(u)}
-                      className={cn(selected && 'bg-accent')}
-                    >
-                      <UserAvatar
-                        displayName={u.displayName}
-                        avatarUrl={u.avatarUrl}
-                        className="mr-2 h-5 w-5"
-                      />
-                      {u.displayName}
-                    </CommandItem>
-                  )
-                })}
-              </CommandGroup>
-            )}
-          </CommandList>
-        </Command>
+        <UserSelectorContent value={value} onChange={onChange} />
       </PopoverContent>
     </Popover>
   )

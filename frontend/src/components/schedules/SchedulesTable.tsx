@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useState, useRef } from "react";
 import { useNavigate, Link } from "@tanstack/react-router";
-import { Loader2, Trash2, PencilLine, Lock } from "lucide-react";
+import { Loader2, Trash2, PencilLine, Lock, Activity } from "lucide-react";
 import { formatDate } from "../../lib/utils";
 import { type ColumnDef } from "@tanstack/react-table";
 import { UserAvatar } from "../UserAvatar";
@@ -46,7 +46,7 @@ export function SchedulesTable({
 }: SchedulesTableProps): React.ReactElement {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const userFilterSpec = useUserFilterSpec('userIds');
+  const userFilterSpec = useUserFilterSpec('userIds', 'Creator');
 
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -204,7 +204,7 @@ export function SchedulesTable({
       refreshKey={refreshKey}
       filters={[
         userFilterSpec,
-        { type: 'multi', key: 'statuses', label: 'statuses', options: STATUS_OPTIONS },
+        { type: 'multi', key: 'statuses', label: 'Status', options: STATUS_OPTIONS, icon: Activity },
         { type: 'search', key: 'q', placeholder: 'Search schedules…' },
       ]}
       fetchData={({ filters, page }) =>

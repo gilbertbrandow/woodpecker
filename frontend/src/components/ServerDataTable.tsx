@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { type ColumnDef, type SortingState } from '@tanstack/react-table'
 import { Search } from 'lucide-react'
 import { DataTable } from './DataTable'
-import { MultiSelectFilter } from './ui/multi-select-filter'
+import { FilterChipBar } from './FilterChipBar'
 import { Input } from './ui/input'
 import { useTableUrlSync } from '../hooks/useTableUrlSync'
 import { useDebounce } from '../hooks/useDebounce'
@@ -23,6 +23,7 @@ export type MultiFilterSpec = {
   key: string
   label: string
   options: { label: string; value: string; icon?: React.ReactNode }[]
+  icon?: React.ComponentType<{ className?: string }>
 }
 
 // General-purpose filter for entity-hydrated values (UserSelector, ScheduleSelector, …).
@@ -40,6 +41,21 @@ export type CustomFilterSpec<TItem> = {
   resolveInstant?: (id: string) => TItem | null
   // Async fallback for IDs that couldn't be resolved synchronously (e.g. GET /users/by-ids).
   resolveIds?: (ids: string[]) => Promise<TItem[]>
+  // Display name shown in filter chips and the picker (e.g. "Users").
+  label?: string
+  // Icon shown in the picker list and chip type label.
+  icon?: React.ComponentType<{ className?: string }>
+  // kept for backward compat – prefer icon
+  // Items to pre-populate when the filter is first added from the panel (e.g. current user).
+  defaultItems?: TItem[]
+  // Renders just the editor content without a trigger button — used inside chip popovers.
+  // Falls back to render() if omitted.
+  renderContent?: (value: TItem[], onChange: (items: TItem[]) => void) => React.ReactNode
+  // Produces a short readable label for the active-filter chip (e.g. "Simon G" or "3 users").
+  getChipLabel?: (items: TItem[]) => string
+  // Renders rich visual content inside the chip's value button (avatars, badges, etc.).
+  // Falls back to the getChipLabel text if omitted.
+  renderChipValue?: (items: TItem[]) => React.ReactNode
 }
 
 export type FilterSpec = SearchFilterSpec | MultiFilterSpec | CustomFilterSpec<any>
@@ -372,47 +388,35 @@ export function ServerDataTable<T>({
     return false
   }, [rawSearch, multiValues, customValues]) // specs is stable
 
-  // ---------------------------------------------------------------------------
-  // Filter bar — rendered inline; DataTable is not React.memo'd so memoising the
-  // JSX reference here would not prevent DataTable re-renders anyway.
-  // ---------------------------------------------------------------------------
+  const searchSpecs = specs.filter((s) => s.type === 'search')
+  const chipSpecs = specs.filter((s) => s.type !== 'search')
+
   const filtersSlot = (
     <>
-      {specs.map((spec) => {
-        if (spec.type === 'search') {
-          return (
-            <div key={spec.key} className="relative">
-              <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder={spec.placeholder ?? 'Search…'}
-                value={rawSearch[spec.key] ?? ''}
-                onChange={(e) => handleSearchChange(spec.key, e.target.value)}
-                className="h-8 pl-7 text-sm sm:w-56"
-              />
-            </div>
-          )
-        }
-        if (spec.type === 'multi') {
-          return (
-            <MultiSelectFilter
-              key={spec.key}
-              label={spec.label}
-              options={spec.options}
-              selected={multiValues[spec.key] ?? []}
-              onChange={(values) => handleMultiChange(spec.key, values)}
-            />
-          )
-        }
-        // custom
-        return (
-          <React.Fragment key={spec.key}>
-            {(spec as CustomFilterSpec<unknown>).render(
-              customValues[spec.key] ?? [],
-              (items) => handleCustomChange(spec.key, items),
-            )}
-          </React.Fragment>
-        )
-      })}
+      {searchSpecs.map((spec) => (
+        <div key={spec.key} className="relative">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder={(spec as { placeholder?: string }).placeholder ?? 'Search…'}
+            value={rawSearch[spec.key] ?? ''}
+            onChange={(e) => handleSearchChange(spec.key, e.target.value)}
+            className="h-7 pl-7 text-xs sm:w-48"
+          />
+        </div>
+      ))}
+      {chipSpecs.length > 0 && (
+        <FilterChipBar
+          specs={chipSpecs}
+          searchValues={rawSearch}
+          multiValues={multiValues}
+          customValues={customValues}
+          onSearchChange={handleSearchChange}
+          onMultiChange={handleMultiChange}
+          onCustomChange={handleCustomChange}
+          onClearAll={handleClearFilters}
+          hasActiveFilters={hasActiveFilters}
+        />
+      )}
     </>
   )
 
@@ -424,8 +428,6 @@ export function ServerDataTable<T>({
       loading={loading}
       hideSearch
       filtersSlot={filtersSlot}
-      filtersActive={hasActiveFilters}
-      onClearFilters={handleClearFilters}
       serverPagination={{ totalRows: total, page, pageSize, onPageChange: setPage }}
       pageSize={pageSize}
       onRowClick={onRowClick}
