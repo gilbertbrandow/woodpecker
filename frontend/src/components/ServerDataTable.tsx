@@ -400,7 +400,7 @@ export function ServerDataTable<T>({
             placeholder={(spec as { placeholder?: string }).placeholder ?? 'Search…'}
             value={rawSearch[spec.key] ?? ''}
             onChange={(e) => handleSearchChange(spec.key, e.target.value)}
-            className="h-7 pl-7 text-xs sm:w-48"
+            className="h-8 pl-7 text-xs focus-visible:ring-offset-0 sm:w-48"
           />
         </div>
       ))}

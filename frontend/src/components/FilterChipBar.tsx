@@ -281,7 +281,7 @@ export function FilterChipBar({
   return (
     <div className={cn(
       'flex flex-wrap items-center gap-1',
-      showContainer && 'h-7 rounded-lg border border-input bg-muted/50 p-px',
+      showContainer && 'h-8 rounded-lg border border-input bg-muted/50 px-[3px] py-0.5',
     )}>
       {/* ── Filter picker button ─────────────────────────────────────── */}
       {!allFiltered && <Popover open={addOpen} onOpenChange={setAddOpen}>
@@ -291,7 +291,7 @@ export function FilterChipBar({
             className={cn(
               showContainer
                 ? 'flex h-6 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-background hover:text-foreground'
-                : 'flex h-7 items-center gap-1.5 rounded-md border border-input px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+                : 'flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
               addOpen && 'bg-accent text-foreground',
             )}
           >
