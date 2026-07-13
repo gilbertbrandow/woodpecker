@@ -80,6 +80,7 @@ type DataTableProps<T> = {
   globalFilterPlaceholder?: string
   filterableColumns?: FilterableColumn[]
   filtersSlot?: React.ReactNode
+  compact?: boolean
   hideSearch?: boolean
   pageSize?: number
   initialSorting?: SortingState
@@ -103,6 +104,7 @@ export function DataTable<T>({
   globalFilterPlaceholder = 'Search…',
   filterableColumns = [],
   filtersSlot,
+  compact = false,
   hideSearch = false,
   pageSize = 10,
   initialSorting = [],
@@ -262,7 +264,7 @@ export function DataTable<T>({
   return (
     <div className="flex flex-col gap-3">
       {(!hideSearch || filtersSlot || filterableColumns.length > 0) && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
           {!hideSearch && (
             <div className="relative">
               <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -309,10 +311,13 @@ export function DataTable<T>({
                     <DropdownMenuTrigger asChild>
                       <button
                         type="button"
-                        className="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        className={cn(
+                          'flex h-8 items-center gap-1.5 rounded-md border border-input text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+                          compact ? 'px-2' : 'px-2.5',
+                        )}
                       >
                         <Columns3 className="h-3 w-3" />
-                        Columns
+                        {!compact && 'Columns'}
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-40">

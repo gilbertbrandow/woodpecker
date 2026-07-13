@@ -98,6 +98,7 @@ export type ServerDataTableProps<T> = {
   getRowClassName?: (row: T) => string
   emptyMessage?: React.ReactNode
   initialSorting?: SortingState
+  compact?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -119,6 +120,7 @@ export function ServerDataTable<T>({
   initialSorting,
   initialCustomValues,
   initialData,
+  compact,
 }: ServerDataTableProps<T>): React.ReactElement {
   const { getParam, getMultiParam, setParams } = useTableUrlSync(tableId)
 
@@ -399,7 +401,7 @@ export function ServerDataTable<T>({
             placeholder="Search…"
             value={rawSearch[spec.key] ?? ''}
             onChange={(e) => handleSearchChange(spec.key, e.target.value)}
-            className="h-8 pl-7 text-xs focus-visible:ring-offset-0 sm:w-36"
+            className="h-8 pl-7 text-xs focus-visible:ring-offset-0 w-28 sm:w-36"
           />
         </div>
       ))}
@@ -414,6 +416,7 @@ export function ServerDataTable<T>({
           onCustomChange={handleCustomChange}
           onClearAll={handleClearFilters}
           hasActiveFilters={hasActiveFilters}
+          compact={compact}
         />
       )}
     </>
@@ -433,6 +436,7 @@ export function ServerDataTable<T>({
       getRowClassName={getRowClassName}
       emptyMessage={emptyMessage}
       initialSorting={initialSorting}
+      compact={compact}
     />
   )
 }

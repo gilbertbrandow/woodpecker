@@ -17,6 +17,7 @@ export type FilterChipBarProps = {
   onCustomChange: (key: string, items: unknown[]) => void
   onClearAll: () => void
   hasActiveFilters: boolean
+  compact?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -147,6 +148,7 @@ export function FilterChipBar({
   onCustomChange,
   onClearAll,
   hasActiveFilters,
+  compact = false,
 }: FilterChipBarProps): React.ReactElement {
   const [addOpen, setAddOpen] = useState(false)
   const [operators, setOperators] = useState<Record<string, string>>({})
@@ -279,7 +281,7 @@ export function FilterChipBar({
 
   return (
     <div className={cn(
-      'flex flex-wrap items-center gap-1',
+      'flex items-center gap-1 [&>*]:shrink-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
       showContainer && 'h-8 rounded-lg border border-input bg-muted/50 px-[3px] py-0.5',
     )}>
       {/* ── Filter picker button ─────────────────────────────────────── */}
@@ -289,8 +291,9 @@ export function FilterChipBar({
             type="button"
             className={cn(
               showContainer
-                ? 'flex h-6 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-background hover:text-foreground'
-                : 'flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+                ? 'flex h-6 items-center gap-1.5 rounded-md text-xs text-muted-foreground transition-colors hover:bg-background hover:text-foreground'
+                : 'flex h-8 items-center gap-1.5 rounded-md border border-input text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+              showContainer ? (compact ? 'px-1.5' : 'px-2') : (compact ? 'px-2' : 'px-2.5'),
               addOpen && 'bg-accent text-foreground',
             )}
           >
@@ -299,7 +302,7 @@ export function FilterChipBar({
             ) : (
               <Funnel className="h-3 w-3" />
             )}
-            {showContainer ? 'Add' : 'Filter'}
+            {!compact && (showContainer ? 'Add' : 'Filter')}
           </button>
         </PopoverTrigger>
 
@@ -452,10 +455,13 @@ export function FilterChipBar({
         <button
           type="button"
           onClick={onClearAll}
-          className="flex h-6 items-center gap-1.5 rounded-md bg-destructive px-2 text-xs text-destructive-foreground transition-colors hover:bg-destructive/90"
+          className={cn(
+            'flex h-6 items-center gap-1.5 rounded-md bg-destructive text-xs text-destructive-foreground transition-colors hover:bg-destructive/90',
+            compact ? 'px-1.5' : 'px-2',
+          )}
         >
           <FunnelX className="h-3 w-3" />
-          Clear
+          {!compact && 'Clear'}
         </button>
       )}
     </div>

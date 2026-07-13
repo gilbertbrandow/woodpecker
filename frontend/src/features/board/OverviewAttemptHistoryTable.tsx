@@ -237,6 +237,7 @@ export function OverviewAttemptHistoryTable({
       getRowClassName={getRowClassName}
       initialSorting={[{ id: 'startedAt', desc: true }]}
       emptyMessage="No attempts recorded."
+      compact
     />
   )
 }
