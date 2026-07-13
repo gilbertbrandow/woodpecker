@@ -42,6 +42,7 @@ def get_attempt_history(
     page: int = 1,
     page_size: int = 20,
     user_ids: list[int] | None = None,
+    user_ids_op: str = 'is',
     result_filter: list[str] | None = None,
 ) -> dict[str, object]:
     _require_own_attempt(training_item_id, user_id)
@@ -56,7 +57,10 @@ def get_attempt_history(
         .where(RunTrainingItem.training_item_id == training_item_id)
     )
     if user_ids:
-        context_stmt = context_stmt.where(Training.user_id.in_(user_ids))
+        if user_ids_op == 'is_not':
+            context_stmt = context_stmt.where(Training.user_id.not_in(user_ids))
+        else:
+            context_stmt = context_stmt.where(Training.user_id.in_(user_ids))
 
     context_rows = db.session.execute(context_stmt).all()
     if not context_rows:

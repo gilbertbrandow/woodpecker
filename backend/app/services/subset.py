@@ -1122,10 +1122,12 @@ def list_subsets(
     user_id: int,
     locked_only: bool = False,
     statuses: list[str] | None = None,
+    statuses_op: str = 'is',
     search: str | None = None,
     page: int = 1,
     page_size: int = 20,
     user_ids: list[int] | None = None,
+    user_ids_op: str = 'is',
 ) -> dict[str, object]:
     if locked_only:
         access_clause = "sub.locked_at IS NOT NULL"
@@ -1140,7 +1142,10 @@ def list_subsets(
         params["search"] = f"%{search}%"
     if user_ids:
         uid_list = ",".join(str(int(uid)) for uid in user_ids)
-        conditions.append(f"AND sub.user_id IN ({uid_list})")
+        if user_ids_op == 'is_not':
+            conditions.append(f"AND sub.user_id NOT IN ({uid_list})")
+        else:
+            conditions.append(f"AND sub.user_id IN ({uid_list})")
     if statuses and not locked_only:
         status_parts: list[str] = []
         if "locked" in statuses:
@@ -1156,7 +1161,11 @@ def list_subsets(
                 "(SELECT 1 FROM subset_training_items sti WHERE sti.subset_id = sub.id))"
             )
         if status_parts:
-            conditions.append(f"AND ({' OR '.join(status_parts)})")
+            inner = ' OR '.join(status_parts)
+            if statuses_op == 'is_not':
+                conditions.append(f"AND NOT ({inner})")
+            else:
+                conditions.append(f"AND ({inner})")
 
     where_sql = " ".join(conditions)
     base_sql = f"""

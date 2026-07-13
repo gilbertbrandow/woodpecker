@@ -362,7 +362,9 @@ _COMPUTED_STATES = frozenset({
 def list_all_trainings(
     schedule_id: int | None = None,
     user_ids: list[int] | None = None,
+    user_ids_op: str = 'is',
     statuses: list[str] | None = None,
+    statuses_op: str = 'is',
     search: str | None = None,
     page: int = 1,
     page_size: int = 20,
@@ -377,19 +379,30 @@ def list_all_trainings(
 
     if user_ids:
         placeholders = ", ".join(f":uid{i}" for i in range(len(user_ids)))
-        conditions.append(f"t.user_id IN ({placeholders})")
         for i, uid in enumerate(user_ids):
             params[f"uid{i}"] = uid
+        if user_ids_op == 'is_not':
+            conditions.append(f"t.user_id NOT IN ({placeholders})")
+        else:
+            conditions.append(f"t.user_id IN ({placeholders})")
 
     # Separate SQL-filterable statuses from computed ones
     valid_sql_statuses = [s for s in (statuses or []) if s in _SQL_FILTERABLE]
     has_computed_filter = statuses is not None and any(s in _COMPUTED_STATES for s in statuses)
 
-    if valid_sql_statuses or has_computed_filter:
-        parts = [f"({_SQL_FILTERABLE[s]})" for s in valid_sql_statuses]
+    if statuses_op == 'is_not':
         if has_computed_filter:
-            parts.append(f"({_IN_PROGRESS_SQL})")
-        conditions.append("(" + " OR ".join(parts) + ")")
+            # Computed states can't be safely negated in SQL — fetch all and filter in Python
+            pass
+        elif valid_sql_statuses:
+            parts = [f"({_SQL_FILTERABLE[s]})" for s in valid_sql_statuses]
+            conditions.append("NOT (" + " OR ".join(parts) + ")")
+    else:
+        if valid_sql_statuses or has_computed_filter:
+            parts = [f"({_SQL_FILTERABLE[s]})" for s in valid_sql_statuses]
+            if has_computed_filter:
+                parts.append(f"({_IN_PROGRESS_SQL})")
+            conditions.append("(" + " OR ".join(parts) + ")")
 
     if search:
         conditions.append("s.name ILIKE :search")
@@ -397,8 +410,9 @@ def list_all_trainings(
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
-    # When computed states are in the filter, fetch all matching rows and paginate in Python
-    # (resolved counts need Python computation; SQL pagination would produce wrong totals)
+    # When computed states are in the filter (is or is_not), fetch all matching rows and
+    # paginate in Python — resolved counts need Python computation, and is_not can't safely
+    # negate the computed SQL pre-filter without excluding valid candidates.
     needs_python_pagination = has_computed_filter
 
     select_sql = f"""
@@ -566,7 +580,10 @@ def list_all_trainings(
 
     if needs_python_pagination:
         requested_states = set(statuses or [])
-        items = [i for i in items if i["trainingState"]["state"] in requested_states]  # type: ignore[index]
+        if statuses_op == 'is_not':
+            items = [i for i in items if i["trainingState"]["state"] not in requested_states]  # type: ignore[index]
+        else:
+            items = [i for i in items if i["trainingState"]["state"] in requested_states]  # type: ignore[index]
         total = len(items)
         start = (page - 1) * page_size
         items = items[start : start + page_size]

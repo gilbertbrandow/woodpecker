@@ -4,6 +4,7 @@ from app.decorators import login_required
 from app.extensions import db
 from app.models.user import User
 from app.services import subset as subset_svc
+from app.utils import parse_multi_filter
 
 subsets_bp = Blueprint("subsets", __name__, url_prefix="/subsets")
 
@@ -32,17 +33,22 @@ def list_subsets() -> Response:
     page = int(page_raw) if page_raw and page_raw.isdigit() else 1
     page_size = int(page_size_raw) if page_size_raw and page_size_raw.isdigit() else 20
     user_ids_raw = request.args.get("userIds")
-    user_ids = [int(x) for x in user_ids_raw.split(",") if x.strip().isdigit()] if user_ids_raw else None
+    user_ids_parts = [s.strip() for s in user_ids_raw.split(",") if s.strip()] if user_ids_raw else []
+    user_ids_op, user_ids_vals = parse_multi_filter(user_ids_parts)
+    user_ids = [int(x) for x in user_ids_vals if x.isdigit()] or None
     statuses_raw = request.args.get("statuses")
-    statuses = [s.strip() for s in statuses_raw.split(",") if s.strip()] if statuses_raw else None
+    statuses_parts = [s.strip() for s in statuses_raw.split(",") if s.strip()] if statuses_raw else []
+    statuses_op, statuses_vals = parse_multi_filter(statuses_parts)
     result = subset_svc.list_subsets(
         session["user_id"],
         locked_only=locked_only,
-        statuses=statuses,
+        statuses=statuses_vals or None,
+        statuses_op=statuses_op,
         search=search,
         page=page,
         page_size=page_size,
         user_ids=user_ids,
+        user_ids_op=user_ids_op,
     )
     return jsonify(result)
 

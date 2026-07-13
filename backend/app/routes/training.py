@@ -3,6 +3,7 @@ from flask import Blueprint, Response, jsonify, request, session
 from app.decorators import login_required
 from app.services import run as run_svc
 from app.services import training as training_svc
+from app.utils import parse_multi_filter
 
 training_bp = Blueprint("training", __name__, url_prefix="/training")
 
@@ -30,8 +31,10 @@ def list_my_trainings() -> Response:
 def list_all_trainings() -> Response:
     schedule_id_raw = request.args.get("scheduleId")
     schedule_id = int(schedule_id_raw) if schedule_id_raw and schedule_id_raw.isdigit() else None
-    user_ids = [int(v) for v in request.args.getlist("userId") if v.isdigit()]
-    statuses = request.args.getlist("status") or None
+    user_ids_op, user_ids_vals = parse_multi_filter(request.args.getlist("userId"))
+    user_ids = [int(v) for v in user_ids_vals if v.isdigit()]
+    statuses_op, statuses_vals = parse_multi_filter(request.args.getlist("status"))
+    statuses = statuses_vals or None
     search = request.args.get("search") or None
     page_raw = request.args.get("page", "1")
     page_size_raw = request.args.get("pageSize", "20")
@@ -41,7 +44,9 @@ def list_all_trainings() -> Response:
     return jsonify(training_svc.list_all_trainings(
         schedule_id=schedule_id,
         user_ids=user_ids or None,
+        user_ids_op=user_ids_op,
         statuses=statuses,
+        statuses_op=statuses_op,
         search=search,
         page=page,
         page_size=page_size,
