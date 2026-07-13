@@ -80,6 +80,7 @@ type DataTableProps<T> = {
   globalFilterPlaceholder?: string
   filterableColumns?: FilterableColumn[]
   filtersSlot?: React.ReactNode
+  searchSlot?: React.ReactNode
   compact?: boolean
   hideSearch?: boolean
   pageSize?: number
@@ -104,6 +105,7 @@ export function DataTable<T>({
   globalFilterPlaceholder = 'Search…',
   filterableColumns = [],
   filtersSlot,
+  searchSlot,
   compact = false,
   hideSearch = false,
   pageSize = 10,
@@ -263,10 +265,10 @@ export function DataTable<T>({
 
   return (
     <div className="flex flex-col gap-3">
-      {(!hideSearch || filtersSlot || filterableColumns.length > 0) && (
-        <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
+      {(!hideSearch || searchSlot || filtersSlot || filterableColumns.length > 0) && (
+        <div className="flex items-center gap-2">
           {!hideSearch && (
-            <div className="relative">
+            <div className="relative shrink-0">
               <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder={globalFilterPlaceholder}
@@ -281,6 +283,8 @@ export function DataTable<T>({
               />
             </div>
           )}
+          {searchSlot}
+          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
           {filtersSlot}
           {filterableColumns.map((fc) => (
             <MultiSelectFilter
@@ -354,6 +358,7 @@ export function DataTable<T>({
               </div>
             )
           })()}
+          </div>
         </div>
       )}
 

@@ -357,10 +357,10 @@ export function ServerDataTable<T>({
   const searchSpecs = specs.filter((s) => s.type === 'search')
   const chipSpecs = specs.filter((s) => s.type !== 'search')
 
-  const filtersSlot = (
+  const searchSlot = searchSpecs.length > 0 ? (
     <>
       {searchSpecs.map((spec) => (
-        <div key={spec.key} className="relative">
+        <div key={spec.key} className="relative shrink-0">
           <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search…"
@@ -370,18 +370,19 @@ export function ServerDataTable<T>({
           />
         </div>
       ))}
-      {chipSpecs.length > 0 && (
-        <FilterChipBar
-          specs={chipSpecs}
-          values={filterValues}
-          onChange={handleFilterChange}
-          onClear={handleClearFilters}
-          hasActiveFilters={hasActiveFilters}
-          compact={compact}
-        />
-      )}
     </>
-  )
+  ) : undefined
+
+  const filtersSlot = chipSpecs.length > 0 ? (
+    <FilterChipBar
+      specs={chipSpecs}
+      values={filterValues}
+      onChange={handleFilterChange}
+      onClear={handleClearFilters}
+      hasActiveFilters={hasActiveFilters}
+      compact={compact}
+    />
+  ) : undefined
 
   return (
     <DataTable
@@ -390,6 +391,7 @@ export function ServerDataTable<T>({
       data={data}
       loading={loading}
       hideSearch
+      searchSlot={searchSlot}
       filtersSlot={filtersSlot}
       serverPagination={{ totalRows: total, page, pageSize, onPageChange: setPage }}
       pageSize={pageSize}
