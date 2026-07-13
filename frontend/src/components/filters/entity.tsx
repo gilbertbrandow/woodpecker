@@ -3,8 +3,8 @@ import type { FilterHandler, EntityFilterSpec, EntityVal } from './types'
 export const entityHandler: FilterHandler<EntityVal, EntityFilterSpec<unknown>> = {
   defaultOperator: 'is',
   operatorOptions: [
-    { value: 'is', label: 'is' },
-    { value: 'is_not', label: 'is not' },
+    { value: 'is', label: 'is', symbol: '=', symbolPlural: '∈' },
+    { value: 'is_not', label: 'is not', symbol: '≠', symbolPlural: '∉' },
   ],
   defaultValue: () => ({ op: 'is', items: [] }),
   isEmpty: (value) => value.items.length === 0,

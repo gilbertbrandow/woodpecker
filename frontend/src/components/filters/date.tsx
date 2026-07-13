@@ -7,10 +7,10 @@ const DATE_OPS = ['after', 'before', 'between', 'not_between'] as const
 export const dateHandler: FilterHandler<DateVal | null, DateFilterSpec> = {
   defaultOperator: 'after',
   operatorOptions: [
-    { value: 'after', label: 'after' },
-    { value: 'before', label: 'before' },
-    { value: 'between', label: 'is between' },
-    { value: 'not_between', label: 'is not between' },
+    { value: 'after', label: 'after', symbol: '>' },
+    { value: 'before', label: 'before', symbol: '<' },
+    { value: 'between', label: 'is between', symbol: '∈' },
+    { value: 'not_between', label: 'is not between', symbol: '∉' },
   ],
   defaultValue: () => null,
   isEmpty: (value) => !value?.from,

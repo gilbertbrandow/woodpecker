@@ -6,8 +6,8 @@ import type { FilterHandler, MultiFilterSpec, MultiVal } from './types'
 export const multiHandler: FilterHandler<MultiVal, MultiFilterSpec> = {
   defaultOperator: 'is',
   operatorOptions: [
-    { value: 'is', label: 'is' },
-    { value: 'is_not', label: 'is not' },
+    { value: 'is', label: 'is', symbol: '=', symbolPlural: '∈' },
+    { value: 'is_not', label: 'is not', symbol: '≠', symbolPlural: '∉' },
   ],
   defaultValue: () => ({ op: 'is', values: [] }),
   isEmpty: (value) => value.values.length === 0,

@@ -79,7 +79,6 @@ export function FilterChipBar({
       setValueOpenKey(spec.key)
     } else {
       setValueOpenKey(null)
-      if (pendingKey === spec.key) setPendingKey(null)
     }
   }
 
@@ -158,14 +157,18 @@ export function FilterChipBar({
         const operator = handler.getOperator(rawValue)
         const operatorOptions = handler.operatorOptions
         const selectionCount = handler.selectionCount?.(rawValue) ?? 1
-        const baseLabel =
-          operatorOptions.find((o) => o.value === operator)?.label ?? operator
+        const operatorOpt = operatorOptions.find((o) => o.value === operator)
+        const baseLabel = operatorOpt?.label ?? operator
         const operatorLabel =
           selectionCount > 1 && operator === 'is'
             ? 'is any of'
             : selectionCount > 1 && operator === 'is_not'
               ? 'is none of'
               : baseLabel
+        const operatorSymbol =
+          selectionCount > 1
+            ? (operatorOpt?.symbolPlural ?? operatorOpt?.symbol)
+            : operatorOpt?.symbol
 
         return (
           <div
@@ -188,7 +191,7 @@ export function FilterChipBar({
                   type="button"
                   className="flex items-center gap-0.5 border-r border-input px-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
-                  {operatorLabel}
+                  {operatorSymbol ?? operatorLabel}
                   <ChevronDown className="h-2.5 w-2.5 opacity-40" />
                 </button>
               </PopoverTrigger>
@@ -203,6 +206,10 @@ export function FilterChipBar({
                             : selectionCount > 1 && op.value === 'is_not'
                               ? 'is none of'
                               : op.label
+                        const symbol =
+                          selectionCount > 1
+                            ? (op.symbolPlural ?? op.symbol)
+                            : op.symbol
                         return (
                           <CommandItem
                             key={op.value}
@@ -222,6 +229,11 @@ export function FilterChipBar({
                                 operator === op.value ? 'opacity-100' : 'opacity-0',
                               )}
                             />
+                            {symbol && (
+                              <span className="mr-2 w-3 text-center text-muted-foreground">
+                                {symbol}
+                              </span>
+                            )}
                             {label}
                           </CommandItem>
                         )
@@ -254,7 +266,10 @@ export function FilterChipBar({
             {/* Remove */}
             <button
               type="button"
-              onClick={() => onChange(spec.key, handler.defaultValue(spec))}
+              onClick={() => {
+                onChange(spec.key, handler.defaultValue(spec))
+                if (pendingKey === spec.key) setPendingKey(null)
+              }}
               className="flex items-center border-l border-input px-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               aria-label={`Remove ${handler.getLabel(spec)} filter`}
             >

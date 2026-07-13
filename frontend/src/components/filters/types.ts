@@ -108,7 +108,7 @@ export interface FilterHandler<TValue = unknown, TSpec = FilterSpec> {
   /** What to include in fetchData filters. Same shape as toUrl for date/range/search. */
   getFetchParams(value: TValue, spec: TSpec): string[]
   getOperator(value: TValue): string
-  operatorOptions: { value: string; label: string }[]
+  operatorOptions: { value: string; label: string; symbol?: string; symbolPlural?: string }[]
   defaultOperator: string
   onOperatorSwitch(
     newOp: string,
