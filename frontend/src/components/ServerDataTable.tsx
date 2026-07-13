@@ -59,7 +59,7 @@ export type CustomFilterSpec<TItem> = {
 
 export type DateVal = { op: 'after' | 'before' | 'between' | 'not_between'; from: string; to?: string }
 
-export type RangeVal = { op: 'gte' | 'lte' | 'between' | 'not_between'; from?: number; to?: number }
+export type RangeVal = { op: 'is' | 'is_not' | 'gt' | 'gte' | 'lt' | 'lte' | 'between' | 'not_between'; from?: number; to?: number }
 
 export type DateFilterSpec = {
   type: 'date'
@@ -199,7 +199,7 @@ export function ServerDataTable<T>({
         }
       } else if (spec.type === 'range') {
         const vals = getMultiParam(spec.key)
-        if (vals.length >= 2 && (vals[0] === 'gte' || vals[0] === 'lte' || vals[0] === 'between' || vals[0] === 'not_between')) {
+        if (vals.length >= 2 && (vals[0] === 'is' || vals[0] === 'is_not' || vals[0] === 'gt' || vals[0] === 'gte' || vals[0] === 'lt' || vals[0] === 'lte' || vals[0] === 'between' || vals[0] === 'not_between')) {
           const from = parseFloat(vals[1])
           const to = vals[2] !== undefined ? parseFloat(vals[2]) : undefined
           if (!isNaN(from)) rangeValues[spec.key] = { op: vals[0], from, to: to !== undefined && !isNaN(to) ? to : undefined }

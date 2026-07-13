@@ -49,8 +49,12 @@ const OPERATOR_OPTIONS = {
     { value: 'not_between', label: 'is not between' },
   ],
   range: [
-    { value: 'gte', label: 'at least' },
-    { value: 'lte', label: 'at most' },
+    { value: 'is', label: 'is' },
+    { value: 'is_not', label: 'is not' },
+    { value: 'gt', label: 'greater than' },
+    { value: 'gte', label: 'greater than or equal' },
+    { value: 'lt', label: 'less than' },
+    { value: 'lte', label: 'less than or equal' },
     { value: 'between', label: 'is between' },
     { value: 'not_between', label: 'is not between' },
   ],
@@ -375,19 +379,12 @@ export function FilterChipBar({
       const val = rangeValues[spec.key]
       const op = val?.op ?? 'gte'
       const isBetween = op === 'between' || op === 'not_between'
-      const fmt = s.formatValue ?? String
       const from = val?.from ?? s.min
       const to = val?.to ?? s.max
       const sliderValue = isBetween ? [from, to] : [from]
+      const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi)
       return (
-        <div className="flex flex-col gap-3 p-3 w-52">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">{fmt(s.min)}</span>
-            <span className="font-medium tabular-nums">
-              {isBetween ? `${fmt(from)} – ${fmt(to)}` : fmt(from)}
-            </span>
-            <span className="text-muted-foreground">{fmt(s.max)}</span>
-          </div>
+        <div className="flex flex-col gap-4 p-3">
           <Slider
             min={s.min}
             max={s.max}
@@ -401,6 +398,49 @@ export function FilterChipBar({
               }
             }}
           />
+          {isBetween ? (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground w-7 shrink-0">Min</span>
+              <Input
+                type="number"
+                className="h-7 w-20 text-xs px-2"
+                value={from}
+                min={s.min}
+                max={s.max}
+                onChange={(e) => {
+                  const v = clamp(Number(e.target.value), s.min, to)
+                  onRangeChange(spec.key, { op, from: v, to })
+                }}
+              />
+              <span className="text-muted-foreground w-7 shrink-0">Max</span>
+              <Input
+                type="number"
+                className="h-7 w-20 text-xs px-2"
+                value={to}
+                min={s.min}
+                max={s.max}
+                onChange={(e) => {
+                  const v = clamp(Number(e.target.value), from, s.max)
+                  onRangeChange(spec.key, { op, from, to: v })
+                }}
+              />
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground w-10 shrink-0">Value</span>
+              <Input
+                type="number"
+                className="h-7 w-20 text-xs px-2"
+                value={from}
+                min={s.min}
+                max={s.max}
+                onChange={(e) => {
+                  const v = clamp(Number(e.target.value), s.min, s.max)
+                  onRangeChange(spec.key, { op, from: v })
+                }}
+              />
+            </div>
+          )}
         </div>
       )
     }
@@ -514,7 +554,7 @@ export function FilterChipBar({
                   <ChevronDown className="h-2.5 w-2.5 opacity-40" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="w-40 p-0">
+              <PopoverContent align="start" className="w-auto min-w-max p-0">
                 <Command>
                   <CommandList>
                     <CommandGroup heading="Operator">
@@ -564,16 +604,24 @@ export function FilterChipBar({
                                   setOperatorOpenKey(null)
                                 }
                               } else if (spec.type === 'range') {
+                                const s = spec as RangeFilterSpec
                                 const cur = rangeValues[spec.key]
-                                const isRangeBetween = op.value === 'between' || op.value === 'not_between'
-                                onRangeChange(spec.key, { op: op.value as RangeVal['op'], from: cur?.from, to: isRangeBetween ? cur?.to : undefined })
-                                setOperatorOpenKey(null)
+                                if (op.value === 'between' || op.value === 'not_between') {
+                                  const from = cur?.from ?? s.min
+                                  const to = cur?.to ?? s.max
+                                  onRangeChange(spec.key, { op: op.value as RangeVal['op'], from, to })
+                                  setOperatorOpenKey(null)
+                                  setValueOpenKey(spec.key)
+                                } else {
+                                  onRangeChange(spec.key, { op: op.value as RangeVal['op'], from: cur?.from ?? s.min })
+                                  setOperatorOpenKey(null)
+                                }
                               } else {
                                 setOperators((prev) => ({ ...prev, [spec.key]: op.value }))
                                 setOperatorOpenKey(null)
                               }
                             }}
-                            className="text-xs"
+                            className="text-xs whitespace-nowrap"
                           >
                             <Check
                               className={cn(

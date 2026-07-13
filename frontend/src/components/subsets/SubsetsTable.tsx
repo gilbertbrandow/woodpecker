@@ -167,7 +167,7 @@ export function SubsetsTable(): React.ReactElement {
         userFilterSpec,
         { type: 'multi', key: 'statuses', label: 'Status', options: STATUS_OPTIONS, icon: Activity },
         { type: 'date', key: 'date', label: 'Date', icon: DATA_ICONS.started },
-        { type: 'range', key: 'puzzleCount', label: 'Puzzles', min: 0, max: 2000, step: 25, icon: DATA_ICONS.puzzles, formatValue: String },
+        { type: 'range', key: 'puzzleCount', label: 'Puzzles', min: 0, max: 1000, step: 25, icon: DATA_ICONS.puzzles, formatValue: (v) => v >= 1000 ? '1000+' : String(v) },
         { type: 'search', key: 'q' },
       ]}
       fetchData={({ filters, page }) =>
