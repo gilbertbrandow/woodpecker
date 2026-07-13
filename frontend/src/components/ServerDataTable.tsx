@@ -57,7 +57,29 @@ export type CustomFilterSpec<TItem> = {
   renderChipValue?: (items: TItem[]) => React.ReactNode
 }
 
-export type FilterSpec = SearchFilterSpec | MultiFilterSpec | CustomFilterSpec<any>
+export type DateVal = { op: 'after' | 'before' | 'between' | 'not_between'; from: string; to?: string }
+
+export type RangeVal = { op: 'gte' | 'lte' | 'between' | 'not_between'; from?: number; to?: number }
+
+export type DateFilterSpec = {
+  type: 'date'
+  key: string
+  label: string
+  icon?: React.ComponentType<{ className?: string }>
+}
+
+export type RangeFilterSpec = {
+  type: 'range'
+  key: string
+  label: string
+  min: number
+  max: number
+  step?: number
+  icon?: React.ComponentType<{ className?: string }>
+  formatValue?: (value: number) => string
+}
+
+export type FilterSpec = SearchFilterSpec | MultiFilterSpec | CustomFilterSpec<any> | DateFilterSpec | RangeFilterSpec
 
 export type FetchParams = {
   // Every filter's current value as string[]. Search filters produce a single-element array.
@@ -149,8 +171,10 @@ export function ServerDataTable<T>({
   type InitData = {
     searchValues: Record<string, string>
     multiValues: Record<string, string[]>
-    customInstant: Record<string, unknown[]>   // immediately resolved from memory
-    customUnresolved: Record<string, string[]> // need async fetch
+    customInstant: Record<string, unknown[]>
+    customUnresolved: Record<string, string[]>
+    dateValues: Record<string, DateVal>
+    rangeValues: Record<string, RangeVal>
     initialPage: number
   }
 
@@ -160,12 +184,26 @@ export function ServerDataTable<T>({
     const multiValues: Record<string, string[]> = {}
     const customInstant: Record<string, unknown[]> = {}
     const customUnresolved: Record<string, string[]> = {}
+    const dateValues: Record<string, DateVal> = {}
+    const rangeValues: Record<string, RangeVal> = {}
 
     for (const spec of specs) {
       if (spec.type === 'search') {
         searchValues[spec.key] = getParam(spec.key) ?? ''
       } else if (spec.type === 'multi') {
         multiValues[spec.key] = getMultiParam(spec.key)
+      } else if (spec.type === 'date') {
+        const vals = getMultiParam(spec.key)
+        if (vals.length >= 2 && (vals[0] === 'after' || vals[0] === 'before' || vals[0] === 'between' || vals[0] === 'not_between')) {
+          dateValues[spec.key] = { op: vals[0], from: vals[1], to: vals[2] }
+        }
+      } else if (spec.type === 'range') {
+        const vals = getMultiParam(spec.key)
+        if (vals.length >= 2 && (vals[0] === 'gte' || vals[0] === 'lte' || vals[0] === 'between' || vals[0] === 'not_between')) {
+          const from = parseFloat(vals[1])
+          const to = vals[2] !== undefined ? parseFloat(vals[2]) : undefined
+          if (!isNaN(from)) rangeValues[spec.key] = { op: vals[0], from, to: to !== undefined && !isNaN(to) ? to : undefined }
+        }
       } else {
         const s = spec as CustomFilterSpec<unknown>
         const ids = getMultiParam(spec.key)
@@ -193,6 +231,8 @@ export function ServerDataTable<T>({
       multiValues,
       customInstant,
       customUnresolved,
+      dateValues,
+      rangeValues,
       initialPage: pageStr ? Math.max(1, parseInt(pageStr, 10)) : 1,
     }
   }
@@ -203,6 +243,8 @@ export function ServerDataTable<T>({
   const [rawSearch, setRawSearch] = useState(initRef.current.searchValues)
   const [multiValues, setMultiValues] = useState(initRef.current.multiValues)
   const [customValues, setCustomValues] = useState(initRef.current.customInstant)
+  const [dateValues, setDateValues] = useState(initRef.current.dateValues)
+  const [rangeValues, setRangeValues] = useState(initRef.current.rangeValues)
   const [isHydrating, setIsHydrating] = useState(() =>
     Object.values(initRef.current!.customUnresolved).some((ids) => ids.length > 0),
   )
@@ -276,12 +318,30 @@ export function ServerDataTable<T>({
     [customValues],
   )
 
+  const dateSerialized = useMemo(
+    () =>
+      Object.entries(dateValues)
+        .sort()
+        .map(([k, v]) => `${k}=${v.op}:${v.from}:${v.to ?? ''}`)
+        .join('&'),
+    [dateValues],
+  )
+
+  const rangeSerialized = useMemo(
+    () =>
+      Object.entries(rangeValues)
+        .sort()
+        .map(([k, v]) => `${k}=${v.op}:${v.from ?? ''}:${v.to ?? ''}`)
+        .join('&'),
+    [rangeValues],
+  )
+
   // When initialData is provided we skip the first fetch — the data is already loaded.
   // Using a params-snapshot instead of a consumed-once flag so React Strict Mode's
   // double-invoke of effects doesn't bypass the skip on the second invocation.
   const initialFetchParamsRef = useRef<string | null>(
     initialData !== undefined
-      ? `${debouncedSearchSerialized}|${multiSerialized}|${customSerialized}|${page}|${refreshKey ?? ''}|${instanceKey ?? ''}`
+      ? `${debouncedSearchSerialized}|${multiSerialized}|${customSerialized}|${dateSerialized}|${rangeSerialized}|${page}|${refreshKey ?? ''}|${instanceKey ?? ''}`
       : null,
   )
 
@@ -298,6 +358,24 @@ export function ServerDataTable<T>({
       } else if (spec.type === 'multi') {
         const vals = multiValues[spec.key] ?? []
         updates[spec.key] = vals.length > 0 ? vals : null
+      } else if (spec.type === 'date') {
+        const val = dateValues[spec.key]
+        if (val?.from) {
+          const arr: string[] = [val.op, val.from]
+          if ((val.op === 'between' || val.op === 'not_between') && val.to) arr.push(val.to)
+          updates[spec.key] = arr
+        } else {
+          updates[spec.key] = null
+        }
+      } else if (spec.type === 'range') {
+        const val = rangeValues[spec.key]
+        if (val?.from !== undefined) {
+          const arr: string[] = [val.op, String(val.from)]
+          if ((val.op === 'between' || val.op === 'not_between') && val.to !== undefined) arr.push(String(val.to))
+          updates[spec.key] = arr
+        } else {
+          updates[spec.key] = null
+        }
       } else {
         const s = spec as CustomFilterSpec<unknown>
         const ids = s.serialize(customValues[spec.key] ?? [])
@@ -307,7 +385,7 @@ export function ServerDataTable<T>({
     updates.page = page > 1 ? String(page) : null
 
     setParams(updates)
-  }, [debouncedSearchSerialized, multiSerialized, customSerialized, page]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [debouncedSearchSerialized, multiSerialized, customSerialized, dateSerialized, rangeSerialized, page]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------------------
   // Fetch: called when settled filter params, page, or refreshKey change.
@@ -319,7 +397,7 @@ export function ServerDataTable<T>({
     // Skip the fetch if params haven't changed from the initial seeded state.
     // Clearing the ref after any change ensures all subsequent fetches run normally.
     if (initialFetchParamsRef.current !== null) {
-      const sig = `${debouncedSearchSerialized}|${multiSerialized}|${customSerialized}|${page}|${refreshKey ?? ''}|${instanceKey ?? ''}`
+      const sig = `${debouncedSearchSerialized}|${multiSerialized}|${customSerialized}|${dateSerialized}|${rangeSerialized}|${page}|${refreshKey ?? ''}|${instanceKey ?? ''}`
       if (sig === initialFetchParamsRef.current) return
       initialFetchParamsRef.current = null
     }
@@ -331,6 +409,20 @@ export function ServerDataTable<T>({
         if (v) filters[spec.key] = [v]
       } else if (spec.type === 'multi') {
         filters[spec.key] = multiValues[spec.key] ?? []
+      } else if (spec.type === 'date') {
+        const val = dateValues[spec.key]
+        if (val?.from) {
+          const arr: string[] = [val.op, val.from]
+          if ((val.op === 'between' || val.op === 'not_between') && val.to) arr.push(val.to)
+          filters[spec.key] = arr
+        }
+      } else if (spec.type === 'range') {
+        const val = rangeValues[spec.key]
+        if (val?.from !== undefined) {
+          const arr: string[] = [val.op, String(val.from)]
+          if ((val.op === 'between' || val.op === 'not_between') && val.to !== undefined) arr.push(String(val.to))
+          filters[spec.key] = arr
+        }
       } else {
         const s = spec as CustomFilterSpec<unknown>
         filters[spec.key] = s.serialize(customValues[spec.key] ?? [])
@@ -350,7 +442,7 @@ export function ServerDataTable<T>({
       .finally(() => { if (!cancelled) setLoading(false) })
 
     return () => { cancelled = true }
-  }, [isHydrating, debouncedSearchSerialized, multiSerialized, customSerialized, page, refreshKey, instanceKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isHydrating, debouncedSearchSerialized, multiSerialized, customSerialized, dateSerialized, rangeSerialized, page, refreshKey, instanceKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------------------
   // Filter change handlers — stable across renders (empty dep arrays, use specsRef)
@@ -370,10 +462,28 @@ export function ServerDataTable<T>({
     setPage(1)
   }, [])
 
+  const handleDateChange = useCallback((key: string, val: DateVal) => {
+    setDateValues((prev) => {
+      if (!val.from) { const next = { ...prev }; delete next[key]; return next }
+      return { ...prev, [key]: val }
+    })
+    setPage(1)
+  }, [])
+
+  const handleRangeChange = useCallback((key: string, val: RangeVal) => {
+    setRangeValues((prev) => {
+      if (val.from === undefined) { const next = { ...prev }; delete next[key]; return next }
+      return { ...prev, [key]: val }
+    })
+    setPage(1)
+  }, [])
+
   const handleClearFilters = useCallback(() => {
     setRawSearch({})
     setMultiValues({})
     setCustomValues({})
+    setDateValues({})
+    setRangeValues({})
     setPage(1)
   }, [])
 
@@ -385,9 +495,11 @@ export function ServerDataTable<T>({
       if (spec.type === 'search' && rawSearch[spec.key]) return true
       if (spec.type === 'multi' && (multiValues[spec.key] ?? []).length > 0) return true
       if (spec.type === 'custom' && (customValues[spec.key] ?? []).length > 0) return true
+      if (spec.type === 'date' && dateValues[spec.key]?.from) return true
+      if (spec.type === 'range' && rangeValues[spec.key]?.from !== undefined) return true
     }
     return false
-  }, [rawSearch, multiValues, customValues]) // specs is stable
+  }, [rawSearch, multiValues, customValues, dateValues, rangeValues]) // specs is stable
 
   const searchSpecs = specs.filter((s) => s.type === 'search')
   const chipSpecs = specs.filter((s) => s.type !== 'search')
@@ -414,6 +526,10 @@ export function ServerDataTable<T>({
           onSearchChange={handleSearchChange}
           onMultiChange={handleMultiChange}
           onCustomChange={handleCustomChange}
+          onDateChange={handleDateChange}
+          onRangeChange={handleRangeChange}
+          dateValues={dateValues}
+          rangeValues={rangeValues}
           onClearAll={handleClearFilters}
           hasActiveFilters={hasActiveFilters}
           compact={compact}

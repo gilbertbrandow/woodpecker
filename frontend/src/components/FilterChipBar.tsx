@@ -5,16 +5,22 @@ import { Popover, PopoverTrigger, PopoverContent } from './ui/popover'
 import { Command, CommandList, CommandGroup, CommandItem } from './ui/command'
 import { Input } from './ui/input'
 import { cn } from '../lib/utils'
-import type { FilterSpec, CustomFilterSpec } from './ServerDataTable'
+import { Slider } from './ui/slider'
+import { Calendar } from './ui/calendar'
+import type { FilterSpec, CustomFilterSpec, RangeFilterSpec, DateVal, RangeVal } from './ServerDataTable'
 
 export type FilterChipBarProps = {
   specs: FilterSpec[]
   searchValues: Record<string, string>
   multiValues: Record<string, string[]>
   customValues: Record<string, unknown[]>
+  dateValues: Record<string, DateVal>
+  rangeValues: Record<string, RangeVal>
   onSearchChange: (key: string, value: string) => void
   onMultiChange: (key: string, values: string[]) => void
   onCustomChange: (key: string, items: unknown[]) => void
+  onDateChange: (key: string, val: DateVal) => void
+  onRangeChange: (key: string, val: RangeVal) => void
   onClearAll: () => void
   hasActiveFilters: boolean
   compact?: boolean
@@ -36,12 +42,26 @@ const OPERATOR_OPTIONS = {
     { value: 'is', label: 'is' },
     { value: 'is_not', label: 'is not' },
   ],
+  date: [
+    { value: 'after', label: 'after' },
+    { value: 'before', label: 'before' },
+    { value: 'between', label: 'is between' },
+    { value: 'not_between', label: 'is not between' },
+  ],
+  range: [
+    { value: 'gte', label: 'at least' },
+    { value: 'lte', label: 'at most' },
+    { value: 'between', label: 'is between' },
+    { value: 'not_between', label: 'is not between' },
+  ],
 } satisfies Record<FilterSpec['type'], { value: string; label: string }[]>
 
 const DEFAULT_OPERATOR: Record<FilterSpec['type'], string> = {
   search: 'contains',
   multi: 'is',
   custom: 'is',
+  date: 'after',
+  range: 'gte',
 }
 
 // ---------------------------------------------------------------------------
@@ -107,11 +127,32 @@ function renderChipValueDisplay(
   return <span className="italic text-muted-foreground">…</span>
 }
 
+function isoToDate(iso: string | undefined): Date | undefined {
+  if (!iso) return undefined
+  const d = new Date(iso + 'T12:00:00')
+  return isNaN(d.getTime()) ? undefined : d
+}
+
+function dateToIso(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function fmtDate(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(iso))
+  } catch { return iso }
+}
+
 function chipSummary(
   spec: FilterSpec,
   searchValues: Record<string, string>,
   multiValues: Record<string, string[]>,
   customValues: Record<string, unknown[]>,
+  dateValues: Record<string, DateVal>,
+  rangeValues: Record<string, RangeVal>,
 ): string | null {
   if (spec.type === 'search') {
     const v = searchValues[spec.key]
@@ -124,6 +165,20 @@ function chipSummary(
     return labels.length <= 2
       ? labels.join(', ')
       : `${labels.slice(0, 2).join(', ')} +${labels.length - 2}`
+  }
+  if (spec.type === 'date') {
+    const val = dateValues[spec.key]
+    if (!val?.from) return null
+    if (val.op === 'between' || val.op === 'not_between') return val.to ? `${fmtDate(val.from)} – ${fmtDate(val.to)}` : null
+    return fmtDate(val.from)
+  }
+  if (spec.type === 'range') {
+    const s = spec as RangeFilterSpec
+    const val = rangeValues[spec.key]
+    if (val?.from === undefined) return null
+    const fmt = s.formatValue ?? String
+    if (val.op === 'between' || val.op === 'not_between') return val.to !== undefined ? `${fmt(val.from)} – ${fmt(val.to)}` : null
+    return fmt(val.from)
   }
   const cs = spec as CustomFilterSpec<unknown>
   const items = customValues[spec.key] ?? []
@@ -143,9 +198,13 @@ export function FilterChipBar({
   searchValues,
   multiValues,
   customValues,
+  dateValues,
+  rangeValues,
   onSearchChange,
   onMultiChange,
   onCustomChange,
+  onDateChange,
+  onRangeChange,
   onClearAll,
   hasActiveFilters,
   compact = false,
@@ -158,19 +217,23 @@ export function FilterChipBar({
   // until the value editor closes (regardless of whether a value was entered).
   const [pendingKey, setPendingKey] = useState<string | null>(null)
 
-  const getOperator = (spec: FilterSpec) => operators[spec.key] ?? DEFAULT_OPERATOR[spec.type]
+  const getOperator = (spec: FilterSpec) => {
+    if (spec.type === 'date') return dateValues[spec.key]?.op ?? 'after'
+    if (spec.type === 'range') return rangeValues[spec.key]?.op ?? 'gte'
+    return operators[spec.key] ?? DEFAULT_OPERATOR[spec.type]
+  }
 
   const showContainer = hasActiveFilters || pendingKey !== null
 
   const allFiltered = specs.every(
-    (spec) => chipSummary(spec, searchValues, multiValues, customValues) !== null,
+    (spec) => chipSummary(spec, searchValues, multiValues, customValues, dateValues, rangeValues) !== null,
   )
 
   // When a filter is picked from the picker list
   const handleAddFilter = (spec: FilterSpec) => {
     setAddOpen(false)
 
-    const alreadyActive = chipSummary(spec, searchValues, multiValues, customValues) !== null
+    const alreadyActive = chipSummary(spec, searchValues, multiValues, customValues, dateValues, rangeValues) !== null
 
     if (alreadyActive) {
       // Already has a value — just re-open its value editor
@@ -204,6 +267,8 @@ export function FilterChipBar({
   const clearFilter = (spec: FilterSpec) => {
     if (spec.type === 'search') onSearchChange(spec.key, '')
     else if (spec.type === 'multi') onMultiChange(spec.key, [])
+    else if (spec.type === 'date') onDateChange(spec.key, { op: 'after', from: '' })
+    else if (spec.type === 'range') onRangeChange(spec.key, { op: 'gte' })
     else onCustomChange(spec.key, [])
   }
 
@@ -272,6 +337,74 @@ export function FilterChipBar({
       )
     }
 
+    if (spec.type === 'date') {
+      const val = dateValues[spec.key]
+      const op = val?.op ?? 'after'
+      const isBetween = op === 'between' || op === 'not_between'
+      if (isBetween) {
+        const range = { from: isoToDate(val?.from), to: isoToDate(val?.to) }
+        return (
+          <Calendar
+            mode="range"
+            defaultMonth={range.from}
+            selected={range}
+            onSelect={(r) => {
+              onDateChange(spec.key, {
+                op,
+                from: r?.from ? dateToIso(r.from) : '',
+                to: r?.to ? dateToIso(r.to) : undefined,
+              })
+            }}
+            autoFocus
+          />
+        )
+      }
+      return (
+        <Calendar
+          mode="single"
+          defaultMonth={isoToDate(val?.from)}
+          selected={isoToDate(val?.from)}
+          onSelect={(d) => onDateChange(spec.key, { op, from: d ? dateToIso(d) : '' })}
+          autoFocus
+        />
+      )
+    }
+
+    if (spec.type === 'range') {
+      const s = spec as RangeFilterSpec
+      const val = rangeValues[spec.key]
+      const op = val?.op ?? 'gte'
+      const isBetween = op === 'between' || op === 'not_between'
+      const fmt = s.formatValue ?? String
+      const from = val?.from ?? s.min
+      const to = val?.to ?? s.max
+      const sliderValue = isBetween ? [from, to] : [from]
+      return (
+        <div className="flex flex-col gap-3 p-3 w-52">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">{fmt(s.min)}</span>
+            <span className="font-medium tabular-nums">
+              {isBetween ? `${fmt(from)} – ${fmt(to)}` : fmt(from)}
+            </span>
+            <span className="text-muted-foreground">{fmt(s.max)}</span>
+          </div>
+          <Slider
+            min={s.min}
+            max={s.max}
+            step={s.step ?? 1}
+            value={sliderValue}
+            onValueChange={(vals) => {
+              if (isBetween) {
+                onRangeChange(spec.key, { op, from: vals[0], to: vals[1] })
+              } else {
+                onRangeChange(spec.key, { op, from: vals[0] })
+              }
+            }}
+          />
+        </div>
+      )
+    }
+
     // custom
     const cs = spec as CustomFilterSpec<unknown>
     const items = customValues[spec.key] ?? []
@@ -312,7 +445,7 @@ export function FilterChipBar({
               <CommandGroup heading="Filterable columns">
                 {specs.map((spec) => {
                   const active =
-                    chipSummary(spec, searchValues, multiValues, customValues) !== null
+                    chipSummary(spec, searchValues, multiValues, customValues, dateValues, rangeValues) !== null
                   return (
                     <CommandItem
                       key={spec.key}
@@ -337,7 +470,7 @@ export function FilterChipBar({
 
       {/* ── Active filter chips ──────────────────────────────────────── */}
       {specs.map((spec) => {
-        const summary = chipSummary(spec, searchValues, multiValues, customValues)
+        const summary = chipSummary(spec, searchValues, multiValues, customValues, dateValues, rangeValues)
         const showChip = summary !== null || valueOpenKey === spec.key || pendingKey === spec.key
         if (!showChip) return null
 
@@ -397,8 +530,48 @@ export function FilterChipBar({
                             key={op.value}
                             value={op.value}
                             onSelect={() => {
-                              setOperators((prev) => ({ ...prev, [spec.key]: op.value }))
-                              setOperatorOpenKey(null)
+                              if (spec.type === 'date') {
+                                const cur = dateValues[spec.key]
+                                if (op.value === 'between' || op.value === 'not_between') {
+                                  let from = cur?.from ?? ''
+                                  let to: string | undefined
+                                  if (!from) {
+                                    const today = new Date()
+                                    today.setHours(12, 0, 0, 0)
+                                    from = dateToIso(today)
+                                    const end = new Date(today)
+                                    end.setDate(end.getDate() + 7)
+                                    to = dateToIso(end)
+                                  } else if (cur?.op === 'before') {
+                                    // "before Jan 15" → "Jan 8 – Jan 15"
+                                    const endDate = new Date(from + 'T12:00:00')
+                                    const startDate = new Date(endDate)
+                                    startDate.setDate(startDate.getDate() - 7)
+                                    to = from
+                                    from = dateToIso(startDate)
+                                  } else {
+                                    // "after Jan 15" → "Jan 15 – Jan 22"
+                                    const startDate = new Date(from + 'T12:00:00')
+                                    const endDate = new Date(startDate)
+                                    endDate.setDate(endDate.getDate() + 7)
+                                    to = dateToIso(endDate)
+                                  }
+                                  onDateChange(spec.key, { op: op.value as DateVal['op'], from, to })
+                                  setOperatorOpenKey(null)
+                                  setValueOpenKey(spec.key)
+                                } else {
+                                  onDateChange(spec.key, { op: op.value as DateVal['op'], from: cur?.from ?? '' })
+                                  setOperatorOpenKey(null)
+                                }
+                              } else if (spec.type === 'range') {
+                                const cur = rangeValues[spec.key]
+                                const isRangeBetween = op.value === 'between' || op.value === 'not_between'
+                                onRangeChange(spec.key, { op: op.value as RangeVal['op'], from: cur?.from, to: isRangeBetween ? cur?.to : undefined })
+                                setOperatorOpenKey(null)
+                              } else {
+                                setOperators((prev) => ({ ...prev, [spec.key]: op.value }))
+                                setOperatorOpenKey(null)
+                              }
                             }}
                             className="text-xs"
                           >
