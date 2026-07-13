@@ -12,7 +12,7 @@ import {
   type ColumnFiltersState,
   type VisibilityState,
 } from '@tanstack/react-table'
-import { ArrowUp, ArrowDown, ArrowUpDown, Search, Loader2, ChevronLeft, ChevronRight, Undo2, Columns3, RotateCcw } from 'lucide-react'
+import { ArrowUp, ArrowDown, ArrowUpDown, Search, Loader2, ChevronLeft, ChevronRight, Columns3, RotateCcw } from 'lucide-react'
 import { Input } from './ui/input'
 import {
   Table,
@@ -101,8 +101,6 @@ type DataTableProps<T> = {
   loading?: boolean
   serverPagination?: ServerPagination
   onFilterChange?: (id: string, values: string[]) => void
-  filtersActive?: boolean
-  onClearFilters?: () => void
   tableId?: string | false
   syncedFilters?: SyncedFilter[]
   footerRow?: React.ReactNode
@@ -126,8 +124,6 @@ export function DataTable<T>({
   loading = false,
   serverPagination,
   onFilterChange,
-  filtersActive = false,
-  onClearFilters,
   tableId,
   syncedFilters,
   footerRow,
@@ -152,7 +148,12 @@ export function DataTable<T>({
     return init
   })
 
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+    const hidden = getMultiParam('hidden')
+    const init: VisibilityState = {}
+    hidden.forEach((id) => { init[id] = false })
+    return init
+  })
 
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(() => {
     const init: ColumnFiltersState = []
@@ -243,29 +244,12 @@ export function DataTable<T>({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syncedFilterValues])
 
-  const hasActiveFilters =
-    filtersActive ||
-    globalFilter !== '' ||
-    columnFilters.length > 0 ||
-    Object.values(filterSelections).some((v) => v.length > 0) ||
-    (syncedFilters?.some((f) => f.value.length > 0) ?? false)
-
-  const clearFilters = (): void => {
-    setGlobalFilter('')
-    setColumnFilters([])
-    setFilterSelections({})
-    setSorting(initialSorting)
-    filterableColumns.forEach((fc) => onFilterChange?.(fc.id, []))
-    syncedFilters?.forEach((f) => f.onChange([]))
-    table.setPageIndex(0)
-
-    const toClear: Record<string, null> = { q: null, sort: null, page: null }
-    filterableColumns.forEach((fc) => { toClear[fc.id] = null })
-    syncedFilters?.forEach((f) => { toClear[f.key] = null })
-    setParams(toClear)  // Clear URL first so onClearFilters can write back defaults
-
-    onClearFilters?.()
-  }
+  useEffect(() => {
+    const hidden = Object.entries(columnVisibility)
+      .filter(([, v]) => v === false)
+      .map(([id]) => id)
+    setParams({ hidden: hidden.length > 0 ? hidden : null })
+  }, [columnVisibility]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { pageIndex } = table.getState().pagination
   const totalFiltered = table.getFilteredRowModel().rows.length
@@ -307,31 +291,31 @@ export function DataTable<T>({
           ))}
           {(() => {
             const hideableCols = table.getAllColumns().filter((c) => c.getCanHide())
-            if (!hasActiveFilters && hideableCols.length === 0) return null
+            if (hideableCols.length === 0) return null
             return (
               <div className="ml-auto flex items-center gap-2">
-                {hasActiveFilters && (
-                  <button
-                    type="button"
-                    onClick={clearFilters}
-                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <Undo2 className="h-3 w-3" />
-                    Clear filters
-                  </button>
-                )}
-                {hideableCols.length > 0 && (
+                {hideableCols.length > 0 && (() => {
+                  const hiddenCount = hideableCols.filter((c) => !c.getIsVisible()).length
+                  return (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button
                         type="button"
                         className={cn(
-                          'flex h-8 items-center gap-1.5 rounded-md border border-input text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+                          'flex h-8 items-center gap-1.5 rounded-md border text-xs transition-colors hover:bg-accent hover:text-foreground',
                           compact ? 'px-2' : 'px-2.5',
+                          hiddenCount > 0
+                            ? 'border-foreground/25 text-foreground'
+                            : 'border-input text-muted-foreground',
                         )}
                       >
                         <Columns3 className="h-3 w-3" />
                         {!compact && 'Columns'}
+                        {hiddenCount > 0 && (
+                          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium leading-none text-primary-foreground tabular-nums">
+                            {hiddenCount}
+                          </span>
+                        )}
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-40">
@@ -364,7 +348,8 @@ export function DataTable<T>({
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                )}
+                  )
+                })()}
               </div>
             )
           })()}

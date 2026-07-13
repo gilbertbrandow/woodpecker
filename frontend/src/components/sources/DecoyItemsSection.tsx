@@ -193,8 +193,6 @@ export function DecoyItemsSection(): React.ReactElement {
         data={items}
         hideSearch
         filtersSlot={filtersSlot}
-        filtersActive={!!selectedOpening}
-        onClearFilters={clearOpening}
         loading={loading}
         tableId={false}
         serverPagination={{
