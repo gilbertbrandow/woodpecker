@@ -24,6 +24,13 @@ import {
 } from './ui/table'
 import { MultiSelectFilter } from './ui/multi-select-filter'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select'
+import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -52,11 +59,14 @@ export type SyncedFilter = {
   onChange: (values: string[]) => void
 }
 
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
+
 export type ServerPagination = {
   totalRows: number
   page: number
   pageSize: number
   onPageChange: (page: number) => void
+  onPageSizeChange?: (pageSize: number) => void
 }
 
 function parseSortParam(sortParam: string | undefined): SortingState {
@@ -468,7 +478,23 @@ export function DataTable<T>({
 
       {serverPagination ? (
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>
+          <div className="flex items-center gap-1.5">
+            <Select
+              value={String(serverPagination.pageSize)}
+              onValueChange={(v) => serverPagination.onPageSizeChange?.(Number(v))}
+            >
+              <SelectTrigger className="h-7 w-auto px-2 text-xs [&>span]:overflow-visible">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((s) => (
+                  <SelectItem key={s} value={String(s)} className="text-xs">{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span>/ Page</span>
+          </div>
+          <span className="tabular-nums">
             {serverPagination.totalRows === 0
               ? 'No results'
               : `Showing ${(serverPagination.page - 1) * serverPagination.pageSize + 1}–${Math.min(serverPagination.page * serverPagination.pageSize, serverPagination.totalRows)} of ${serverPagination.totalRows}`}
@@ -476,9 +502,7 @@ export function DataTable<T>({
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => {
-                serverPagination.onPageChange(serverPagination.page - 1)
-              }}
+              onClick={() => serverPagination.onPageChange(serverPagination.page - 1)}
               disabled={serverPagination.page <= 1 || loading}
               className="flex items-center gap-0.5 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
             >
@@ -490,9 +514,7 @@ export function DataTable<T>({
             </span>
             <button
               type="button"
-              onClick={() => {
-                serverPagination.onPageChange(serverPagination.page + 1)
-              }}
+              onClick={() => serverPagination.onPageChange(serverPagination.page + 1)}
               disabled={serverPagination.page * serverPagination.pageSize >= serverPagination.totalRows || loading}
               className="flex items-center gap-0.5 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
             >
@@ -503,7 +525,27 @@ export function DataTable<T>({
         </div>
       ) : (
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>
+          <div className="flex items-center gap-1.5">
+            <Select
+              value={String(table.getState().pagination.pageSize)}
+              onValueChange={(v) => {
+                table.setPageSize(Number(v))
+                table.setPageIndex(0)
+                setParams({ page: null })
+              }}
+            >
+              <SelectTrigger className="h-7 w-auto px-2 text-xs [&>span]:overflow-visible">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((s) => (
+                  <SelectItem key={s} value={String(s)} className="text-xs">{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span>/ Page</span>
+          </div>
+          <span className="tabular-nums">
             {totalFiltered === 0
               ? 'No results'
               : `Showing ${start}–${end} of ${totalFiltered}`}

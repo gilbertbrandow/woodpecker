@@ -36,6 +36,7 @@ export type FetchParams = {
   // Every filter's current value as string[]. Search filters produce a single-element array.
   filters: Record<string, string[]>
   page: number
+  pageSize: number
   // Reserved for future server-side sorting support — always undefined for now.
   sort?: { key: string; dir: 'asc' | 'desc' }
 }
@@ -82,7 +83,7 @@ export function ServerDataTable<T>({
   tableId,
   columns,
   filters: filtersProp,
-  pageSize = 20,
+  pageSize: pageSizeProp = 20,
   fetchData,
   onDataChange,
   refreshKey,
@@ -123,6 +124,7 @@ export function ServerDataTable<T>({
     filterValues: FilterValues
     customUnresolved: Record<string, string[]>
     initialPage: number
+    initialPageSize: number
   }
 
   const initRef = useRef<InitData | null>(null)
@@ -179,10 +181,12 @@ export function ServerDataTable<T>({
     }
 
     const pageStr = getParam('page')
+    const pageSizeStr = getParam('pageSize')
     initRef.current = {
       filterValues,
       customUnresolved,
       initialPage: pageStr ? Math.max(1, parseInt(pageStr, 10)) : 1,
+      initialPageSize: pageSizeStr ? Math.max(1, parseInt(pageSizeStr, 10)) : pageSizeProp,
     }
   }
 
@@ -194,6 +198,7 @@ export function ServerDataTable<T>({
     Object.values(initRef.current!.customUnresolved).some((ids) => ids.length > 0),
   )
   const [page, setPage] = useState(initRef.current.initialPage)
+  const [pageSize, setPageSize] = useState(initRef.current.initialPageSize)
   const [data, setData] = useState<T[]>(() => initialData?.items ?? [])
   const [total, setTotal] = useState(() => initialData?.total ?? 0)
   const [loading, setLoading] = useState(() => !initialData)
@@ -267,7 +272,7 @@ export function ServerDataTable<T>({
   // When initialData is provided we skip the first fetch — the data is already loaded.
   const initialFetchParamsRef = useRef<string | null>(
     initialData !== undefined
-      ? `${debouncedSearchSerialized}|${nonSearchSerialized}|${page}|${refreshKey ?? ''}|${instanceKey ?? ''}`
+      ? `${debouncedSearchSerialized}|${nonSearchSerialized}|${page}|${pageSize}|${refreshKey ?? ''}|${instanceKey ?? ''}`
       : null,
   )
 
@@ -285,9 +290,10 @@ export function ServerDataTable<T>({
       updates[spec.key] = tokens.length > 0 ? tokens : null
     }
     updates.page = page > 1 ? String(page) : null
+    updates.pageSize = pageSize !== pageSizeProp ? String(pageSize) : null
 
     setParams(updates)
-  }, [debouncedSearchSerialized, nonSearchSerialized, page]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [debouncedSearchSerialized, nonSearchSerialized, page, pageSize]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------------------
   // Fetch: called when settled filter params, page, or refreshKey change.
@@ -297,7 +303,7 @@ export function ServerDataTable<T>({
     if (isHydrating) return
 
     if (initialFetchParamsRef.current !== null) {
-      const sig = `${debouncedSearchSerialized}|${nonSearchSerialized}|${page}|${refreshKey ?? ''}|${instanceKey ?? ''}`
+      const sig = `${debouncedSearchSerialized}|${nonSearchSerialized}|${page}|${pageSize}|${refreshKey ?? ''}|${instanceKey ?? ''}`
       if (sig === initialFetchParamsRef.current) return
       initialFetchParamsRef.current = null
     }
@@ -312,7 +318,7 @@ export function ServerDataTable<T>({
 
     let cancelled = false
     setLoading(true)
-    fetchDataRef.current({ filters, page })
+    fetchDataRef.current({ filters, page, pageSize })
       .then(({ items, total: t }) => {
         if (cancelled) return
         setData(items)
@@ -323,7 +329,7 @@ export function ServerDataTable<T>({
       .finally(() => { if (!cancelled) setLoading(false) })
 
     return () => { cancelled = true }
-  }, [isHydrating, debouncedSearchSerialized, nonSearchSerialized, page, refreshKey, instanceKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isHydrating, debouncedSearchSerialized, nonSearchSerialized, page, pageSize, refreshKey, instanceKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------------------
   // Filter change handlers
@@ -393,7 +399,7 @@ export function ServerDataTable<T>({
       hideSearch
       searchSlot={searchSlot}
       filtersSlot={filtersSlot}
-      serverPagination={{ totalRows: total, page, pageSize, onPageChange: setPage }}
+      serverPagination={{ totalRows: total, page, pageSize, onPageChange: setPage, onPageSizeChange: (s) => { setPageSize(s); setPage(1) } }}
       pageSize={pageSize}
       onRowClick={onRowClick}
       getRowClassName={getRowClassName}
