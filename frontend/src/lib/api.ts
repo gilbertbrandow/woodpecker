@@ -1078,7 +1078,7 @@ export const api = {
       search?: string
       page?: number
       pageSize?: number
-      userIds?: number[]
+      userIds?: string[]
     }): Promise<{ items: Subset[]; total: number }> => {
       const params = new URLSearchParams()
       if (opts?.lockedOnly) params.set('locked', 'true')
@@ -1129,7 +1129,7 @@ export const api = {
       search?: string
       page?: number
       pageSize?: number
-      userIds?: number[]
+      userIds?: string[]
     }): Promise<{ items: ScheduleSummary[]; total: number }> => {
       const params = new URLSearchParams()
       if (opts?.subsetId !== undefined) params.set('subsetId', String(opts.subsetId))
@@ -1179,7 +1179,7 @@ export const api = {
     },
     listAll: (opts?: {
       scheduleId?: number
-      userIds?: number[]
+      userIds?: string[]
       statuses?: string[]
       search?: string
       page?: number
@@ -1188,7 +1188,7 @@ export const api = {
       const p = new URLSearchParams()
       p.set('tz', Intl.DateTimeFormat().resolvedOptions().timeZone)
       if (opts?.scheduleId !== undefined) p.set('scheduleId', String(opts.scheduleId))
-      if (opts?.userIds?.length) opts.userIds.forEach((id) => p.append('userId', String(id)))
+      if (opts?.userIds?.length) opts.userIds.forEach((v) => p.append('userId', v))
       if (opts?.statuses?.length) opts.statuses.forEach((s) => p.append('status', s))
       if (opts?.search) p.set('search', opts.search)
       if (opts?.page !== undefined) p.set('page', String(opts.page))
@@ -1266,12 +1266,12 @@ export const api = {
   trainingItems: {
     getAttemptHistory: (
       trainingItemId: number,
-      opts?: { page?: number; pageSize?: number; userId?: number[]; result?: string[] },
+      opts?: { page?: number; pageSize?: number; userId?: string[]; result?: string[] },
     ): Promise<{ attempts: AttemptHistoryRow[]; total: number }> => {
       const p = new URLSearchParams()
       if (opts?.page) p.set('page', String(opts.page))
       if (opts?.pageSize) p.set('pageSize', String(opts.pageSize))
-      opts?.userId?.forEach((id) => p.append('userId', String(id)))
+      opts?.userId?.forEach((v) => p.append('userId', v))
       opts?.result?.forEach((r) => p.append('result', r))
       const qs = p.toString()
       return request(`/training-items/${trainingItemId}/attempt-history${qs ? `?${qs}` : ''}`)

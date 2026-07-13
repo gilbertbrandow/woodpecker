@@ -161,7 +161,7 @@ export function TrainingTable({
       fetchData={({ filters, page }) =>
         api.training.listAll({
           scheduleId,
-          userIds: filters.userId?.map(Number),
+          userIds: filters.userId,
           statuses: filters.status?.length ? filters.status : undefined,
           search: filters.q?.[0] || undefined,
           page,

@@ -193,7 +193,7 @@ export function OverviewAttemptHistoryTable({
       const { attempts, total } = await api.trainingItems.getAttemptHistory(trainingItemId, {
         page: params.page,
         pageSize: PAGE_SIZE,
-        userId: (params.filters.userId ?? []).map(Number),
+        userId: params.filters.userId,
         result: params.filters.result ?? [],
       })
       return {

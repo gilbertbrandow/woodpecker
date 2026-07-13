@@ -1,15 +1,15 @@
 import { useAuth } from '../context/auth'
 import { UserSelector, UserSelectorContent } from '../components/UserSelector'
 import { api, type SelectableUser } from '../lib/api'
-import type { CustomFilterSpec } from '../components/ServerDataTable'
+import type { EntityFilterSpec } from '../components/ServerDataTable'
 import { Users } from 'lucide-react'
 import { AvatarGroup, AvatarGroupCount } from '../components/ui/avatar'
 import { UserAvatar } from '../components/UserAvatar'
 
-// Returns a ready-made ServerDataTable CustomFilterSpec for a user selector filter.
+// Returns a ready-made ServerDataTable EntityFilterSpec for a user selector filter.
 // Handles 'me' token resolution, numeric ID hydration, and renders a UserSelector.
 // Pass the urlKey that matches the backend query param (e.g. 'userId' or 'userIds').
-export function useUserFilterSpec(urlKey: string, label = 'Users'): CustomFilterSpec<SelectableUser> {
+export function useUserFilterSpec(urlKey: string, label = 'Users'): EntityFilterSpec<SelectableUser> {
   const { user } = useAuth()
 
   const currentUser: SelectableUser | null = user
@@ -17,7 +17,7 @@ export function useUserFilterSpec(urlKey: string, label = 'Users'): CustomFilter
     : null
 
   return {
-    type: 'custom',
+    type: 'entity',
     key: urlKey,
     label,
     icon: Users,

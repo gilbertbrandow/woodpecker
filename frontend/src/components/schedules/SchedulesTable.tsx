@@ -213,7 +213,7 @@ export function SchedulesTable({
           search: filters.q?.[0] || undefined,
           page,
           pageSize: PAGE_SIZE,
-          userIds: filters.userIds?.map(Number),
+          userIds: filters.userIds,
           statuses: filters.statuses?.length ? filters.statuses : undefined,
         })
       }
