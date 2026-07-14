@@ -43,7 +43,7 @@ export function FilterChipBar({
   // the editor closes (regardless of whether a value was entered).
   const [pendingKey, setPendingKey] = useState<string | null>(null)
 
-  const showContainer = hasActiveFilters || pendingKey !== null
+  const showContainer = hasActiveFilters || pendingKey !== null || valueOpenKey !== null
 
   const allFiltered = specs.every((spec) => {
     const handler = getHandler(spec)
@@ -79,6 +79,9 @@ export function FilterChipBar({
       setValueOpenKey(spec.key)
     } else {
       setValueOpenKey(null)
+      const handler = getHandler(spec)
+      const rawValue = values[spec.key] ?? handler.defaultValue(spec)
+      if (handler.isEmpty(rawValue)) setPendingKey(spec.key)
     }
   }
 
@@ -283,7 +286,7 @@ export function FilterChipBar({
       {hasActiveFilters && (
         <button
           type="button"
-          onClick={onClear}
+          onClick={() => { onClear(); setPendingKey(null); setValueOpenKey(null) }}
           className={cn(
             'flex h-6 items-center gap-1.5 rounded-md bg-destructive text-xs text-destructive-foreground transition-colors hover:bg-destructive/90',
             compact ? 'px-1.5' : 'px-2',
