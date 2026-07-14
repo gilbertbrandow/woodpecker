@@ -488,6 +488,12 @@ export type SelectableSchedule = {
   status: string
 }
 
+export type SelectableSubset = {
+  id: number
+  name: string
+  status: 'draft' | 'filled' | 'locked'
+}
+
 export type ParticipantInfo = {
   id: number
   displayName: string
@@ -1358,6 +1364,8 @@ export const api = {
     },
   },
   users: {
+    suggest: (limit = 5): Promise<SelectableUser[]> =>
+      request(`/users/suggest?limit=${limit}`),
     search: (q: string, limit = 10): Promise<SelectableUser[]> =>
       request(`/users/search?q=${encodeURIComponent(q)}&limit=${limit}`),
     getByIds: (ids: number[]): Promise<SelectableUser[]> =>
