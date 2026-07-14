@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { ScheduleSelector, ScheduleSelectorContent } from '../components/ScheduleSelector'
 import { api, type SelectableSchedule } from '../lib/api'
 import type { EntityFilterSpec } from '../components/ServerDataTable'
@@ -6,7 +7,7 @@ import { CalendarDays } from 'lucide-react'
 // Returns a ready-made ServerDataTable EntityFilterSpec for a schedule selector filter.
 // Pass the urlKey that matches the backend query param (e.g. 'scheduleId').
 export function useScheduleFilterSpec(urlKey: string, label = 'Schedule'): EntityFilterSpec<SelectableSchedule> {
-  return {
+  return useMemo<EntityFilterSpec<SelectableSchedule>>(() => ({
     type: 'entity',
     key: urlKey,
     label,
@@ -30,5 +31,5 @@ export function useScheduleFilterSpec(urlKey: string, label = 'Schedule'): Entit
       const label = schedules.length === 1 ? schedules[0].name : `${schedules.length} schedules`
       return <span className="font-medium text-foreground">{label}</span>
     },
-  }
+  }), [urlKey, label])
 }

@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useState, useRef } from "react";
+import { useServerTable } from "../../hooks/useServerTable";
 import { useNavigate, Link } from "@tanstack/react-router";
 import { Loader2, Trash2, PencilLine, Lock, Activity } from "lucide-react";
 import { formatDate } from "../../lib/utils";
@@ -46,10 +47,10 @@ export function SchedulesTable({
 }: SchedulesTableProps): React.ReactElement {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const userFilterSpec = useUserFilterSpec('userIds', 'Creator');
+  const userFilterSpec = useUserFilterSpec('userId', 'Creator');
 
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const { refreshKey, refetch } = useServerTable();
 
   const deletingIdRef = useRef(deletingId);
   deletingIdRef.current = deletingId;
@@ -62,7 +63,7 @@ export function SchedulesTable({
     try {
       await api.schedules.delete(item.id);
       toast.success("Schedule deleted", { description: `"${item.name}" has been removed.` });
-      setRefreshKey((k) => k + 1);
+      refetch();
     } finally {
       setDeletingId(null);
       setTimeout(() => { blockNavRef.current = false; }, 300);
@@ -204,18 +205,11 @@ export function SchedulesTable({
       refreshKey={refreshKey}
       filters={[
         userFilterSpec,
-        { type: 'multi', key: 'statuses', label: 'Status', options: STATUS_OPTIONS, icon: Activity },
+        { type: 'multi', key: 'status', label: 'Status', options: STATUS_OPTIONS, icon: Activity },
         { type: 'search', key: 'q' },
       ]}
-      fetchData={({ filters, page }) =>
-        api.schedules.list({
-          subsetId,
-          search: filters.q?.[0] || undefined,
-          page,
-          pageSize: PAGE_SIZE,
-          userIds: filters.userIds,
-          statuses: filters.statuses?.length ? filters.statuses : undefined,
-        })
+      fetchData={(params) =>
+        api.schedules.list(params, subsetId !== undefined ? { subsetId } : undefined)
       }
       onDataChange={(_, total) => onCountChange?.(total)}
       onRowClick={(schedule) => {

@@ -8,7 +8,6 @@ import { CONCEPT_ICONS, DATA_ICONS } from '../../lib/icons'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 import { ServerDataTable, type FetchParams } from '../../components/ServerDataTable'
 import { useUserFilterSpec } from '../../hooks/useUserFilterSpec'
-import { MultiSelectFilter } from '../../components/ui/multi-select-filter'
 import { UserSelector } from '../../components/UserSelector'
 import type { SelectableUser } from '../../lib/api'
 
@@ -157,27 +156,13 @@ export function OverviewAttemptHistoryTable({
           />
         ),
       },
-      {
-        type: 'custom' as const,
-        key: 'result',
-        render: (value: string[], onChange: (v: string[]) => void) => (
-          <MultiSelectFilter
-            label="Result"
-            options={RESULT_OPTIONS}
-            selected={value}
-            onChange={onChange}
-            className="h-7 text-xs"
-          />
-        ),
-        serialize: (v: string[]) => v,
-        resolveInstant: (id: string) => id,
-      },
+      { type: 'multi' as const, key: 'result', label: 'Result', options: RESULT_OPTIONS },
     ],
     [baseUserFilter, onUserFilterChange],
   )
 
   const initialCustomValues = React.useMemo(
-    () => ({ userId: [currentUser], result: [] }),
+    () => ({ userId: [currentUser] }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [], // captured at mount; currentUser provides the default "me" filter
   )

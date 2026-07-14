@@ -161,21 +161,15 @@ export function TrainingTable({
         userFilterSpec,
         subsetFilterSpec,
         ...(scheduleId === undefined ? [scheduleFilterSpec] : []),
-        { type: 'multi', key: 'status', label: 'statuses', options: STATUS_OPTIONS },
+        { type: 'multi', key: 'status', label: 'Status', options: STATUS_OPTIONS },
         { type: 'search', key: 'q' },
       ]}
-      fetchData={({ filters, page }) =>
-        api.training.listAll({
-          scheduleIds: scheduleId !== undefined
-            ? [String(scheduleId)]
-            : filters.scheduleId,
-          subsetIds: filters.subsetId,
-          userIds: filters.userId,
-          statuses: filters.status?.length ? filters.status : undefined,
-          search: filters.q?.[0] || undefined,
-          page,
-          pageSize: PAGE_SIZE,
-        })
+      fetchData={(params) =>
+        api.training.listAll(
+          scheduleId !== undefined
+            ? { ...params, filters: { ...params.filters, scheduleId: ['is', String(scheduleId)] } }
+            : params,
+        )
       }
       onRowClick={(t) =>
         void navigate({

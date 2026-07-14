@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { useState, useRef } from 'react'
+import { useServerTable } from '../../hooks/useServerTable'
 import { useNavigate } from '@tanstack/react-router'
 import { Loader2, Trash2, PencilLine, Layers, Lock, Activity } from 'lucide-react'
 import { formatDate } from '../../lib/utils'
@@ -39,7 +40,7 @@ export function SubsetsTable(): React.ReactElement {
   const userFilterSpec = useUserFilterSpec('userId', 'Creator')
 
   const [deletingId, setDeletingId] = useState<number | null>(null)
-  const [refreshKey, setRefreshKey] = useState(0)
+  const { refreshKey, refetch } = useServerTable()
 
   const deletingIdRef = useRef(deletingId)
   deletingIdRef.current = deletingId
@@ -52,7 +53,7 @@ export function SubsetsTable(): React.ReactElement {
     try {
       await api.subsets.delete(item.id)
       toast.success('Subset deleted', { description: `"${item.name}" has been removed.` })
-      setRefreshKey((k) => k + 1)
+      refetch()
     } catch {
     } finally {
       setDeletingId(null)

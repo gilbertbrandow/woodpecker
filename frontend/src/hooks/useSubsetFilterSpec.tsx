@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { SubsetSelector, SubsetSelectorContent } from '../components/SubsetSelector'
 import { api, type SelectableSubset } from '../lib/api'
 import type { EntityFilterSpec } from '../components/ServerDataTable'
@@ -6,7 +7,7 @@ import { LibraryBig } from 'lucide-react'
 // Returns a ready-made ServerDataTable EntityFilterSpec for a subset selector filter.
 // Pass the urlKey that matches the backend query param (e.g. 'subsetId').
 export function useSubsetFilterSpec(urlKey: string, label = 'Subset'): EntityFilterSpec<SelectableSubset> {
-  return {
+  return useMemo<EntityFilterSpec<SelectableSubset>>(() => ({
     type: 'entity',
     key: urlKey,
     label,
@@ -30,5 +31,5 @@ export function useSubsetFilterSpec(urlKey: string, label = 'Subset'): EntityFil
       const label = subsets.length === 1 ? subsets[0].name : `${subsets.length} subsets`
       return <span className="font-medium text-foreground">{label}</span>
     },
-  }
+  }), [urlKey, label])
 }

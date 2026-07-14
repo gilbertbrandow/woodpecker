@@ -1147,26 +1147,13 @@ export const api = {
     getStats: (id: number): Promise<SubsetStats> => request(`/subsets/${id}/stats`),
   },
   schedules: {
-    list: (opts?: {
-      subsetId?: number
-      lockedOnly?: boolean
-      statuses?: string[]
-      search?: string
-      page?: number
-      pageSize?: number
-      userIds?: string[]
-    }): Promise<{ items: ScheduleSummary[]; total: number }> => {
-      const params = new URLSearchParams()
-      if (opts?.subsetId !== undefined) params.set('subsetId', String(opts.subsetId))
-      if (opts?.lockedOnly) params.set('locked', 'true')
-      if (opts?.statuses?.length) params.set('statuses', opts.statuses.join(','))
-      if (opts?.search) params.set('search', opts.search)
-      if (opts?.page !== undefined) params.set('page', String(opts.page))
-      if (opts?.pageSize !== undefined) params.set('pageSize', String(opts.pageSize))
-      if (opts?.userIds?.length) params.set('userIds', opts.userIds.join(','))
-      const qs = params.toString()
-      return request(`/schedules${qs ? `?${qs}` : ''}`)
+    list: (params: TableParams, fixed?: Record<string, string | number>): Promise<{ items: ScheduleSummary[]; total: number }> => {
+      const p = tableParamsToUrl(params)
+      if (fixed) for (const [k, v] of Object.entries(fixed)) p.set(k, String(v))
+      return request(`/schedules?${p}`)
     },
+    listLocked: (limit = 20): Promise<{ items: ScheduleSummary[]; total: number }> =>
+      request(`/schedules?locked=true&pageSize=${limit}`),
     suggest: (limit = 8): Promise<SelectableSchedule[]> =>
       request(`/schedules/suggest?limit=${limit}`),
     search: (q: string, limit = 10): Promise<SelectableSchedule[]> =>
@@ -1208,26 +1195,10 @@ export const api = {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
       return request(`/training?tz=${encodeURIComponent(tz)}`)
     },
-    listAll: (opts?: {
-      scheduleIds?: string[]
-      subsetIds?: string[]
-      userIds?: string[]
-      statuses?: string[]
-      search?: string
-      page?: number
-      pageSize?: number
-    }): Promise<TrainingPage> => {
-      const p = new URLSearchParams()
+    listAll: (params: TableParams): Promise<TrainingPage> => {
+      const p = tableParamsToUrl(params)
       p.set('tz', Intl.DateTimeFormat().resolvedOptions().timeZone)
-      if (opts?.scheduleIds?.length) opts.scheduleIds.forEach((v) => p.append('scheduleId', v))
-      if (opts?.subsetIds?.length) opts.subsetIds.forEach((v) => p.append('subsetId', v))
-      if (opts?.userIds?.length) opts.userIds.forEach((v) => p.append('userId', v))
-      if (opts?.statuses?.length) opts.statuses.forEach((s) => p.append('status', s))
-      if (opts?.search) p.set('search', opts.search)
-      if (opts?.page !== undefined) p.set('page', String(opts.page))
-      if (opts?.pageSize !== undefined) p.set('pageSize', String(opts.pageSize))
-      const qs = p.toString()
-      return request(`/training/all${qs ? `?${qs}` : ''}`)
+      return request(`/training/all?${p}`)
     },
     setRunTarget: (
       trainingId: number,

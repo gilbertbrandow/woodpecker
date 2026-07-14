@@ -28,7 +28,7 @@ export function TrainingNewPage(): React.ReactElement | null {
   useEffect(() => {
     if (!user) return
     api.schedules
-      .list({ lockedOnly: true })
+      .listLocked()
       .then((r) => setSchedules(r.items))
       .catch(() => {})
       .finally(() => setSchedulesLoading(false))
