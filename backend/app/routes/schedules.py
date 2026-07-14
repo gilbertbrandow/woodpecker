@@ -21,6 +21,23 @@ def _load_creator(schedule: Schedule) -> User:
     return creator
 
 
+@schedules_bp.get("/suggest")
+@login_required
+def suggest_schedules() -> Response:
+    limit = min(20, max(1, int(request.args.get("limit", "8"))))
+    return jsonify(schedule_svc.suggest_schedules(limit=limit))
+
+
+@schedules_bp.get("/search")
+@login_required
+def search_schedules() -> Response:
+    q = request.args.get("q", "").strip()
+    limit = min(50, max(1, int(request.args.get("limit", "10"))))
+    if not q:
+        return jsonify([])
+    return jsonify(schedule_svc.search_schedules(q, limit=limit))
+
+
 @schedules_bp.get("/by-ids")
 @login_required
 def get_schedules_by_ids() -> Response:

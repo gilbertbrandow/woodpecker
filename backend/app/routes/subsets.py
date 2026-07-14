@@ -9,6 +9,31 @@ from app.utils import parse_multi_filter
 subsets_bp = Blueprint("subsets", __name__, url_prefix="/subsets")
 
 
+@subsets_bp.get("/suggest")
+@login_required
+def suggest_subsets() -> Response:
+    limit = min(20, max(1, int(request.args.get("limit", "8"))))
+    return jsonify(subset_svc.suggest_subsets(limit=limit))
+
+
+@subsets_bp.get("/search")
+@login_required
+def search_subsets() -> Response:
+    q = request.args.get("q", "").strip()
+    limit = min(50, max(1, int(request.args.get("limit", "10"))))
+    if not q:
+        return jsonify([])
+    return jsonify(subset_svc.search_subsets(q, limit=limit))
+
+
+@subsets_bp.get("/by-ids")
+@login_required
+def get_subsets_by_ids() -> Response:
+    ids_raw = request.args.get("ids", "")
+    ids = [int(x) for x in ids_raw.split(",") if x.strip().isdigit()]
+    return jsonify(subset_svc.get_subsets_by_ids(ids))
+
+
 @subsets_bp.post("")
 @login_required
 def create_subset() -> tuple[Response, int]:

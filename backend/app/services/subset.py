@@ -1118,6 +1118,30 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
 
     return {"sources": sources_out, "totalActive": total}
 
+def suggest_subsets(limit: int = 8) -> list[dict[str, object]]:
+    rows = db.session.scalars(
+        sa.select(Subset).order_by(Subset.created_at.desc()).limit(limit)
+    ).all()
+    return [{"id": s.id, "name": s.name, "status": subset_status(s)} for s in rows]
+
+
+def search_subsets(q: str, limit: int = 10) -> list[dict[str, object]]:
+    rows = db.session.scalars(
+        sa.select(Subset)
+        .where(Subset.name.ilike(f"%{q}%"))
+        .order_by(Subset.name)
+        .limit(limit)
+    ).all()
+    return [{"id": s.id, "name": s.name, "status": subset_status(s)} for s in rows]
+
+
+def get_subsets_by_ids(ids: list[int]) -> list[dict[str, object]]:
+    if not ids:
+        return []
+    rows = db.session.scalars(sa.select(Subset).where(Subset.id.in_(ids))).all()
+    return [{"id": s.id, "name": s.name, "status": subset_status(s)} for s in rows]
+
+
 def list_subsets(
     user_id: int,
     locked_only: bool = False,

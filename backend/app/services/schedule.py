@@ -130,6 +130,23 @@ def delete_schedule(schedule_id: int, user_id: int) -> None:
     db.session.commit()
 
 
+def suggest_schedules(limit: int = 8) -> list[dict[str, object]]:
+    rows = db.session.scalars(
+        sa.select(Schedule).order_by(Schedule.created_at.desc()).limit(limit)
+    ).all()
+    return [{"id": s.id, "name": s.name, "status": s.status} for s in rows]
+
+
+def search_schedules(q: str, limit: int = 10) -> list[dict[str, object]]:
+    rows = db.session.scalars(
+        sa.select(Schedule)
+        .where(Schedule.name.ilike(f"%{q}%"))
+        .order_by(Schedule.name)
+        .limit(limit)
+    ).all()
+    return [{"id": s.id, "name": s.name, "status": s.status} for s in rows]
+
+
 def get_schedule(schedule_id: int, user_id: int) -> Schedule:
     return _get_accessible_schedule(schedule_id, user_id)
 

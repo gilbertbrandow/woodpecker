@@ -29,8 +29,10 @@ def list_my_trainings() -> Response:
 @training_bp.get("/all")
 @login_required
 def list_all_trainings() -> Response:
-    schedule_id_raw = request.args.get("scheduleId")
-    schedule_id = int(schedule_id_raw) if schedule_id_raw and schedule_id_raw.isdigit() else None
+    schedule_ids_op, schedule_ids_vals = parse_multi_filter(request.args.getlist("scheduleId"))
+    schedule_ids = [int(v) for v in schedule_ids_vals if v.isdigit()]
+    subset_ids_op, subset_ids_vals = parse_multi_filter(request.args.getlist("subsetId"))
+    subset_ids = [int(v) for v in subset_ids_vals if v.isdigit()]
     user_ids_op, user_ids_vals = parse_multi_filter(request.args.getlist("userId"))
     user_ids = [int(v) for v in user_ids_vals if v.isdigit()]
     statuses_op, statuses_vals = parse_multi_filter(request.args.getlist("status"))
@@ -42,7 +44,10 @@ def list_all_trainings() -> Response:
     page_size = min(100, max(1, int(page_size_raw))) if page_size_raw.isdigit() else 20
     tz_str = request.args.get("tz", "UTC")
     return jsonify(training_svc.list_all_trainings(
-        schedule_id=schedule_id,
+        schedule_ids=schedule_ids or None,
+        schedule_ids_op=schedule_ids_op,
+        subset_ids=subset_ids or None,
+        subset_ids_op=subset_ids_op,
         user_ids=user_ids or None,
         user_ids_op=user_ids_op,
         statuses=statuses,

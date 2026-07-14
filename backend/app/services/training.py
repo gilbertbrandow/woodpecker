@@ -360,7 +360,10 @@ _COMPUTED_STATES = frozenset({
 
 
 def list_all_trainings(
-    schedule_id: int | None = None,
+    schedule_ids: list[int] | None = None,
+    schedule_ids_op: str = 'is',
+    subset_ids: list[int] | None = None,
+    subset_ids_op: str = 'is',
     user_ids: list[int] | None = None,
     user_ids_op: str = 'is',
     statuses: list[str] | None = None,
@@ -373,9 +376,23 @@ def list_all_trainings(
     conditions = []
     params: dict[str, object] = {}
 
-    if schedule_id is not None:
-        conditions.append("t.schedule_id = :sid")
-        params["sid"] = schedule_id
+    if schedule_ids:
+        placeholders = ", ".join(f":sch{i}" for i in range(len(schedule_ids)))
+        for i, sid in enumerate(schedule_ids):
+            params[f"sch{i}"] = sid
+        if schedule_ids_op == 'is_not':
+            conditions.append(f"t.schedule_id NOT IN ({placeholders})")
+        else:
+            conditions.append(f"t.schedule_id IN ({placeholders})")
+
+    if subset_ids:
+        placeholders = ", ".join(f":ssid{i}" for i in range(len(subset_ids)))
+        for i, ssid in enumerate(subset_ids):
+            params[f"ssid{i}"] = ssid
+        if subset_ids_op == 'is_not':
+            conditions.append(f"s.subset_id NOT IN ({placeholders})")
+        else:
+            conditions.append(f"s.subset_id IN ({placeholders})")
 
     if user_ids:
         placeholders = ", ".join(f":uid{i}" for i in range(len(user_ids)))
