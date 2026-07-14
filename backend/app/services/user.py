@@ -11,6 +11,14 @@ def get_users_by_ids(ids: list[int]) -> list[dict[str, object]]:
     return [{"id": u.id, "displayName": u.display_name, "avatarUrl": u.avatar_url} for u in rows]
 
 
+def suggest_users(exclude_id: int | None = None, limit: int = 5) -> list[dict[str, object]]:
+    stmt = sa.select(User).order_by(User.last_seen_at.desc().nulls_last()).limit(limit)
+    if exclude_id is not None:
+        stmt = stmt.where(User.id != exclude_id)
+    rows = db.session.scalars(stmt).all()
+    return [{"id": u.id, "displayName": u.display_name, "avatarUrl": u.avatar_url} for u in rows]
+
+
 def search_users(q: str, limit: int = 10) -> list[dict[str, object]]:
     pattern = f"%{q}%"
     rows = db.session.scalars(
