@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -9,7 +9,6 @@ import {
   flexRender,
   type ColumnDef,
   type SortingState,
-  type ColumnFiltersState,
   type VisibilityState,
 } from '@tanstack/react-table'
 import { ArrowUp, ArrowDown, ArrowUpDown, Search, Loader2, ChevronLeft, ChevronRight, Columns3, RotateCcw } from 'lucide-react'
@@ -22,7 +21,6 @@ import {
   TableHead,
   TableCell,
 } from './ui/table'
-import { MultiSelectFilter } from './ui/multi-select-filter'
 import {
   Select,
   SelectContent,
@@ -45,18 +43,6 @@ type ColMeta = {
   className?: string
   rankDesc?: boolean
   icon?: React.ComponentType<{ className?: string }>
-}
-
-export type FilterableColumn = {
-  id: string
-  label: string
-  options: { label: string; value: string; icon?: React.ReactNode }[]
-}
-
-export type SyncedFilter = {
-  key: string
-  value: string[]
-  onChange: (values: string[]) => void
 }
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
@@ -88,7 +74,6 @@ type DataTableProps<T> = {
   columns: ColumnDef<T>[]
   data: T[]
   globalFilterPlaceholder?: string
-  filterableColumns?: FilterableColumn[]
   filtersSlot?: React.ReactNode
   searchSlot?: React.ReactNode
   compact?: boolean
@@ -100,9 +85,7 @@ type DataTableProps<T> = {
   emptyMessage?: React.ReactNode
   loading?: boolean
   serverPagination?: ServerPagination
-  onFilterChange?: (id: string, values: string[]) => void
   tableId?: string | false
-  syncedFilters?: SyncedFilter[]
   footerRow?: React.ReactNode
   onFooterRowClick?: () => void
 }
@@ -111,7 +94,6 @@ export function DataTable<T>({
   columns,
   data,
   globalFilterPlaceholder = 'Search…',
-  filterableColumns = [],
   filtersSlot,
   searchSlot,
   compact = false,
@@ -123,9 +105,7 @@ export function DataTable<T>({
   emptyMessage = <span className="text-muted-foreground">No results.</span>,
   loading = false,
   serverPagination,
-  onFilterChange,
   tableId,
-  syncedFilters,
   footerRow,
   onFooterRowClick,
 }: DataTableProps<T>): React.ReactElement {
@@ -139,28 +119,10 @@ export function DataTable<T>({
 
   const [globalFilter, setGlobalFilter] = useState<string>(() => getParam('q') ?? '')
 
-  const [filterSelections, setFilterSelections] = useState<Record<string, string[]>>(() => {
-    const init: Record<string, string[]> = {}
-    filterableColumns.forEach((fc) => {
-      const vals = getMultiParam(fc.id)
-      if (vals.length > 0) init[fc.id] = vals
-    })
-    return init
-  })
-
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
     const hidden = getMultiParam('hidden')
     const init: VisibilityState = {}
     hidden.forEach((id) => { init[id] = false })
-    return init
-  })
-
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(() => {
-    const init: ColumnFiltersState = []
-    filterableColumns.forEach((fc) => {
-      const vals = getMultiParam(fc.id)
-      if (vals.length > 0) init.push({ id: fc.id, value: vals })
-    })
     return init
   })
 
@@ -177,7 +139,6 @@ export function DataTable<T>({
     state: {
       sorting,
       globalFilter,
-      columnFilters,
       columnVisibility,
     },
     onColumnVisibilityChange: setColumnVisibility,
@@ -191,11 +152,6 @@ export function DataTable<T>({
       setGlobalFilter(value)
       table.setPageIndex(0)
     },
-    onColumnFiltersChange: (updater) => {
-      const next = typeof updater === 'function' ? updater(columnFilters) : updater
-      setColumnFilters(next)
-      table.setPageIndex(0)
-    },
     globalFilterFn: 'includesString',
     manualPagination: !!serverPagination,
     getCoreRowModel: getCoreRowModel(),
@@ -207,42 +163,6 @@ export function DataTable<T>({
       sorting: initialSorting,
     },
   })
-
-  const handleFilterableColumnChange = (id: string, values: string[]): void => {
-    setFilterSelections((prev) => ({ ...prev, [id]: values }))
-    onFilterChange?.(id, values)
-    if (!onFilterChange) {
-      setColumnFilters((prev) => {
-        const without = prev.filter((f) => f.id !== id)
-        if (values.length === 0) return without
-        return [...without, { id, value: values }]
-      })
-      table.setPageIndex(0)
-    }
-    setParams({ [id]: values.length > 0 ? values : null, page: null })
-  }
-
-  // Serialize synced filter values into a stable string so the effect below can use it as a
-  // dependency. We intentionally avoid depending on the syncedFilters array reference (which is
-  // a new object every render) and instead trigger only when the actual values change.
-  const syncedFilterValues = syncedFilters?.map((f) => f.value.join(',')).join('|') ?? ''
-  const syncedFiltersInitializedRef = useRef(false)
-  useEffect(() => {
-    if (!syncedFilters?.length) return
-    const updates: Record<string, string | string[] | null> = {}
-    // syncedFilters is captured via closure — always reflects the current render's values
-    // because this effect only runs when syncedFilterValues (the serialised snapshot) changes.
-    syncedFilters.forEach((f) => {
-      updates[f.key] = f.value.length > 0 ? f.value : null
-    })
-    if (syncedFiltersInitializedRef.current) {
-      updates.page = null
-    }
-    syncedFiltersInitializedRef.current = true
-    setParams(updates)
-  // syncedFilters is intentionally omitted — see comment above
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [syncedFilterValues])
 
   useEffect(() => {
     const hidden = Object.entries(columnVisibility)
@@ -259,7 +179,7 @@ export function DataTable<T>({
 
   return (
     <div className="flex flex-col gap-3">
-      {(!hideSearch || searchSlot || filtersSlot || filterableColumns.length > 0) && (
+      {(!hideSearch || searchSlot || filtersSlot) && (
         <div className="flex items-center gap-2">
           {!hideSearch && (
             <div className="relative shrink-0">
@@ -280,15 +200,6 @@ export function DataTable<T>({
           {searchSlot}
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
           {filtersSlot}
-          {filterableColumns.map((fc) => (
-            <MultiSelectFilter
-              key={fc.id}
-              label={fc.label}
-              options={fc.options}
-              selected={filterSelections[fc.id] ?? []}
-              onChange={(values) => handleFilterableColumnChange(fc.id, values)}
-            />
-          ))}
           {(() => {
             const hideableCols = table.getAllColumns().filter((c) => c.getCanHide())
             if (hideableCols.length === 0) return null

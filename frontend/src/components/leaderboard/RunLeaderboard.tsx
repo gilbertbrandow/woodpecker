@@ -1,8 +1,9 @@
 import * as React from 'react'
-import { useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { DataTable, type FilterableColumn } from '../DataTable'
+import { DataTable } from '../DataTable'
+import { MultiSelectFilter } from '../ui/multi-select-filter'
 import { DATA_ICONS, CONCEPT_ICONS } from '../../lib/icons'
 import { UserAvatar } from '../UserAvatar'
 import { StatusBadge, runStatusToStatusValue } from '../StatusBadge'
@@ -67,17 +68,19 @@ export function RunLeaderboard({
     [rows],
   )
 
-  const filterableColumns = useMemo<FilterableColumn[]>(() => {
-    if (!allowFiltering) return []
-    const result: FilterableColumn[] = []
-    if (scheduleId === undefined) {
-      result.push({ id: 'schedule', label: 'schedules', options: scheduleOptions })
+  const [selectedSchedules, setSelectedSchedules] = useState<string[]>([])
+  const [selectedRuns, setSelectedRuns] = useState<string[]>([])
+
+  const filteredRows = useMemo(() => {
+    let r = rows
+    if (selectedSchedules.length > 0) {
+      r = r.filter((row) => selectedSchedules.includes(String(row.scheduleId)))
     }
-    if (runIndex === undefined) {
-      result.push({ id: 'runNumber', label: 'runs', options: runNumberOptions })
+    if (selectedRuns.length > 0) {
+      r = r.filter((row) => selectedRuns.includes(String(row.runIndex + 1)))
     }
-    return result
-  }, [allowFiltering, scheduleId, runIndex, scheduleOptions, runNumberOptions])
+    return r
+  }, [rows, selectedSchedules, selectedRuns])
 
   const columns = useMemo<ColumnDef<LeaderboardRun>[]>(() => {
     const positionColumn: ColumnDef<LeaderboardRun> = {
@@ -113,7 +116,6 @@ export function RunLeaderboard({
       header: 'Schedule',
       meta: { icon: CONCEPT_ICONS.Schedule },
       enableSorting: false,
-      filterFn: (row, id, val: string[]) => !val.length || val.includes(row.getValue(id) as string),
       cell: ({ row }) => (
         <Link
           to="/app/schedules/$scheduleId"
@@ -132,7 +134,6 @@ export function RunLeaderboard({
       header: 'Run',
       meta: { icon: CONCEPT_ICONS.Run },
       enableSorting: false,
-      filterFn: (row, id, val: string[]) => !val.length || val.includes(row.getValue(id) as string),
       cell: ({ row }) => (
         <span className="tabular-nums">#{row.original.runIndex + 1}</span>
       ),
@@ -255,13 +256,40 @@ export function RunLeaderboard({
     ]
   }, [scheduleId, runIndex, compact, currentUserId])
 
+  const internalFiltersSlot = allowFiltering && (scheduleId === undefined || runIndex === undefined) ? (
+    <>
+      {scheduleId === undefined && (
+        <MultiSelectFilter
+          label="schedules"
+          options={scheduleOptions}
+          selected={selectedSchedules}
+          onChange={setSelectedSchedules}
+        />
+      )}
+      {runIndex === undefined && (
+        <MultiSelectFilter
+          label="runs"
+          options={runNumberOptions}
+          selected={selectedRuns}
+          onChange={setSelectedRuns}
+        />
+      )}
+    </>
+  ) : undefined
+
+  const combinedFiltersSlot = (internalFiltersSlot || filtersSlot) ? (
+    <>
+      {internalFiltersSlot}
+      {filtersSlot}
+    </>
+  ) : undefined
+
   return (
     <DataTable
       tableId={tableId}
       columns={columns}
-      data={rows}
-      filterableColumns={filterableColumns}
-      filtersSlot={compact ? undefined : filtersSlot}
+      data={filteredRows}
+      filtersSlot={compact ? undefined : combinedFiltersSlot}
       hideSearch
       pageSize={compact ? 5 : 20}
       initialSorting={[{ id: 'accuracyPct', desc: true }]}

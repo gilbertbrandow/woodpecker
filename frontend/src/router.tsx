@@ -33,8 +33,6 @@ import { AdminUsersPage } from './pages/AdminUsersPage'
 import { AdminWaitlistPage } from './pages/AdminWaitlistPage'
 import { AdminWhitelistPage } from './pages/AdminWhitelistPage'
 import { AdminWhitelistNewPage } from './pages/AdminWhitelistNewPage'
-import { PaginationPrototypePage } from './pages/PaginationPrototypePage'
-
 type RouterContext = {
   auth: AuthContextValue
 }
@@ -293,13 +291,6 @@ const runRoute = createRoute({
   component: RunPage,
 })
 
-const paginationPrototypeRoute = createRoute({
-  getParentRoute: () => appShellRoute,
-  path: '/prototype/pagination',
-  validateSearch: validateTableSearch,
-  component: PaginationPrototypePage,
-})
-
 const adminIndexRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: '/admin',
@@ -411,7 +402,6 @@ const routeTree = rootRoute.addChildren([
       lichessTacticsDashboardRoute,
       scrapedPositionalRoute,
       decoySourceRoute,
-      paginationPrototypeRoute,
       adminIndexRoute,
       adminUsersRoute,
       adminWaitlistRoute,
