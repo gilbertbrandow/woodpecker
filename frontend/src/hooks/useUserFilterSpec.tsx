@@ -21,7 +21,6 @@ export function useUserFilterSpec(urlKey: string, label = 'Users'): EntityFilter
     key: urlKey,
     label,
     icon: Users,
-    defaultItems: currentUser ? [currentUser] : [],
     render: (value, onChange) => (
       <UserSelector value={value} onChange={onChange} />
     ),

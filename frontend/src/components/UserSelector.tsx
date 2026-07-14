@@ -54,7 +54,14 @@ export function UserSelectorContent({
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SelectableUser[]>([])
   const [searching, setSearching] = useState(false)
+  const [suggestions, setSuggestions] = useState<SelectableUser[]>([])
   const debouncedQuery = useDebounce(query, 300)
+
+  useEffect(() => {
+    let cancelled = false
+    api.users.suggest().then((r) => { if (!cancelled) setSuggestions(r) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     if (debouncedQuery.length < 2) {
@@ -97,79 +104,101 @@ export function UserSelectorContent({
         onValueChange={setQuery}
       />
       {value.length > 0 && (
-        <div className="flex flex-wrap gap-1 border-b px-2 py-2">
-          {value.map((u) => (
-            <span
-              key={u.id}
-              className="flex items-center overflow-hidden rounded-full bg-muted pr-2 text-xs"
-            >
-              <UserAvatar
-                displayName={u.displayName}
-                avatarUrl={u.avatarUrl}
-                className="h-5 w-5 shrink-0"
-              />
-              <span className="ml-1.5">{u.displayName}</span>
-              <button
-                type="button"
-                onClick={(e) => remove(u.id, e)}
-                className="ml-1 rounded-full hover:text-foreground"
-                aria-label={`Remove ${u.displayName}`}
-              >
-                <X className="h-2.5 w-2.5" />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-      <CommandList>
-        {!isSearching ? (
-          me ? (
-            <CommandGroup heading="Quick">
-              <CommandItem
-                value={String(me.id)}
-                onSelect={() => toggle(me)}
-                className={cn(value.some((u) => u.id === me.id) && 'bg-accent')}
+        <div className="border-b px-2 py-2">
+          <div className="flex flex-wrap gap-1">
+            {value.map((u) => (
+              <span
+                key={u.id}
+                className="flex items-center overflow-hidden rounded-full bg-muted pr-2 text-xs"
               >
                 <UserAvatar
-                  displayName={me.displayName}
-                  avatarUrl={me.avatarUrl}
-                  className="mr-2 h-5 w-5"
+                  displayName={u.displayName}
+                  avatarUrl={u.avatarUrl}
+                  className="h-5 w-5 shrink-0"
                 />
-                <span className="flex-1">Me</span>
-                <span className="ml-2 text-xs text-muted-foreground">{me.displayName}</span>
-              </CommandItem>
-              <CommandEmpty>Type to search for other users.</CommandEmpty>
-            </CommandGroup>
-          ) : (
-            <CommandEmpty>Type to search for users.</CommandEmpty>
-          )
-        ) : searching ? (
-          <CommandEmpty>Searching…</CommandEmpty>
-        ) : results.length === 0 ? (
-          <CommandEmpty>No users found.</CommandEmpty>
-        ) : (
-          <CommandGroup>
-            {results.map((u) => {
-              const selected = value.some((v) => v.id === u.id)
-              return (
-                <CommandItem
-                  key={u.id}
-                  value={String(u.id)}
-                  onSelect={() => toggle(u)}
-                  className={cn(selected && 'bg-accent')}
+                <span className="ml-1.5">{u.displayName}</span>
+                <button
+                  type="button"
+                  onClick={(e) => remove(u.id, e)}
+                  className="ml-1 rounded-full hover:text-foreground"
+                  aria-label={`Remove ${u.displayName}`}
                 >
-                  <UserAvatar
-                    displayName={u.displayName}
-                    avatarUrl={u.avatarUrl}
-                    className="mr-2 h-5 w-5"
-                  />
-                  {u.displayName}
-                </CommandItem>
-              )
-            })}
-          </CommandGroup>
-        )}
-      </CommandList>
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {(() => {
+        const visibleSuggestions = [
+          ...(me && !value.some((u) => u.id === me.id) ? [{ ...me, isMe: true }] : []),
+          ...suggestions
+            .filter((u) => !value.some((v) => v.id === u.id))
+            .map((u) => ({ ...u, isMe: false })),
+        ]
+        const showSuggestions = !isSearching && visibleSuggestions.length > 0
+        return (
+          <>
+            <div className="relative">
+              <CommandList>
+                {!isSearching ? (
+                  showSuggestions && (
+                    <CommandGroup heading="Suggestions">
+                      {visibleSuggestions.map((u) => (
+                        <CommandItem
+                          key={u.id}
+                          value={String(u.id)}
+                          onSelect={() => toggle(u)}
+                        >
+                          <UserAvatar
+                            displayName={u.displayName}
+                            avatarUrl={u.avatarUrl}
+                            className="mr-2 h-5 w-5"
+                          />
+                          {u.displayName}
+                          {u.isMe && (
+                            <span className="ml-1.5 text-xs italic text-muted-foreground">(me)</span>
+                          )}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  )
+                ) : searching ? (
+                  <CommandEmpty>Searching…</CommandEmpty>
+                ) : results.filter((u) => !value.some((v) => v.id === u.id)).length === 0 ? (
+                  <CommandEmpty>No users found.</CommandEmpty>
+                ) : (
+                  <CommandGroup heading="Results">
+                    {results
+                      .filter((u) => !value.some((v) => v.id === u.id))
+                      .map((u) => (
+                        <CommandItem
+                          key={u.id}
+                          value={String(u.id)}
+                          onSelect={() => toggle(u)}
+                        >
+                          <UserAvatar
+                            displayName={u.displayName}
+                            avatarUrl={u.avatarUrl}
+                            className="mr-2 h-5 w-5"
+                          />
+                          {u.displayName}
+                        </CommandItem>
+                      ))}
+                  </CommandGroup>
+                )}
+              </CommandList>
+              {showSuggestions && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-background to-transparent" />
+              )}
+            </div>
+            {showSuggestions && (
+              <p className="px-3 pb-2 text-[10px] italic text-muted-foreground">Search to find any user</p>
+            )}
+          </>
+        )
+      })()}
     </Command>
   )
 }
