@@ -1096,6 +1096,12 @@ export const api = {
       const qs = params.toString()
       return request(`/subsets${qs ? `?${qs}` : ''}`)
     },
+    suggest: (limit = 8): Promise<SelectableSubset[]> =>
+      request(`/subsets/suggest?limit=${limit}`),
+    search: (q: string, limit = 10): Promise<SelectableSubset[]> =>
+      request(`/subsets/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+    getByIds: (ids: number[]): Promise<SelectableSubset[]> =>
+      ids.length === 0 ? Promise.resolve([]) : request(`/subsets/by-ids?ids=${ids.join(',')}`),
     get: (id: number): Promise<Subset> => request(`/subsets/${id}`),
     create: (name: string, puzzleCount: number): Promise<Subset> =>
       request('/subsets', { method: 'POST', body: JSON.stringify({ name, puzzleCount }) }),
@@ -1148,6 +1154,12 @@ export const api = {
       const qs = params.toString()
       return request(`/schedules${qs ? `?${qs}` : ''}`)
     },
+    suggest: (limit = 8): Promise<SelectableSchedule[]> =>
+      request(`/schedules/suggest?limit=${limit}`),
+    search: (q: string, limit = 10): Promise<SelectableSchedule[]> =>
+      request(`/schedules/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+    getByIds: (ids: number[]): Promise<SelectableSchedule[]> =>
+      ids.length === 0 ? Promise.resolve([]) : request(`/schedules/by-ids?ids=${ids.join(',')}`),
     get: (id: number): Promise<Schedule> => request(`/schedules/${id}`),
     create: (name: string, subsetId: number): Promise<Schedule> =>
       request('/schedules', { method: 'POST', body: JSON.stringify({ name, subsetId }) }),
@@ -1184,7 +1196,8 @@ export const api = {
       return request(`/training?tz=${encodeURIComponent(tz)}`)
     },
     listAll: (opts?: {
-      scheduleId?: number
+      scheduleIds?: string[]
+      subsetIds?: string[]
       userIds?: string[]
       statuses?: string[]
       search?: string
@@ -1193,7 +1206,8 @@ export const api = {
     }): Promise<TrainingPage> => {
       const p = new URLSearchParams()
       p.set('tz', Intl.DateTimeFormat().resolvedOptions().timeZone)
-      if (opts?.scheduleId !== undefined) p.set('scheduleId', String(opts.scheduleId))
+      if (opts?.scheduleIds?.length) opts.scheduleIds.forEach((v) => p.append('scheduleId', v))
+      if (opts?.subsetIds?.length) opts.subsetIds.forEach((v) => p.append('subsetId', v))
       if (opts?.userIds?.length) opts.userIds.forEach((v) => p.append('userId', v))
       if (opts?.statuses?.length) opts.statuses.forEach((s) => p.append('status', s))
       if (opts?.search) p.set('search', opts.search)
@@ -1370,10 +1384,6 @@ export const api = {
       request(`/users/search?q=${encodeURIComponent(q)}&limit=${limit}`),
     getByIds: (ids: number[]): Promise<SelectableUser[]> =>
       ids.length === 0 ? Promise.resolve([]) : request(`/users/by-ids?ids=${ids.join(',')}`),
-  },
-  selectableSchedules: {
-    getByIds: (ids: number[]): Promise<SelectableSchedule[]> =>
-      ids.length === 0 ? Promise.resolve([]) : request(`/schedules/by-ids?ids=${ids.join(',')}`),
   },
   attempts: {
     complete: (

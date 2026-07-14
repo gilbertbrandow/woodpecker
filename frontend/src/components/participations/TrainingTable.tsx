@@ -19,6 +19,8 @@ import { UserAvatar } from "../UserAvatar";
 import { ServerDataTable } from "../ServerDataTable";
 import { api, type AllTrainingSummary } from "../../lib/api";
 import { useUserFilterSpec } from "../../hooks/useUserFilterSpec";
+import { useSubsetFilterSpec } from "../../hooks/useSubsetFilterSpec";
+import { useScheduleFilterSpec } from "../../hooks/useScheduleFilterSpec";
 import { CONCEPT_ICONS, DATA_ICONS } from "../../lib/icons";
 
 const PAGE_SIZE = 20;
@@ -48,6 +50,8 @@ export function TrainingTable({
 }: TrainingTableProps): React.ReactElement {
   const navigate = useNavigate();
   const userFilterSpec = useUserFilterSpec('userId');
+  const subsetFilterSpec = useSubsetFilterSpec('subsetId');
+  const scheduleFilterSpec = useScheduleFilterSpec('scheduleId');
 
   const columns = useMemo<ColumnDef<AllTrainingSummary>[]>(
     () => [
@@ -155,12 +159,17 @@ export function TrainingTable({
       instanceKey={scheduleId}
       filters={[
         userFilterSpec,
+        subsetFilterSpec,
+        ...(scheduleId === undefined ? [scheduleFilterSpec] : []),
         { type: 'multi', key: 'status', label: 'statuses', options: STATUS_OPTIONS },
         { type: 'search', key: 'q' },
       ]}
       fetchData={({ filters, page }) =>
         api.training.listAll({
-          scheduleId,
+          scheduleIds: scheduleId !== undefined
+            ? [String(scheduleId)]
+            : filters.scheduleId,
+          subsetIds: filters.subsetId,
           userIds: filters.userId,
           statuses: filters.status?.length ? filters.status : undefined,
           search: filters.q?.[0] || undefined,

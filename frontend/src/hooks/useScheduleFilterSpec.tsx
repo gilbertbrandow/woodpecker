@@ -19,7 +19,7 @@ export function useScheduleFilterSpec(urlKey: string, label = 'Schedule'): Entit
     ),
     serialize: (schedules) => schedules.map((s) => String(s.id)),
     resolveInstant: () => null,
-    resolveIds: (ids) => api.selectableSchedules.getByIds(ids.map(Number)),
+    resolveIds: (ids) => api.schedules.getByIds(ids.map(Number)),
     getChipLabel: (schedules) => {
       if (schedules.length === 0) return ''
       if (schedules.length === 1) return schedules[0].name

@@ -19,12 +19,7 @@ export function useSubsetFilterSpec(urlKey: string, label = 'Subset'): EntityFil
     ),
     serialize: (subsets) => subsets.map((s) => String(s.id)),
     resolveInstant: () => null,
-    resolveIds: (ids) =>
-      Promise.all(
-        ids.map((id) =>
-          api.subsets.get(Number(id)).then((s) => ({ id: s.id, name: s.name, status: s.status })),
-        ),
-      ),
+    resolveIds: (ids) => api.subsets.getByIds(ids.map(Number)),
     getChipLabel: (subsets) => {
       if (subsets.length === 0) return ''
       if (subsets.length === 1) return subsets[0].name
