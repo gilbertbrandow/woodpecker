@@ -52,7 +52,6 @@ def create_subset() -> tuple[Response, int]:
 @login_required
 def list_subsets() -> Response:
     q = TableQuery(request)
-    user_ids = q.int_filter("userId")
     statuses = q.str_filter("status")
     result = subset_svc.list_subsets(
         session["user_id"],
@@ -62,8 +61,7 @@ def list_subsets() -> Response:
         search=q.q,
         page=q.page,
         page_size=q.page_size,
-        user_ids=user_ids.int_or_none,
-        user_ids_op=user_ids.op,
+        user_ids=q.int_filter("userId"),
         date=q.date_filter("date"),
         puzzle_count=q.range_filter("puzzleCount"),
     )

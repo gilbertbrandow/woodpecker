@@ -4,6 +4,7 @@ from typing import cast
 import sqlalchemy as sa
 
 from app.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
+from app.table_query import FilterList
 from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.subset import Subset
@@ -194,8 +195,7 @@ def list_schedules(
     search: str | None = None,
     page: int = 1,
     page_size: int = 20,
-    user_ids: list[int] | None = None,
-    user_ids_op: str = 'is',
+    user_ids: FilterList | None = None,
 ) -> dict[str, object]:
     if locked_only:
         access_clause = "s.locked_at IS NOT NULL"
@@ -203,20 +203,16 @@ def list_schedules(
         access_clause = "(s.locked_at IS NOT NULL OR s.user_id = :uid)"
 
     params: dict[str, object] = {"uid": user_id}
-    conditions: list[str] = [f"WHERE {access_clause}"]
+    conditions: list[str] = [access_clause]
 
     if subset_id is not None:
-        conditions.append("AND s.subset_id = :subset_id")
+        conditions.append("s.subset_id = :subset_id")
         params["subset_id"] = subset_id
     if search:
-        conditions.append("AND s.name ILIKE :search")
+        conditions.append("s.name ILIKE :search")
         params["search"] = f"%{search}%"
-    if user_ids:
-        uid_list = ",".join(str(int(uid)) for uid in user_ids)
-        if user_ids_op == 'is_not':
-            conditions.append(f"AND s.user_id NOT IN ({uid_list})")
-        else:
-            conditions.append(f"AND s.user_id IN ({uid_list})")
+    if user_ids is not None:
+        user_ids.apply(conditions, params, "s.user_id", prefix="uid")
     if statuses and not locked_only:
         status_parts: list[str] = []
         if "locked" in statuses:
@@ -226,11 +222,11 @@ def list_schedules(
         if status_parts:
             inner = ' OR '.join(status_parts)
             if statuses_op == 'is_not':
-                conditions.append(f"AND NOT ({inner})")
+                conditions.append(f"NOT ({inner})")
             else:
-                conditions.append(f"AND ({inner})")
+                conditions.append(f"({inner})")
 
-    where_sql = " ".join(conditions)
+    where_sql = "WHERE " + " AND ".join(conditions)
     base_sql = f"""
         FROM schedules s
         JOIN users u ON u.id = s.user_id

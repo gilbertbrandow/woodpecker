@@ -10,6 +10,7 @@ from app.models.training import Training
 from app.models.subset import Subset
 from app.models.user import User
 from app.exceptions import ConflictError, ValidationError, NotFoundError, ForbiddenError
+from app.table_query import FilterList
 from app.services.schedule_config import ScheduleConfig, RunDefinition
 from app.services.training_state import compute_training_state
 
@@ -360,12 +361,9 @@ _COMPUTED_STATES = frozenset({
 
 
 def list_all_trainings(
-    schedule_ids: list[int] | None = None,
-    schedule_ids_op: str = 'is',
-    subset_ids: list[int] | None = None,
-    subset_ids_op: str = 'is',
-    user_ids: list[int] | None = None,
-    user_ids_op: str = 'is',
+    schedule_ids: FilterList | None = None,
+    subset_ids: FilterList | None = None,
+    user_ids: FilterList | None = None,
     statuses: list[str] | None = None,
     statuses_op: str = 'is',
     search: str | None = None,
@@ -373,35 +371,15 @@ def list_all_trainings(
     page_size: int = 20,
     tz_str: str = "UTC",
 ) -> dict[str, object]:
-    conditions = []
+    conditions: list[str] = []
     params: dict[str, object] = {}
 
-    if schedule_ids:
-        placeholders = ", ".join(f":sch{i}" for i in range(len(schedule_ids)))
-        for i, sid in enumerate(schedule_ids):
-            params[f"sch{i}"] = sid
-        if schedule_ids_op == 'is_not':
-            conditions.append(f"t.schedule_id NOT IN ({placeholders})")
-        else:
-            conditions.append(f"t.schedule_id IN ({placeholders})")
-
-    if subset_ids:
-        placeholders = ", ".join(f":ssid{i}" for i in range(len(subset_ids)))
-        for i, ssid in enumerate(subset_ids):
-            params[f"ssid{i}"] = ssid
-        if subset_ids_op == 'is_not':
-            conditions.append(f"s.subset_id NOT IN ({placeholders})")
-        else:
-            conditions.append(f"s.subset_id IN ({placeholders})")
-
-    if user_ids:
-        placeholders = ", ".join(f":uid{i}" for i in range(len(user_ids)))
-        for i, uid in enumerate(user_ids):
-            params[f"uid{i}"] = uid
-        if user_ids_op == 'is_not':
-            conditions.append(f"t.user_id NOT IN ({placeholders})")
-        else:
-            conditions.append(f"t.user_id IN ({placeholders})")
+    if schedule_ids is not None:
+        schedule_ids.apply(conditions, params, "t.schedule_id", prefix="sch")
+    if subset_ids is not None:
+        subset_ids.apply(conditions, params, "s.subset_id", prefix="ssid")
+    if user_ids is not None:
+        user_ids.apply(conditions, params, "t.user_id", prefix="uid")
 
     # Separate SQL-filterable statuses from computed ones
     valid_sql_statuses = [s for s in (statuses or []) if s in _SQL_FILTERABLE]

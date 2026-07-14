@@ -6,7 +6,7 @@ from typing import Any
 import sqlalchemy as sa
 
 from app.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
-from app.table_query import DateFilter, RangeFilter
+from app.table_query import DateFilter, FilterList, RangeFilter
 from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.subset import Subset, SubsetTrainingItem
@@ -1151,8 +1151,7 @@ def list_subsets(
     search: str | None = None,
     page: int = 1,
     page_size: int = 20,
-    user_ids: list[int] | None = None,
-    user_ids_op: str = 'is',
+    user_ids: FilterList | None = None,
     date: DateFilter | None = None,
     puzzle_count: RangeFilter | None = None,
 ) -> dict[str, object]:
@@ -1162,17 +1161,13 @@ def list_subsets(
         access_clause = "(sub.user_id = :uid OR (sub.locked_at IS NOT NULL AND sub.user_id != :uid))"
 
     params: dict[str, object] = {"uid": user_id}
-    conditions: list[str] = [f"WHERE {access_clause}"]
+    conditions: list[str] = [access_clause]
 
     if search:
-        conditions.append("AND sub.name ILIKE :search")
+        conditions.append("sub.name ILIKE :search")
         params["search"] = f"%{search}%"
-    if user_ids:
-        uid_list = ",".join(str(int(uid)) for uid in user_ids)
-        if user_ids_op == 'is_not':
-            conditions.append(f"AND sub.user_id NOT IN ({uid_list})")
-        else:
-            conditions.append(f"AND sub.user_id IN ({uid_list})")
+    if user_ids is not None:
+        user_ids.apply(conditions, params, "sub.user_id", prefix="uid")
     if date is not None:
         date.apply(conditions, params, "DATE(COALESCE(sub.locked_at, sub.created_at))", prefix="date")
     if puzzle_count is not None:
@@ -1194,11 +1189,11 @@ def list_subsets(
         if status_parts:
             inner = ' OR '.join(status_parts)
             if statuses_op == 'is_not':
-                conditions.append(f"AND NOT ({inner})")
+                conditions.append(f"NOT ({inner})")
             else:
-                conditions.append(f"AND ({inner})")
+                conditions.append(f"({inner})")
 
-    where_sql = " ".join(conditions)
+    where_sql = "WHERE " + " AND ".join(conditions)
     base_sql = f"""
         FROM subsets sub
         JOIN users u ON u.id = sub.user_id

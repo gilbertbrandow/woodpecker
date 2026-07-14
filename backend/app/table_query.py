@@ -8,6 +8,37 @@ from flask import Request
 from app.utils import parse_multi_filter
 
 # ---------------------------------------------------------------------------
+# Shared SQL-building helpers (bare conditions — callers join with AND)
+# ---------------------------------------------------------------------------
+
+def _apply_comparison(
+    conditions: list[str],
+    params: dict[str, object],
+    column_expr: str,
+    prefix: str,
+    sql_op: str,
+    val: object,
+) -> None:
+    conditions.append(f"{column_expr} {sql_op} :{prefix}_from")
+    params[f"{prefix}_from"] = val
+
+
+def _apply_between(
+    conditions: list[str],
+    params: dict[str, object],
+    column_expr: str,
+    prefix: str,
+    from_val: object,
+    to_val: object,
+    negated: bool,
+) -> None:
+    not_ = "NOT " if negated else ""
+    conditions.append(f"{column_expr} {not_}BETWEEN :{prefix}_from AND :{prefix}_to")
+    params[f"{prefix}_from"] = from_val
+    params[f"{prefix}_to"] = to_val
+
+
+# ---------------------------------------------------------------------------
 # Multi-value (entity / status) filters
 # ---------------------------------------------------------------------------
 
@@ -24,6 +55,22 @@ class FilterList:
     @property
     def int_or_none(self) -> list[int] | None:
         return self.int_values or None
+
+    def apply(
+        self,
+        conditions: list[str],
+        params: dict[str, object],
+        column_expr: str,
+        prefix: str = "list",
+    ) -> None:
+        values: list[int] | list[str] = self.int_values or self.str_values
+        if not values:
+            return
+        for i, v in enumerate(values):
+            params[f"{prefix}_{i}"] = v
+        placeholders = ", ".join(f":{prefix}_{i}" for i in range(len(values)))
+        not_ = "NOT " if self.op == 'is_not' else ""
+        conditions.append(f"{column_expr} {not_}IN ({placeholders})")
 
 
 # ---------------------------------------------------------------------------
@@ -53,19 +100,12 @@ class DateFilter:
     ) -> None:
         if not self.is_set:
             return
-        from_ = f":{prefix}_from"
-        to_ = f":{prefix}_to"
         if self.op == 'after':
-            conditions.append(f"AND {column_expr} > {from_}")
-            params[f"{prefix}_from"] = self.from_date
+            _apply_comparison(conditions, params, column_expr, prefix, '>', self.from_date)
         elif self.op == 'before':
-            conditions.append(f"AND {column_expr} < {from_}")
-            params[f"{prefix}_from"] = self.from_date
+            _apply_comparison(conditions, params, column_expr, prefix, '<', self.from_date)
         elif self.op in ('between', 'not_between') and self.to_date:
-            not_ = "NOT " if self.op == 'not_between' else ""
-            conditions.append(f"AND {column_expr} {not_}BETWEEN {from_} AND {to_}")
-            params[f"{prefix}_from"] = self.from_date
-            params[f"{prefix}_to"] = self.to_date
+            _apply_between(conditions, params, column_expr, prefix, self.from_date, self.to_date, self.op == 'not_between')
 
 
 # ---------------------------------------------------------------------------
@@ -102,18 +142,11 @@ class RangeFilter:
     ) -> None:
         if not self.is_set or self.from_val is None:
             return
-        cast = int if as_int else float
-        from_ = f":{prefix}_from"
-        to_ = f":{prefix}_to"
+        coerce = int if as_int else float
         if self.op in _RANGE_OP_SQL:
-            sql_op = _RANGE_OP_SQL[self.op]
-            conditions.append(f"AND {column_expr} {sql_op} {from_}")
-            params[f"{prefix}_from"] = cast(self.from_val)
+            _apply_comparison(conditions, params, column_expr, prefix, _RANGE_OP_SQL[self.op], coerce(self.from_val))
         elif self.op in ('between', 'not_between') and self.to_val is not None:
-            not_ = "NOT " if self.op == 'not_between' else ""
-            conditions.append(f"AND {column_expr} {not_}BETWEEN {from_} AND {to_}")
-            params[f"{prefix}_from"] = cast(self.from_val)
-            params[f"{prefix}_to"] = cast(self.to_val)
+            _apply_between(conditions, params, column_expr, prefix, coerce(self.from_val), coerce(self.to_val), self.op == 'not_between')
 
 
 # ---------------------------------------------------------------------------

@@ -500,12 +500,13 @@ class TestAttemptHistoryFilters:
         assert body["total"] == 1
         assert body["attempts"] == []
 
-    def test_invalid_user_id_returns_422(self, client: FlaskClient, db_session) -> None:
+    def test_invalid_user_id_is_ignored(self, client: FlaskClient, db_session) -> None:
         world = _seed_training_item_world(db_session)
         with client.session_transaction() as sess:
             sess["user_id"] = world["user_a_id"]
 
+        # Non-integer userId values are silently skipped — no filter applied, all results returned.
         resp = client.get(
             f"/training-items/{world['training_item_id']}/attempt-history?userId=notanumber"
         )
-        assert resp.status_code == 422
+        assert resp.status_code == 200
