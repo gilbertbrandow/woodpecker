@@ -1142,6 +1142,12 @@ def get_subsets_by_ids(ids: list[int]) -> list[dict[str, object]]:
     return [{"id": s.id, "name": s.name, "status": subset_status(s)} for s in rows]
 
 
+_RANGE_OP_SQL: dict[str, str] = {
+    'is': '=', 'is_not': '!=',
+    'gt': '>', 'gte': '>=', 'lt': '<', 'lte': '<=',
+}
+
+
 def list_subsets(
     user_id: int,
     locked_only: bool = False,
@@ -1152,6 +1158,12 @@ def list_subsets(
     page_size: int = 20,
     user_ids: list[int] | None = None,
     user_ids_op: str = 'is',
+    date_op: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    puzzle_count_op: str | None = None,
+    puzzle_count_from: float | None = None,
+    puzzle_count_to: float | None = None,
 ) -> dict[str, object]:
     if locked_only:
         access_clause = "sub.locked_at IS NOT NULL"
@@ -1170,6 +1182,30 @@ def list_subsets(
             conditions.append(f"AND sub.user_id NOT IN ({uid_list})")
         else:
             conditions.append(f"AND sub.user_id IN ({uid_list})")
+    if date_op and date_from:
+        eff_date = "DATE(COALESCE(sub.locked_at, sub.created_at))"
+        if date_op == 'after':
+            conditions.append(f"AND {eff_date} > :date_from")
+            params["date_from"] = date_from
+        elif date_op == 'before':
+            conditions.append(f"AND {eff_date} < :date_from")
+            params["date_from"] = date_from
+        elif date_op in ('between', 'not_between') and date_to:
+            not_ = "NOT " if date_op == 'not_between' else ""
+            conditions.append(f"AND {eff_date} {not_}BETWEEN :date_from AND :date_to")
+            params["date_from"] = date_from
+            params["date_to"] = date_to
+    if puzzle_count_op and puzzle_count_from is not None:
+        eff_count = "COALESCE(sub.locked_puzzle_count, sub.puzzle_count)"
+        if puzzle_count_op in _RANGE_OP_SQL:
+            sql_op = _RANGE_OP_SQL[puzzle_count_op]
+            conditions.append(f"AND {eff_count} {sql_op} :pc_from")
+            params["pc_from"] = int(puzzle_count_from)
+        elif puzzle_count_op in ('between', 'not_between') and puzzle_count_to is not None:
+            not_ = "NOT " if puzzle_count_op == 'not_between' else ""
+            conditions.append(f"AND {eff_count} {not_}BETWEEN :pc_from AND :pc_to")
+            params["pc_from"] = int(puzzle_count_from)
+            params["pc_to"] = int(puzzle_count_to)
     if statuses and not locked_only:
         status_parts: list[str] = []
         if "locked" in statuses:
