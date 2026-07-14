@@ -1,4 +1,7 @@
-def parse_multi_filter(values: list[str]) -> tuple[str, list[str]]:
+from typing import Literal, cast
+
+
+def parse_multi_filter(values: list[str]) -> tuple[Literal['is', 'is_not'], list[str]]:
     """Extract operator from [op?, val1, val2] list produced by the frontend filter system.
 
     The frontend sends [op, ...values] where op is 'is' or 'is_not'.
@@ -7,5 +10,5 @@ def parse_multi_filter(values: list[str]) -> tuple[str, list[str]]:
     if not values:
         return 'is', []
     if values[0] in ('is', 'is_not'):
-        return values[0], values[1:]
+        return cast(Literal['is', 'is_not'], values[0]), values[1:]
     return 'is', values
