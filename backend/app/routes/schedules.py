@@ -69,13 +69,11 @@ def list_schedules() -> Response:
     q = TableQuery(request)
     subset_id_raw = request.args.get("subsetId")
     subset_id = int(subset_id_raw) if subset_id_raw and subset_id_raw.isdigit() else None
-    statuses = q.str_filter("status")
     result = schedule_svc.list_schedules(
         session["user_id"],
         subset_id=subset_id,
         locked_only=q.flag("locked"),
-        statuses=statuses.str_or_none,
-        statuses_op=statuses.op,
+        status=q.str_filter("status"),
         search=q.q,
         page=q.page,
         page_size=q.page_size,

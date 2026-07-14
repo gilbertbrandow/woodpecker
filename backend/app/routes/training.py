@@ -30,14 +30,12 @@ def list_my_trainings() -> Response:
 @login_required
 def list_all_trainings() -> Response:
     q = TableQuery(request)
-    statuses = q.str_filter("status")
     tz_str = request.args.get("tz", "UTC")
     return jsonify(training_svc.list_all_trainings(
         schedule_ids=q.int_filter("scheduleId"),
         subset_ids=q.int_filter("subsetId"),
         user_ids=q.int_filter("userId"),
-        statuses=statuses.str_or_none,
-        statuses_op=statuses.op,
+        status=q.str_filter("status"),
         search=q.q,
         page=q.page,
         page_size=q.page_size,

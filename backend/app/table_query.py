@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 from flask import Request
 
@@ -71,6 +71,24 @@ class FilterList:
         placeholders = ", ".join(f":{prefix}_{i}" for i in range(len(values)))
         not_ = "NOT " if self.op == 'is_not' else ""
         conditions.append(f"{column_expr} {not_}IN ({placeholders})")
+
+    def apply_orm(self, stmt: Any, column: Any) -> Any:
+        values: list[int] | list[str] = self.int_values or self.str_values
+        if not values:
+            return stmt
+        if self.op == 'is_not':
+            return stmt.where(column.not_in(values))
+        return stmt.where(column.in_(values))
+
+    def apply_status(self, conditions: list[str], status_sql: dict[str, str]) -> None:
+        parts = [status_sql[v] for v in self.str_values if v in status_sql]
+        if not parts:
+            return
+        inner = " OR ".join(parts)
+        if self.op == 'is_not':
+            conditions.append(f"NOT ({inner})")
+        else:
+            conditions.append(f"({inner})")
 
 
 # ---------------------------------------------------------------------------

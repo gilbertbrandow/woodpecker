@@ -364,8 +364,7 @@ def list_all_trainings(
     schedule_ids: FilterList | None = None,
     subset_ids: FilterList | None = None,
     user_ids: FilterList | None = None,
-    statuses: list[str] | None = None,
-    statuses_op: str = 'is',
+    status: FilterList | None = None,
     search: str | None = None,
     page: int = 1,
     page_size: int = 20,
@@ -381,11 +380,12 @@ def list_all_trainings(
     if user_ids is not None:
         user_ids.apply(conditions, params, "t.user_id", prefix="uid")
 
-    # Separate SQL-filterable statuses from computed ones
-    valid_sql_statuses = [s for s in (statuses or []) if s in _SQL_FILTERABLE]
-    has_computed_filter = statuses is not None and any(s in _COMPUTED_STATES for s in statuses)
+    # Separate SQL-filterable statuses from computed ones that need Python resolution.
+    _status_values = status.str_values if status is not None else []
+    valid_sql_statuses = [s for s in _status_values if s in _SQL_FILTERABLE]
+    has_computed_filter = status is not None and any(s in _COMPUTED_STATES for s in _status_values)
 
-    if statuses_op == 'is_not':
+    if status is not None and status.op == 'is_not':
         if has_computed_filter:
             # Computed states can't be safely negated in SQL — fetch all and filter in Python
             pass
@@ -573,9 +573,9 @@ def list_all_trainings(
             },
         })
 
-    if needs_python_pagination:
-        requested_states = set(statuses or [])
-        if statuses_op == 'is_not':
+    if needs_python_pagination and status is not None:
+        requested_states = set(status.str_values)
+        if status.op == 'is_not':
             items = [i for i in items if i["trainingState"]["state"] not in requested_states]  # type: ignore[index]
         else:
             items = [i for i in items if i["trainingState"]["state"] in requested_states]  # type: ignore[index]

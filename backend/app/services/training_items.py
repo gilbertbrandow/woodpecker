@@ -43,7 +43,7 @@ def get_attempt_history(
     page: int = 1,
     page_size: int = 20,
     user_ids: FilterList | None = None,
-    result_filter: list[str] | None = None,
+    result: FilterList | None = None,
 ) -> dict[str, object]:
     _require_own_attempt(training_item_id, user_id)
 
@@ -56,11 +56,8 @@ def get_attempt_history(
         .join(Schedule, Training.schedule_id == Schedule.id)
         .where(RunTrainingItem.training_item_id == training_item_id)
     )
-    if user_ids is not None and user_ids.int_values:
-        if user_ids.op == 'is_not':
-            context_stmt = context_stmt.where(Training.user_id.not_in(user_ids.int_values))
-        else:
-            context_stmt = context_stmt.where(Training.user_id.in_(user_ids.int_values))
+    if user_ids is not None:
+        context_stmt = user_ids.apply_orm(context_stmt, Training.user_id)
 
     context_rows = db.session.execute(context_stmt).all()
     if not context_rows:
@@ -93,8 +90,12 @@ def get_attempt_history(
 
         sorted_attempts = sorted(attempts_by_rp.get(rp.id, []), key=lambda a: a.try_number)
         for a in sorted_attempts:
-            if result_filter and a.status not in result_filter:
-                continue
+            if result is not None and result.str_values:
+                matches = a.status in result.str_values
+                if result.op == 'is_not':
+                    matches = not matches
+                if not matches:
+                    continue
             type_data = attempt_type_fields(sorted_attempts, a.try_number, total_queue)
             rows.append({
                 "attemptId": a.id,

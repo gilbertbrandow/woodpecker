@@ -11,14 +11,13 @@ training_items_bp = Blueprint("training_items", __name__, url_prefix="/training-
 @login_required
 def get_attempt_history(training_item_id: int) -> tuple[Response, int] | Response:
     q = TableQuery(request)
-    result_filter = q.str_filter("result").str_or_none
     result = training_items_svc.get_attempt_history(
         training_item_id,
         session["user_id"],
         page=q.page,
         page_size=q.page_size,
         user_ids=q.int_filter("userId"),
-        result_filter=result_filter,
+        result=q.str_filter("result"),
     )
     return jsonify(result)
 

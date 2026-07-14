@@ -1143,11 +1143,23 @@ def get_subsets_by_ids(ids: list[int]) -> list[dict[str, object]]:
     return [{"id": s.id, "name": s.name, "status": subset_status(s)} for s in rows]
 
 
+_SUBSET_STATUS_SQL: dict[str, str] = {
+    "locked": "sub.locked_at IS NOT NULL",
+    "filled": (
+        "sub.locked_at IS NULL"
+        " AND EXISTS (SELECT 1 FROM subset_training_items sti WHERE sti.subset_id = sub.id)"
+    ),
+    "draft": (
+        "sub.locked_at IS NULL"
+        " AND NOT EXISTS (SELECT 1 FROM subset_training_items sti WHERE sti.subset_id = sub.id)"
+    ),
+}
+
+
 def list_subsets(
     user_id: int,
     locked_only: bool = False,
-    statuses: list[str] | None = None,
-    statuses_op: str = 'is',
+    status: FilterList | None = None,
     search: str | None = None,
     page: int = 1,
     page_size: int = 20,
@@ -1172,26 +1184,8 @@ def list_subsets(
         date.apply(conditions, params, "DATE(COALESCE(sub.locked_at, sub.created_at))", prefix="date")
     if puzzle_count is not None:
         puzzle_count.apply(conditions, params, "COALESCE(sub.locked_puzzle_count, sub.puzzle_count)", prefix="pc", as_int=True)
-    if statuses and not locked_only:
-        status_parts: list[str] = []
-        if "locked" in statuses:
-            status_parts.append("sub.locked_at IS NOT NULL")
-        if "filled" in statuses:
-            status_parts.append(
-                "(sub.locked_at IS NULL AND EXISTS "
-                "(SELECT 1 FROM subset_training_items sti WHERE sti.subset_id = sub.id))"
-            )
-        if "draft" in statuses:
-            status_parts.append(
-                "(sub.locked_at IS NULL AND NOT EXISTS "
-                "(SELECT 1 FROM subset_training_items sti WHERE sti.subset_id = sub.id))"
-            )
-        if status_parts:
-            inner = ' OR '.join(status_parts)
-            if statuses_op == 'is_not':
-                conditions.append(f"NOT ({inner})")
-            else:
-                conditions.append(f"({inner})")
+    if status is not None and not locked_only:
+        status.apply_status(conditions, _SUBSET_STATUS_SQL)
 
     where_sql = "WHERE " + " AND ".join(conditions)
     base_sql = f"""

@@ -186,12 +186,17 @@ def get_schedule_insights(schedule_id: int, user_id: int) -> list[dict[str, obje
     return result
 
 
+_SCHEDULE_STATUS_SQL: dict[str, str] = {
+    "locked": "s.locked_at IS NOT NULL",
+    "draft": "s.locked_at IS NULL",
+}
+
+
 def list_schedules(
     user_id: int,
     subset_id: int | None = None,
     locked_only: bool = False,
-    statuses: list[str] | None = None,
-    statuses_op: str = 'is',
+    status: FilterList | None = None,
     search: str | None = None,
     page: int = 1,
     page_size: int = 20,
@@ -213,18 +218,8 @@ def list_schedules(
         params["search"] = f"%{search}%"
     if user_ids is not None:
         user_ids.apply(conditions, params, "s.user_id", prefix="uid")
-    if statuses and not locked_only:
-        status_parts: list[str] = []
-        if "locked" in statuses:
-            status_parts.append("s.locked_at IS NOT NULL")
-        if "draft" in statuses:
-            status_parts.append("s.locked_at IS NULL")
-        if status_parts:
-            inner = ' OR '.join(status_parts)
-            if statuses_op == 'is_not':
-                conditions.append(f"NOT ({inner})")
-            else:
-                conditions.append(f"({inner})")
+    if status is not None and not locked_only:
+        status.apply_status(conditions, _SCHEDULE_STATUS_SQL)
 
     where_sql = "WHERE " + " AND ".join(conditions)
     base_sql = f"""

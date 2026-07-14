@@ -52,12 +52,10 @@ def create_subset() -> tuple[Response, int]:
 @login_required
 def list_subsets() -> Response:
     q = TableQuery(request)
-    statuses = q.str_filter("status")
     result = subset_svc.list_subsets(
         session["user_id"],
         locked_only=q.flag("locked"),
-        statuses=statuses.str_or_none,
-        statuses_op=statuses.op,
+        status=q.str_filter("status"),
         search=q.q,
         page=q.page,
         page_size=q.page_size,
