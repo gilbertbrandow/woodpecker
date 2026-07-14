@@ -28,7 +28,7 @@ export function ScheduleNewPage(): React.ReactElement | null {
   useEffect(() => {
     if (!user) return
     api.subsets
-      .list({ lockedOnly: true })
+      .listLocked()
       .then((r) => setSubsets(r.items))
       .catch(() => {})
       .finally(() => setSubsetsLoading(false))

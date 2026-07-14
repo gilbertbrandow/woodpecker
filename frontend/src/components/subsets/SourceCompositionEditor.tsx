@@ -572,7 +572,7 @@ export function SourceCompositionEditor({
 
   useEffect(() => {
     api.subsets
-      .list({ lockedOnly: true, pageSize: 200 })
+      .listLocked(200)
       .then((r) => {
         setLockedSubsets(r.items);
         setSubsetMeta((prev) => {

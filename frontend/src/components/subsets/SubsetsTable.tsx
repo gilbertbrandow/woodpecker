@@ -36,7 +36,7 @@ const STATUS_OPTIONS = [
 export function SubsetsTable(): React.ReactElement {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const userFilterSpec = useUserFilterSpec('userIds', 'Creator')
+  const userFilterSpec = useUserFilterSpec('userId', 'Creator')
 
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -165,20 +165,12 @@ export function SubsetsTable(): React.ReactElement {
       refreshKey={refreshKey}
       filters={[
         userFilterSpec,
-        { type: 'multi', key: 'statuses', label: 'Status', options: STATUS_OPTIONS, icon: Activity },
+        { type: 'multi', key: 'status', label: 'Status', options: STATUS_OPTIONS, icon: Activity },
         { type: 'date', key: 'date', label: 'Date', icon: DATA_ICONS.started },
         { type: 'range', key: 'puzzleCount', label: 'Puzzles', min: 0, max: 1000, step: 25, icon: DATA_ICONS.puzzles, formatValue: (v) => v >= 1000 ? '1000+' : String(v) },
         { type: 'search', key: 'q' },
       ]}
-      fetchData={({ filters, page }) =>
-        api.subsets.list({
-          search: filters.q?.[0] || undefined,
-          page,
-          pageSize: PAGE_SIZE,
-          userIds: filters.userIds,
-          statuses: filters.statuses?.length ? filters.statuses : undefined,
-        })
-      }
+      fetchData={(params) => api.subsets.list(params)}
       onRowClick={(subset) => {
         if (blockNavRef.current) return
         void navigate({

@@ -1,6 +1,33 @@
 import { request } from './request'
 export { ApiError } from './request'
 
+// ---------------------------------------------------------------------------
+// Table params — shared serialiser for ServerDataTable → backend
+// ---------------------------------------------------------------------------
+
+// Structural alias for ServerDataTable's FetchParams — defined here to keep
+// api.ts free of UI-layer imports. All api list methods accept this type so
+// fetchData callbacks can call them directly with no manual field mapping.
+//
+// Wire format:
+//   page=1&pageSize=20&q=text
+//   userId=is&userId=1&userId=2   (repeated params; op prefix from entity/multi filters)
+//   status=is&status=active
+//
+// Filter key names must match the backend param names exactly. Search is
+// always keyed 'q' on both sides.
+export type TableParams = { filters: Record<string, string[]>; page: number; pageSize: number }
+
+// Serialises TableParams to URLSearchParams. Exported so callers can build
+// custom requests (e.g. with extra fixed params) without going through an
+// api method.
+export function tableParamsToUrl({ filters, page, pageSize }: TableParams): URLSearchParams {
+  const p = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+  for (const [key, values] of Object.entries(filters))
+    for (const v of values) p.append(key, v)
+  return p
+}
+
 export type AuthUser = {
   status: 'active'
   id: number
@@ -1078,24 +1105,10 @@ export const api = {
       request<AuthUser>('/settings', { method: 'PATCH', body: JSON.stringify(payload) }),
   },
   subsets: {
-    list: (opts?: {
-      lockedOnly?: boolean
-      statuses?: string[]
-      search?: string
-      page?: number
-      pageSize?: number
-      userIds?: string[]
-    }): Promise<{ items: Subset[]; total: number }> => {
-      const params = new URLSearchParams()
-      if (opts?.lockedOnly) params.set('locked', 'true')
-      if (opts?.statuses?.length) params.set('statuses', opts.statuses.join(','))
-      if (opts?.search) params.set('search', opts.search)
-      if (opts?.page !== undefined) params.set('page', String(opts.page))
-      if (opts?.pageSize !== undefined) params.set('pageSize', String(opts.pageSize))
-      if (opts?.userIds?.length) params.set('userIds', opts.userIds.join(','))
-      const qs = params.toString()
-      return request(`/subsets${qs ? `?${qs}` : ''}`)
-    },
+    list: (params: TableParams): Promise<{ items: Subset[]; total: number }> =>
+      request(`/subsets?${tableParamsToUrl(params)}`),
+    listLocked: (limit = 20): Promise<{ items: Subset[]; total: number }> =>
+      request(`/subsets?locked=true&pageSize=${limit}`),
     suggest: (limit = 8): Promise<SelectableSubset[]> =>
       request(`/subsets/suggest?limit=${limit}`),
     search: (q: string, limit = 10): Promise<SelectableSubset[]> =>
