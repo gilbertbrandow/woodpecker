@@ -17,7 +17,8 @@ def get_attempt_history(training_item_id: int) -> tuple[Response, int] | Respons
     if user_ids_vals and not all(uid.isdigit() for uid in user_ids_vals):
         raise ValidationError("Invalid parameter", "userId must be a positive integer.")
     user_ids = [int(uid) for uid in user_ids_vals] or None
-    result_values = request.args.getlist("result") or None
+    _, result_vals = parse_multi_filter(request.args.getlist("result"))
+    result_values = result_vals or None
     result = training_items_svc.get_attempt_history(
         training_item_id,
         session["user_id"],

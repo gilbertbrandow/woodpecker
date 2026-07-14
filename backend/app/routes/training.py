@@ -3,7 +3,7 @@ from flask import Blueprint, Response, jsonify, request, session
 from app.decorators import login_required
 from app.services import run as run_svc
 from app.services import training as training_svc
-from app.utils import parse_multi_filter
+from app.table_query import TableQuery
 
 training_bp = Blueprint("training", __name__, url_prefix="/training")
 
@@ -29,32 +29,24 @@ def list_my_trainings() -> Response:
 @training_bp.get("/all")
 @login_required
 def list_all_trainings() -> Response:
-    schedule_ids_op, schedule_ids_vals = parse_multi_filter(request.args.getlist("scheduleId"))
-    schedule_ids = [int(v) for v in schedule_ids_vals if v.isdigit()]
-    subset_ids_op, subset_ids_vals = parse_multi_filter(request.args.getlist("subsetId"))
-    subset_ids = [int(v) for v in subset_ids_vals if v.isdigit()]
-    user_ids_op, user_ids_vals = parse_multi_filter(request.args.getlist("userId"))
-    user_ids = [int(v) for v in user_ids_vals if v.isdigit()]
-    statuses_op, statuses_vals = parse_multi_filter(request.args.getlist("status"))
-    statuses = statuses_vals or None
-    search = request.args.get("search") or None
-    page_raw = request.args.get("page", "1")
-    page_size_raw = request.args.get("pageSize", "20")
-    page = max(1, int(page_raw)) if page_raw.isdigit() else 1
-    page_size = min(100, max(1, int(page_size_raw))) if page_size_raw.isdigit() else 20
+    q = TableQuery(request)
+    schedule_ids = q.int_filter("scheduleId")
+    subset_ids = q.int_filter("subsetId")
+    user_ids = q.int_filter("userId")
+    statuses = q.str_filter("status")
     tz_str = request.args.get("tz", "UTC")
     return jsonify(training_svc.list_all_trainings(
-        schedule_ids=schedule_ids or None,
-        schedule_ids_op=schedule_ids_op,
-        subset_ids=subset_ids or None,
-        subset_ids_op=subset_ids_op,
-        user_ids=user_ids or None,
-        user_ids_op=user_ids_op,
-        statuses=statuses,
-        statuses_op=statuses_op,
-        search=search,
-        page=page,
-        page_size=page_size,
+        schedule_ids=schedule_ids.int_or_none,
+        schedule_ids_op=schedule_ids.op,
+        subset_ids=subset_ids.int_or_none,
+        subset_ids_op=subset_ids.op,
+        user_ids=user_ids.int_or_none,
+        user_ids_op=user_ids.op,
+        statuses=statuses.str_or_none,
+        statuses_op=statuses.op,
+        search=q.q,
+        page=q.page,
+        page_size=q.page_size,
         tz_str=tz_str,
     ))
 

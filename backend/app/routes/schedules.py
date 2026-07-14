@@ -8,7 +8,7 @@ from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.user import User
 from app.services import schedule as schedule_svc
-from app.utils import parse_multi_filter
+from app.table_query import TableQuery
 from app.services import training as training_svc
 
 schedules_bp = Blueprint("schedules", __name__, url_prefix="/schedules")
@@ -66,32 +66,22 @@ def create_schedule() -> tuple[Response, int]:
 @schedules_bp.get("")
 @login_required
 def list_schedules() -> Response:
+    q = TableQuery(request)
     subset_id_raw = request.args.get("subsetId")
     subset_id = int(subset_id_raw) if subset_id_raw and subset_id_raw.isdigit() else None
-    locked_only = request.args.get("locked") == "true"
-    search = request.args.get("search") or None
-    page_raw = request.args.get("page")
-    page_size_raw = request.args.get("pageSize")
-    page = int(page_raw) if page_raw and page_raw.isdigit() else 1
-    page_size = int(page_size_raw) if page_size_raw and page_size_raw.isdigit() else 20
-    user_ids_raw = request.args.get("userIds")
-    user_ids_parts = [s.strip() for s in user_ids_raw.split(",") if s.strip()] if user_ids_raw else []
-    user_ids_op, user_ids_vals = parse_multi_filter(user_ids_parts)
-    user_ids = [int(x) for x in user_ids_vals if x.isdigit()] or None
-    statuses_raw = request.args.get("statuses")
-    statuses_parts = [s.strip() for s in statuses_raw.split(",") if s.strip()] if statuses_raw else []
-    statuses_op, statuses_vals = parse_multi_filter(statuses_parts)
+    user_ids = q.int_filter("userId")
+    statuses = q.str_filter("status")
     result = schedule_svc.list_schedules(
         session["user_id"],
         subset_id=subset_id,
-        locked_only=locked_only,
-        statuses=statuses_vals or None,
-        statuses_op=statuses_op,
-        search=search,
-        page=page,
-        page_size=page_size,
-        user_ids=user_ids,
-        user_ids_op=user_ids_op,
+        locked_only=q.flag("locked"),
+        statuses=statuses.str_or_none,
+        statuses_op=statuses.op,
+        search=q.q,
+        page=q.page,
+        page_size=q.page_size,
+        user_ids=user_ids.int_or_none,
+        user_ids_op=user_ids.op,
     )
     return jsonify(result)
 
