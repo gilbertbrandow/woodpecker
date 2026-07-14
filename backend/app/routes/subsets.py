@@ -54,8 +54,6 @@ def list_subsets() -> Response:
     q = TableQuery(request)
     user_ids = q.int_filter("userId")
     statuses = q.str_filter("status")
-    date = q.date_filter("date")
-    puzzle_count = q.range_filter("puzzleCount")
     result = subset_svc.list_subsets(
         session["user_id"],
         locked_only=q.flag("locked"),
@@ -66,12 +64,8 @@ def list_subsets() -> Response:
         page_size=q.page_size,
         user_ids=user_ids.int_or_none,
         user_ids_op=user_ids.op,
-        date_op=date.op if date.is_set else None,
-        date_from=date.from_date,
-        date_to=date.to_date,
-        puzzle_count_op=puzzle_count.op if puzzle_count.is_set else None,
-        puzzle_count_from=puzzle_count.from_val,
-        puzzle_count_to=puzzle_count.to_val,
+        date=q.date_filter("date"),
+        puzzle_count=q.range_filter("puzzleCount"),
     )
     return jsonify(result)
 

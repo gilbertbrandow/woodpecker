@@ -44,6 +44,29 @@ class DateFilter:
     def is_set(self) -> bool:
         return self.from_date is not None
 
+    def apply(
+        self,
+        conditions: list[str],
+        params: dict[str, object],
+        column_expr: str,
+        prefix: str = "date",
+    ) -> None:
+        if not self.is_set:
+            return
+        from_ = f":{prefix}_from"
+        to_ = f":{prefix}_to"
+        if self.op == 'after':
+            conditions.append(f"AND {column_expr} > {from_}")
+            params[f"{prefix}_from"] = self.from_date
+        elif self.op == 'before':
+            conditions.append(f"AND {column_expr} < {from_}")
+            params[f"{prefix}_from"] = self.from_date
+        elif self.op in ('between', 'not_between') and self.to_date:
+            not_ = "NOT " if self.op == 'not_between' else ""
+            conditions.append(f"AND {column_expr} {not_}BETWEEN {from_} AND {to_}")
+            params[f"{prefix}_from"] = self.from_date
+            params[f"{prefix}_to"] = self.to_date
+
 
 # ---------------------------------------------------------------------------
 # Range filter  (wire: puzzleCount=gte&puzzleCount=100  or  …=between&…=100&…=500)
@@ -51,6 +74,12 @@ class DateFilter:
 
 RangeOp = Literal['is', 'is_not', 'gt', 'gte', 'lt', 'lte', 'between', 'not_between']
 _RANGE_OPS: frozenset[str] = frozenset({'is', 'is_not', 'gt', 'gte', 'lt', 'lte', 'between', 'not_between'})
+
+
+_RANGE_OP_SQL: dict[str, str] = {
+    'is': '=', 'is_not': '!=',
+    'gt': '>', 'gte': '>=', 'lt': '<', 'lte': '<=',
+}
 
 
 @dataclass
@@ -62,6 +91,29 @@ class RangeFilter:
     @property
     def is_set(self) -> bool:
         return self.from_val is not None
+
+    def apply(
+        self,
+        conditions: list[str],
+        params: dict[str, object],
+        column_expr: str,
+        prefix: str = "range",
+        as_int: bool = False,
+    ) -> None:
+        if not self.is_set or self.from_val is None:
+            return
+        cast = int if as_int else float
+        from_ = f":{prefix}_from"
+        to_ = f":{prefix}_to"
+        if self.op in _RANGE_OP_SQL:
+            sql_op = _RANGE_OP_SQL[self.op]
+            conditions.append(f"AND {column_expr} {sql_op} {from_}")
+            params[f"{prefix}_from"] = cast(self.from_val)
+        elif self.op in ('between', 'not_between') and self.to_val is not None:
+            not_ = "NOT " if self.op == 'not_between' else ""
+            conditions.append(f"AND {column_expr} {not_}BETWEEN {from_} AND {to_}")
+            params[f"{prefix}_from"] = cast(self.from_val)
+            params[f"{prefix}_to"] = cast(self.to_val)
 
 
 # ---------------------------------------------------------------------------
