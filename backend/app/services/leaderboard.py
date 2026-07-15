@@ -252,11 +252,13 @@ def get_weekly_board(
                             ELSE NULL
                         END
                     )                           AS avg_rating,
-                    AVG(pa.time_spent_ms)       AS avg_solve_time_ms
+                    AVG(pa.time_spent_ms)       AS avg_solve_time_ms,
+                    ARRAY_AGG(DISTINCT s.name ORDER BY s.name) AS schedule_names
                 FROM training_attempts pa
                 JOIN run_training_items rp ON rp.id = pa.run_training_item_id
                 JOIN runs r       ON r.id = rp.run_id
                 JOIN trainings t  ON t.id = r.training_id
+                JOIN schedules s  ON s.id = t.schedule_id
                 JOIN training_items ti ON ti.id = rp.training_item_id
                 LEFT JOIN lichess_tactics lt  ON lt.training_item_id = rp.training_item_id
                 LEFT JOIN scraped_positional_puzzles spp ON spp.training_item_id = rp.training_item_id
@@ -282,7 +284,8 @@ def get_weekly_board(
                 COALESCE(ws.scraped_positional_count, 0)     AS scraped_positional_count,
                 COALESCE(ws.decoy_count, 0)                  AS decoy_count,
                 ws.avg_rating,
-                ws.avg_solve_time_ms
+                ws.avg_solve_time_ms,
+                COALESCE(ws.schedule_names, ARRAY[]::text[]) AS schedule_names
             FROM active_users au
             JOIN users u ON u.id = au.user_id
             LEFT JOIN weekly_stats ws ON ws.user_id = au.user_id
@@ -319,6 +322,7 @@ def get_weekly_board(
             "avgRating": float(row.avg_rating) if row.avg_rating is not None else None,
             "avgAccuracyPct": accuracy_pct,
             "avgSolveTimeMs": float(row.avg_solve_time_ms) if row.avg_solve_time_ms is not None else None,
+            "scheduleNames": list(row.schedule_names) if row.schedule_names else [],
         })
 
     total = len(result)

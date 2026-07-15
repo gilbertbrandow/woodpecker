@@ -274,3 +274,19 @@ class TestLeaderboardWeeklyFilters:
         user_ids = {i["userId"] for i in items}
         assert alice.id in user_ids
         assert bob.id not in user_ids
+
+    def test_schedule_names_field(self, client: FlaskClient, db_session) -> None:
+        # scheduleNames is derived from training_attempts (7-day window), not runs.
+        # A user appears via active_users (has runs) but scheduleNames is empty
+        # without completed puzzle attempts — verify the field is always present.
+        alice = _make_user(db_session, "lbw_sn_alice", "Alice SN")
+        _login(client, alice.id)
+        sched = _make_schedule(db_session, alice, name="Alpha")
+        _make_run(db_session, alice, sched)
+
+        resp = client.get(f"/leaderboard/weekly?userId=is&userId={alice.id}")
+
+        assert resp.status_code == 200
+        items = resp.get_json()["items"]
+        assert len(items) == 1
+        assert isinstance(items[0]["scheduleNames"], list)
