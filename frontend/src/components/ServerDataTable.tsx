@@ -60,7 +60,7 @@ export type ServerDataTableProps<T> = {
   columns: ColumnDef<T>[]
   // Declared filter slots, rendered left-to-right in the filter bar.
   filters?: FilterSpec[]
-  pageSize?: number
+  pageSize: number
   // Called whenever filter state is settled (after hydration on mount, on every change).
   // Receive fetchData via ref internally — identity changes don't trigger re-fetches.
   fetchData: (params: FetchParams) => Promise<{ items: T[]; total: number }>
@@ -83,7 +83,7 @@ export function ServerDataTable<T>({
   tableId,
   columns,
   filters: filtersProp,
-  pageSize: pageSizeProp = 20,
+  pageSize: pageSizeProp,
   fetchData,
   onDataChange,
   refreshKey,

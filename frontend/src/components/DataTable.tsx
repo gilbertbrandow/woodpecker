@@ -212,7 +212,7 @@ export function DataTable<T>({
                   table.setPageIndex(0)
                   setParams({ q: val || null, page: null })
                 }}
-                className="h-8 pl-7 text-sm sm:w-56"
+                className="h-8 pl-7 text-xs focus-visible:ring-offset-0 w-28 sm:w-36"
               />
             </div>
           )}
