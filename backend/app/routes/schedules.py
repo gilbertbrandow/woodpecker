@@ -67,17 +67,18 @@ def create_schedule() -> tuple[Response, int]:
 @login_required
 def list_schedules() -> Response:
     q = TableQuery(request)
-    subset_id_raw = request.args.get("subsetId")
-    subset_id = int(subset_id_raw) if subset_id_raw and subset_id_raw.isdigit() else None
     result = schedule_svc.list_schedules(
         session["user_id"],
-        subset_id=subset_id,
+        subset_ids=q.int_filter("subsetId"),
         locked_only=q.flag("locked"),
         status=q.str_filter("status"),
         search=q.q,
         page=q.page,
         page_size=q.page_size,
         user_ids=q.int_filter("userId"),
+        date=q.date_filter("date"),
+        run_count=q.range_filter("runCount"),
+        puzzle_count=q.range_filter("puzzleCount"),
     )
     return jsonify(result)
 
