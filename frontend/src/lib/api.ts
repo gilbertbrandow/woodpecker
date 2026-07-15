@@ -1306,11 +1306,8 @@ export const api = {
       }
       return request<{ items: LeaderboardRun[] }>(`/leaderboard?${p.toString()}`).then((r) => r.items)
     },
-    getWeekly: (scheduleIds?: number[]): Promise<WeeklyLeaderboardRow[]> => {
-      const p = new URLSearchParams({ pageSize: '100' })
-      if (scheduleIds?.length) scheduleIds.forEach((id) => p.append('scheduleId', String(id)))
-      return request<{ items: WeeklyLeaderboardRow[] }>(`/leaderboard/weekly?${p.toString()}`).then((r) => r.items)
-    },
+    getWeekly: (): Promise<WeeklyLeaderboardRow[]> =>
+      request<{ items: WeeklyLeaderboardRow[] }>('/leaderboard/weekly?pageSize=100').then((r) => r.items),
     listRuns: (params: TableParams): Promise<{ items: LeaderboardRun[]; total: number }> =>
       request(`/leaderboard?${tableParamsToUrl(params).toString()}`),
     listWeekly: (params: TableParams): Promise<{ items: WeeklyLeaderboardRow[]; total: number }> =>

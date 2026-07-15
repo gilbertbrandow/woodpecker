@@ -67,8 +67,8 @@ export function LeaderboardPage(): React.ReactElement | null {
   )
 
   const weeklyFilters = useMemo<FilterSpec[]>(
-    () => [{ type: 'search', key: 'q' }, scheduleFilterSpec, userFilterSpec],
-    [scheduleFilterSpec, userFilterSpec],
+    () => [{ type: 'search', key: 'q' }, userFilterSpec],
+    [userFilterSpec],
   )
 
   const fetchRunData = useCallback((params: FetchParams) => {

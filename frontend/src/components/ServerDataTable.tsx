@@ -350,10 +350,6 @@ export function ServerDataTable<T>({
     setPage(1)
   }, [])
 
-  // ---------------------------------------------------------------------------
-  // Active filter check — search is excluded intentionally: the Clear button
-  // and its visibility are scoped to chip filters only.
-  // ---------------------------------------------------------------------------
   const searchSpecs = specs.filter((s) => s.type === 'search')
   const chipSpecs = specs.filter((s) => s.type !== 'search')
 
