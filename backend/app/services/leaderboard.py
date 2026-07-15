@@ -1,24 +1,49 @@
+from __future__ import annotations
+
 import sqlalchemy as sa
 
 from app.extensions import db
+from app.table_query import FilterList
+
+_EMPTY_FILTER = FilterList(op='is')
+
+_STATUS_SQL = {
+    'active':    'r.completed_at IS NULL AND r.aborted_at IS NULL',
+    'completed': 'r.completed_at IS NOT NULL AND r.aborted_at IS NULL',
+    'aborted':   'r.aborted_at IS NOT NULL',
+}
 
 
 def get_run_board(
-    schedule_id: int | None = None,
+    schedule_filter: FilterList | None = None,
+    user_filter: FilterList | None = None,
+    status_filter: FilterList | None = None,
     run_index: int | None = None,
     exclude_aborted: bool = False,
-) -> list[dict[str, object]]:
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+) -> tuple[list[dict[str, object]], int]:
+    sch_f = schedule_filter or _EMPTY_FILTER
+    usr_f = user_filter or _EMPTY_FILTER
+    sta_f = status_filter or _EMPTY_FILTER
+
     conditions: list[str] = []
     params: dict[str, object] = {}
 
-    if schedule_id is not None:
-        conditions.append("t.schedule_id = :schedule_id")
-        params["schedule_id"] = schedule_id
+    sch_f.apply(conditions, params, "t.schedule_id", prefix="sched")
+    usr_f.apply(conditions, params, "u.id", prefix="usr")
+
     if run_index is not None:
         conditions.append("r.run_index = :run_index")
         params["run_index"] = run_index
     if exclude_aborted:
         conditions.append("r.aborted_at IS NULL")
+    if search:
+        conditions.append("(u.display_name ILIKE :q OR s.name ILIKE :q)")
+        params["q"] = f"%{search}%"
+
+    sta_f.apply_status(conditions, _STATUS_SQL)
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
@@ -169,18 +194,39 @@ def get_run_board(
             "avgTimeFailedMs": float(row.avg_time_failed_ms) if row.avg_time_failed_ms is not None else None,
             "deltaAccuracyPct": float(row.delta_accuracy_pct) if row.delta_accuracy_pct is not None else None,
         })
-    return result
+
+    total = len(result)
+    offset = (page - 1) * page_size
+    return result[offset:offset + page_size], total
 
 
-def get_weekly_board(schedule_ids: list[int] | None = None) -> list[dict[str, object]]:
+def get_weekly_board(
+    schedule_filter: FilterList | None = None,
+    user_filter: FilterList | None = None,
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+) -> tuple[list[dict[str, object]], int]:
+    sch_f = schedule_filter or _EMPTY_FILTER
+    usr_f = user_filter or _EMPTY_FILTER
+
+    sched_conditions: list[str] = []
     params: dict[str, object] = {}
+    sch_f.apply(sched_conditions, params, "t.schedule_id", prefix="sched")
+
     weekly_schedule_where = ""
     active_schedule_where = ""
+    if sched_conditions:
+        cond = " AND ".join(sched_conditions)
+        weekly_schedule_where = f"AND ({cond})"
+        active_schedule_where = f"WHERE ({cond})"
 
-    if schedule_ids:
-        weekly_schedule_where = "AND t.schedule_id = ANY(:schedule_ids)"
-        active_schedule_where = "WHERE t.schedule_id = ANY(:schedule_ids)"
-        params["schedule_ids"] = schedule_ids
+    outer_conditions: list[str] = []
+    usr_f.apply(outer_conditions, params, "u.id", prefix="usr")
+    if search:
+        outer_conditions.append("u.display_name ILIKE :q")
+        params["q"] = f"%{search}%"
+    outer_where = ("WHERE " + " AND ".join(outer_conditions)) if outer_conditions else ""
 
     rows = db.session.execute(
         sa.text(f"""
@@ -240,6 +286,7 @@ def get_weekly_board(schedule_ids: list[int] | None = None) -> list[dict[str, ob
             FROM active_users au
             JOIN users u ON u.id = au.user_id
             LEFT JOIN weekly_stats ws ON ws.user_id = au.user_id
+            {outer_where}
             ORDER BY COALESCE(ws.resolved_count, 0) DESC, u.display_name
         """),
         params,
@@ -273,4 +320,7 @@ def get_weekly_board(schedule_ids: list[int] | None = None) -> list[dict[str, ob
             "avgAccuracyPct": accuracy_pct,
             "avgSolveTimeMs": float(row.avg_solve_time_ms) if row.avg_solve_time_ms is not None else None,
         })
-    return result
+
+    total = len(result)
+    offset = (page - 1) * page_size
+    return result[offset:offset + page_size], total

@@ -11,6 +11,7 @@ from app.services.schedule_config import ScheduleConfig
 from app.services.training import get_training_progress
 from app.services.training_state import end_of_today_utc
 from app.services import leaderboard as leaderboard_svc
+from app.table_query import FilterList
 
 
 # ---------------------------------------------------------------------------
@@ -471,10 +472,11 @@ def get_dashboard(
         progress_card = None
 
     # --- Leaderboard (first page bundled to avoid waterfall on the frontend) ---
-    leaderboard = leaderboard_svc.get_run_board(
-        schedule_id=resolved["scheduleId"],
+    leaderboard, _ = leaderboard_svc.get_run_board(
+        schedule_filter=FilterList(op='is', int_values=[resolved["scheduleId"]]),
         run_index=run_index,
         exclude_aborted=True,
+        page_size=100,
     )
 
     return {
