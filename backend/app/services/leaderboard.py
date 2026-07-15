@@ -201,27 +201,15 @@ def get_run_board(
 
 
 def get_weekly_board(
-    schedule_filter: FilterList | None = None,
     user_filter: FilterList | None = None,
     search: str | None = None,
     page: int = 1,
     page_size: int = 50,
 ) -> tuple[list[dict[str, object]], int]:
-    sch_f = schedule_filter or _EMPTY_FILTER
     usr_f = user_filter or _EMPTY_FILTER
 
-    sched_conditions: list[str] = []
-    params: dict[str, object] = {}
-    sch_f.apply(sched_conditions, params, "t.schedule_id", prefix="sched")
-
-    weekly_schedule_where = ""
-    active_schedule_where = ""
-    if sched_conditions:
-        cond = " AND ".join(sched_conditions)
-        weekly_schedule_where = f"AND ({cond})"
-        active_schedule_where = f"WHERE ({cond})"
-
     outer_conditions: list[str] = []
+    params: dict[str, object] = {}
     usr_f.apply(outer_conditions, params, "u.id", prefix="usr")
     if search:
         outer_conditions.append("u.display_name ILIKE :q")
@@ -265,14 +253,12 @@ def get_weekly_board(
                 LEFT JOIN scraped_positional_difficulties spd ON spd.id = spp.difficulty_id
                 WHERE pa.completed_at >= NOW() - INTERVAL '7 days'
                   AND pa.status != 'in_progress'
-                  {weekly_schedule_where}
                 GROUP BY t.user_id
             ),
             active_users AS (
                 SELECT DISTINCT t.user_id
                 FROM trainings t
                 JOIN runs r ON r.training_id = t.id AND r.aborted_at IS NULL
-                {active_schedule_where}
             )
             SELECT
                 u.id                                     AS user_id,
