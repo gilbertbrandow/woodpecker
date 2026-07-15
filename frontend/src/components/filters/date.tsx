@@ -1,10 +1,11 @@
 import { Calendar } from '../ui/calendar'
 import type { FilterHandler, DateFilterSpec, DateVal } from './types'
 import { isoToDate, dateToIso, fmtDate } from './types'
+import { withNullable } from './null-ops'
 
 const DATE_OPS = ['after', 'before', 'between', 'not_between'] as const
 
-export const dateHandler: FilterHandler<DateVal | null, DateFilterSpec> = {
+const baseDateHandler: FilterHandler<DateVal | null, DateFilterSpec> = {
   defaultOperator: 'after',
   operatorOptions: [
     { value: 'after', label: 'after', symbol: '>' },
@@ -23,7 +24,7 @@ export const dateHandler: FilterHandler<DateVal | null, DateFilterSpec> = {
   fromUrl: (tokens) => {
     if (tokens.length < 2) return null
     const [op, from, to] = tokens
-    if (!DATE_OPS.includes(op as DateVal['op'])) return null
+    if (!DATE_OPS.includes(op as (typeof DATE_OPS)[number])) return null
     return { op: op as DateVal['op'], from, to }
   },
   getFetchParams: (value) => {
@@ -115,3 +116,5 @@ export const dateHandler: FilterHandler<DateVal | null, DateFilterSpec> = {
   getLabel: (spec) => spec.label,
   getIcon: (spec) => spec.icon ?? null,
 }
+
+export const dateHandler = withNullable(baseDateHandler, (op) => ({ op, from: '' }))

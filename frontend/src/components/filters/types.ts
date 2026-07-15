@@ -9,12 +9,21 @@ export type SearchFilterSpec = {
   key: string
 }
 
+export type OperatorOption = {
+  value: string
+  label: string
+  symbol?: string
+  symbolPlural?: string
+  icon?: React.ReactNode
+}
+
 export type MultiFilterSpec = {
   type: 'multi'
   key: string
   label: string
   options: { label: string; value: string; icon: React.ReactNode }[]
   icon?: React.ComponentType<{ className?: string }>
+  nullable?: boolean
 }
 
 export type CustomFilterSpec<TItem> = {
@@ -48,29 +57,31 @@ export type EntityFilterSpec<TItem> = {
   renderContent?: (value: TItem[], onChange: (items: TItem[]) => void) => React.ReactNode
   getChipLabel?: (items: TItem[]) => string
   renderChipValue?: (items: TItem[]) => React.ReactNode
+  nullable?: boolean
 }
 
-export type EntityVal = { op: 'is' | 'is_not'; items: unknown[] }
+export type EntityVal = { op: 'is' | 'is_not' | 'set' | 'not_set'; items: unknown[] }
 
 export type DateVal = {
-  op: 'after' | 'before' | 'between' | 'not_between'
+  op: 'after' | 'before' | 'between' | 'not_between' | 'set' | 'not_set'
   from: string
   to?: string
 }
 
 export type RangeVal = {
-  op: 'is' | 'is_not' | 'gt' | 'gte' | 'lt' | 'lte' | 'between' | 'not_between'
+  op: 'is' | 'is_not' | 'gt' | 'gte' | 'lt' | 'lte' | 'between' | 'not_between' | 'set' | 'not_set'
   from?: number
   to?: number
 }
 
-export type MultiVal = { op: 'is' | 'is_not'; values: string[] }
+export type MultiVal = { op: 'is' | 'is_not' | 'set' | 'not_set'; values: string[] }
 
 export type DateFilterSpec = {
   type: 'date'
   key: string
   label: string
   icon?: React.ComponentType<{ className?: string }>
+  nullable?: boolean
 }
 
 export type RangeFilterSpec = {
@@ -82,6 +93,7 @@ export type RangeFilterSpec = {
   step?: number
   icon?: React.ComponentType<{ className?: string }>
   formatValue?: (value: number) => string
+  nullable?: boolean
 }
 
 export type FilterSpec =
@@ -108,7 +120,9 @@ export interface FilterHandler<TValue = unknown, TSpec = FilterSpec> {
   /** What to include in fetchData filters. Same shape as toUrl for date/range/search. */
   getFetchParams(value: TValue, spec: TSpec): string[]
   getOperator(value: TValue): string
-  operatorOptions: { value: string; label: string; symbol?: string; symbolPlural?: string }[]
+  operatorOptions: OperatorOption[]
+  /** Override to return spec-dependent operator options (e.g. appending null-ops when spec.nullable). */
+  getOperatorOptions?(spec: TSpec): OperatorOption[]
   defaultOperator: string
   onOperatorSwitch(
     newOp: string,
@@ -122,6 +136,8 @@ export interface FilterHandler<TValue = unknown, TSpec = FilterSpec> {
   getIcon(spec: TSpec): React.ComponentType<{ className?: string }> | null
   /** For pluralised operator labels ("is any of"). Return number of active selections. */
   selectionCount?(value: TValue): number
+  /** Return false to remove the value box entirely (no popover, no chevron). */
+  isValueEditable?(value: TValue): boolean
 }
 
 // ---------------------------------------------------------------------------

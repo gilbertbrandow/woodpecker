@@ -158,7 +158,7 @@ export function FilterChipBar({
         if (!showChip) return null
 
         const operator = handler.getOperator(rawValue)
-        const operatorOptions = handler.operatorOptions
+        const operatorOptions = handler.getOperatorOptions?.(spec) ?? handler.operatorOptions
         const selectionCount = handler.selectionCount?.(rawValue) ?? 1
         const operatorOpt = operatorOptions.find((o) => o.value === operator)
         const baseLabel = operatorOpt?.label ?? operator
@@ -232,9 +232,9 @@ export function FilterChipBar({
                                 operator === op.value ? 'opacity-100' : 'opacity-0',
                               )}
                             />
-                            {symbol && (
-                              <span className="mr-2 w-3 text-center text-muted-foreground">
-                                {symbol}
+                            {(op.icon || symbol) && (
+                              <span className="mr-2 flex w-3 items-center justify-center text-center text-muted-foreground">
+                                {op.icon ?? symbol}
                               </span>
                             )}
                             {label}
@@ -248,23 +248,25 @@ export function FilterChipBar({
             </Popover>
 
             {/* Value selector */}
-            <Popover
-              open={valueOpenKey === spec.key}
-              onOpenChange={(open) => handleValueOpenChange(spec, open)}
-            >
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className="flex items-center gap-1 px-2 transition-colors hover:bg-accent"
-                >
-                  {handler.renderChipValue(rawValue, spec)}
-                  <ChevronDown className="h-2.5 w-2.5 opacity-40" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="p-0">
-                {handler.renderEditor(rawValue, (v) => onChange(spec.key, v), spec)}
-              </PopoverContent>
-            </Popover>
+            {(handler.isValueEditable?.(rawValue) ?? true) && (
+              <Popover
+                open={valueOpenKey === spec.key}
+                onOpenChange={(open) => handleValueOpenChange(spec, open)}
+              >
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1 border-r border-input px-2 transition-colors hover:bg-accent"
+                  >
+                    {handler.renderChipValue(rawValue, spec)}
+                    <ChevronDown className="h-2.5 w-2.5 opacity-40" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="p-0">
+                  {handler.renderEditor(rawValue, (v) => onChange(spec.key, v), spec)}
+                </PopoverContent>
+              </Popover>
+            )}
 
             {/* Remove */}
             <button
@@ -273,7 +275,7 @@ export function FilterChipBar({
                 onChange(spec.key, handler.defaultValue(spec))
                 if (pendingKey === spec.key) setPendingKey(null)
               }}
-              className="flex items-center border-l border-input px-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="flex items-center px-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               aria-label={`Remove ${handler.getLabel(spec)} filter`}
             >
               <X className="h-3 w-3" />

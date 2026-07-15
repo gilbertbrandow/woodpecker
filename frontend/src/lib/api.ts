@@ -497,6 +497,7 @@ export type MyTrainingSummary = {
 
 export type AllTrainingSummary = MyTrainingSummary & {
   user: { id: number; displayName: string; avatarUrl: string | null }
+  subsetName: string
 }
 
 export type TrainingPage = {

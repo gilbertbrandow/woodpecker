@@ -1,6 +1,7 @@
 import { Slider } from '../ui/slider'
 import { Input } from '../ui/input'
 import type { FilterHandler, RangeFilterSpec, RangeVal } from './types'
+import { withNullable } from './null-ops'
 
 const RANGE_OPS = ['is', 'is_not', 'gt', 'gte', 'lt', 'lte', 'between', 'not_between'] as const
 
@@ -8,7 +9,7 @@ function clamp(v: number, lo: number, hi: number) {
   return Math.min(Math.max(v, lo), hi)
 }
 
-export const rangeHandler: FilterHandler<RangeVal | null, RangeFilterSpec> = {
+const baseRangeHandler: FilterHandler<RangeVal | null, RangeFilterSpec> = {
   defaultOperator: 'gte',
   operatorOptions: [
     { value: 'is', label: 'is', symbol: '=' },
@@ -32,7 +33,7 @@ export const rangeHandler: FilterHandler<RangeVal | null, RangeFilterSpec> = {
   fromUrl: (tokens) => {
     if (tokens.length < 2) return null
     const [op, fromStr, toStr] = tokens
-    if (!RANGE_OPS.includes(op as RangeVal['op'])) return null
+    if (!RANGE_OPS.includes(op as (typeof RANGE_OPS)[number])) return null
     const from = parseFloat(fromStr)
     if (isNaN(from)) return null
     const to = toStr !== undefined ? parseFloat(toStr) : undefined
@@ -155,3 +156,5 @@ export const rangeHandler: FilterHandler<RangeVal | null, RangeFilterSpec> = {
   getLabel: (spec) => spec.label,
   getIcon: (spec) => spec.icon ?? null,
 }
+
+export const rangeHandler = withNullable(baseRangeHandler, (op) => ({ op } as RangeVal))

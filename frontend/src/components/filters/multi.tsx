@@ -2,8 +2,9 @@ import { Check } from 'lucide-react'
 import { Command, CommandList, CommandGroup, CommandItem } from '../ui/command'
 import { cn } from '../../lib/utils'
 import type { FilterHandler, MultiFilterSpec, MultiVal } from './types'
+import { withNullable } from './null-ops'
 
-export const multiHandler: FilterHandler<MultiVal, MultiFilterSpec> = {
+const baseMultiHandler: FilterHandler<MultiVal, MultiFilterSpec> = {
   defaultOperator: 'is',
   operatorOptions: [
     { value: 'is', label: 'is', symbol: '=', symbolPlural: '∈' },
@@ -99,3 +100,8 @@ export const multiHandler: FilterHandler<MultiVal, MultiFilterSpec> = {
   getIcon: (spec) => spec.icon ?? null,
   selectionCount: (value) => value.values.length,
 }
+
+export const multiHandler = withNullable(
+  baseMultiHandler,
+  (op) => ({ op, values: [] } as MultiVal),
+)

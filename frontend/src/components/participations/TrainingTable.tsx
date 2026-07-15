@@ -121,6 +121,23 @@ export function TrainingTable({
                 {row.original.scheduleName}
               </Link>
             ),
+          }),
+          col<AllTrainingSummary>({
+            id: "subset",
+            accessorFn: (row) => row.subsetName,
+            header: "Subset",
+            meta: { icon: CONCEPT_ICONS.Subset },
+            cell: ({ row }) => (
+              <Link
+                to="/app/subsets/$subsetId"
+                params={{ subsetId: String(row.original.subsetId) }}
+                className="font-medium hover:underline"
+                title={row.original.subsetName}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {row.original.subsetName}
+              </Link>
+            ),
           })]
         : []),
       col({
@@ -161,6 +178,8 @@ export function TrainingTable({
         subsetFilterSpec,
         ...(scheduleId === undefined ? [scheduleFilterSpec] : []),
         { type: 'multi', key: 'status', label: 'Status', options: STATUS_OPTIONS, icon: DATA_ICONS.status },
+        { type: 'date', key: 'startedAt', label: 'Started', icon: DATA_ICONS.started },
+        { type: 'date', key: 'completedAt', label: 'Finished', icon: DATA_ICONS.finished, nullable: true },
         { type: 'search', key: 'q' },
       ]}
       fetchData={(params) =>

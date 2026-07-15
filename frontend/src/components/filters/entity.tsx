@@ -1,6 +1,7 @@
 import type { FilterHandler, EntityFilterSpec, EntityVal } from './types'
+import { withNullable } from './null-ops'
 
-export const entityHandler: FilterHandler<EntityVal, EntityFilterSpec<unknown>> = {
+const baseEntityHandler: FilterHandler<EntityVal, EntityFilterSpec<unknown>> = {
   defaultOperator: 'is',
   operatorOptions: [
     { value: 'is', label: 'is', symbol: '=', symbolPlural: '∈' },
@@ -55,3 +56,8 @@ export const entityHandler: FilterHandler<EntityVal, EntityFilterSpec<unknown>> 
   getIcon: (spec) => spec.icon ?? null,
   selectionCount: (value) => value.items.length,
 }
+
+export const entityHandler = withNullable(
+  baseEntityHandler,
+  (op) => ({ op, items: [] } as EntityVal),
+)
