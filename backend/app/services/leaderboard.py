@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 
 from app.extensions import db
-from app.table_query import FilterList
+from app.table_query import FilterList, RangeFilter, SetFilter
 
 _EMPTY_FILTER = FilterList(op='is')
 
@@ -202,6 +202,9 @@ def get_run_board(
 
 def get_weekly_board(
     user_filter: FilterList | None = None,
+    puzzles_filter: RangeFilter | None = None,
+    avg_rating_filter: RangeFilter | None = None,
+    schedules_filter: SetFilter | None = None,
     search: str | None = None,
     page: int = 1,
     page_size: int = 50,
@@ -214,6 +217,12 @@ def get_weekly_board(
     if search:
         outer_conditions.append("u.display_name ILIKE :q")
         params["q"] = f"%{search}%"
+    if puzzles_filter:
+        puzzles_filter.apply(outer_conditions, params, "COALESCE(ws.resolved_count, 0)", prefix="puzzles", as_int=True)
+    if avg_rating_filter:
+        avg_rating_filter.apply(outer_conditions, params, "ws.avg_rating", prefix="avg_rating")
+    if schedules_filter:
+        schedules_filter.apply(outer_conditions, params, "ws.schedule_ids", prefix="schedules")
     outer_where = ("WHERE " + " AND ".join(outer_conditions)) if outer_conditions else ""
 
     rows = db.session.execute(
@@ -241,7 +250,8 @@ def get_weekly_board(
                         END
                     )                           AS avg_rating,
                     AVG(pa.time_spent_ms)       AS avg_solve_time_ms,
-                    ARRAY_AGG(DISTINCT s.name ORDER BY s.name) AS schedule_names
+                    ARRAY_AGG(DISTINCT s.name ORDER BY s.name)           AS schedule_names,
+                    ARRAY_AGG(DISTINCT t.schedule_id ORDER BY t.schedule_id) AS schedule_ids
                 FROM training_attempts pa
                 JOIN run_training_items rp ON rp.id = pa.run_training_item_id
                 JOIN runs r       ON r.id = rp.run_id

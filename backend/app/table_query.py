@@ -188,6 +188,46 @@ class RangeFilter:
 
 
 # ---------------------------------------------------------------------------
+# Set filter  (wire: scheduleIds=overlaps&scheduleIds=1&scheduleIds=2)
+# Operators match PostgreSQL integer-array ops: &&, @>, <@, and NOT &&.
+# ---------------------------------------------------------------------------
+
+SetOp = Literal['overlaps', 'superset', 'subset', 'disjoint']
+_SET_OPS: frozenset[str] = frozenset({'overlaps', 'superset', 'subset', 'disjoint'})
+
+
+@dataclass
+class SetFilter:
+    op: SetOp = 'overlaps'
+    int_values: list[int] = field(default_factory=list)
+
+    @property
+    def is_set(self) -> bool:
+        return bool(self.int_values)
+
+    def apply(
+        self,
+        conditions: list[str],
+        params: dict[str, object],
+        column_expr: str,
+        prefix: str = 'set',
+    ) -> None:
+        if not self.is_set:
+            return
+        for i, v in enumerate(self.int_values):
+            params[f'{prefix}_{i}'] = v
+        arr = f"ARRAY[{', '.join(f':{prefix}_{i}' for i in range(len(self.int_values)))}]::integer[]"
+        if self.op == 'overlaps':
+            conditions.append(f"{column_expr} && {arr}")
+        elif self.op == 'superset':
+            conditions.append(f"{column_expr} @> {arr}")
+        elif self.op == 'subset':
+            conditions.append(f"{column_expr} <@ {arr}")
+        elif self.op == 'disjoint':
+            conditions.append(f"NOT ({column_expr} && {arr})")
+
+
+# ---------------------------------------------------------------------------
 # TableQuery — parses standard ServerDataTable params from a Flask request
 # ---------------------------------------------------------------------------
 
@@ -273,3 +313,16 @@ class TableQuery:
             except ValueError:
                 pass
         return RangeFilter(op=op, from_val=from_val, to_val=to_val)
+
+    def set_filter(self, key: str) -> SetFilter:
+        tokens = self._args.getlist(key)
+        if not tokens or tokens[0] not in _SET_OPS:
+            return SetFilter()
+        op = cast(SetOp, tokens[0])
+        int_vals: list[int] = []
+        for t in tokens[1:]:
+            try:
+                int_vals.append(int(t))
+            except ValueError:
+                pass
+        return SetFilter(op=op, int_values=int_vals)

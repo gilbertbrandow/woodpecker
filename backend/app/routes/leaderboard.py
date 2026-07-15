@@ -58,6 +58,9 @@ def get_weekly_leaderboard() -> Response | tuple[Response, int]:
     q = TableQuery(request)
     items, total = leaderboard_svc.get_weekly_board(
         user_filter=q.int_filter("userId"),
+        puzzles_filter=q.range_filter("puzzles"),
+        avg_rating_filter=q.range_filter("avgRating"),
+        schedules_filter=q.set_filter("scheduleIds"),
         search=q.q,
         page=q.page,
         page_size=q.page_size,
