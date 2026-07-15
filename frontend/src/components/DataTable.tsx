@@ -251,7 +251,7 @@ export function DataTable<T>({
                         )}
                       </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-40">
+                    <DropdownMenuContent align="end" className="min-w-40 w-max">
                       {hideableCols.map((col) => {
                         const header = col.columnDef.header
                         const label = typeof header === 'string' && header.trim()

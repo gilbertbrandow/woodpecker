@@ -340,28 +340,31 @@ export function ServerDataTable<T>({
   }, [])
 
   const handleClearFilters = useCallback(() => {
-    const cleared: FilterValues = {}
-    for (const spec of specsRef.current) {
-      cleared[spec.key] = getHandler(spec).defaultValue(spec)
-    }
-    setFilterValues(cleared)
+    setFilterValues((prev) => {
+      const next = { ...prev }
+      for (const spec of specsRef.current) {
+        if (spec.type !== 'search') next[spec.key] = getHandler(spec).defaultValue(spec)
+      }
+      return next
+    })
     setPage(1)
   }, [])
 
   // ---------------------------------------------------------------------------
-  // Active filter check
+  // Active filter check — search is excluded intentionally: the Clear button
+  // and its visibility are scoped to chip filters only.
   // ---------------------------------------------------------------------------
+  const searchSpecs = specs.filter((s) => s.type === 'search')
+  const chipSpecs = specs.filter((s) => s.type !== 'search')
+
   const hasActiveFilters = useMemo(
     () =>
-      specs.some((spec) => {
+      chipSpecs.some((spec) => {
         const handler = getHandler(spec)
         return !handler.isEmpty(filterValues[spec.key] ?? handler.defaultValue(spec))
       }),
-    [filterValues], // specs is stable
+    [filterValues], // specs and chipSpecs are stable
   )
-
-  const searchSpecs = specs.filter((s) => s.type === 'search')
-  const chipSpecs = specs.filter((s) => s.type !== 'search')
 
   const searchSlot = searchSpecs.length > 0 ? (
     <>
