@@ -584,6 +584,7 @@ export type WeeklyLeaderboardRow = {
   avgRating: number | null
   avgAccuracyPct: number | null
   avgSolveTimeMs: number | null
+  scheduleNames: string[]
 }
 
 export type PositionStatus =

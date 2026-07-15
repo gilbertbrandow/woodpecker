@@ -270,6 +270,24 @@ export function LeaderboardPage(): React.ReactElement | null {
       ),
     },
     {
+      id: 'schedules',
+      header: 'Schedules',
+      meta: { icon: CONCEPT_ICONS.Schedule, defaultHidden: true },
+      enableSorting: false,
+      cell: ({ row }) => {
+        const names = row.original.scheduleNames
+        if (names.length === 0) return <span className="text-muted-foreground">—</span>
+        return (
+          <span className="flex items-center gap-1">
+            <span className="truncate max-w-32">{names[0]}</span>
+            {names.length > 1 && (
+              <span className="text-xs text-muted-foreground shrink-0">+{names.length - 1}</span>
+            )}
+          </span>
+        )
+      },
+    },
+    {
       id: 'puzzlesAttempted',
       accessorFn: (r) => r.puzzlesAttempted,
       header: 'Puzzles',

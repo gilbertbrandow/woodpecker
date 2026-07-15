@@ -45,6 +45,7 @@ declare module '@tanstack/react-table' {
     className?: string
     rankDesc?: boolean
     icon?: React.ComponentType<{ className?: string }>
+    defaultHidden?: boolean
   }
 }
 
@@ -52,6 +53,7 @@ type ColMeta = {
   className?: string
   rankDesc?: boolean
   icon?: React.ComponentType<{ className?: string }>
+  defaultHidden?: boolean
 }
 
 export function col<T>(
@@ -141,6 +143,12 @@ export function DataTable<T>({
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
     const hidden = getMultiParam('hidden')
     const init: VisibilityState = {}
+    // meta.defaultHidden columns start hidden unless URL overrides them visible
+    for (const col of columns) {
+      if (col.id && (col.meta as ColMeta | undefined)?.defaultHidden) {
+        init[col.id] = false
+      }
+    }
     hidden.forEach((id) => { init[id] = false })
     return init
   })
@@ -228,7 +236,10 @@ export function DataTable<T>({
             return (
               <div className="ml-auto flex items-center gap-2">
                 {hideableCols.length > 0 && (() => {
-                  const hiddenCount = hideableCols.filter((c) => !c.getIsVisible()).length
+                  const deviatingCount = hideableCols.filter((c) => {
+                    const defaultHidden = !!(c.columnDef.meta as ColMeta | undefined)?.defaultHidden
+                    return c.getIsVisible() === defaultHidden
+                  }).length
                   return (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -237,16 +248,16 @@ export function DataTable<T>({
                         className={cn(
                           'flex h-8 items-center gap-1.5 rounded-md border text-xs transition-colors hover:bg-accent hover:text-foreground',
                           compact ? 'px-2' : 'px-2.5',
-                          hiddenCount > 0
+                          deviatingCount > 0
                             ? 'border-foreground/25 text-foreground'
                             : 'border-input text-muted-foreground',
                         )}
                       >
                         <Columns3 className="h-3 w-3" />
                         {!compact && 'Columns'}
-                        {hiddenCount > 0 && (
+                        {deviatingCount > 0 && (
                           <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium leading-none text-primary-foreground tabular-nums">
-                            {hiddenCount}
+                            {deviatingCount}
                           </span>
                         )}
                       </button>
