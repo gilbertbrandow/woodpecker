@@ -11,7 +11,7 @@ import {
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table'
-import { ArrowUp, ArrowDown, ArrowUpDown, Search, Loader2, ChevronLeft, ChevronRight, Columns3, RotateCcw } from 'lucide-react'
+import { ArrowUp, ArrowDown, ArrowUpDown, Search, Loader2, ChevronLeft, ChevronRight, Columns3, RotateCcw, EyeOff } from 'lucide-react'
 import { Input } from './ui/input'
 import {
   Table,
@@ -38,6 +38,7 @@ import {
 } from './ui/dropdown-menu'
 import { cn } from '../lib/utils'
 import { useTableUrlSync } from '../hooks/useTableUrlSync'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip'
 
 declare module '@tanstack/react-table' {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -268,7 +269,9 @@ export function DataTable<T>({
                         const label = typeof header === 'string' && header.trim()
                           ? header
                           : col.id.charAt(0).toUpperCase() + col.id.slice(1)
-                        const ColIcon = (col.columnDef.meta as ColMeta | undefined)?.icon
+                        const colMeta = col.columnDef.meta as ColMeta | undefined
+                        const ColIcon = colMeta?.icon
+                        const isDefaultHidden = !!colMeta?.defaultHidden
                         return (
                           <DropdownMenuCheckboxItem
                             key={col.id}
@@ -279,12 +282,28 @@ export function DataTable<T>({
                           >
                             {ColIcon && <ColIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
                             {label}
+                            {isDefaultHidden && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <EyeOff className="ml-auto h-3 w-3 shrink-0 text-muted-foreground/60" />
+                                </TooltipTrigger>
+                                <TooltipContent side="right">Hidden by default</TooltipContent>
+                              </Tooltip>
+                            )}
                           </DropdownMenuCheckboxItem>
                         )
                       })}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        onClick={() => table.resetColumnVisibility()}
+                        onClick={() => {
+                          const defaultState: VisibilityState = {}
+                          for (const c of hideableCols) {
+                            if ((c.columnDef.meta as ColMeta | undefined)?.defaultHidden) {
+                              defaultState[c.id] = false
+                            }
+                          }
+                          table.setColumnVisibility(defaultState)
+                        }}
                         className="text-xs"
                       >
                         <RotateCcw className="mr-2 h-3 w-3" />
