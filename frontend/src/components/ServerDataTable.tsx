@@ -71,7 +71,7 @@ export type ServerDataTableProps<T> = {
   onRowClick?: (row: T) => void
   getRowClassName?: (row: T) => string
   emptyMessage?: React.ReactNode
-  initialSorting?: SortingState
+  initialSorting: SortingState
   compact?: boolean
 }
 

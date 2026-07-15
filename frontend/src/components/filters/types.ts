@@ -13,7 +13,7 @@ export type MultiFilterSpec = {
   type: 'multi'
   key: string
   label: string
-  options: { label: string; value: string; icon?: React.ReactNode }[]
+  options: { label: string; value: string; icon: React.ReactNode }[]
   icon?: React.ComponentType<{ className?: string }>
 }
 

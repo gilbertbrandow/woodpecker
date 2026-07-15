@@ -17,6 +17,7 @@ import { StatusBadge, trainingStateToStatusValue } from "../StatusBadge";
 import { ProgressBar } from "../ProgressBar";
 import { UserAvatar } from "../UserAvatar";
 import { ServerDataTable } from "../ServerDataTable";
+import { col } from "../DataTable";
 import { api, type AllTrainingSummary } from "../../lib/api";
 import { useUserFilterSpec } from "../../hooks/useUserFilterSpec";
 import { useSubsetFilterSpec } from "../../hooks/useSubsetFilterSpec";
@@ -55,7 +56,7 @@ export function TrainingTable({
 
   const columns = useMemo<ColumnDef<AllTrainingSummary>[]>(
     () => [
-      {
+      col({
         id: "user",
         accessorFn: (row) => row.user.displayName,
         header: "User",
@@ -67,8 +68,8 @@ export function TrainingTable({
             avatarUrl={row.original.user.avatarUrl}
           />
         ),
-      },
-      {
+      }),
+      col({
         accessorKey: "status",
         header: "Status",
         meta: { icon: DATA_ICONS.status },
@@ -80,8 +81,8 @@ export function TrainingTable({
             )}
           />
         ),
-      },
-      {
+      }),
+      col({
         id: "progress",
         accessorFn: (row) =>
           row.totalPuzzles > 0 ? row.completedPuzzles / row.totalPuzzles : 0,
@@ -102,29 +103,27 @@ export function TrainingTable({
             />
           );
         },
-      },
+      }),
       ...(!hideSchedule
-        ? ([
-            {
-              id: "schedule",
-              accessorFn: (row: AllTrainingSummary) => row.scheduleName,
-              header: "Schedule",
-              meta: { icon: CONCEPT_ICONS.Schedule },
-              cell: ({ row }: { row: { original: AllTrainingSummary } }) => (
-                <Link
-                  to="/app/schedules/$scheduleId"
-                  params={{ scheduleId: String(row.original.scheduleId) }}
-                  className="font-medium hover:underline"
-                  title={row.original.scheduleName}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {row.original.scheduleName}
-                </Link>
-              ),
-            },
-          ] as ColumnDef<AllTrainingSummary>[])
+        ? [col<AllTrainingSummary>({
+            id: "schedule",
+            accessorFn: (row) => row.scheduleName,
+            header: "Schedule",
+            meta: { icon: CONCEPT_ICONS.Schedule },
+            cell: ({ row }) => (
+              <Link
+                to="/app/schedules/$scheduleId"
+                params={{ scheduleId: String(row.original.scheduleId) }}
+                className="font-medium hover:underline"
+                title={row.original.scheduleName}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {row.original.scheduleName}
+              </Link>
+            ),
+          })]
         : []),
-      {
+      col({
         id: "startedAt",
         accessorFn: (row) => new Date(row.startedAt).getTime(),
         header: "Started",
@@ -134,8 +133,8 @@ export function TrainingTable({
             {formatDate(row.original.startedAt)}
           </span>
         ),
-      },
-      {
+      }),
+      col({
         id: "completedAt",
         accessorFn: (row) =>
           row.completedAt ? new Date(row.completedAt).getTime() : 0,
@@ -146,7 +145,7 @@ export function TrainingTable({
             {row.original.completedAt ? formatDate(row.original.completedAt) : "—"}
           </span>
         ),
-      },
+      }),
     ],
     [hideSchedule],
   );
@@ -161,7 +160,7 @@ export function TrainingTable({
         userFilterSpec,
         subsetFilterSpec,
         ...(scheduleId === undefined ? [scheduleFilterSpec] : []),
-        { type: 'multi', key: 'status', label: 'Status', options: STATUS_OPTIONS },
+        { type: 'multi', key: 'status', label: 'Status', options: STATUS_OPTIONS, icon: DATA_ICONS.status },
         { type: 'search', key: 'q' },
       ]}
       fetchData={(params) =>
@@ -171,6 +170,7 @@ export function TrainingTable({
             : params,
         )
       }
+      initialSorting={[{ id: 'startedAt', desc: true }]}
       onRowClick={(t) =>
         void navigate({
           to: "/app/training/$trainingId",

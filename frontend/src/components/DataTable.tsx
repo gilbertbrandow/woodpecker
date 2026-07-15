@@ -39,10 +39,29 @@ import {
 import { cn } from '../lib/utils'
 import { useTableUrlSync } from '../hooks/useTableUrlSync'
 
+declare module '@tanstack/react-table' {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData, TValue> {
+    className?: string
+    rankDesc?: boolean
+    icon?: React.ComponentType<{ className?: string }>
+  }
+}
+
 type ColMeta = {
   className?: string
   rankDesc?: boolean
   icon?: React.ComponentType<{ className?: string }>
+}
+
+export function col<T>(
+  def: ColumnDef<T> & { meta: { icon: React.ComponentType<{ className?: string }> } },
+): ColumnDef<T> {
+  return def
+}
+
+export function actionCol<T>(def: ColumnDef<T>): ColumnDef<T> {
+  return { ...def, enableHiding: false }
 }
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
@@ -201,7 +220,10 @@ export function DataTable<T>({
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
           {filtersSlot}
           {(() => {
-            const hideableCols = table.getAllColumns().filter((c) => c.getCanHide())
+            const hideableCols = table.getAllColumns().filter((c) => {
+              if (!c.getCanHide()) return false
+              return !!(c.columnDef.meta as ColMeta | undefined)?.icon
+            })
             if (hideableCols.length === 0) return null
             return (
               <div className="ml-auto flex items-center gap-2">

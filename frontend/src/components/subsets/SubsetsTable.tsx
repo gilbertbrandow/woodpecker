@@ -8,6 +8,7 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { UserAvatar } from '../UserAvatar'
 import { StatusBadge } from '../StatusBadge'
 import { ServerDataTable } from '../ServerDataTable'
+import { col, actionCol } from '../DataTable'
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -65,7 +66,7 @@ export function SubsetsTable(): React.ReactElement {
 
   const columns = React.useMemo<ColumnDef<Subset>[]>(
     () => [
-      {
+      col({
         id: 'creator',
         accessorFn: (row) => row.ownedBy.displayName,
         header: 'Creator',
@@ -77,29 +78,29 @@ export function SubsetsTable(): React.ReactElement {
             avatarUrl={row.original.ownedBy.avatarUrl}
           />
         ),
-      },
-      {
+      }),
+      col({
         accessorKey: 'name',
         header: 'Name',
         meta: { icon: DATA_ICONS.name },
         cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
-      },
-      {
+      }),
+      col({
         accessorKey: 'status',
         header: 'Status',
         meta: { icon: DATA_ICONS.status },
         enableSorting: false,
         cell: ({ row }) => <StatusBadge status={row.original.status} />,
-      },
-      {
+      }),
+      col({
         accessorKey: 'puzzleCount',
         header: 'Puzzles',
         meta: { icon: DATA_ICONS.puzzles },
         cell: ({ row }) => (
           <span className="tabular-nums text-muted-foreground">{row.original.puzzleCount}</span>
         ),
-      },
-      {
+      }),
+      col({
         id: 'date',
         accessorFn: (row) =>
           row.lockedAt ? new Date(row.lockedAt).getTime() : new Date(row.createdAt).getTime(),
@@ -110,12 +111,11 @@ export function SubsetsTable(): React.ReactElement {
             {formatDate(row.original.lockedAt ?? row.original.createdAt)}
           </span>
         ),
-      },
-      {
+      }),
+      actionCol({
         id: 'actions',
         header: '',
         enableSorting: false,
-        enableHiding: false,
         cell: ({ row }) => {
           const canDelete = row.original.ownedBy.id === user?.id && row.original.status !== 'locked'
           if (!canDelete) return null
@@ -154,7 +154,7 @@ export function SubsetsTable(): React.ReactElement {
             </AlertDialog>
           )
         },
-      },
+      }),
     ],
     [user],
   )
@@ -179,6 +179,7 @@ export function SubsetsTable(): React.ReactElement {
           params: { subsetId: String(subset.id) },
         })
       }}
+      initialSorting={[{ id: 'date', desc: true }]}
       emptyMessage="No subsets match your filters."
     />
   )

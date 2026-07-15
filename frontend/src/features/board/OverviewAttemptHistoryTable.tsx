@@ -7,6 +7,7 @@ import { UserAvatar } from '../../components/UserAvatar'
 import { CONCEPT_ICONS, DATA_ICONS } from '../../lib/icons'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 import { ServerDataTable, type FetchParams } from '../../components/ServerDataTable'
+import { col } from '../../components/DataTable'
 import { useUserFilterSpec } from '../../hooks/useUserFilterSpec'
 import { UserSelector } from '../../components/UserSelector'
 import type { SelectableUser } from '../../lib/api'
@@ -35,7 +36,7 @@ const RESULT_OPTIONS = [
 ]
 
 const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
-  {
+  col({
     id: 'user',
     header: () => (
       <Tooltip>
@@ -45,7 +46,7 @@ const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
         <TooltipContent>User</TooltipContent>
       </Tooltip>
     ),
-    meta: { className: 'px-2 py-1 text-xs' },
+    meta: { className: 'px-2 py-1 text-xs', icon: DATA_ICONS.user },
     enableSorting: false,
     cell: ({ row }) => {
       const { displayName, avatarUrl } = row.original
@@ -55,16 +56,16 @@ const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
         <span className="inline-block h-4 w-4 rounded-full bg-muted" />
       )
     },
-  },
-  {
+  }),
+  col({
     id: 'runLabel',
     accessorKey: 'runOrder',
     header: 'Run',
     meta: { className: 'px-2 py-1', icon: CONCEPT_ICONS.Run },
     enableSorting: true,
     cell: ({ row }) => row.original.runLabel,
-  },
-  {
+  }),
+  col({
     accessorKey: 'tryNumber',
     header: 'Try',
     enableSorting: false,
@@ -82,8 +83,8 @@ const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
         </Tooltip>
       ),
     meta: { className: 'px-2 py-1', icon: DATA_ICONS.tries },
-  },
-  {
+  }),
+  col({
     accessorKey: 'result',
     header: () => (
       <Tooltip>
@@ -100,9 +101,9 @@ const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
       ) : (
         <X className="h-3 w-3" />
       ),
-    meta: { className: 'px-2 py-1 text-xs' },
-  },
-  {
+    meta: { className: 'px-2 py-1 text-xs', icon: CheckCheck },
+  }),
+  col({
     accessorKey: 'timeSpentMs',
     header: 'Time',
     enableSorting: true,
@@ -110,14 +111,14 @@ const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
     cell: ({ row }) =>
       row.original.timeSpentMs !== null ? formatSolveTimeMs(row.original.timeSpentMs) : '—',
     meta: { className: 'px-2 py-1', icon: DATA_ICONS.time },
-  },
-  {
+  }),
+  col({
     accessorKey: 'startedAt',
     header: 'Date',
     enableSorting: true,
     cell: ({ row }) => (row.original.startedAt ? row.original.startedAt.slice(0, 10) : '—'),
     meta: { className: 'px-2 py-1', icon: DATA_ICONS.started },
-  },
+  }),
 ]
 
 type OverviewAttemptHistoryTableProps = {

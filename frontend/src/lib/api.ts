@@ -367,6 +367,7 @@ export type ScheduleSummary = {
   createdBy: { id: number; displayName: string; avatarUrl: string | null }
   subsetId: number
   subsetName: string
+  subsetPuzzleCount: number
   runCount: number
   totalHours: number
   puzzleOrder: PuzzleOrder | null

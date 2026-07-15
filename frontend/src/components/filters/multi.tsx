@@ -85,9 +85,7 @@ export const multiHandler: FilterHandler<MultiVal, MultiFilterSpec> = {
                   >
                     <Check className="h-3 w-3" />
                   </div>
-                  {option.icon && (
-                    <span className="mr-2 flex items-center">{option.icon}</span>
-                  )}
+                  <span className="mr-2 flex items-center">{option.icon}</span>
                   {option.label}
                 </CommandItem>
               )

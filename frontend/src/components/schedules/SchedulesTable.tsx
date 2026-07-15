@@ -9,6 +9,7 @@ import { UserAvatar } from "../UserAvatar";
 import { StatusBadge } from "../StatusBadge";
 import { useAuth } from "../../context/auth";
 import { ServerDataTable } from "../ServerDataTable";
+import { col, actionCol } from "../DataTable";
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -23,6 +24,7 @@ import {
 import type { ScheduleSummary } from "../../lib/api";
 import { api } from "../../lib/api";
 import { useUserFilterSpec } from "../../hooks/useUserFilterSpec";
+import { useSubsetFilterSpec } from "../../hooks/useSubsetFilterSpec";
 import { formatDuration } from "./DurationInput";
 import { toast } from "../../lib/toast";
 import { CONCEPT_ICONS, DATA_ICONS } from "../../lib/icons";
@@ -48,6 +50,7 @@ export function SchedulesTable({
   const { user } = useAuth();
   const navigate = useNavigate();
   const userFilterSpec = useUserFilterSpec('userId', 'Creator');
+  const subsetFilterSpec = useSubsetFilterSpec('subsetId', 'Subset');
 
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const { refreshKey, refetch } = useServerTable();
@@ -74,7 +77,7 @@ export function SchedulesTable({
 
   const columns = React.useMemo<ColumnDef<ScheduleSummary>[]>(
     () => [
-      {
+      col({
         id: "creator",
         accessorFn: (row) => row.createdBy.displayName,
         header: "Creator",
@@ -86,14 +89,21 @@ export function SchedulesTable({
             avatarUrl={row.original.createdBy.avatarUrl}
           />
         ),
-      },
-      {
+      }),
+      col({
         accessorKey: "name",
         header: "Name",
         meta: { icon: DATA_ICONS.name },
         cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
-      },
-      {
+      }),
+      col({
+        accessorKey: "status",
+        header: "Status",
+        meta: { icon: DATA_ICONS.status },
+        enableSorting: false,
+        cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      }),
+      col({
         id: "subset",
         accessorFn: (row) => row.subsetName,
         header: "Subset",
@@ -110,15 +120,16 @@ export function SchedulesTable({
             {row.original.subsetName}
           </Link>
         ),
-      },
-      {
-        accessorKey: "status",
-        header: "Status",
-        meta: { icon: DATA_ICONS.status },
-        enableSorting: false,
-        cell: ({ row }) => <StatusBadge status={row.original.status} />,
-      },
-      {
+      }),
+      col({
+        accessorKey: "subsetPuzzleCount",
+        header: "Puzzles",
+        meta: { icon: DATA_ICONS.puzzles },
+        cell: ({ row }) => (
+          <span className="tabular-nums text-muted-foreground">{row.original.subsetPuzzleCount}</span>
+        ),
+      }),
+      col({
         accessorKey: "runCount",
         header: "Runs",
         meta: { icon: CONCEPT_ICONS.Run },
@@ -127,8 +138,8 @@ export function SchedulesTable({
             {row.original.runCount > 0 ? row.original.runCount : "—"}
           </span>
         ),
-      },
-      {
+      }),
+      col({
         accessorKey: "totalHours",
         header: "Duration",
         meta: { icon: DATA_ICONS.time },
@@ -137,8 +148,8 @@ export function SchedulesTable({
             {row.original.totalHours > 0 ? formatDuration(row.original.totalHours) : "—"}
           </span>
         ),
-      },
-      {
+      }),
+      col({
         id: "date",
         accessorFn: (row) =>
           row.lockedAt ? new Date(row.lockedAt).getTime() : new Date(row.createdAt).getTime(),
@@ -149,8 +160,8 @@ export function SchedulesTable({
             {formatDate(row.original.lockedAt ?? row.original.createdAt)}
           </span>
         ),
-      },
-      {
+      }),
+      actionCol({
         id: "actions",
         header: "",
         enableSorting: false,
@@ -192,7 +203,7 @@ export function SchedulesTable({
             </AlertDialog>
           );
         },
-      },
+      }),
     ],
     [user],
   );
@@ -205,7 +216,11 @@ export function SchedulesTable({
       refreshKey={refreshKey}
       filters={[
         userFilterSpec,
+        ...(subsetId === undefined ? [subsetFilterSpec] : []),
         { type: 'multi', key: 'status', label: 'Status', options: STATUS_OPTIONS, icon: Activity },
+        { type: 'date', key: 'date', label: 'Date', icon: DATA_ICONS.started },
+        { type: 'range', key: 'runCount', label: 'Runs', min: 0, max: 10, step: 1, icon: CONCEPT_ICONS.Run, formatValue: (v) => v >= 10 ? '10+' : String(v) },
+        { type: 'range', key: 'puzzleCount', label: 'Puzzles', min: 0, max: 1000, step: 25, icon: DATA_ICONS.puzzles, formatValue: (v) => v >= 1000 ? '1000+' : String(v) },
         { type: 'search', key: 'q' },
       ]}
       fetchData={(params) =>
@@ -219,6 +234,7 @@ export function SchedulesTable({
           params: { scheduleId: String(schedule.id) },
         });
       }}
+      initialSorting={[{ id: 'date', desc: true }]}
       emptyMessage="No schedules match your filters."
     />
   );

@@ -6,6 +6,7 @@ import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { PageWrapper } from '../components/PageWrapper'
 import { ServerDataTable } from '../components/ServerDataTable'
+import { col, actionCol } from '../components/DataTable'
 import { AdminUserCapBanner } from '../components/AdminUserCapBanner'
 import { api, type AdminWaitlistEntry } from '../lib/api'
 import { formatDate } from '../lib/utils'
@@ -48,15 +49,15 @@ export function AdminWaitlistPage(): React.ReactElement {
 
   const columns = useMemo<ColumnDef<AdminWaitlistEntry>[]>(
     () => [
-      {
+      col({
         accessorKey: 'lichessUsername',
         header: 'Lichess username',
         meta: { icon: DATA_ICONS.lichessUsername },
         cell: ({ row }) => (
           <span className="font-medium">{row.original.lichessUsername}</span>
         ),
-      },
-      {
+      }),
+      col({
         id: 'status',
         header: 'Status',
         meta: { icon: DATA_ICONS.status },
@@ -71,16 +72,16 @@ export function AdminWaitlistPage(): React.ReactElement {
               Pending
             </Badge>
           ),
-      },
-      {
+      }),
+      col({
         accessorKey: 'email',
         header: 'Email',
         meta: { icon: DATA_ICONS.email },
         cell: ({ row }) => (
           <span className="text-muted-foreground">{row.original.email ?? '—'}</span>
         ),
-      },
-      {
+      }),
+      col({
         accessorKey: 'createdAt',
         header: 'Joined',
         meta: { icon: DATA_ICONS.started },
@@ -89,8 +90,8 @@ export function AdminWaitlistPage(): React.ReactElement {
             {formatDate(row.original.createdAt)}
           </span>
         ),
-      },
-      {
+      }),
+      col({
         accessorKey: 'updatedAt',
         header: 'Last attempt',
         meta: { icon: DATA_ICONS.lastAttempt },
@@ -99,8 +100,8 @@ export function AdminWaitlistPage(): React.ReactElement {
             {formatDate(row.original.updatedAt)}
           </span>
         ),
-      },
-      {
+      }),
+      actionCol({
         id: 'actions',
         header: '',
         enableSorting: false,
@@ -143,7 +144,7 @@ export function AdminWaitlistPage(): React.ReactElement {
             </AlertDialog>
           )
         },
-      },
+      }),
     ],
     [],
   )
@@ -165,6 +166,7 @@ export function AdminWaitlistPage(): React.ReactElement {
         fetchData={({ filters: f, page }) =>
           api.admin.waitlist({ page, q: f.q?.[0] || undefined })
         }
+        initialSorting={[{ id: 'createdAt', desc: true }]}
         emptyMessage="Nobody on the waitlist."
       />
     </PageWrapper>
