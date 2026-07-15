@@ -1296,20 +1296,24 @@ export const api = {
   },
   leaderboard: {
     getRuns: (opts?: { scheduleId?: number; trainingId?: number; runIndex?: number }): Promise<LeaderboardRun[]> => {
-      const p = new URLSearchParams()
+      const p = new URLSearchParams({ pageSize: '100' })
       if (opts?.trainingId !== undefined && opts?.runIndex !== undefined) {
         p.set('trainingId', String(opts.trainingId))
         p.set('runIndex', String(opts.runIndex))
       } else if (opts?.scheduleId !== undefined) {
         p.set('scheduleId', String(opts.scheduleId))
       }
-      const qs = p.toString()
-      return request<{ runs: LeaderboardRun[] }>(`/leaderboard${qs ? `?${qs}` : ''}`).then((r) => r.runs)
+      return request<{ items: LeaderboardRun[] }>(`/leaderboard?${p.toString()}`).then((r) => r.items)
     },
     getWeekly: (scheduleIds?: number[]): Promise<WeeklyLeaderboardRow[]> => {
-      const qs = scheduleIds?.length ? scheduleIds.map((id) => `scheduleId=${id}`).join('&') : ''
-      return request<{ rows: WeeklyLeaderboardRow[] }>(`/leaderboard/weekly${qs ? `?${qs}` : ''}`).then((r) => r.rows)
+      const p = new URLSearchParams({ pageSize: '100' })
+      if (scheduleIds?.length) scheduleIds.forEach((id) => p.append('scheduleId', String(id)))
+      return request<{ items: WeeklyLeaderboardRow[] }>(`/leaderboard/weekly?${p.toString()}`).then((r) => r.items)
     },
+    listRuns: (params: TableParams): Promise<{ items: LeaderboardRun[]; total: number }> =>
+      request(`/leaderboard?${tableParamsToUrl(params).toString()}`),
+    listWeekly: (params: TableParams): Promise<{ items: WeeklyLeaderboardRow[]; total: number }> =>
+      request(`/leaderboard/weekly?${tableParamsToUrl(params).toString()}`),
   },
   sources: {
     list: (): Promise<{ sources: SourceListItem[] }> => request('/sources/'),
