@@ -10,7 +10,7 @@ from app.models.training import Training
 from app.models.subset import Subset
 from app.models.user import User
 from app.exceptions import ConflictError, ValidationError, NotFoundError, ForbiddenError
-from app.table_query import FilterList
+from app.table_query import DateFilter, FilterList
 from app.services.schedule_config import ScheduleConfig, RunDefinition
 from app.services.training_state import compute_training_state
 
@@ -365,6 +365,8 @@ def list_all_trainings(
     subset_ids: FilterList | None = None,
     user_ids: FilterList | None = None,
     status: FilterList | None = None,
+    started_at: DateFilter | None = None,
+    completed_at: DateFilter | None = None,
     search: str | None = None,
     page: int = 1,
     page_size: int = 20,
@@ -379,6 +381,10 @@ def list_all_trainings(
         subset_ids.apply(conditions, params, "s.subset_id", prefix="ssid")
     if user_ids is not None:
         user_ids.apply(conditions, params, "t.user_id", prefix="uid")
+    if started_at is not None:
+        started_at.apply(conditions, params, "DATE(t.started_at)", prefix="sa")
+    if completed_at is not None:
+        completed_at.apply(conditions, params, "DATE(t.completed_at)", prefix="ca")
 
     # Separate SQL-filterable statuses from computed ones that need Python resolution.
     _status_values = status.str_values if status is not None else []
@@ -414,6 +420,7 @@ def list_all_trainings(
         SELECT t.id, t.schedule_id, t.user_id,
                t.started_at, t.completed_at, t.aborted_at,
                s.name AS schedule_name, s.subset_id, s.config,
+               sub.name AS subset_name,
                u.display_name, u.avatar_url,
                CASE
                  WHEN t.aborted_at IS NOT NULL THEN 'aborted'
@@ -443,6 +450,7 @@ def list_all_trainings(
                ) AS completed_puzzles
         FROM trainings t
         JOIN schedules s ON s.id = t.schedule_id
+        JOIN subsets sub ON sub.id = s.subset_id
         JOIN users u ON u.id = t.user_id
         {where}
         ORDER BY t.started_at DESC
@@ -558,6 +566,7 @@ def list_all_trainings(
             "scheduleId": row.schedule_id,
             "scheduleName": row.schedule_name,
             "subsetId": row.subset_id,
+            "subsetName": row.subset_name,
             "status": row.status,
             "totalRuns": total_runs,
             "completedPuzzles": row.completed_puzzles,

@@ -36,6 +36,8 @@ def list_all_trainings() -> Response:
         subset_ids=q.int_filter("subsetId"),
         user_ids=q.int_filter("userId"),
         status=q.str_filter("status"),
+        started_at=q.date_filter("startedAt"),
+        completed_at=q.date_filter("completedAt"),
         search=q.q,
         page=q.page,
         page_size=q.page_size,

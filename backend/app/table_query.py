@@ -5,7 +5,7 @@ from typing import Any, Literal, cast
 
 from flask import Request
 
-from app.utils import parse_multi_filter
+from app.utils import FilterOp, parse_multi_filter
 
 # ---------------------------------------------------------------------------
 # Shared SQL-building helpers (bare conditions — callers join with AND)
@@ -44,7 +44,7 @@ def _apply_between(
 
 @dataclass
 class FilterList:
-    op: Literal['is', 'is_not']
+    op: FilterOp
     str_values: list[str] = field(default_factory=list)
     int_values: list[int] = field(default_factory=list)
 
@@ -63,6 +63,12 @@ class FilterList:
         column_expr: str,
         prefix: str = "list",
     ) -> None:
+        if self.op == 'set':
+            conditions.append(f"{column_expr} IS NOT NULL")
+            return
+        if self.op == 'not_set':
+            conditions.append(f"{column_expr} IS NULL")
+            return
         values: list[int] | list[str] = self.int_values or self.str_values
         if not values:
             return
@@ -73,6 +79,10 @@ class FilterList:
         conditions.append(f"{column_expr} {not_}IN ({placeholders})")
 
     def apply_orm(self, stmt: Any, column: Any) -> Any:
+        if self.op == 'set':
+            return stmt.where(column.is_not(None))
+        if self.op == 'not_set':
+            return stmt.where(column.is_(None))
         values: list[int] | list[str] = self.int_values or self.str_values
         if not values:
             return stmt
@@ -95,8 +105,8 @@ class FilterList:
 # Date filter  (wire: date=after&date=2024-01-15  or  date=between&date=…&date=…)
 # ---------------------------------------------------------------------------
 
-DateOp = Literal['after', 'before', 'between', 'not_between']
-_DATE_OPS: frozenset[str] = frozenset({'after', 'before', 'between', 'not_between'})
+DateOp = Literal['after', 'before', 'between', 'not_between', 'set', 'not_set']
+_DATE_OPS: frozenset[str] = frozenset({'after', 'before', 'between', 'not_between', 'set', 'not_set'})
 
 
 @dataclass
@@ -107,7 +117,7 @@ class DateFilter:
 
     @property
     def is_set(self) -> bool:
-        return self.from_date is not None
+        return self.op in ('set', 'not_set') or self.from_date is not None
 
     def apply(
         self,
@@ -118,7 +128,11 @@ class DateFilter:
     ) -> None:
         if not self.is_set:
             return
-        if self.op == 'after':
+        if self.op == 'set':
+            conditions.append(f"{column_expr} IS NOT NULL")
+        elif self.op == 'not_set':
+            conditions.append(f"{column_expr} IS NULL")
+        elif self.op == 'after':
             _apply_comparison(conditions, params, column_expr, prefix, '>', self.from_date)
         elif self.op == 'before':
             _apply_comparison(conditions, params, column_expr, prefix, '<', self.from_date)
@@ -130,8 +144,8 @@ class DateFilter:
 # Range filter  (wire: puzzleCount=gte&puzzleCount=100  or  …=between&…=100&…=500)
 # ---------------------------------------------------------------------------
 
-RangeOp = Literal['is', 'is_not', 'gt', 'gte', 'lt', 'lte', 'between', 'not_between']
-_RANGE_OPS: frozenset[str] = frozenset({'is', 'is_not', 'gt', 'gte', 'lt', 'lte', 'between', 'not_between'})
+RangeOp = Literal['is', 'is_not', 'gt', 'gte', 'lt', 'lte', 'between', 'not_between', 'set', 'not_set']
+_RANGE_OPS: frozenset[str] = frozenset({'is', 'is_not', 'gt', 'gte', 'lt', 'lte', 'between', 'not_between', 'set', 'not_set'})
 
 
 _RANGE_OP_SQL: dict[str, str] = {
@@ -148,7 +162,7 @@ class RangeFilter:
 
     @property
     def is_set(self) -> bool:
-        return self.from_val is not None
+        return self.op in ('set', 'not_set') or self.from_val is not None
 
     def apply(
         self,
@@ -158,6 +172,12 @@ class RangeFilter:
         prefix: str = "range",
         as_int: bool = False,
     ) -> None:
+        if self.op == 'set':
+            conditions.append(f"{column_expr} IS NOT NULL")
+            return
+        if self.op == 'not_set':
+            conditions.append(f"{column_expr} IS NULL")
+            return
         if not self.is_set or self.from_val is None:
             return
         coerce = int if as_int else float
@@ -222,26 +242,34 @@ class TableQuery:
 
     def date_filter(self, key: str) -> DateFilter:
         tokens = self._args.getlist(key)
-        if len(tokens) >= 2 and tokens[0] in _DATE_OPS:
-            op = cast(DateOp, tokens[0])
-            from_date = tokens[1] or None
-            to_date = (tokens[2] or None) if len(tokens) >= 3 else None
-            return DateFilter(op=op, from_date=from_date, to_date=to_date)
-        return DateFilter()
+        if not tokens or tokens[0] not in _DATE_OPS:
+            return DateFilter()
+        op = cast(DateOp, tokens[0])
+        if op in ('set', 'not_set'):
+            return DateFilter(op=op)
+        if len(tokens) < 2:
+            return DateFilter()
+        from_date = tokens[1] or None
+        to_date = (tokens[2] or None) if len(tokens) >= 3 else None
+        return DateFilter(op=op, from_date=from_date, to_date=to_date)
 
     def range_filter(self, key: str) -> RangeFilter:
         tokens = self._args.getlist(key)
-        if len(tokens) >= 2 and tokens[0] in _RANGE_OPS:
-            op = cast(RangeOp, tokens[0])
+        if not tokens or tokens[0] not in _RANGE_OPS:
+            return RangeFilter()
+        op = cast(RangeOp, tokens[0])
+        if op in ('set', 'not_set'):
+            return RangeFilter(op=op)
+        if len(tokens) < 2:
+            return RangeFilter()
+        try:
+            from_val = float(tokens[1])
+        except ValueError:
+            return RangeFilter()
+        to_val: float | None = None
+        if len(tokens) >= 3:
             try:
-                from_val = float(tokens[1])
+                to_val = float(tokens[2])
             except ValueError:
-                return RangeFilter()
-            to_val: float | None = None
-            if len(tokens) >= 3:
-                try:
-                    to_val = float(tokens[2])
-                except ValueError:
-                    pass
-            return RangeFilter(op=op, from_val=from_val, to_val=to_val)
-        return RangeFilter()
+                pass
+        return RangeFilter(op=op, from_val=from_val, to_val=to_val)
