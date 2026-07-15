@@ -366,8 +366,10 @@ export function DataTable<T>({
           <TableBody>
             {loading && pageRows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-10 text-center">
-                  <Loader2 className="mx-auto h-4 w-4 animate-spin text-muted-foreground" />
+                <TableCell colSpan={columns.length} className="h-10">
+                  <div className="sticky left-1/2 w-fit -translate-x-1/2">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  </div>
                 </TableCell>
               </TableRow>
             )}
@@ -416,10 +418,12 @@ export function DataTable<T>({
         </Table>
         {loading && pageRows.length > 0 && (
           <div
-            className="absolute inset-x-0 bottom-0 flex items-center justify-center rounded-b-md backdrop-blur-[2px] bg-background/40"
+            className="absolute inset-x-0 bottom-0 flex items-center rounded-b-md backdrop-blur-[2px] bg-background/40"
             style={{ top: theadRef.current?.offsetHeight ?? 0 }}
           >
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <div className="sticky left-1/2 -translate-x-1/2">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
           </div>
         )}
       </div>
