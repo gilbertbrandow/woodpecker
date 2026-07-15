@@ -3,6 +3,7 @@ import { searchHandler } from './search'
 import { multiHandler } from './multi'
 import { customHandler } from './custom'
 import { entityHandler } from './entity'
+import { setHandler } from './set'
 import { dateHandler } from './date'
 import { rangeHandler } from './range'
 
@@ -12,6 +13,7 @@ const FILTER_HANDLERS: Record<FilterSpec['type'], FilterHandler<any, any>> = {
   multi: multiHandler,
   custom: customHandler,
   entity: entityHandler,
+  set: setHandler,
   date: dateHandler,
   range: rangeHandler,
 }

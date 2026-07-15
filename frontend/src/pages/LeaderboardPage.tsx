@@ -6,9 +6,10 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { PageWrapper } from '../components/PageWrapper'
 import { useAuth } from '../context/auth'
 import { ServerDataTable } from '../components/ServerDataTable'
-import type { FetchParams, FilterSpec, MultiFilterSpec } from '../components/ServerDataTable'
+import type { FetchParams, FilterSpec, MultiFilterSpec, RangeFilterSpec } from '../components/ServerDataTable'
 import { useUserFilterSpec } from '../hooks/useUserFilterSpec'
 import { useScheduleFilterSpec } from '../hooks/useScheduleFilterSpec'
+import { useScheduleSetFilterSpec } from '../hooks/useScheduleSetFilterSpec'
 import { DATA_ICONS, CONCEPT_ICONS } from '../lib/icons'
 import { UserAvatar } from '../components/UserAvatar'
 import { StatusBadge, runStatusToStatusValue } from '../components/StatusBadge'
@@ -19,6 +20,26 @@ import { api } from '../lib/api'
 import type { LeaderboardRun, WeeklyLeaderboardRow } from '../lib/api'
 
 const PAGE_SIZE = 50
+
+const WEEKLY_PUZZLES_FILTER: RangeFilterSpec = {
+  type: 'range',
+  key: 'puzzles',
+  label: 'Puzzles',
+  min: 0,
+  max: 1000,
+  step: 10,
+  icon: DATA_ICONS.puzzles,
+}
+
+const WEEKLY_AVG_RATING_FILTER: RangeFilterSpec = {
+  type: 'range',
+  key: 'avgRating',
+  label: 'Avg rating',
+  min: 1000,
+  max: 3000,
+  step: 50,
+  icon: DATA_ICONS.rating,
+}
 
 const RUN_STATUS_FILTER: MultiFilterSpec = {
   type: 'multi',
@@ -54,6 +75,7 @@ export function LeaderboardPage(): React.ReactElement | null {
 
   const userFilterSpec = useUserFilterSpec('userId')
   const scheduleFilterSpec = useScheduleFilterSpec('scheduleId')
+  const scheduleSetFilterSpec = useScheduleSetFilterSpec('scheduleIds')
 
   // Page refs for computing global position badge offsets in server-paginated mode.
   // ServerDataTable sets pageIndex=0 in the tanstack table, so getGlobalPosition()
@@ -67,8 +89,8 @@ export function LeaderboardPage(): React.ReactElement | null {
   )
 
   const weeklyFilters = useMemo<FilterSpec[]>(
-    () => [{ type: 'search', key: 'q' }, userFilterSpec],
-    [userFilterSpec],
+    () => [{ type: 'search', key: 'q' }, userFilterSpec, WEEKLY_PUZZLES_FILTER, WEEKLY_AVG_RATING_FILTER, scheduleSetFilterSpec],
+    [userFilterSpec, scheduleSetFilterSpec],
   )
 
   const fetchRunData = useCallback((params: FetchParams) => {

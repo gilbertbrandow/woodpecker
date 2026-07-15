@@ -7,6 +7,8 @@ export type {
   CustomFilterSpec,
   EntityFilterSpec,
   EntityVal,
+  SetFilterSpec,
+  SetVal,
   DateFilterSpec,
   RangeFilterSpec,
   DateVal,

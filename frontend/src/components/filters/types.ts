@@ -15,6 +15,7 @@ export type OperatorOption = {
   symbol?: string
   symbolPlural?: string
   icon?: React.ReactNode
+  iconPlural?: React.ReactNode
 }
 
 export type MultiFilterSpec = {
@@ -62,6 +63,28 @@ export type EntityFilterSpec<TItem> = {
 
 export type EntityVal = { op: 'is' | 'is_not' | 'set' | 'not_set'; items: unknown[] }
 
+// Set filter: the row value is a set; operators describe the relationship between
+// the filter selection (F) and the row's set (R).
+//   overlaps  — R ∩ F ≠ ∅  — row has at least one selected item
+//   superset  — F ⊆ R      — row has all selected items
+//   subset    — R ⊆ F      — row's items are all within the selection
+//   disjoint  — R ∩ F = ∅  — row has none of the selected items
+export type SetVal = { op: 'overlaps' | 'superset' | 'subset' | 'disjoint'; items: unknown[] }
+
+export type SetFilterSpec<TItem> = {
+  type: 'set'
+  key: string
+  render: (value: TItem[], onChange: (items: TItem[]) => void) => React.ReactNode
+  serialize: (items: TItem[]) => string[]
+  resolveInstant?: (id: string) => TItem | null
+  resolveIds?: (ids: string[]) => Promise<TItem[]>
+  label?: string
+  icon?: React.ComponentType<{ className?: string }>
+  getChipLabel?: (items: TItem[]) => string
+  renderChipValue?: (items: TItem[]) => React.ReactNode
+  renderContent?: (value: TItem[], onChange: (items: TItem[]) => void) => React.ReactNode
+}
+
 export type DateVal = {
   op: 'after' | 'before' | 'between' | 'not_between' | 'set' | 'not_set'
   from: string
@@ -101,6 +124,7 @@ export type FilterSpec =
   | MultiFilterSpec
   | CustomFilterSpec<any>
   | EntityFilterSpec<any>
+  | SetFilterSpec<any>
   | DateFilterSpec
   | RangeFilterSpec
 

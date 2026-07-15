@@ -172,6 +172,10 @@ export function FilterChipBar({
           selectionCount > 1
             ? (operatorOpt?.symbolPlural ?? operatorOpt?.symbol)
             : operatorOpt?.symbol
+        const operatorIcon =
+          selectionCount > 1
+            ? (operatorOpt?.iconPlural ?? operatorOpt?.icon)
+            : operatorOpt?.icon
 
         return (
           <div
@@ -194,7 +198,9 @@ export function FilterChipBar({
                   type="button"
                   className="flex items-center gap-0.5 border-r border-input px-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
-                  {operatorSymbol ?? operatorLabel}
+                  {operatorIcon
+                    ? <span className="flex h-3 w-3 items-center justify-center">{operatorIcon}</span>
+                    : (operatorSymbol ?? operatorLabel)}
                   <ChevronDown className="h-2.5 w-2.5 opacity-40" />
                 </button>
               </PopoverTrigger>
@@ -213,6 +219,10 @@ export function FilterChipBar({
                           selectionCount > 1
                             ? (op.symbolPlural ?? op.symbol)
                             : op.symbol
+                        const icon =
+                          selectionCount > 1
+                            ? (op.iconPlural ?? op.icon)
+                            : op.icon
                         return (
                           <CommandItem
                             key={op.value}
@@ -232,9 +242,9 @@ export function FilterChipBar({
                                 operator === op.value ? 'opacity-100' : 'opacity-0',
                               )}
                             />
-                            {(op.icon || symbol) && (
+                            {(icon || symbol) && (
                               <span className="mr-2 flex w-3 items-center justify-center text-center text-muted-foreground">
-                                {op.icon ?? symbol}
+                                {icon ?? symbol}
                               </span>
                             )}
                             {label}
