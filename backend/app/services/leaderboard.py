@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 
 from app.extensions import db
-from app.table_query import FilterList, RangeFilter, SetFilter
+from app.table_query import DateFilter, FilterList, RangeFilter, SetFilter
 
 _EMPTY_FILTER = FilterList(op='is')
 
@@ -18,6 +18,9 @@ def get_run_board(
     schedule_filter: FilterList | None = None,
     user_filter: FilterList | None = None,
     status_filter: FilterList | None = None,
+    started_filter: DateFilter | None = None,
+    avg_rating_filter: RangeFilter | None = None,
+    resolved_filter: RangeFilter | None = None,
     run_index: int | None = None,
     exclude_aborted: bool = False,
     search: str | None = None,
@@ -42,6 +45,12 @@ def get_run_board(
     if search:
         conditions.append("(u.display_name ILIKE :q OR s.name ILIKE :q)")
         params["q"] = f"%{search}%"
+    if started_filter:
+        started_filter.apply(conditions, params, "r.started_at", prefix="started")
+    if avg_rating_filter:
+        avg_rating_filter.apply(conditions, params, "rs.avg_rating", prefix="avg_rating")
+    if resolved_filter:
+        resolved_filter.apply(conditions, params, "COALESCE(rs.resolved_count, 0)", prefix="resolved", as_int=True)
 
     sta_f.apply_status(conditions, _STATUS_SQL)
 

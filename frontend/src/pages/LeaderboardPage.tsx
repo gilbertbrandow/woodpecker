@@ -6,7 +6,7 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { PageWrapper } from '../components/PageWrapper'
 import { useAuth } from '../context/auth'
 import { ServerDataTable } from '../components/ServerDataTable'
-import type { FetchParams, FilterSpec, MultiFilterSpec, RangeFilterSpec } from '../components/ServerDataTable'
+import type { FetchParams, FilterSpec, MultiFilterSpec, RangeFilterSpec, DateFilterSpec } from '../components/ServerDataTable'
 import { useUserFilterSpec } from '../hooks/useUserFilterSpec'
 import { useScheduleFilterSpec } from '../hooks/useScheduleFilterSpec'
 import { useScheduleSetFilterSpec } from '../hooks/useScheduleSetFilterSpec'
@@ -20,6 +20,33 @@ import { api } from '../lib/api'
 import type { LeaderboardRun, WeeklyLeaderboardRow } from '../lib/api'
 
 const PAGE_SIZE = 50
+
+const RUN_STARTED_FILTER: DateFilterSpec = {
+  type: 'date',
+  key: 'startedAt',
+  label: 'Started',
+  icon: DATA_ICONS.started,
+}
+
+const RUN_AVG_RATING_FILTER: RangeFilterSpec = {
+  type: 'range',
+  key: 'avgRating',
+  label: 'Avg rating',
+  min: 1000,
+  max: 3000,
+  step: 50,
+  icon: DATA_ICONS.rating,
+}
+
+const RUN_RESOLVED_FILTER: RangeFilterSpec = {
+  type: 'range',
+  key: 'resolvedCount',
+  label: 'Attempts completed',
+  min: 0,
+  max: 1000,
+  step: 10,
+  icon: DATA_ICONS.attempts,
+}
 
 const WEEKLY_PUZZLES_FILTER: RangeFilterSpec = {
   type: 'range',
@@ -84,7 +111,7 @@ export function LeaderboardPage(): React.ReactElement | null {
   const weeklyPageRef = useRef({ page: 1, pageSize: PAGE_SIZE })
 
   const runFilters = useMemo<FilterSpec[]>(
-    () => [{ type: 'search', key: 'q' }, userFilterSpec, RUN_STATUS_FILTER, scheduleFilterSpec],
+    () => [{ type: 'search', key: 'q' }, userFilterSpec, RUN_STATUS_FILTER, scheduleFilterSpec, RUN_STARTED_FILTER, RUN_AVG_RATING_FILTER, RUN_RESOLVED_FILTER],
     [userFilterSpec, scheduleFilterSpec],
   )
 
