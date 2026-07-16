@@ -38,11 +38,14 @@ def lichess_tactics_source_run_metadata() -> Response:
 @sources_bp.get("/scraped-positional/items")
 @login_required
 def scraped_positional_items() -> Response:
-    page = max(1, request.args.get("page", 1, type=int))
-    difficulty = request.args.get("difficulty", None, type=int)
-    theme = request.args.get("theme", None, type=str) or None
-    opening = request.args.get("opening", None, type=str) or None
-    return jsonify(pos_svc.list_items(page, difficulty, theme, opening))
+    q = TableQuery(request)
+    return jsonify(pos_svc.list_items(
+        page=q.page,
+        page_size=q.page_size,
+        difficulty=q.int_filter("difficulty"),
+        theme=q.str_set_filter("theme"),
+        opening=q.str_filter("opening"),
+    ))
 
 
 @sources_bp.get("/scraped-positional/source-run-metadata")

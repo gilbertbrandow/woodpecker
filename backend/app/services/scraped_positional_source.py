@@ -1,5 +1,6 @@
 from sqlalchemy import func, select, exists
 from sqlalchemy.orm import selectinload
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.extensions import db
 from app.models.opening import Opening
@@ -15,8 +16,7 @@ from app.models.source_import_run import (
     SourceImportSource,
     SourceImportStatus,
 )
-
-ITEMS_PAGE_SIZE = 20
+from app.table_query import FilterList, SetFilter
 
 
 def _serialize_puzzle(p: ScrapedPositionalPuzzle) -> dict:
@@ -38,20 +38,28 @@ def _serialize_puzzle(p: ScrapedPositionalPuzzle) -> dict:
     }
 
 
-def list_items(page: int, difficulty_value: int | None, theme_name: str | None, opening_name: str | None) -> dict:
-    conditions = []
+def list_items(
+    page: int,
+    page_size: int,
+    difficulty: FilterList,
+    theme: SetFilter,
+    opening: FilterList,
+) -> dict:
+    conditions: list[ColumnElement[bool]] = []
 
-    if difficulty_value is not None:
+    if difficulty.int_values:
         difficulty_id_subq = (
             select(ScrapedPositionalDifficulty.id)
-            .where(ScrapedPositionalDifficulty.value == difficulty_value)
-            .scalar_subquery()
+            .where(ScrapedPositionalDifficulty.value.in_(difficulty.int_values))
         )
-        conditions.append(ScrapedPositionalPuzzle.difficulty_id == difficulty_id_subq)
+        if difficulty.op == 'is_not':
+            conditions.append(ScrapedPositionalPuzzle.difficulty_id.not_in(difficulty_id_subq))
+        else:
+            conditions.append(ScrapedPositionalPuzzle.difficulty_id.in_(difficulty_id_subq))
 
-    if theme_name:
-        conditions.append(
-            exists(
+    if theme.is_set and theme.str_values:
+        def _theme_subq(names: list[str]):
+            return (
                 select(scraped_positional_theme_links.c.positional_puzzle_id)
                 .join(
                     ScrapedPositionalTheme,
@@ -59,24 +67,48 @@ def list_items(page: int, difficulty_value: int | None, theme_name: str | None, 
                 )
                 .where(
                     scraped_positional_theme_links.c.positional_puzzle_id == ScrapedPositionalPuzzle.id,
-                    ScrapedPositionalTheme.name == theme_name,
+                    ScrapedPositionalTheme.name.in_(names),
+                )
+            )
+        if theme.op == 'overlaps':
+            conditions.append(exists(_theme_subq(theme.str_values)))
+        elif theme.op == 'disjoint':
+            conditions.append(~exists(_theme_subq(theme.str_values)))
+        elif theme.op == 'superset':
+            for name in theme.str_values:
+                conditions.append(exists(_theme_subq([name])))
+        elif theme.op == 'subset':
+            conditions.append(
+                ~exists(
+                    select(scraped_positional_theme_links.c.positional_puzzle_id)
+                    .join(
+                        ScrapedPositionalTheme,
+                        ScrapedPositionalTheme.id == scraped_positional_theme_links.c.positional_theme_id,
+                    )
+                    .where(
+                        scraped_positional_theme_links.c.positional_puzzle_id == ScrapedPositionalPuzzle.id,
+                        ScrapedPositionalTheme.name.notin_(theme.str_values),
+                    )
+                )
+            )
+
+    opening_names = opening.str_values
+    if opening_names:
+        conditions.append(
+            exists(
+                select(Opening.id)
+                .where(
+                    Opening.id == ScrapedPositionalPuzzle.opening_id,
+                    Opening.name.in_(opening_names),
                 )
             )
         )
-
-    if opening_name:
-        opening_id_subq = (
-            select(Opening.id)
-            .where(Opening.name == opening_name)
-            .scalar_subquery()
-        )
-        conditions.append(ScrapedPositionalPuzzle.opening_id == opening_id_subq)
 
     total: int = db.session.execute(
         select(func.count()).select_from(ScrapedPositionalPuzzle).where(*conditions)
     ).scalar_one()
 
-    offset = (page - 1) * ITEMS_PAGE_SIZE
+    offset = (page - 1) * page_size
     puzzles = list(
         db.session.execute(
             select(ScrapedPositionalPuzzle)
@@ -87,17 +119,17 @@ def list_items(page: int, difficulty_value: int | None, theme_name: str | None, 
                 selectinload(ScrapedPositionalPuzzle.opening),
             )
             .order_by(ScrapedPositionalPuzzle.id)
-            .limit(ITEMS_PAGE_SIZE)
+            .limit(page_size)
             .offset(offset)
         ).scalars()
     )
 
-    total_pages = max(1, (total + ITEMS_PAGE_SIZE - 1) // ITEMS_PAGE_SIZE)
+    total_pages = max(1, (total + page_size - 1) // page_size)
 
     return {
-        "puzzles": [_serialize_puzzle(p) for p in puzzles],
+        "items": [_serialize_puzzle(p) for p in puzzles],
         "page": page,
-        "pageSize": ITEMS_PAGE_SIZE,
+        "pageSize": page_size,
         "totalPages": total_pages,
         "total": total,
     }
