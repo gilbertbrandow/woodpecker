@@ -7,6 +7,7 @@ import { PageWrapper } from '../components/PageWrapper'
 import { useAuth } from '../context/auth'
 import { ServerDataTable } from '../components/ServerDataTable'
 import type { FetchParams, FilterSpec, MultiFilterSpec, RangeFilterSpec, DateFilterSpec } from '../components/ServerDataTable'
+import { col, actionCol } from '../components/DataTable'
 import { useUserFilterSpec } from '../hooks/useUserFilterSpec'
 import { useScheduleFilterSpec } from '../hooks/useScheduleFilterSpec'
 import { useScheduleSetFilterSpec } from '../hooks/useScheduleSetFilterSpec'
@@ -131,7 +132,7 @@ export function LeaderboardPage(): React.ReactElement | null {
   }, [])
 
   const runColumns = useMemo<ColumnDef<LeaderboardRun>[]>(() => [
-    {
+    actionCol({
       id: 'position',
       enableSorting: false,
       header: '',
@@ -140,8 +141,8 @@ export function LeaderboardPage(): React.ReactElement | null {
         const { page, pageSize } = runPageRef.current
         return <PositionBadge position={(page - 1) * pageSize + getGlobalPosition(row, table)} />
       },
-    },
-    {
+    }),
+    col({
       id: 'user',
       accessorFn: (r) => r.displayName,
       header: 'User',
@@ -156,8 +157,8 @@ export function LeaderboardPage(): React.ReactElement | null {
           )}
         </span>
       ),
-    },
-    {
+    }),
+    col({
       id: 'schedule',
       accessorFn: (r) => String(r.scheduleId),
       header: 'Schedule',
@@ -173,8 +174,8 @@ export function LeaderboardPage(): React.ReactElement | null {
           {row.original.scheduleName}
         </Link>
       ),
-    },
-    {
+    }),
+    col({
       id: 'runNumber',
       accessorFn: (r) => String(r.runIndex + 1),
       header: 'Run',
@@ -183,8 +184,8 @@ export function LeaderboardPage(): React.ReactElement | null {
       cell: ({ row }) => (
         <span className="tabular-nums">#{row.original.runIndex + 1}</span>
       ),
-    },
-    {
+    }),
+    col({
       id: 'status',
       accessorKey: 'status',
       header: 'Status',
@@ -193,8 +194,8 @@ export function LeaderboardPage(): React.ReactElement | null {
       cell: ({ row }) => (
         <StatusBadge status={runStatusToStatusValue(row.original.status)} />
       ),
-    },
-    {
+    }),
+    col({
       id: 'startedAt',
       accessorFn: (r) => new Date(r.startedAt).getTime(),
       header: 'Started',
@@ -203,8 +204,8 @@ export function LeaderboardPage(): React.ReactElement | null {
       cell: ({ row }) => (
         <span className="text-muted-foreground">{formatDate(row.original.startedAt)}</span>
       ),
-    },
-    {
+    }),
+    col({
       id: 'accuracyPct',
       accessorFn: (r) => r.accuracyPct ?? -1,
       header: 'Accuracy',
@@ -216,16 +217,16 @@ export function LeaderboardPage(): React.ReactElement | null {
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
-    },
-    {
+    }),
+    col({
       id: 'deltaAccuracyPct',
       accessorFn: (r) => r.deltaAccuracyPct ?? -Infinity,
       header: 'Δ accuracy',
       meta: { icon: DATA_ICONS.delta },
       enableSorting: true,
       cell: ({ row }) => formatDelta(row.original.deltaAccuracyPct),
-    },
-    {
+    }),
+    col({
       id: 'avgRating',
       accessorFn: (r) => r.avgRating ?? -1,
       header: 'Avg rating',
@@ -237,8 +238,8 @@ export function LeaderboardPage(): React.ReactElement | null {
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
-    },
-    {
+    }),
+    col({
       id: 'avgSolveTimeMs',
       accessorFn: (r) => r.avgSolveTimeMs ?? Infinity,
       header: 'Avg time',
@@ -250,12 +251,12 @@ export function LeaderboardPage(): React.ReactElement | null {
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
-    },
-    {
+    }),
+    col({
       id: 'avgTimeSolvedMs',
       accessorFn: (r) => r.avgTimeSolvedMs ?? Infinity,
       header: 'Avg time (solved)',
-      meta: { rankDesc: false, icon: DATA_ICONS.time },
+      meta: { rankDesc: false, icon: DATA_ICONS.time, defaultHidden: true },
       enableSorting: true,
       cell: ({ row }) =>
         row.original.avgTimeSolvedMs !== null ? (
@@ -263,12 +264,12 @@ export function LeaderboardPage(): React.ReactElement | null {
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
-    },
-    {
+    }),
+    col({
       id: 'avgTimeFailedMs',
       accessorFn: (r) => r.avgTimeFailedMs ?? Infinity,
       header: 'Avg time (failed)',
-      meta: { rankDesc: false, icon: DATA_ICONS.time },
+      meta: { rankDesc: false, icon: DATA_ICONS.time, defaultHidden: true },
       enableSorting: true,
       cell: ({ row }) =>
         row.original.avgTimeFailedMs !== null ? (
@@ -276,8 +277,8 @@ export function LeaderboardPage(): React.ReactElement | null {
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
-    },
-    {
+    }),
+    col({
       id: 'resolvedCount',
       accessorFn: (r) => r.resolvedCount,
       header: 'Attempts completed',
@@ -288,11 +289,11 @@ export function LeaderboardPage(): React.ReactElement | null {
           {formatNumber(row.original.resolvedCount)} / {formatNumber(row.original.totalPuzzles)}
         </span>
       ),
-    },
+    }),
   ], [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const weeklyColumns = useMemo<ColumnDef<WeeklyLeaderboardRow>[]>(() => [
-    {
+    actionCol({
       id: 'position',
       enableSorting: false,
       header: '',
@@ -301,8 +302,8 @@ export function LeaderboardPage(): React.ReactElement | null {
         const { page, pageSize } = weeklyPageRef.current
         return <PositionBadge position={(page - 1) * pageSize + getGlobalPosition(row, table)} />
       },
-    },
-    {
+    }),
+    col({
       id: 'user',
       accessorFn: (r) => r.displayName,
       header: 'User',
@@ -317,8 +318,8 @@ export function LeaderboardPage(): React.ReactElement | null {
           )}
         </span>
       ),
-    },
-    {
+    }),
+    col({
       id: 'schedules',
       header: 'Schedules',
       meta: { icon: CONCEPT_ICONS.Schedule, defaultHidden: true },
@@ -335,8 +336,8 @@ export function LeaderboardPage(): React.ReactElement | null {
           </span>
         )
       },
-    },
-    {
+    }),
+    col({
       id: 'puzzlesAttempted',
       accessorFn: (r) => r.puzzlesAttempted,
       header: 'Puzzles',
@@ -345,8 +346,8 @@ export function LeaderboardPage(): React.ReactElement | null {
       cell: ({ row }) => (
         <span className="tabular-nums font-medium">{row.original.puzzlesAttempted}</span>
       ),
-    },
-    {
+    }),
+    col({
       id: 'lichessTacticPct',
       accessorFn: (r) => r.lichessTacticPct ?? -1,
       header: 'Tactical',
@@ -358,8 +359,8 @@ export function LeaderboardPage(): React.ReactElement | null {
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
-    },
-    {
+    }),
+    col({
       id: 'scrapedPositionalPct',
       accessorFn: (r) => r.scrapedPositionalPct ?? -1,
       header: 'Positional',
@@ -371,8 +372,8 @@ export function LeaderboardPage(): React.ReactElement | null {
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
-    },
-    {
+    }),
+    col({
       id: 'decoyPct',
       accessorFn: (r) => r.decoyPct ?? -1,
       header: 'Decoy',
@@ -384,8 +385,8 @@ export function LeaderboardPage(): React.ReactElement | null {
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
-    },
-    {
+    }),
+    col({
       id: 'avgRating',
       accessorFn: (r) => r.avgRating ?? -1,
       header: 'Avg rating',
@@ -397,8 +398,8 @@ export function LeaderboardPage(): React.ReactElement | null {
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
-    },
-    {
+    }),
+    col({
       id: 'avgAccuracyPct',
       accessorFn: (r) => r.avgAccuracyPct ?? -1,
       header: 'Accuracy',
@@ -410,8 +411,8 @@ export function LeaderboardPage(): React.ReactElement | null {
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
-    },
-    {
+    }),
+    col({
       id: 'avgSolveTimeMs',
       accessorFn: (r) => r.avgSolveTimeMs ?? Infinity,
       header: 'Avg solve time',
@@ -423,7 +424,7 @@ export function LeaderboardPage(): React.ReactElement | null {
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
-    },
+    }),
   ], [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!user) return null
