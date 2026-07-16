@@ -102,8 +102,16 @@ def start_run(training_id: int) -> tuple[Response, int]:
 @training_bp.get("/<int:training_id>/runs")
 @login_required
 def list_runs(training_id: int) -> tuple[Response, int] | Response:
-    runs = run_svc.list_runs(training_id)
-    return jsonify([run_svc.run_dict(r) for r in runs])
+    q = TableQuery(request)
+    result = run_svc.list_runs_paged(
+        training_id,
+        page=q.page,
+        page_size=q.page_size,
+        status=q.str_filter("status"),
+        started_at=q.date_filter("startedAt"),
+        completed_at=q.date_filter("completedAt"),
+    )
+    return jsonify(result)
 
 
 @training_bp.get("/<int:training_id>/cross-run-item/<int:training_item_id>")

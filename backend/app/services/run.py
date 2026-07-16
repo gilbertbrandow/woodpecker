@@ -14,6 +14,7 @@ from app.models.schedule import Schedule
 from app.models.training import Training
 from app.models.subset import Subset, SubsetTrainingItem
 from app.exceptions import ConflictError, NotFoundError, ForbiddenError
+from app.table_query import DateFilter, FilterList
 from app.services.attempt_state import (
     attempt_type_fields,
     derive_attempt_outcome,
@@ -792,6 +793,75 @@ def list_runs(training_id: int) -> list[Run]:
             .order_by(Run.started_at.asc())
         ).all()
     )
+
+
+# SQL expression for the run's derived status (mirrors Run.status property).
+_RUN_STATUS_SQL: dict[str, str] = {
+    "aborted": "r.aborted_at IS NOT NULL",
+    "completed": "r.aborted_at IS NULL AND r.completed_at IS NOT NULL",
+    "active": "r.aborted_at IS NULL AND r.completed_at IS NULL",
+}
+
+
+def list_runs_paged(
+    training_id: int,
+    page: int = 1,
+    page_size: int = 20,
+    status: FilterList | None = None,
+    started_at: DateFilter | None = None,
+    completed_at: DateFilter | None = None,
+) -> dict[str, object]:
+    training = db.session.get(Training, training_id)
+    if training is None:
+        raise NotFoundError("Training not found", "The requested training does not exist.")
+
+    conditions: list[str] = ["r.training_id = :training_id"]
+    params: dict[str, object] = {"training_id": training_id}
+
+    if status is not None and status.str_values:
+        valid = [v for v in status.str_values if v in _RUN_STATUS_SQL]
+        if valid:
+            parts = [f"({_RUN_STATUS_SQL[v]})" for v in valid]
+            if status.op == "is_not":
+                conditions.append("NOT (" + " OR ".join(parts) + ")")
+            else:
+                conditions.append("(" + " OR ".join(parts) + ")")
+
+    if started_at is not None:
+        started_at.apply(conditions, params, "DATE(r.started_at)", prefix="sa")
+
+    if completed_at is not None:
+        completed_at.apply(conditions, params, "DATE(r.completed_at)", prefix="ca")
+
+    where = "WHERE " + " AND ".join(conditions)
+
+    select_sql = f"""
+        SELECT r.id
+        FROM runs r
+        {where}
+        ORDER BY r.run_index ASC
+    """
+
+    params["limit"] = page_size
+    params["offset"] = (page - 1) * page_size
+    run_ids: list[int] = [
+        row[0]
+        for row in db.session.execute(
+            sa.text(select_sql + " LIMIT :limit OFFSET :offset"), params
+        ).all()
+    ]
+    total: int = db.session.scalar(
+        sa.text(f"SELECT COUNT(*) FROM runs r {where}"),
+        {k: v for k, v in params.items() if k not in ("limit", "offset")},
+    ) or 0
+
+    runs_by_id: dict[int, Run] = {}
+    if run_ids:
+        for run in db.session.scalars(sa.select(Run).where(Run.id.in_(run_ids))).all():
+            runs_by_id[run.id] = run
+
+    items = [run_dict(runs_by_id[rid]) for rid in run_ids if rid in runs_by_id]
+    return {"items": items, "total": total}
 
 
 def get_run(run_id: int) -> Run:

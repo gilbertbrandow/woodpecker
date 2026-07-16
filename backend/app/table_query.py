@@ -200,10 +200,11 @@ _SET_OPS: frozenset[str] = frozenset({'overlaps', 'superset', 'subset', 'disjoin
 class SetFilter:
     op: SetOp = 'overlaps'
     int_values: list[int] = field(default_factory=list)
+    str_values: list[str] = field(default_factory=list)
 
     @property
     def is_set(self) -> bool:
-        return bool(self.int_values)
+        return bool(self.int_values) or bool(self.str_values)
 
     def apply(
         self,
@@ -326,3 +327,10 @@ class TableQuery:
             except ValueError:
                 pass
         return SetFilter(op=op, int_values=int_vals)
+
+    def str_set_filter(self, key: str) -> SetFilter:
+        tokens = self._args.getlist(key)
+        if not tokens or tokens[0] not in _SET_OPS:
+            return SetFilter()
+        op = cast(SetOp, tokens[0])
+        return SetFilter(op=op, str_values=tokens[1:])

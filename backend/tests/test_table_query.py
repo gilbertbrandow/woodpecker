@@ -1,5 +1,5 @@
 """Unit tests for table_query filter types — no DB or Flask context needed."""
-from app.table_query import FilterList, DateFilter, RangeFilter
+from app.table_query import FilterList, DateFilter, RangeFilter, SetFilter
 
 
 # ---------------------------------------------------------------------------
@@ -201,4 +201,57 @@ def test_range_filter_not_set() -> None:
     params: dict[str, object] = {}
     f.apply(conditions, params, "t.puzzle_count", prefix="pc")
     assert conditions == ["t.puzzle_count IS NULL"]
+    assert params == {}
+
+
+# ---------------------------------------------------------------------------
+# SetFilter — str_values
+# ---------------------------------------------------------------------------
+
+def test_set_filter_is_set_with_str_values() -> None:
+    f = SetFilter(op='overlaps', str_values=['fork', 'pin'])
+    assert f.is_set is True
+
+
+def test_set_filter_is_set_empty_is_false() -> None:
+    f = SetFilter()
+    assert f.is_set is False
+
+
+def test_set_filter_is_set_with_int_values() -> None:
+    f = SetFilter(op='overlaps', int_values=[1, 2])
+    assert f.is_set is True
+
+
+def test_set_filter_str_values_default_empty() -> None:
+    f = SetFilter()
+    assert f.str_values == []
+    assert f.int_values == []
+
+
+def test_set_filter_apply_int_overlaps() -> None:
+    f = SetFilter(op='overlaps', int_values=[10, 20])
+    conditions: list[str] = []
+    params: dict[str, object] = {}
+    f.apply(conditions, params, "t.tag_ids", prefix="tags")
+    assert len(conditions) == 1
+    assert "&&" in conditions[0]
+    assert params == {"tags_0": 10, "tags_1": 20}
+
+
+def test_set_filter_apply_int_disjoint() -> None:
+    f = SetFilter(op='disjoint', int_values=[5])
+    conditions: list[str] = []
+    params: dict[str, object] = {}
+    f.apply(conditions, params, "t.tag_ids", prefix="tags")
+    assert conditions[0].startswith("NOT (")
+    assert "&&" in conditions[0]
+
+
+def test_set_filter_apply_noop_when_empty() -> None:
+    f = SetFilter()
+    conditions: list[str] = []
+    params: dict[str, object] = {}
+    f.apply(conditions, params, "t.tag_ids", prefix="tags")
+    assert conditions == []
     assert params == {}

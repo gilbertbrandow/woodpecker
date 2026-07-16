@@ -227,7 +227,7 @@ class TestLichessTacticsItems:
         _make_tactic(db_session, "it003", 1000, source_run=run)
         _make_tactic(db_session, "it004", 2000, source_run=run)
 
-        body = client.get("/sources/lichess-tactics/items?ratingMin=1500").get_json()
+        body = client.get("/sources/lichess-tactics/items?rating=gte&rating=1500").get_json()
 
         assert body["total"] == 1
         assert body["puzzles"][0]["puzzleId"] == "it004"
@@ -238,7 +238,7 @@ class TestLichessTacticsItems:
         _make_tactic(db_session, "it005", 1000, source_run=run)
         _make_tactic(db_session, "it006", 2000, source_run=run)
 
-        body = client.get("/sources/lichess-tactics/items?ratingMax=1500").get_json()
+        body = client.get("/sources/lichess-tactics/items?rating=lte&rating=1500").get_json()
 
         assert body["total"] == 1
         assert body["puzzles"][0]["puzzleId"] == "it005"
@@ -247,7 +247,7 @@ class TestLichessTacticsItems:
         _login(client, _make_user(db_session).id)
         _make_tactic(db_session, "it007", 1500)
 
-        body = client.get("/sources/lichess-tactics/items?ratingMin=9999").get_json()
+        body = client.get("/sources/lichess-tactics/items?rating=gte&rating=9999").get_json()
 
         assert body["total"] == 0
         assert body["puzzles"] == []
