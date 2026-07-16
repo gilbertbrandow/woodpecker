@@ -46,6 +46,7 @@ declare module '@tanstack/react-table' {
     className?: string
     rankDesc?: boolean
     icon?: React.ComponentType<{ className?: string }>
+    iconOnly?: boolean
     defaultHidden?: boolean
   }
 }
@@ -54,6 +55,7 @@ type ColMeta = {
   className?: string
   rankDesc?: boolean
   icon?: React.ComponentType<{ className?: string }>
+  iconOnly?: boolean
   defaultHidden?: boolean
 }
 
@@ -336,10 +338,19 @@ export function DataTable<T>({
                   const HeaderIcon = colMeta?.icon
                   const renderedHeader = flexRender(h.column.columnDef.header, h.getContext())
                   const headerNode = HeaderIcon ? (
-                    <span className="inline-flex items-center gap-1.5">
-                      <HeaderIcon className="h-3.5 w-3.5" />
-                      {renderedHeader}
-                    </span>
+                    colMeta?.iconOnly ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex"><HeaderIcon className="h-3.5 w-3.5" /></span>
+                        </TooltipTrigger>
+                        <TooltipContent>{renderedHeader}</TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5">
+                        <HeaderIcon className="h-3.5 w-3.5" />
+                        {renderedHeader}
+                      </span>
+                    )
                   ) : renderedHeader
                   return (
                     <TableHead key={h.id} className={cn('whitespace-nowrap', colMeta?.className)}>

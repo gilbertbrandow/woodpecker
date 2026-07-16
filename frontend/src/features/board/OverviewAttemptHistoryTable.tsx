@@ -38,15 +38,8 @@ const RESULT_OPTIONS = [
 const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
   col({
     id: 'user',
-    header: () => (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex"><DATA_ICONS.user className="h-3.5 w-3.5" /></span>
-        </TooltipTrigger>
-        <TooltipContent>User</TooltipContent>
-      </Tooltip>
-    ),
-    meta: { className: 'px-2 py-1 text-xs', icon: DATA_ICONS.user },
+    header: 'User',
+    meta: { className: 'px-2 py-1 text-xs', icon: DATA_ICONS.user, iconOnly: true },
     enableSorting: false,
     cell: ({ row }) => {
       const { displayName, avatarUrl } = row.original
@@ -86,14 +79,7 @@ const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
   }),
   col({
     accessorKey: 'result',
-    header: () => (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex"><CheckCheck className="h-3.5 w-3.5" /></span>
-        </TooltipTrigger>
-        <TooltipContent>Result</TooltipContent>
-      </Tooltip>
-    ),
+    header: 'Result',
     enableSorting: false,
     cell: ({ row }) =>
       row.original.result === 'solved' ? (
@@ -101,7 +87,7 @@ const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
       ) : (
         <X className="h-3 w-3" />
       ),
-    meta: { className: 'px-2 py-1 text-xs', icon: CheckCheck },
+    meta: { className: 'px-2 py-1 text-xs', icon: CheckCheck, iconOnly: true },
   }),
   col({
     accessorKey: 'timeSpentMs',
