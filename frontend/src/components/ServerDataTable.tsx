@@ -44,7 +44,8 @@ export type FetchParams = {
 export type ServerDataTableProps<T> = {
   // Optional namespace that prefixes all URL params, e.g. "run" → ?run_userId=…
   // Use when multiple ServerDataTables appear on the same page.
-  tableId?: string
+  // Pass false to disable URL sync entirely (wizard/picker tables).
+  tableId?: string | false
   // Pre-seed custom filter values when no URL param is present for that key.
   // Useful for "default filter" scenarios (e.g. current user pre-selected).
   // Only applied at mount; ignored if the URL already carries a value for the key.
@@ -73,6 +74,8 @@ export type ServerDataTableProps<T> = {
   emptyMessage?: React.ReactNode
   initialSorting: SortingState
   compact?: boolean
+  footerRow?: React.ReactNode
+  onFooterRowClick?: () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -95,6 +98,8 @@ export function ServerDataTable<T>({
   initialCustomValues,
   initialData,
   compact,
+  footerRow,
+  onFooterRowClick,
 }: ServerDataTableProps<T>): React.ReactElement {
   const { getParam, getMultiParam, setParams } = useTableUrlSync(tableId)
 
@@ -405,6 +410,8 @@ export function ServerDataTable<T>({
       emptyMessage={emptyMessage}
       initialSorting={initialSorting}
       compact={compact}
+      footerRow={footerRow}
+      onFooterRowClick={onFooterRowClick}
     />
   )
 }
