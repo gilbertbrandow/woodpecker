@@ -69,6 +69,10 @@ export function actionCol<T>(def: ColumnDef<T>): ColumnDef<T> {
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
 
+function pageSizeOptions(current: number): number[] {
+  return [...new Set([...PAGE_SIZE_OPTIONS, current])].sort((a, b) => a - b)
+}
+
 export type ServerPagination = {
   totalRows: number
   page: number
@@ -439,7 +443,7 @@ export function DataTable<T>({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {PAGE_SIZE_OPTIONS.map((s) => (
+                {pageSizeOptions(serverPagination.pageSize).map((s) => (
                   <SelectItem key={s} value={String(s)} className="text-xs">{s}</SelectItem>
                 ))}
               </SelectContent>
@@ -490,7 +494,7 @@ export function DataTable<T>({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {PAGE_SIZE_OPTIONS.map((s) => (
+                {pageSizeOptions(table.getState().pagination.pageSize).map((s) => (
                   <SelectItem key={s} value={String(s)} className="text-xs">{s}</SelectItem>
                 ))}
               </SelectContent>

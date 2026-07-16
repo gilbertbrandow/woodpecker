@@ -14,7 +14,7 @@ from app.models.schedule import Schedule
 from app.models.training import Training
 from app.models.subset import Subset, SubsetTrainingItem
 from app.exceptions import ConflictError, NotFoundError, ForbiddenError
-from app.table_query import DateFilter, FilterList
+from app.table_query import DateFilter, FilterList, RangeFilter
 from app.services.attempt_state import (
     attempt_type_fields,
     derive_attempt_outcome,
@@ -668,9 +668,17 @@ def run_dict(run: Run, tz: str = "UTC") -> dict[str, object]:
     )
 
     counts: dict[str, int] = {}
+    solve_times: list[int] = []
     for rp in run_puzzles:
         s = derive_position_status(rp.attempts, total_queue)
         counts[s] = counts.get(s, 0) + 1
+        if s in ("solved", "solved_with_retries"):
+            completed = sorted(
+                [a for a in rp.attempts if a.status != "in_progress"],
+                key=lambda a: a.try_number,
+            )
+            if completed and completed[-1].time_spent_ms is not None:
+                solve_times.append(completed[-1].time_spent_ms)
 
     total = sum(counts.values())
     return {
@@ -686,6 +694,8 @@ def run_dict(run: Run, tz: str = "UTC") -> dict[str, object]:
         "solvedWithRetriesCount": counts.get("solved_with_retries", 0),
         "failedCount": counts.get("failed", 0),
         "inProgressCount": counts.get("in_progress", 0) + counts.get("not_started", 0),
+        "avgSolveTimeMs": round(sum(solve_times) / len(solve_times)) if solve_times else None,
+        "fastestSolveTimeMs": min(solve_times) if solve_times else None,
         "currentRunTrainingItemId": _current_run_puzzle_id(run.id, total_queue),
         "targetAccuracy": run.target_accuracy,
         "targetMinSolveSeconds": run.target_min_solve_seconds,
@@ -908,45 +918,106 @@ def continue_run(run_id: int, user_id: int) -> dict[str, object]:
     }
 
 
-def list_run_puzzles(run_id: int) -> dict[str, object]:
+def list_run_puzzles(
+    run_id: int,
+    page: int = 1,
+    page_size: int = 25,
+    source_type: FilterList | None = None,
+    position_status: FilterList | None = None,
+    time_ms: RangeFilter | None = None,
+    rating: RangeFilter | None = None,
+) -> dict[str, object]:
     run = _get_run(run_id)
     _, config = _get_schedule_config(run)
     total_queue = config.total_queue
 
-    rows = db.session.execute(
-        sa.text("""
-            SELECT rp.id AS run_training_item_id,
-                   rp.position,
-                   rp.training_item_id,
-                   COUNT(pa.id) FILTER (WHERE pa.status != 'in_progress') AS try_count,
-                   (
-                       SELECT pa2.time_spent_ms
-                       FROM training_attempts pa2
-                       WHERE pa2.run_training_item_id = rp.id
-                         AND pa2.status != 'in_progress'
-                       ORDER BY pa2.try_number DESC
-                       LIMIT 1
-                   ) AS time_ms
+    cte_sql = """
+        WITH base AS (
+            SELECT
+                rp.id AS run_training_item_id,
+                rp.position,
+                rp.training_item_id,
+                COUNT(pa.id) FILTER (WHERE pa.status != 'in_progress') AS try_count,
+                (
+                    SELECT pa2.time_spent_ms
+                    FROM training_attempts pa2
+                    WHERE pa2.run_training_item_id = rp.id
+                      AND pa2.status != 'in_progress'
+                    ORDER BY pa2.try_number DESC
+                    LIMIT 1
+                ) AS time_ms,
+                CASE
+                    WHEN NOT EXISTS (SELECT 1 FROM training_attempts WHERE run_training_item_id = rp.id)
+                        THEN 'not_started'
+                    WHEN EXISTS (SELECT 1 FROM training_attempts WHERE run_training_item_id = rp.id AND status = 'in_progress')
+                        THEN 'in_progress'
+                    WHEN EXISTS (
+                        SELECT 1 FROM training_attempts
+                        WHERE run_training_item_id = rp.id AND status = 'solved'
+                          AND try_number = 1 AND try_number <= :total_queue
+                    ) THEN 'solved'
+                    WHEN EXISTS (
+                        SELECT 1 FROM training_attempts
+                        WHERE run_training_item_id = rp.id AND status = 'solved'
+                          AND try_number <= :total_queue
+                    ) THEN 'solved_with_retries'
+                    WHEN (
+                        SELECT COUNT(*) FROM training_attempts
+                        WHERE run_training_item_id = rp.id
+                          AND status != 'in_progress' AND try_number <= :total_queue
+                    ) >= :total_queue THEN 'failed'
+                    ELSE 'in_progress'
+                END AS position_status,
+                ti.source_type,
+                lt.rating AS lichess_rating,
+                spd.min_rating
             FROM run_training_items rp
+            JOIN training_items ti ON ti.id = rp.training_item_id
             LEFT JOIN training_attempts pa ON pa.run_training_item_id = rp.id
+            LEFT JOIN lichess_tactics lt ON lt.training_item_id = rp.training_item_id
+            LEFT JOIN scraped_positional_puzzles spp ON spp.training_item_id = rp.training_item_id
+            LEFT JOIN scraped_positional_difficulties spd ON spd.id = spp.difficulty_id
             WHERE rp.run_id = :run_id
-            GROUP BY rp.id, rp.position, rp.training_item_id
-            ORDER BY rp.position
-        """),
-        {"run_id": run_id},
+            GROUP BY rp.id, rp.position, rp.training_item_id, ti.source_type, lt.rating, spd.min_rating
+        )
+    """
+
+    conditions: list[str] = []
+    params: dict[str, object] = {"run_id": run_id, "total_queue": total_queue}
+
+    if source_type is not None:
+        source_type.apply(conditions, params, "source_type", "st")
+    if position_status is not None:
+        position_status.apply(conditions, params, "position_status", "ps")
+    if time_ms is not None:
+        time_ms.apply(conditions, params, "time_ms", "tms", as_int=True)
+    if rating is not None:
+        rating.apply(conditions, params, "COALESCE(lichess_rating, min_rating)", "rat", as_int=True)
+
+    where_sql = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+    total: int = db.session.scalar(
+        sa.text(f"{cte_sql} SELECT COUNT(*) FROM base {where_sql}"),
+        params,
+    ) or 0
+
+    rows = db.session.execute(
+        sa.text(f"{cte_sql} SELECT * FROM base {where_sql} ORDER BY position LIMIT :limit OFFSET :offset"),
+        {**params, "limit": page_size, "offset": (page - 1) * page_size},
     ).all()
 
+    rp_ids = [row.run_training_item_id for row in rows]
     training_item_ids = [row.training_item_id for row in rows]
     payloads = get_content_batch(training_item_ids)
 
-    rp_ids = [row.run_training_item_id for row in rows]
     attempts_by_puzzle: dict[int, list[TrainingAttempt]] = {rp_id: [] for rp_id in rp_ids}
-    for a in db.session.scalars(
-        sa.select(TrainingAttempt).where(TrainingAttempt.run_training_item_id.in_(rp_ids))
-    ).all():
-        attempts_by_puzzle[a.run_training_item_id].append(a)
+    if rp_ids:
+        for a in db.session.scalars(
+            sa.select(TrainingAttempt).where(TrainingAttempt.run_training_item_id.in_(rp_ids))
+        ).all():
+            attempts_by_puzzle[a.run_training_item_id].append(a)
 
-    training_items: list[dict[str, object]] = [
+    items: list[dict[str, object]] = [
         {
             "runTrainingItemId": row.run_training_item_id,
             "position": row.position,
@@ -959,7 +1030,7 @@ def list_run_puzzles(run_id: int) -> dict[str, object]:
         }
         for row in rows
     ]
-    return {"maxTriesPerItem": total_queue, "trainingItems": training_items}
+    return {"maxTriesPerItem": total_queue, "items": items, "total": total}
 
 
 def get_run_puzzle(run_id: int, run_puzzle_id: int, user_id: int) -> dict[str, object]:

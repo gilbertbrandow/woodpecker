@@ -696,6 +696,8 @@ export type Run = {
   solvedWithRetriesCount: number
   failedCount: number
   inProgressCount: number
+  avgSolveTimeMs: number | null
+  fastestSolveTimeMs: number | null
   currentRunTrainingItemId: number | null
   paceChart: PaceChartData | null
 }
@@ -711,7 +713,8 @@ export type RunTrainingItemListItem = {
 
 export type RunTrainingItemList = {
   maxTriesPerItem: number
-  trainingItems: RunTrainingItemListItem[]
+  items: RunTrainingItemListItem[]
+  total: number
 }
 
 export type Schedule = {
@@ -1248,8 +1251,8 @@ export const api = {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
       return request(`/runs/${runId}?tz=${encodeURIComponent(tz)}`)
     },
-    trainingItems: (runId: number): Promise<RunTrainingItemList> =>
-      request(`/runs/${runId}/training-items`),
+    listTrainingItems: (runId: number, params: TableParams): Promise<RunTrainingItemList> =>
+      request(`/runs/${runId}/training-items?${tableParamsToUrl(params)}`),
     getTrainingItem: (runId: number, runTrainingItemId: number): Promise<RunTrainingItemFull> =>
       request(`/runs/${runId}/training-items/${runTrainingItemId}`),
     getOverview: (
