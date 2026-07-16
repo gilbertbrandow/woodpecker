@@ -1222,6 +1222,10 @@ export const api = {
       request(`/training/${trainingId}/status${tz ? `?tz=${encodeURIComponent(tz)}` : ''}`),
     abort: (trainingId: number): Promise<Training> =>
       request(`/training/${trainingId}/abort`, { method: 'POST' }),
+    listRuns: (trainingId: number, params: TableParams): Promise<{ items: Run[]; total: number }> => {
+      const p = tableParamsToUrl(params)
+      return request(`/training/${trainingId}/runs?${p}`)
+    },
   },
   themes: {
     list: (): Promise<Theme[]> => request('/themes'),
@@ -1238,7 +1242,8 @@ export const api = {
         body: JSON.stringify(runIndex === undefined ? {} : { runIndex }),
       }),
     list: (trainingId: number): Promise<Run[]> =>
-      request(`/training/${trainingId}/runs`),
+      request<{ items: Run[]; total: number }>(`/training/${trainingId}/runs?page=1&pageSize=100`)
+        .then((r) => r.items),
     get: (runId: number): Promise<Run> => {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
       return request(`/runs/${runId}?tz=${encodeURIComponent(tz)}`)
@@ -1318,22 +1323,8 @@ export const api = {
     lichessTactics: {
       sourceRunMetadata: (): Promise<{ metadata: LichessTacticsSourceRunMetadata | null }> =>
         request('/sources/lichess-tactics/source-run-metadata'),
-      items: (params: {
-        page?: number
-        ratingMin?: number
-        ratingMax?: number
-        theme?: string
-        openings?: string[]
-      }): Promise<LichessTacticPage> => {
-        const p = new URLSearchParams()
-        if (params.page !== undefined) p.set('page', String(params.page))
-        if (params.ratingMin !== undefined) p.set('ratingMin', String(params.ratingMin))
-        if (params.ratingMax !== undefined) p.set('ratingMax', String(params.ratingMax))
-        if (params.theme) p.set('theme', params.theme)
-        if (params.openings?.length) p.set('openings', params.openings.join(','))
-        const qs = p.toString()
-        return request(`/sources/lichess-tactics/items${qs ? `?${qs}` : ''}`)
-      },
+      items: (params: TableParams): Promise<LichessTacticPage> =>
+        request(`/sources/lichess-tactics/items?${tableParamsToUrl(params)}`),
     },
     scrapedPositional: {
       sourceRunMetadata: (): Promise<{ metadata: ScrapedPositionalSourceRunMetadata | null }> =>
@@ -1356,13 +1347,8 @@ export const api = {
     decoys: {
       sourceRunMetadata: (): Promise<{ metadata: DecoySourceRunMetadata | null }> =>
         request('/sources/decoys/source-run-metadata'),
-      items: (params: { page?: number; opening?: string }): Promise<DecoyPage> => {
-        const p = new URLSearchParams()
-        if (params.page !== undefined) p.set('page', String(params.page))
-        if (params.opening) p.set('opening', params.opening)
-        const qs = p.toString()
-        return request(`/sources/decoys/items${qs ? `?${qs}` : ''}`)
-      },
+      items: (params: TableParams): Promise<DecoyPage> =>
+        request(`/sources/decoys/items?${tableParamsToUrl(params)}`),
     },
   },
   users: {
