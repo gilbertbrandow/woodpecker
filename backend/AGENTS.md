@@ -47,13 +47,7 @@ Do not add `sentry_sdk.capture_exception()` calls anywhere in route handlers or 
 
 ## Table endpoints
 
-All server-paginated list endpoints parse their request with `TableQuery` from
-`app/table_query.py`. Never read pagination or filter params via `request.args`
-directly.
-
-### Standard pattern
-
-Routes are thin: parse → delegate to service → return JSON.
+All server-paginated list endpoints use `TableQuery` from `app/table_query.py` — never read pagination or filter params from `request.args` directly.
 
 ```python
 # route
@@ -75,8 +69,6 @@ def list_things() -> Response:
     )
     return jsonify(result)
 ```
-
-Services build the query with `conditions` / `params` lists and call `.apply()`:
 
 ```python
 # service
@@ -109,7 +101,7 @@ def list_things(
     return {'items': [...], 'total': total}
 ```
 
-### `TableQuery` attributes and methods
+**`TableQuery` attributes and methods**
 
 | Member | Type | Purpose |
 | ------ | ---- | ------- |

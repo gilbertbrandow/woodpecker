@@ -102,9 +102,7 @@ Pass it straight to the API layer — never parse filters in the component.
 
 ### Filter specs → backend methods
 
-Declare filters as `FilterSpec[]` on the `filters` prop. The component handles
-rendering chips, URL sync, and serialising values into the `filters` dict that
-`fetchData` receives. Each type maps to a specific backend `TableQuery` method:
+Declare filters as `FilterSpec[]` on the `filters` prop. Each type maps to a specific backend `TableQuery` method:
 
 | Frontend `type` | Value type | Backend method |
 | --------------- | ---------- | -------------- |
