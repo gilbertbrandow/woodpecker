@@ -7,7 +7,7 @@ import { useAuth } from '../context/auth'
 import { TrainingItemTypeBadge, ScarecrowIcon } from '../components/TrainingItemTypeBadge'
 import { ConceptIcon } from '../components/ConceptIcon'
 import { WhatIsThisDrawer } from '../components/WhatIsThisDrawer'
-import { DataTable } from '../components/DataTable'
+import { DataTable, col } from '../components/DataTable'
 import { FilterChipBar } from '../components/FilterChipBar'
 import { getHandler } from '../components/filters'
 import type { FilterSpec, FilterValues, MultiVal, DateVal } from '../components/filters'
@@ -72,21 +72,21 @@ function matchesDateFilter(dateStr: string | null, filter: DateVal | null): bool
 }
 
 const columns: ColumnDef<SourceListItem>[] = [
-  {
+  col({
     id: 'name',
     header: 'Name',
     meta: { icon: DATA_ICONS.name },
     accessorFn: (row) => SOURCE_NAMES[row.sourceType],
     cell: ({ row }) => <span className="font-medium">{SOURCE_NAMES[row.original.sourceType]}</span>,
-  },
-  {
+  }),
+  col({
     accessorKey: 'sourceType',
     header: 'Type',
     meta: { icon: DATA_ICONS.type },
     enableSorting: false,
     cell: ({ row }) => <TrainingItemTypeBadge source={row.original.sourceType} />,
-  },
-  {
+  }),
+  col({
     accessorKey: 'firstImported',
     header: 'First imported',
     meta: { icon: DATA_ICONS.started },
@@ -95,8 +95,8 @@ const columns: ColumnDef<SourceListItem>[] = [
         {row.original.firstImported ? formatDate(row.original.firstImported) : '—'}
       </span>
     ),
-  },
-  {
+  }),
+  col({
     accessorKey: 'lastSynced',
     header: 'Last synced',
     meta: { icon: DATA_ICONS.lastAttempt },
@@ -105,8 +105,8 @@ const columns: ColumnDef<SourceListItem>[] = [
         {row.original.lastSynced ? formatDate(row.original.lastSynced) : '—'}
       </span>
     ),
-  },
-  {
+  }),
+  col({
     accessorKey: 'puzzleCount',
     header: 'Puzzles',
     meta: { icon: DATA_ICONS.puzzles, className: 'text-right' },
@@ -115,7 +115,7 @@ const columns: ColumnDef<SourceListItem>[] = [
         {formatNumber(row.original.puzzleCount)}
       </span>
     ),
-  },
+  }),
 ]
 
 export function SourcesListPage(): React.ReactElement | null {
