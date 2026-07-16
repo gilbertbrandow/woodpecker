@@ -1308,6 +1308,12 @@ export const api = {
       request<{ items: WeeklyLeaderboardRow[] }>('/leaderboard/weekly?pageSize=100').then((r) => r.items),
     listRuns: (params: TableParams): Promise<{ items: LeaderboardRun[]; total: number }> =>
       request(`/leaderboard?${tableParamsToUrl(params).toString()}`),
+    listRunsByTraining: (trainingId: number, runIndex: number, params: TableParams): Promise<{ items: LeaderboardRun[]; total: number }> => {
+      const p = tableParamsToUrl(params)
+      p.set('trainingId', String(trainingId))
+      p.set('runIndex', String(runIndex))
+      return request(`/leaderboard?${p.toString()}`)
+    },
     listWeekly: (params: TableParams): Promise<{ items: WeeklyLeaderboardRow[]; total: number }> =>
       request(`/leaderboard/weekly?${tableParamsToUrl(params).toString()}`),
   },

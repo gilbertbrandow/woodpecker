@@ -16,7 +16,7 @@ import {
   type ScheduleInsightPoint,
   type MyTrainingSummary,
 } from "../lib/api";
-import { useRunLeaderboard } from "../hooks/useRunLeaderboard";
+import { ScheduleRunLeaderboard } from "../components/leaderboard/ScheduleRunLeaderboard";
 import { AreaChart, Area, XAxis, YAxis } from "recharts";
 import {
   ChartContainer,
@@ -41,7 +41,6 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui/table";
-import { RunLeaderboard } from "../components/leaderboard/RunLeaderboard";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import {
@@ -211,11 +210,6 @@ export function SchedulePage(): React.ReactElement | null {
       .catch(() => {})
       .finally(() => setInsightsLoading(false));
   }, [activeTab, id, user, insightsData]);
-
-  const { rows: leaderboardRuns, loading: leaderboardLoading } = useRunLeaderboard({
-    scheduleId: id,
-    enabled: activeTab === "insights" && !!user,
-  });
 
   if (authLoading || !user) return null;
 
@@ -774,12 +768,8 @@ export function SchedulePage(): React.ReactElement | null {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="pt-4">
-                  <RunLeaderboard
-                    tableId="leaderboard"
-                    rows={leaderboardRuns}
+                  <ScheduleRunLeaderboard
                     scheduleId={id}
-                    allowFiltering
-                    loading={leaderboardLoading}
                     currentUserId={user?.id}
                   />
                 </div>
