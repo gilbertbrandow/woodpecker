@@ -1,38 +1,25 @@
 import * as React from 'react'
-import { useState, useEffect, useMemo } from 'react'
+import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { type ColumnDef } from '@tanstack/react-table'
 import { useAuth } from '../context/auth'
 import { api, type Subset } from '../lib/api'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
-import { UserAvatar } from '../components/UserAvatar'
-import { DataTable } from '../components/DataTable'
-import { DATA_ICONS } from '../lib/icons'
+import { SubsetsTable } from '../components/subsets/SubsetsTable'
 
 export function ScheduleNewPage(): React.ReactElement | null {
   const { user, loading } = useAuth()
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [selectedSubset, setSelectedSubset] = useState<Subset | null>(null)
-  const [subsets, setSubsets] = useState<Subset[]>([])
-  const [subsetsLoading, setSubsetsLoading] = useState(true)
+  const [subsetsTotal, setSubsetsTotal] = useState<number | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!loading && !user) {
       void navigate({ to: '/' })
     }
   }, [user, loading, navigate])
-
-  useEffect(() => {
-    if (!user) return
-    api.subsets
-      .listLocked()
-      .then((r) => setSubsets(r.items))
-      .catch(() => {})
-      .finally(() => setSubsetsLoading(false))
-  }, [user])
 
   if (loading || !user) return null
 
@@ -49,77 +36,11 @@ export function ScheduleNewPage(): React.ReactElement | null {
     }
   }
 
-  const selectedId = selectedSubset?.id ?? null
-
-  const columns: ColumnDef<Subset>[] = useMemo(
-    () => [
-      {
-        id: 'select',
-        header: 'Selected',
-        enableSorting: false,
-        cell: ({ row }) => (
-          <div className="h-4 w-4 shrink-0 rounded-full border border-primary flex items-center justify-center">
-            {row.original.id === selectedId && (
-              <div className="h-2.5 w-2.5 rounded-full bg-primary" />
-            )}
-          </div>
-        ),
-      },
-      {
-        id: 'owner',
-        header: 'Owner',
-        meta: { icon: DATA_ICONS.user },
-        enableSorting: false,
-        cell: ({ row }) => (
-          <UserAvatar
-            displayName={row.original.ownedBy.displayName}
-            avatarUrl={row.original.ownedBy.avatarUrl}
-          />
-        ),
-      },
-      {
-        accessorKey: 'name',
-        header: 'Name',
-        meta: { icon: DATA_ICONS.name },
-        cell: ({ row }) => (
-          <span className="font-medium">{row.original.name}</span>
-        ),
-      },
-      {
-        id: 'puzzleCount',
-        header: 'Puzzles',
-        meta: { icon: DATA_ICONS.puzzles },
-        accessorFn: (row) => row.puzzleCount,
-        cell: ({ row }) => (
-          <span className="tabular-nums text-muted-foreground">{row.original.puzzleCount}</span>
-        ),
-      },
-      {
-        id: 'lockedAt',
-        header: 'Locked',
-        meta: { icon: DATA_ICONS.started },
-        accessorFn: (row) => row.lockedAt ?? '',
-        cell: ({ row }) => (
-          <span className="text-muted-foreground">
-            {row.original.lockedAt
-              ? new Date(row.original.lockedAt).toLocaleDateString(undefined, {
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric',
-                })
-              : '—'}
-          </span>
-        ),
-      },
-    ],
-    [selectedId],
-  )
-
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
-<h1 className="mb-6 text-xl font-semibold">New schedule</h1>
+      <h1 className="mb-6 text-xl font-semibold">New schedule</h1>
 
-      {!subsetsLoading && subsets.length === 0 ? (
+      {subsetsTotal === 0 ? (
         <p className="text-sm text-muted-foreground">
           No locked subsets available. Subsets must be locked before they can be used in a schedule.
         </p>
@@ -141,20 +62,11 @@ export function ScheduleNewPage(): React.ReactElement | null {
 
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium">Subset</label>
-            {subsetsLoading ? (
-              <p className="text-sm text-muted-foreground">Loading…</p>
-            ) : (
-              <DataTable
-                tableId={false}
-                columns={columns}
-                data={subsets}
-                globalFilterPlaceholder="Search subsets…"
-                pageSize={8}
-                onRowClick={(row) => setSelectedSubset(selectedSubset?.id === row.id ? null : row)}
-                getRowClassName={(row) => row.id === selectedId ? 'bg-muted' : ''}
-                emptyMessage="No locked subsets available."
-              />
-            )}
+            <SubsetsTable
+              selectedId={selectedSubset?.id ?? null}
+              onSelect={(subset) => setSelectedSubset(subset)}
+              onCountChange={(total) => setSubsetsTotal(total)}
+            />
           </div>
 
           <Button type="submit" disabled={!canSubmit} className="self-start">
