@@ -1,13 +1,15 @@
 import * as React from "react";
 import { useState, useRef } from "react";
+import { useServerTable } from "../../hooks/useServerTable";
 import { useNavigate, Link } from "@tanstack/react-router";
-import { Loader2, Trash2, PencilLine, Lock } from "lucide-react";
+import { Loader2, Trash2, PencilLine, Lock, Activity } from "lucide-react";
 import { formatDate } from "../../lib/utils";
 import { type ColumnDef } from "@tanstack/react-table";
 import { UserAvatar } from "../UserAvatar";
 import { StatusBadge } from "../StatusBadge";
 import { useAuth } from "../../context/auth";
 import { ServerDataTable } from "../ServerDataTable";
+import { col, actionCol } from "../DataTable";
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -22,6 +24,7 @@ import {
 import type { ScheduleSummary } from "../../lib/api";
 import { api } from "../../lib/api";
 import { useUserFilterSpec } from "../../hooks/useUserFilterSpec";
+import { useSubsetFilterSpec } from "../../hooks/useSubsetFilterSpec";
 import { formatDuration } from "./DurationInput";
 import { toast } from "../../lib/toast";
 import { CONCEPT_ICONS, DATA_ICONS } from "../../lib/icons";
@@ -37,19 +40,26 @@ type SchedulesTableProps = {
   subsetId?: number;
   onCountChange?: (count: number) => void;
   tableId?: string;
+  // Picker mode: rows act as radio buttons instead of navigating.
+  selectedId?: number | null;
+  onSelect?: (item: ScheduleSummary | null) => void;
 };
 
 export function SchedulesTable({
   subsetId,
   onCountChange,
   tableId,
+  selectedId,
+  onSelect,
 }: SchedulesTableProps): React.ReactElement {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const userFilterSpec = useUserFilterSpec('userIds');
+  const userFilterSpec = useUserFilterSpec('userId', 'Creator');
+  const subsetFilterSpec = useSubsetFilterSpec('subsetId', 'Subset');
+  const pickerMode = onSelect !== undefined;
 
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const { refreshKey, refetch } = useServerTable();
 
   const deletingIdRef = useRef(deletingId);
   deletingIdRef.current = deletingId;
@@ -62,7 +72,7 @@ export function SchedulesTable({
     try {
       await api.schedules.delete(item.id);
       toast.success("Schedule deleted", { description: `"${item.name}" has been removed.` });
-      setRefreshKey((k) => k + 1);
+      refetch();
     } finally {
       setDeletingId(null);
       setTimeout(() => { blockNavRef.current = false; }, 300);
@@ -71,85 +81,120 @@ export function SchedulesTable({
   const handleDeleteRef = useRef(handleDelete);
   handleDeleteRef.current = handleDelete;
 
-  const columns = React.useMemo<ColumnDef<ScheduleSummary>[]>(
-    () => [
-      {
-        id: "creator",
-        accessorFn: (row) => row.createdBy.displayName,
-        header: "Creator",
-        meta: { icon: DATA_ICONS.user },
+  const columns = React.useMemo<ColumnDef<ScheduleSummary>[]>(() => {
+    const cols: ColumnDef<ScheduleSummary>[] = []
+
+    if (pickerMode) {
+      cols.push(actionCol({
+        id: "select",
+        header: "",
         enableSorting: false,
         cell: ({ row }) => (
-          <UserAvatar
-            displayName={row.original.createdBy.displayName}
-            avatarUrl={row.original.createdBy.avatarUrl}
-          />
+          <div className="h-4 w-4 shrink-0 rounded-full border border-primary flex items-center justify-center">
+            {row.original.id === selectedId && (
+              <div className="h-2.5 w-2.5 rounded-full bg-primary" />
+            )}
+          </div>
         ),
-      },
-      {
-        accessorKey: "name",
-        header: "Name",
-        meta: { icon: DATA_ICONS.name },
-        cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
-      },
-      {
-        id: "subset",
-        accessorFn: (row) => row.subsetName,
-        header: "Subset",
-        meta: { icon: CONCEPT_ICONS.Subset },
-        enableSorting: false,
-        cell: ({ row }) => (
-          <Link
-            to="/app/subsets/$subsetId"
-            params={{ subsetId: String(row.original.subsetId) }}
-            className="text-sm text-muted-foreground hover:underline"
-            title={row.original.subsetName}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {row.original.subsetName}
-          </Link>
-        ),
-      },
-      {
+      }))
+    }
+
+    cols.push(col({
+      id: "creator",
+      accessorFn: (row) => row.createdBy.displayName,
+      header: "Creator",
+      meta: { icon: DATA_ICONS.user },
+      enableSorting: false,
+      cell: ({ row }) => (
+        <UserAvatar
+          displayName={row.original.createdBy.displayName}
+          avatarUrl={row.original.createdBy.avatarUrl}
+        />
+      ),
+    }))
+
+    cols.push(col({
+      accessorKey: "name",
+      header: "Name",
+      meta: { icon: DATA_ICONS.name },
+      cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+    }))
+
+    if (!pickerMode) {
+      cols.push(col({
         accessorKey: "status",
         header: "Status",
         meta: { icon: DATA_ICONS.status },
         enableSorting: false,
         cell: ({ row }) => <StatusBadge status={row.original.status} />,
-      },
-      {
-        accessorKey: "runCount",
-        header: "Runs",
-        meta: { icon: CONCEPT_ICONS.Run },
-        cell: ({ row }) => (
-          <span className="tabular-nums text-muted-foreground">
-            {row.original.runCount > 0 ? row.original.runCount : "—"}
-          </span>
-        ),
-      },
-      {
-        accessorKey: "totalHours",
-        header: "Duration",
-        meta: { icon: DATA_ICONS.time },
-        cell: ({ row }) => (
-          <span className="tabular-nums text-muted-foreground">
-            {row.original.totalHours > 0 ? formatDuration(row.original.totalHours) : "—"}
-          </span>
-        ),
-      },
-      {
-        id: "date",
-        accessorFn: (row) =>
-          row.lockedAt ? new Date(row.lockedAt).getTime() : new Date(row.createdAt).getTime(),
-        header: "Date",
-        meta: { icon: DATA_ICONS.started },
-        cell: ({ row }) => (
-          <span className="text-muted-foreground">
-            {formatDate(row.original.lockedAt ?? row.original.createdAt)}
-          </span>
-        ),
-      },
-      {
+      }))
+    }
+
+    cols.push(col({
+      id: "subset",
+      accessorFn: (row) => row.subsetName,
+      header: "Subset",
+      meta: { icon: CONCEPT_ICONS.Subset },
+      enableSorting: false,
+      cell: ({ row }) => (
+        <Link
+          to="/app/subsets/$subsetId"
+          params={{ subsetId: String(row.original.subsetId) }}
+          className="text-sm text-muted-foreground hover:underline"
+          title={row.original.subsetName}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {row.original.subsetName}
+        </Link>
+      ),
+    }))
+
+    cols.push(col({
+      accessorKey: "subsetPuzzleCount",
+      header: "Puzzles",
+      meta: { icon: DATA_ICONS.puzzles },
+      cell: ({ row }) => (
+        <span className="tabular-nums text-muted-foreground">{row.original.subsetPuzzleCount}</span>
+      ),
+    }))
+
+    cols.push(col({
+      accessorKey: "runCount",
+      header: "Runs",
+      meta: { icon: CONCEPT_ICONS.Run },
+      cell: ({ row }) => (
+        <span className="tabular-nums text-muted-foreground">
+          {row.original.runCount > 0 ? row.original.runCount : "—"}
+        </span>
+      ),
+    }))
+
+    cols.push(col({
+      accessorKey: "totalHours",
+      header: "Duration",
+      meta: { icon: DATA_ICONS.time },
+      cell: ({ row }) => (
+        <span className="tabular-nums text-muted-foreground">
+          {row.original.totalHours > 0 ? formatDuration(row.original.totalHours) : "—"}
+        </span>
+      ),
+    }))
+
+    cols.push(col({
+      id: "date",
+      accessorFn: (row) =>
+        row.lockedAt ? new Date(row.lockedAt).getTime() : new Date(row.createdAt).getTime(),
+      header: "Date",
+      meta: { icon: DATA_ICONS.started },
+      cell: ({ row }) => (
+        <span className="text-muted-foreground">
+          {formatDate(row.original.lockedAt ?? row.original.createdAt)}
+        </span>
+      ),
+    }))
+
+    if (!pickerMode) {
+      cols.push(actionCol({
         id: "actions",
         header: "",
         enableSorting: false,
@@ -191,41 +236,51 @@ export function SchedulesTable({
             </AlertDialog>
           );
         },
-      },
-    ],
-    [user],
-  );
+      }))
+    }
+
+    return cols
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, selectedId, pickerMode]);
 
   return (
     <ServerDataTable
-      tableId={tableId}
+      tableId={pickerMode ? false : tableId}
       columns={columns}
-      pageSize={PAGE_SIZE}
+      pageSize={pickerMode ? 10 : PAGE_SIZE}
       refreshKey={refreshKey}
       filters={[
         userFilterSpec,
-        { type: 'multi', key: 'statuses', label: 'statuses', options: STATUS_OPTIONS },
-        { type: 'search', key: 'q', placeholder: 'Search schedules…' },
+        ...(subsetId === undefined && !pickerMode ? [subsetFilterSpec] : []),
+        ...(!pickerMode ? [
+          { type: 'multi' as const, key: 'status', label: 'Status', options: STATUS_OPTIONS, icon: Activity },
+        ] : []),
+        { type: 'date', key: 'date', label: 'Date', icon: DATA_ICONS.started },
+        { type: 'range', key: 'runCount', label: 'Runs', min: 0, max: 10, step: 1, icon: CONCEPT_ICONS.Run, formatValue: (v: number) => v >= 10 ? '10+' : String(v) },
+        { type: 'range', key: 'puzzleCount', label: 'Puzzles', min: 0, max: 1000, step: 25, icon: DATA_ICONS.puzzles, formatValue: (v: number) => v >= 1000 ? '1000+' : String(v) },
+        { type: 'search', key: 'q' },
       ]}
-      fetchData={({ filters, page }) =>
-        api.schedules.list({
-          subsetId,
-          search: filters.q?.[0] || undefined,
-          page,
-          pageSize: PAGE_SIZE,
-          userIds: filters.userIds?.map(Number),
-          statuses: filters.statuses?.length ? filters.statuses : undefined,
+      fetchData={(params) =>
+        api.schedules.list(params, {
+          ...(pickerMode && { locked: 'true' }),
+          ...(subsetId !== undefined && { subsetId }),
         })
       }
       onDataChange={(_, total) => onCountChange?.(total)}
       onRowClick={(schedule) => {
+        if (pickerMode) {
+          onSelect(schedule.id === selectedId ? null : schedule);
+          return;
+        }
         if (blockNavRef.current) return;
         void navigate({
           to: "/app/schedules/$scheduleId",
           params: { scheduleId: String(schedule.id) },
         });
       }}
-      emptyMessage="No schedules match your filters."
+      getRowClassName={pickerMode ? (row) => row.id === selectedId ? 'bg-muted' : '' : undefined}
+      initialSorting={[{ id: 'date', desc: true }]}
+      emptyMessage={pickerMode ? 'No locked schedules match your filters.' : 'No schedules match your filters.'}
     />
   );
 }

@@ -1,6 +1,33 @@
 import { request } from './request'
 export { ApiError } from './request'
 
+// ---------------------------------------------------------------------------
+// Table params — shared serialiser for ServerDataTable → backend
+// ---------------------------------------------------------------------------
+
+// Structural alias for ServerDataTable's FetchParams — defined here to keep
+// api.ts free of UI-layer imports. All api list methods accept this type so
+// fetchData callbacks can call them directly with no manual field mapping.
+//
+// Wire format:
+//   page=1&pageSize=20&q=text
+//   userId=is&userId=1&userId=2   (repeated params; op prefix from entity/multi filters)
+//   status=is&status=active
+//
+// Filter key names must match the backend param names exactly. Search is
+// always keyed 'q' on both sides.
+export type TableParams = { filters: Record<string, string[]>; page: number; pageSize: number }
+
+// Serialises TableParams to URLSearchParams. Exported so callers can build
+// custom requests (e.g. with extra fixed params) without going through an
+// api method.
+export function tableParamsToUrl({ filters, page, pageSize }: TableParams): URLSearchParams {
+  const p = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+  for (const [key, values] of Object.entries(filters))
+    for (const v of values) p.append(key, v)
+  return p
+}
+
 export type AuthUser = {
   status: 'active'
   id: number
@@ -340,6 +367,7 @@ export type ScheduleSummary = {
   createdBy: { id: number; displayName: string; avatarUrl: string | null }
   subsetId: number
   subsetName: string
+  subsetPuzzleCount: number
   runCount: number
   totalHours: number
   puzzleOrder: PuzzleOrder | null
@@ -469,6 +497,7 @@ export type MyTrainingSummary = {
 
 export type AllTrainingSummary = MyTrainingSummary & {
   user: { id: number; displayName: string; avatarUrl: string | null }
+  subsetName: string
 }
 
 export type TrainingPage = {
@@ -486,6 +515,12 @@ export type SelectableSchedule = {
   id: number
   name: string
   status: string
+}
+
+export type SelectableSubset = {
+  id: number
+  name: string
+  status: 'draft' | 'filled' | 'locked'
 }
 
 export type ParticipantInfo = {
@@ -549,6 +584,7 @@ export type WeeklyLeaderboardRow = {
   avgRating: number | null
   avgAccuracyPct: number | null
   avgSolveTimeMs: number | null
+  scheduleNames: string[]
 }
 
 export type PositionStatus =
@@ -660,6 +696,8 @@ export type Run = {
   solvedWithRetriesCount: number
   failedCount: number
   inProgressCount: number
+  avgSolveTimeMs: number | null
+  fastestSolveTimeMs: number | null
   currentRunTrainingItemId: number | null
   paceChart: PaceChartData | null
 }
@@ -675,7 +713,8 @@ export type RunTrainingItemListItem = {
 
 export type RunTrainingItemList = {
   maxTriesPerItem: number
-  trainingItems: RunTrainingItemListItem[]
+  items: RunTrainingItemListItem[]
+  total: number
 }
 
 export type Schedule = {
@@ -1072,24 +1111,16 @@ export const api = {
       request<AuthUser>('/settings', { method: 'PATCH', body: JSON.stringify(payload) }),
   },
   subsets: {
-    list: (opts?: {
-      lockedOnly?: boolean
-      statuses?: string[]
-      search?: string
-      page?: number
-      pageSize?: number
-      userIds?: number[]
-    }): Promise<{ items: Subset[]; total: number }> => {
-      const params = new URLSearchParams()
-      if (opts?.lockedOnly) params.set('locked', 'true')
-      if (opts?.statuses?.length) params.set('statuses', opts.statuses.join(','))
-      if (opts?.search) params.set('search', opts.search)
-      if (opts?.page !== undefined) params.set('page', String(opts.page))
-      if (opts?.pageSize !== undefined) params.set('pageSize', String(opts.pageSize))
-      if (opts?.userIds?.length) params.set('userIds', opts.userIds.join(','))
-      const qs = params.toString()
-      return request(`/subsets${qs ? `?${qs}` : ''}`)
-    },
+    list: (params: TableParams): Promise<{ items: Subset[]; total: number }> =>
+      request(`/subsets?${tableParamsToUrl(params)}`),
+    listLocked: (limit = 20): Promise<{ items: Subset[]; total: number }> =>
+      request(`/subsets?locked=true&pageSize=${limit}`),
+    suggest: (limit = 8): Promise<SelectableSubset[]> =>
+      request(`/subsets/suggest?limit=${limit}`),
+    search: (q: string, limit = 10): Promise<SelectableSubset[]> =>
+      request(`/subsets/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+    getByIds: (ids: number[]): Promise<SelectableSubset[]> =>
+      ids.length === 0 ? Promise.resolve([]) : request(`/subsets/by-ids?ids=${ids.join(',')}`),
     get: (id: number): Promise<Subset> => request(`/subsets/${id}`),
     create: (name: string, puzzleCount: number): Promise<Subset> =>
       request('/subsets', { method: 'POST', body: JSON.stringify({ name, puzzleCount }) }),
@@ -1122,26 +1153,19 @@ export const api = {
     getStats: (id: number): Promise<SubsetStats> => request(`/subsets/${id}/stats`),
   },
   schedules: {
-    list: (opts?: {
-      subsetId?: number
-      lockedOnly?: boolean
-      statuses?: string[]
-      search?: string
-      page?: number
-      pageSize?: number
-      userIds?: number[]
-    }): Promise<{ items: ScheduleSummary[]; total: number }> => {
-      const params = new URLSearchParams()
-      if (opts?.subsetId !== undefined) params.set('subsetId', String(opts.subsetId))
-      if (opts?.lockedOnly) params.set('locked', 'true')
-      if (opts?.statuses?.length) params.set('statuses', opts.statuses.join(','))
-      if (opts?.search) params.set('search', opts.search)
-      if (opts?.page !== undefined) params.set('page', String(opts.page))
-      if (opts?.pageSize !== undefined) params.set('pageSize', String(opts.pageSize))
-      if (opts?.userIds?.length) params.set('userIds', opts.userIds.join(','))
-      const qs = params.toString()
-      return request(`/schedules${qs ? `?${qs}` : ''}`)
+    list: (params: TableParams, fixed?: Record<string, string | number>): Promise<{ items: ScheduleSummary[]; total: number }> => {
+      const p = tableParamsToUrl(params)
+      if (fixed) for (const [k, v] of Object.entries(fixed)) p.set(k, String(v))
+      return request(`/schedules?${p}`)
     },
+    listLocked: (limit = 20): Promise<{ items: ScheduleSummary[]; total: number }> =>
+      request(`/schedules?locked=true&pageSize=${limit}`),
+    suggest: (limit = 8): Promise<SelectableSchedule[]> =>
+      request(`/schedules/suggest?limit=${limit}`),
+    search: (q: string, limit = 10): Promise<SelectableSchedule[]> =>
+      request(`/schedules/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+    getByIds: (ids: number[]): Promise<SelectableSchedule[]> =>
+      ids.length === 0 ? Promise.resolve([]) : request(`/schedules/by-ids?ids=${ids.join(',')}`),
     get: (id: number): Promise<Schedule> => request(`/schedules/${id}`),
     create: (name: string, subsetId: number): Promise<Schedule> =>
       request('/schedules', { method: 'POST', body: JSON.stringify({ name, subsetId }) }),
@@ -1177,24 +1201,10 @@ export const api = {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
       return request(`/training?tz=${encodeURIComponent(tz)}`)
     },
-    listAll: (opts?: {
-      scheduleId?: number
-      userIds?: number[]
-      statuses?: string[]
-      search?: string
-      page?: number
-      pageSize?: number
-    }): Promise<TrainingPage> => {
-      const p = new URLSearchParams()
+    listAll: (params: TableParams): Promise<TrainingPage> => {
+      const p = tableParamsToUrl(params)
       p.set('tz', Intl.DateTimeFormat().resolvedOptions().timeZone)
-      if (opts?.scheduleId !== undefined) p.set('scheduleId', String(opts.scheduleId))
-      if (opts?.userIds?.length) opts.userIds.forEach((id) => p.append('userId', String(id)))
-      if (opts?.statuses?.length) opts.statuses.forEach((s) => p.append('status', s))
-      if (opts?.search) p.set('search', opts.search)
-      if (opts?.page !== undefined) p.set('page', String(opts.page))
-      if (opts?.pageSize !== undefined) p.set('pageSize', String(opts.pageSize))
-      const qs = p.toString()
-      return request(`/training/all${qs ? `?${qs}` : ''}`)
+      return request(`/training/all?${p}`)
     },
     setRunTarget: (
       trainingId: number,
@@ -1215,6 +1225,10 @@ export const api = {
       request(`/training/${trainingId}/status${tz ? `?tz=${encodeURIComponent(tz)}` : ''}`),
     abort: (trainingId: number): Promise<Training> =>
       request(`/training/${trainingId}/abort`, { method: 'POST' }),
+    listRuns: (trainingId: number, params: TableParams): Promise<{ items: Run[]; total: number }> => {
+      const p = tableParamsToUrl(params)
+      return request(`/training/${trainingId}/runs?${p}`)
+    },
   },
   themes: {
     list: (): Promise<Theme[]> => request('/themes'),
@@ -1231,13 +1245,14 @@ export const api = {
         body: JSON.stringify(runIndex === undefined ? {} : { runIndex }),
       }),
     list: (trainingId: number): Promise<Run[]> =>
-      request(`/training/${trainingId}/runs`),
+      request<{ items: Run[]; total: number }>(`/training/${trainingId}/runs?page=1&pageSize=100`)
+        .then((r) => r.items),
     get: (runId: number): Promise<Run> => {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
       return request(`/runs/${runId}?tz=${encodeURIComponent(tz)}`)
     },
-    trainingItems: (runId: number): Promise<RunTrainingItemList> =>
-      request(`/runs/${runId}/training-items`),
+    listTrainingItems: (runId: number, params: TableParams): Promise<RunTrainingItemList> =>
+      request(`/runs/${runId}/training-items?${tableParamsToUrl(params)}`),
     getTrainingItem: (runId: number, runTrainingItemId: number): Promise<RunTrainingItemFull> =>
       request(`/runs/${runId}/training-items/${runTrainingItemId}`),
     getOverview: (
@@ -1266,16 +1281,9 @@ export const api = {
   trainingItems: {
     getAttemptHistory: (
       trainingItemId: number,
-      opts?: { page?: number; pageSize?: number; userId?: number[]; result?: string[] },
-    ): Promise<{ attempts: AttemptHistoryRow[]; total: number }> => {
-      const p = new URLSearchParams()
-      if (opts?.page) p.set('page', String(opts.page))
-      if (opts?.pageSize) p.set('pageSize', String(opts.pageSize))
-      opts?.userId?.forEach((id) => p.append('userId', String(id)))
-      opts?.result?.forEach((r) => p.append('result', r))
-      const qs = p.toString()
-      return request(`/training-items/${trainingItemId}/attempt-history${qs ? `?${qs}` : ''}`)
-    },
+      params: TableParams,
+    ): Promise<{ attempts: AttemptHistoryRow[]; total: number }> =>
+      request(`/training-items/${trainingItemId}/attempt-history?${tableParamsToUrl(params)}`),
     getSpectateView: (trainingItemId: number, attemptId: number): Promise<AttemptSpectateView> =>
       request(`/training-items/${trainingItemId}/attempts/${attemptId}`),
   },
@@ -1290,82 +1298,56 @@ export const api = {
   },
   leaderboard: {
     getRuns: (opts?: { scheduleId?: number; trainingId?: number; runIndex?: number }): Promise<LeaderboardRun[]> => {
-      const p = new URLSearchParams()
+      const p = new URLSearchParams({ pageSize: '100' })
       if (opts?.trainingId !== undefined && opts?.runIndex !== undefined) {
         p.set('trainingId', String(opts.trainingId))
         p.set('runIndex', String(opts.runIndex))
       } else if (opts?.scheduleId !== undefined) {
         p.set('scheduleId', String(opts.scheduleId))
       }
-      const qs = p.toString()
-      return request<{ runs: LeaderboardRun[] }>(`/leaderboard${qs ? `?${qs}` : ''}`).then((r) => r.runs)
+      return request<{ items: LeaderboardRun[] }>(`/leaderboard?${p.toString()}`).then((r) => r.items)
     },
-    getWeekly: (scheduleIds?: number[]): Promise<WeeklyLeaderboardRow[]> => {
-      const qs = scheduleIds?.length ? scheduleIds.map((id) => `scheduleId=${id}`).join('&') : ''
-      return request<{ rows: WeeklyLeaderboardRow[] }>(`/leaderboard/weekly${qs ? `?${qs}` : ''}`).then((r) => r.rows)
+    getWeekly: (): Promise<WeeklyLeaderboardRow[]> =>
+      request<{ items: WeeklyLeaderboardRow[] }>('/leaderboard/weekly?pageSize=100').then((r) => r.items),
+    listRuns: (params: TableParams): Promise<{ items: LeaderboardRun[]; total: number }> =>
+      request(`/leaderboard?${tableParamsToUrl(params).toString()}`),
+    listRunsByTraining: (trainingId: number, runIndex: number, params: TableParams): Promise<{ items: LeaderboardRun[]; total: number }> => {
+      const p = tableParamsToUrl(params)
+      p.set('trainingId', String(trainingId))
+      p.set('runIndex', String(runIndex))
+      return request(`/leaderboard?${p.toString()}`)
     },
+    listWeekly: (params: TableParams): Promise<{ items: WeeklyLeaderboardRow[]; total: number }> =>
+      request(`/leaderboard/weekly?${tableParamsToUrl(params).toString()}`),
   },
   sources: {
     list: (): Promise<{ sources: SourceListItem[] }> => request('/sources/'),
     lichessTactics: {
       sourceRunMetadata: (): Promise<{ metadata: LichessTacticsSourceRunMetadata | null }> =>
         request('/sources/lichess-tactics/source-run-metadata'),
-      items: (params: {
-        page?: number
-        ratingMin?: number
-        ratingMax?: number
-        theme?: string
-        openings?: string[]
-      }): Promise<LichessTacticPage> => {
-        const p = new URLSearchParams()
-        if (params.page !== undefined) p.set('page', String(params.page))
-        if (params.ratingMin !== undefined) p.set('ratingMin', String(params.ratingMin))
-        if (params.ratingMax !== undefined) p.set('ratingMax', String(params.ratingMax))
-        if (params.theme) p.set('theme', params.theme)
-        if (params.openings?.length) p.set('openings', params.openings.join(','))
-        const qs = p.toString()
-        return request(`/sources/lichess-tactics/items${qs ? `?${qs}` : ''}`)
-      },
+      items: (params: TableParams): Promise<LichessTacticPage> =>
+        request(`/sources/lichess-tactics/items?${tableParamsToUrl(params)}`),
     },
     scrapedPositional: {
       sourceRunMetadata: (): Promise<{ metadata: ScrapedPositionalSourceRunMetadata | null }> =>
         request('/sources/scraped-positional/source-run-metadata'),
-      items: (params: {
-        page?: number
-        difficulty?: number
-        theme?: string
-        opening?: string
-      }): Promise<ScrapedPositionalPage> => {
-        const p = new URLSearchParams()
-        if (params.page !== undefined) p.set('page', String(params.page))
-        if (params.difficulty !== undefined) p.set('difficulty', String(params.difficulty))
-        if (params.theme) p.set('theme', params.theme)
-        if (params.opening) p.set('opening', params.opening)
-        const qs = p.toString()
-        return request(`/sources/scraped-positional/items${qs ? `?${qs}` : ''}`)
-      },
+      items: (params: TableParams): Promise<{ items: ScrapedPositionalPuzzle[]; total: number }> =>
+        request(`/sources/scraped-positional/items?${tableParamsToUrl(params)}`),
     },
     decoys: {
       sourceRunMetadata: (): Promise<{ metadata: DecoySourceRunMetadata | null }> =>
         request('/sources/decoys/source-run-metadata'),
-      items: (params: { page?: number; opening?: string }): Promise<DecoyPage> => {
-        const p = new URLSearchParams()
-        if (params.page !== undefined) p.set('page', String(params.page))
-        if (params.opening) p.set('opening', params.opening)
-        const qs = p.toString()
-        return request(`/sources/decoys/items${qs ? `?${qs}` : ''}`)
-      },
+      items: (params: TableParams): Promise<DecoyPage> =>
+        request(`/sources/decoys/items?${tableParamsToUrl(params)}`),
     },
   },
   users: {
+    suggest: (limit = 5): Promise<SelectableUser[]> =>
+      request(`/users/suggest?limit=${limit}`),
     search: (q: string, limit = 10): Promise<SelectableUser[]> =>
       request(`/users/search?q=${encodeURIComponent(q)}&limit=${limit}`),
     getByIds: (ids: number[]): Promise<SelectableUser[]> =>
       ids.length === 0 ? Promise.resolve([]) : request(`/users/by-ids?ids=${ids.join(',')}`),
-  },
-  selectableSchedules: {
-    getByIds: (ids: number[]): Promise<SelectableSchedule[]> =>
-      ids.length === 0 ? Promise.resolve([]) : request(`/schedules/by-ids?ids=${ids.join(',')}`),
   },
   attempts: {
     complete: (
@@ -1383,27 +1365,12 @@ export const api = {
     },
   },
   admin: {
-    users: (params: { page?: number; q?: string }): Promise<{ items: AdminUser[]; total: number }> => {
-      const p = new URLSearchParams()
-      if (params.page !== undefined) p.set('page', String(params.page))
-      if (params.q) p.set('q', params.q)
-      const qs = p.toString()
-      return request(`/admin/users${qs ? `?${qs}` : ''}`)
-    },
-    waitlist: (params: { page?: number; q?: string }): Promise<{ items: AdminWaitlistEntry[]; total: number }> => {
-      const p = new URLSearchParams()
-      if (params.page !== undefined) p.set('page', String(params.page))
-      if (params.q) p.set('q', params.q)
-      const qs = p.toString()
-      return request(`/admin/waitlist${qs ? `?${qs}` : ''}`)
-    },
-    whitelist: (params: { page?: number; q?: string }): Promise<{ items: AdminWhitelistEntry[]; total: number }> => {
-      const p = new URLSearchParams()
-      if (params.page !== undefined) p.set('page', String(params.page))
-      if (params.q) p.set('q', params.q)
-      const qs = p.toString()
-      return request(`/admin/whitelist${qs ? `?${qs}` : ''}`)
-    },
+    users: (params: TableParams): Promise<{ items: AdminUser[]; total: number }> =>
+      request(`/admin/users?${tableParamsToUrl(params)}`),
+    waitlist: (params: TableParams): Promise<{ items: AdminWaitlistEntry[]; total: number }> =>
+      request(`/admin/waitlist?${tableParamsToUrl(params)}`),
+    whitelist: (params: TableParams): Promise<{ items: AdminWhitelistEntry[]; total: number }> =>
+      request(`/admin/whitelist?${tableParamsToUrl(params)}`),
     addWhitelist: (lichessUsername: string): Promise<AdminWhitelistEntry> =>
       request('/admin/whitelist', { method: 'POST', body: JSON.stringify({ lichessUsername }) }),
     deleteWhitelist: (username: string): Promise<void> =>

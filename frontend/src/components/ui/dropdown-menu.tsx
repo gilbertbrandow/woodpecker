@@ -1,5 +1,6 @@
 import * as React from 'react'
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
+import { Check } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
 const DropdownMenu = DropdownMenuPrimitive.Root
@@ -70,6 +71,36 @@ function DropdownMenuItem({
   )
 }
 
+function DropdownMenuCheckboxItem({
+  className,
+  children,
+  checked,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.CheckboxItem>): React.ReactElement {
+  return (
+    <DropdownMenuPrimitive.CheckboxItem
+      className={cn(
+        'flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors',
+        'focus:bg-accent focus:text-accent-foreground',
+        'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+        className,
+      )}
+      checked={checked}
+      {...props}
+    >
+      <div
+        className={cn(
+          'flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary',
+          checked ? 'bg-primary text-primary-foreground' : 'opacity-50 [&_svg]:invisible',
+        )}
+      >
+        <Check className="h-3 w-3" />
+      </div>
+      {children}
+    </DropdownMenuPrimitive.CheckboxItem>
+  )
+}
+
 export {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -77,4 +108,5 @@ export {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuItem,
+  DropdownMenuCheckboxItem,
 }

@@ -2,6 +2,7 @@ from flask import Blueprint, Response, jsonify, request, session
 
 from app.decorators import login_required
 from app.services import run as run_svc
+from app.table_query import TableQuery
 
 runs_bp = Blueprint("runs", __name__, url_prefix="/runs")
 
@@ -31,7 +32,16 @@ def continue_run(run_id: int) -> tuple[Response, int] | Response:
 @runs_bp.get("/<int:run_id>/training-items")
 @login_required
 def list_run_training_items(run_id: int) -> tuple[Response, int] | Response:
-    result = run_svc.list_run_puzzles(run_id)
+    q = TableQuery(request)
+    result = run_svc.list_run_puzzles(
+        run_id,
+        page=q.page,
+        page_size=q.page_size,
+        source_type=q.str_filter('sourceType'),
+        position_status=q.str_filter('positionStatus'),
+        time_ms=q.range_filter('timeMs'),
+        rating=q.range_filter('rating'),
+    )
     return jsonify(result)
 
 

@@ -317,7 +317,7 @@ class TestApiResponsePrivacy:
             response = client.get("/leaderboard")
             assert response.status_code == 200
             data = response.get_json()
-            for run in data.get("runs", []):
+            for run in data["items"]:
                 assert "lichess_username" not in run
                 assert "username" not in run
 

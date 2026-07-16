@@ -3,6 +3,7 @@ from flask import Blueprint, Response, jsonify, request, session
 from app.decorators import login_required
 from app.services import run as run_svc
 from app.services import training as training_svc
+from app.table_query import TableQuery
 
 training_bp = Blueprint("training", __name__, url_prefix="/training")
 
@@ -28,23 +29,18 @@ def list_my_trainings() -> Response:
 @training_bp.get("/all")
 @login_required
 def list_all_trainings() -> Response:
-    schedule_id_raw = request.args.get("scheduleId")
-    schedule_id = int(schedule_id_raw) if schedule_id_raw and schedule_id_raw.isdigit() else None
-    user_ids = [int(v) for v in request.args.getlist("userId") if v.isdigit()]
-    statuses = request.args.getlist("status") or None
-    search = request.args.get("search") or None
-    page_raw = request.args.get("page", "1")
-    page_size_raw = request.args.get("pageSize", "20")
-    page = max(1, int(page_raw)) if page_raw.isdigit() else 1
-    page_size = min(100, max(1, int(page_size_raw))) if page_size_raw.isdigit() else 20
+    q = TableQuery(request)
     tz_str = request.args.get("tz", "UTC")
     return jsonify(training_svc.list_all_trainings(
-        schedule_id=schedule_id,
-        user_ids=user_ids or None,
-        statuses=statuses,
-        search=search,
-        page=page,
-        page_size=page_size,
+        schedule_ids=q.int_filter("scheduleId"),
+        subset_ids=q.int_filter("subsetId"),
+        user_ids=q.int_filter("userId"),
+        status=q.str_filter("status"),
+        started_at=q.date_filter("startedAt"),
+        completed_at=q.date_filter("completedAt"),
+        search=q.q,
+        page=q.page,
+        page_size=q.page_size,
         tz_str=tz_str,
     ))
 
@@ -106,8 +102,16 @@ def start_run(training_id: int) -> tuple[Response, int]:
 @training_bp.get("/<int:training_id>/runs")
 @login_required
 def list_runs(training_id: int) -> tuple[Response, int] | Response:
-    runs = run_svc.list_runs(training_id)
-    return jsonify([run_svc.run_dict(r) for r in runs])
+    q = TableQuery(request)
+    result = run_svc.list_runs_paged(
+        training_id,
+        page=q.page,
+        page_size=q.page_size,
+        status=q.str_filter("status"),
+        started_at=q.date_filter("startedAt"),
+        completed_at=q.date_filter("completedAt"),
+    )
+    return jsonify(result)
 
 
 @training_bp.get("/<int:training_id>/cross-run-item/<int:training_item_id>")

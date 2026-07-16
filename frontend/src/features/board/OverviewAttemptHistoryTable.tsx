@@ -7,8 +7,8 @@ import { UserAvatar } from '../../components/UserAvatar'
 import { CONCEPT_ICONS, DATA_ICONS } from '../../lib/icons'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 import { ServerDataTable, type FetchParams } from '../../components/ServerDataTable'
+import { col } from '../../components/DataTable'
 import { useUserFilterSpec } from '../../hooks/useUserFilterSpec'
-import { MultiSelectFilter } from '../../components/ui/multi-select-filter'
 import { UserSelector } from '../../components/UserSelector'
 import type { SelectableUser } from '../../lib/api'
 
@@ -36,17 +36,10 @@ const RESULT_OPTIONS = [
 ]
 
 const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
-  {
+  col({
     id: 'user',
-    header: () => (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex"><DATA_ICONS.user className="h-3.5 w-3.5" /></span>
-        </TooltipTrigger>
-        <TooltipContent>User</TooltipContent>
-      </Tooltip>
-    ),
-    meta: { className: 'px-2 py-1 text-xs' },
+    header: 'User',
+    meta: { className: 'px-2 py-1 text-xs', icon: DATA_ICONS.user, iconOnly: true },
     enableSorting: false,
     cell: ({ row }) => {
       const { displayName, avatarUrl } = row.original
@@ -56,16 +49,16 @@ const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
         <span className="inline-block h-4 w-4 rounded-full bg-muted" />
       )
     },
-  },
-  {
+  }),
+  col({
     id: 'runLabel',
     accessorKey: 'runOrder',
     header: 'Run',
     meta: { className: 'px-2 py-1', icon: CONCEPT_ICONS.Run },
     enableSorting: true,
     cell: ({ row }) => row.original.runLabel,
-  },
-  {
+  }),
+  col({
     accessorKey: 'tryNumber',
     header: 'Try',
     enableSorting: false,
@@ -83,17 +76,10 @@ const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
         </Tooltip>
       ),
     meta: { className: 'px-2 py-1', icon: DATA_ICONS.tries },
-  },
-  {
+  }),
+  col({
     accessorKey: 'result',
-    header: () => (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex"><CheckCheck className="h-3.5 w-3.5" /></span>
-        </TooltipTrigger>
-        <TooltipContent>Result</TooltipContent>
-      </Tooltip>
-    ),
+    header: 'Result',
     enableSorting: false,
     cell: ({ row }) =>
       row.original.result === 'solved' ? (
@@ -101,9 +87,9 @@ const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
       ) : (
         <X className="h-3 w-3" />
       ),
-    meta: { className: 'px-2 py-1 text-xs' },
-  },
-  {
+    meta: { className: 'px-2 py-1 text-xs', icon: CheckCheck, iconOnly: true },
+  }),
+  col({
     accessorKey: 'timeSpentMs',
     header: 'Time',
     enableSorting: true,
@@ -111,14 +97,14 @@ const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
     cell: ({ row }) =>
       row.original.timeSpentMs !== null ? formatSolveTimeMs(row.original.timeSpentMs) : '—',
     meta: { className: 'px-2 py-1', icon: DATA_ICONS.time },
-  },
-  {
+  }),
+  col({
     accessorKey: 'startedAt',
     header: 'Date',
     enableSorting: true,
     cell: ({ row }) => (row.original.startedAt ? row.original.startedAt.slice(0, 10) : '—'),
     meta: { className: 'px-2 py-1', icon: DATA_ICONS.started },
-  },
+  }),
 ]
 
 type OverviewAttemptHistoryTableProps = {
@@ -157,27 +143,13 @@ export function OverviewAttemptHistoryTable({
           />
         ),
       },
-      {
-        type: 'custom' as const,
-        key: 'result',
-        render: (value: string[], onChange: (v: string[]) => void) => (
-          <MultiSelectFilter
-            label="Result"
-            options={RESULT_OPTIONS}
-            selected={value}
-            onChange={onChange}
-            className="h-7 text-xs"
-          />
-        ),
-        serialize: (v: string[]) => v,
-        resolveInstant: (id: string) => id,
-      },
+      { type: 'multi' as const, key: 'result', label: 'Result', options: RESULT_OPTIONS },
     ],
     [baseUserFilter, onUserFilterChange],
   )
 
   const initialCustomValues = React.useMemo(
-    () => ({ userId: [currentUser], result: [] }),
+    () => ({ userId: [currentUser] }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [], // captured at mount; currentUser provides the default "me" filter
   )
@@ -190,12 +162,7 @@ export function OverviewAttemptHistoryTable({
 
   const fetchData = React.useCallback(
     async (params: FetchParams): Promise<{ items: OverviewAttemptHistoryRow[]; total: number }> => {
-      const { attempts, total } = await api.trainingItems.getAttemptHistory(trainingItemId, {
-        page: params.page,
-        pageSize: PAGE_SIZE,
-        userId: (params.filters.userId ?? []).map(Number),
-        result: params.filters.result ?? [],
-      })
+      const { attempts, total } = await api.trainingItems.getAttemptHistory(trainingItemId, params)
       return {
         items: attempts.map((a) => ({
           attemptId: a.attemptId,
@@ -237,6 +204,7 @@ export function OverviewAttemptHistoryTable({
       getRowClassName={getRowClassName}
       initialSorting={[{ id: 'startedAt', desc: true }]}
       emptyMessage="No attempts recorded."
+      compact
     />
   )
 }

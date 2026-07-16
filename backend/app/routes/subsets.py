@@ -4,8 +4,34 @@ from app.decorators import login_required
 from app.extensions import db
 from app.models.user import User
 from app.services import subset as subset_svc
+from app.table_query import TableQuery
 
 subsets_bp = Blueprint("subsets", __name__, url_prefix="/subsets")
+
+
+@subsets_bp.get("/suggest")
+@login_required
+def suggest_subsets() -> Response:
+    limit = min(20, max(1, int(request.args.get("limit", "8"))))
+    return jsonify(subset_svc.suggest_subsets(limit=limit))
+
+
+@subsets_bp.get("/search")
+@login_required
+def search_subsets() -> Response:
+    q = request.args.get("q", "").strip()
+    limit = min(50, max(1, int(request.args.get("limit", "10"))))
+    if not q:
+        return jsonify([])
+    return jsonify(subset_svc.search_subsets(q, limit=limit))
+
+
+@subsets_bp.get("/by-ids")
+@login_required
+def get_subsets_by_ids() -> Response:
+    ids_raw = request.args.get("ids", "")
+    ids = [int(x) for x in ids_raw.split(",") if x.strip().isdigit()]
+    return jsonify(subset_svc.get_subsets_by_ids(ids))
 
 
 @subsets_bp.post("")
@@ -25,24 +51,17 @@ def create_subset() -> tuple[Response, int]:
 @subsets_bp.get("")
 @login_required
 def list_subsets() -> Response:
-    locked_only = request.args.get("locked") == "true"
-    search = request.args.get("search") or None
-    page_raw = request.args.get("page")
-    page_size_raw = request.args.get("pageSize")
-    page = int(page_raw) if page_raw and page_raw.isdigit() else 1
-    page_size = int(page_size_raw) if page_size_raw and page_size_raw.isdigit() else 20
-    user_ids_raw = request.args.get("userIds")
-    user_ids = [int(x) for x in user_ids_raw.split(",") if x.strip().isdigit()] if user_ids_raw else None
-    statuses_raw = request.args.get("statuses")
-    statuses = [s.strip() for s in statuses_raw.split(",") if s.strip()] if statuses_raw else None
+    q = TableQuery(request)
     result = subset_svc.list_subsets(
         session["user_id"],
-        locked_only=locked_only,
-        statuses=statuses,
-        search=search,
-        page=page,
-        page_size=page_size,
-        user_ids=user_ids,
+        locked_only=q.flag("locked"),
+        status=q.str_filter("status"),
+        search=q.q,
+        page=q.page,
+        page_size=q.page_size,
+        user_ids=q.int_filter("userId"),
+        date=q.date_filter("date"),
+        puzzle_count=q.range_filter("puzzleCount"),
     )
     return jsonify(result)
 

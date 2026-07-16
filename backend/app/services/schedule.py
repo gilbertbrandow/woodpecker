@@ -4,6 +4,7 @@ from typing import cast
 import sqlalchemy as sa
 
 from app.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
+from app.table_query import DateFilter, FilterList, RangeFilter
 from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.subset import Subset
@@ -130,6 +131,23 @@ def delete_schedule(schedule_id: int, user_id: int) -> None:
     db.session.commit()
 
 
+def suggest_schedules(limit: int = 8) -> list[dict[str, object]]:
+    rows = db.session.scalars(
+        sa.select(Schedule).order_by(Schedule.created_at.desc()).limit(limit)
+    ).all()
+    return [{"id": s.id, "name": s.name, "status": s.status} for s in rows]
+
+
+def search_schedules(q: str, limit: int = 10) -> list[dict[str, object]]:
+    rows = db.session.scalars(
+        sa.select(Schedule)
+        .where(Schedule.name.ilike(f"%{q}%"))
+        .order_by(Schedule.name)
+        .limit(limit)
+    ).all()
+    return [{"id": s.id, "name": s.name, "status": s.status} for s in rows]
+
+
 def get_schedule(schedule_id: int, user_id: int) -> Schedule:
     return _get_accessible_schedule(schedule_id, user_id)
 
@@ -168,15 +186,24 @@ def get_schedule_insights(schedule_id: int, user_id: int) -> list[dict[str, obje
     return result
 
 
+_SCHEDULE_STATUS_SQL: dict[str, str] = {
+    "locked": "s.locked_at IS NOT NULL",
+    "draft": "s.locked_at IS NULL",
+}
+
+
 def list_schedules(
     user_id: int,
-    subset_id: int | None = None,
+    subset_ids: FilterList | None = None,
     locked_only: bool = False,
-    statuses: list[str] | None = None,
+    status: FilterList | None = None,
     search: str | None = None,
     page: int = 1,
     page_size: int = 20,
-    user_ids: list[int] | None = None,
+    user_ids: FilterList | None = None,
+    date: DateFilter | None = None,
+    run_count: RangeFilter | None = None,
+    puzzle_count: RangeFilter | None = None,
 ) -> dict[str, object]:
     if locked_only:
         access_clause = "s.locked_at IS NOT NULL"
@@ -184,27 +211,25 @@ def list_schedules(
         access_clause = "(s.locked_at IS NOT NULL OR s.user_id = :uid)"
 
     params: dict[str, object] = {"uid": user_id}
-    conditions: list[str] = [f"WHERE {access_clause}"]
+    conditions: list[str] = [access_clause]
 
-    if subset_id is not None:
-        conditions.append("AND s.subset_id = :subset_id")
-        params["subset_id"] = subset_id
+    if subset_ids is not None:
+        subset_ids.apply(conditions, params, "s.subset_id", prefix="ssid")
     if search:
-        conditions.append("AND s.name ILIKE :search")
+        conditions.append("s.name ILIKE :search")
         params["search"] = f"%{search}%"
-    if user_ids:
-        uid_list = ",".join(str(int(uid)) for uid in user_ids)
-        conditions.append(f"AND s.user_id IN ({uid_list})")
-    if statuses and not locked_only:
-        status_parts: list[str] = []
-        if "locked" in statuses:
-            status_parts.append("s.locked_at IS NOT NULL")
-        if "draft" in statuses:
-            status_parts.append("s.locked_at IS NULL")
-        if status_parts:
-            conditions.append(f"AND ({' OR '.join(status_parts)})")
+    if user_ids is not None:
+        user_ids.apply(conditions, params, "s.user_id", prefix="uid")
+    if status is not None and not locked_only:
+        status.apply_status(conditions, _SCHEDULE_STATUS_SQL)
+    if date is not None:
+        date.apply(conditions, params, "DATE(COALESCE(s.locked_at, s.created_at))", prefix="date")
+    if run_count is not None:
+        run_count.apply(conditions, params, "COALESCE(jsonb_array_length(s.config->'runs'), 0)", prefix="rc", as_int=True)
+    if puzzle_count is not None:
+        puzzle_count.apply(conditions, params, "COALESCE(sub.locked_puzzle_count, sub.puzzle_count)", prefix="pc", as_int=True)
 
-    where_sql = " ".join(conditions)
+    where_sql = "WHERE " + " AND ".join(conditions)
     base_sql = f"""
         FROM schedules s
         JOIN users u ON u.id = s.user_id
@@ -225,7 +250,8 @@ def list_schedules(
             SELECT s.id, s.name, s.description, s.config,
                    s.created_at, s.locked_at, s.subset_id,
                    u.id AS user_id, u.display_name, u.avatar_url,
-                   sub.name AS subset_name
+                   sub.name AS subset_name,
+                   COALESCE(sub.locked_puzzle_count, sub.puzzle_count) AS subset_puzzle_count
             {base_sql}
             ORDER BY s.created_at DESC
             {limit_clause}
@@ -237,11 +263,11 @@ def list_schedules(
     for row in rows:
         if isinstance(row.config, dict):
             schedule_cfg = ScheduleConfig.from_dict(row.config)
-            run_count = len(schedule_cfg.runs)
+            run_cnt = len(schedule_cfg.runs)
             total_hours = schedule_cfg.total_hours
             puzzle_order: str | None = schedule_cfg.puzzle_order
         else:
-            run_count = 0
+            run_cnt = 0
             total_hours = 0
             puzzle_order = None
         items.append({
@@ -252,7 +278,8 @@ def list_schedules(
             "createdBy": {"id": int(row.user_id), "displayName": row.display_name, "avatarUrl": row.avatar_url},
             "subsetId": row.subset_id,
             "subsetName": row.subset_name,
-            "runCount": run_count,
+            "subsetPuzzleCount": int(row.subset_puzzle_count) if row.subset_puzzle_count is not None else 0,
+            "runCount": run_cnt,
             "totalHours": total_hours,
             "puzzleOrder": puzzle_order,
             "createdAt": row.created_at.isoformat(),

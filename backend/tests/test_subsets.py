@@ -1362,6 +1362,157 @@ class TestListSubsetsLockedOnly:
         assert resp.get_json()["items"] == []
 
 
+# ── Route: GET /subsets — date and puzzleCount filters ───────────────────────────
+
+@pytest.mark.integration
+class TestListSubsetsFilters:
+    """Tests for the date and puzzleCount query filters on GET /subsets."""
+
+    def _make_dated_subset(self, session, user, created: datetime, puzzle_count: int = 10):  # type: ignore[misc]
+        from app.models.subset import Subset
+        subset = Subset(user_id=user.id, name="dated", puzzle_count=puzzle_count)
+        session.add(subset)
+        session.flush()
+        # Override the server default so we can control the date precisely.
+        subset.created_at = created
+        session.flush()
+        return subset
+
+    def test_date_after_excludes_older(self, client: FlaskClient, db_session) -> None:
+        user = _make_user(db_session, "lsf_date_after")
+        _login(client, user.id)
+        jan = self._make_dated_subset(db_session, user, datetime(2024, 1, 15, tzinfo=timezone.utc))
+        mar = self._make_dated_subset(db_session, user, datetime(2024, 3, 15, tzinfo=timezone.utc))
+
+        resp = client.get("/subsets?date=after&date=2024-02-01")
+
+        assert resp.status_code == 200
+        ids = {item["id"] for item in resp.get_json()["items"]}
+        assert mar.id in ids
+        assert jan.id not in ids
+
+    def test_date_before_excludes_newer(self, client: FlaskClient, db_session) -> None:
+        user = _make_user(db_session, "lsf_date_before")
+        _login(client, user.id)
+        jan = self._make_dated_subset(db_session, user, datetime(2024, 1, 15, tzinfo=timezone.utc))
+        mar = self._make_dated_subset(db_session, user, datetime(2024, 3, 15, tzinfo=timezone.utc))
+
+        resp = client.get("/subsets?date=before&date=2024-02-01")
+
+        assert resp.status_code == 200
+        ids = {item["id"] for item in resp.get_json()["items"]}
+        assert jan.id in ids
+        assert mar.id not in ids
+
+    def test_date_between_filters_to_range(self, client: FlaskClient, db_session) -> None:
+        user = _make_user(db_session, "lsf_date_between")
+        _login(client, user.id)
+        jan = self._make_dated_subset(db_session, user, datetime(2024, 1, 15, tzinfo=timezone.utc))
+        mar = self._make_dated_subset(db_session, user, datetime(2024, 3, 15, tzinfo=timezone.utc))
+
+        resp = client.get("/subsets?date=between&date=2024-01-01&date=2024-02-01")
+
+        assert resp.status_code == 200
+        ids = {item["id"] for item in resp.get_json()["items"]}
+        assert jan.id in ids
+        assert mar.id not in ids
+
+    def test_date_not_between_excludes_range(self, client: FlaskClient, db_session) -> None:
+        user = _make_user(db_session, "lsf_date_notbetween")
+        _login(client, user.id)
+        jan = self._make_dated_subset(db_session, user, datetime(2024, 1, 15, tzinfo=timezone.utc))
+        mar = self._make_dated_subset(db_session, user, datetime(2024, 3, 15, tzinfo=timezone.utc))
+
+        resp = client.get("/subsets?date=not_between&date=2024-01-01&date=2024-02-01")
+
+        assert resp.status_code == 200
+        ids = {item["id"] for item in resp.get_json()["items"]}
+        assert mar.id in ids
+        assert jan.id not in ids
+
+    def test_puzzle_count_gte(self, client: FlaskClient, db_session) -> None:
+        user = _make_user(db_session, "lsf_pc_gte")
+        _login(client, user.id)
+        small = _make_subset(db_session, user, puzzle_count=10)
+        big = _make_subset(db_session, user, puzzle_count=100)
+
+        resp = client.get("/subsets?puzzleCount=gte&puzzleCount=50")
+
+        assert resp.status_code == 200
+        ids = {item["id"] for item in resp.get_json()["items"]}
+        assert big.id in ids
+        assert small.id not in ids
+
+    def test_puzzle_count_lte(self, client: FlaskClient, db_session) -> None:
+        user = _make_user(db_session, "lsf_pc_lte")
+        _login(client, user.id)
+        small = _make_subset(db_session, user, puzzle_count=10)
+        big = _make_subset(db_session, user, puzzle_count=100)
+
+        resp = client.get("/subsets?puzzleCount=lte&puzzleCount=50")
+
+        assert resp.status_code == 200
+        ids = {item["id"] for item in resp.get_json()["items"]}
+        assert small.id in ids
+        assert big.id not in ids
+
+    def test_puzzle_count_between(self, client: FlaskClient, db_session) -> None:
+        user = _make_user(db_session, "lsf_pc_between")
+        _login(client, user.id)
+        small = _make_subset(db_session, user, puzzle_count=10)
+        big = _make_subset(db_session, user, puzzle_count=500)
+
+        resp = client.get("/subsets?puzzleCount=between&puzzleCount=5&puzzleCount=100")
+
+        assert resp.status_code == 200
+        ids = {item["id"] for item in resp.get_json()["items"]}
+        assert small.id in ids
+        assert big.id not in ids
+
+    def test_puzzle_count_not_between(self, client: FlaskClient, db_session) -> None:
+        user = _make_user(db_session, "lsf_pc_notbetween")
+        _login(client, user.id)
+        small = _make_subset(db_session, user, puzzle_count=10)
+        big = _make_subset(db_session, user, puzzle_count=500)
+
+        resp = client.get("/subsets?puzzleCount=not_between&puzzleCount=5&puzzleCount=100")
+
+        assert resp.status_code == 200
+        ids = {item["id"] for item in resp.get_json()["items"]}
+        assert big.id in ids
+        assert small.id not in ids
+
+    def test_date_filter_uses_locked_at_when_set(self, client: FlaskClient, db_session) -> None:
+        user = _make_user(db_session, "lsf_date_locked")
+        _login(client, user.id)
+        # Subset created Jan but locked Mar — the effective date should be Mar.
+        subset = self._make_dated_subset(db_session, user, datetime(2024, 1, 15, tzinfo=timezone.utc))
+        subset.locked_at = datetime(2024, 3, 15, tzinfo=timezone.utc)
+        subset.locked_puzzle_count = 0
+        db_session.flush()
+
+        resp = client.get("/subsets?date=after&date=2024-02-01")
+
+        assert resp.status_code == 200
+        ids = {item["id"] for item in resp.get_json()["items"]}
+        assert subset.id in ids
+
+    def test_puzzle_count_uses_locked_puzzle_count_when_set(self, client: FlaskClient, db_session) -> None:
+        user = _make_user(db_session, "lsf_pc_locked")
+        _login(client, user.id)
+        # Subset configured with puzzle_count=10 but locked with 100 active puzzles.
+        subset = _make_subset(db_session, user, puzzle_count=10)
+        subset.locked_at = datetime.now(timezone.utc)
+        subset.locked_puzzle_count = 100
+        db_session.flush()
+
+        resp = client.get("/subsets?puzzleCount=gte&puzzleCount=50")
+
+        assert resp.status_code == 200
+        ids = {item["id"] for item in resp.get_json()["items"]}
+        assert subset.id in ids
+
+
 # ── Route: GET /subsets/{id}/stats — DECOY source ────────────────────────────────
 
 @pytest.mark.integration

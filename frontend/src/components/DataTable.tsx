@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -9,9 +9,9 @@ import {
   flexRender,
   type ColumnDef,
   type SortingState,
-  type ColumnFiltersState,
+  type VisibilityState,
 } from '@tanstack/react-table'
-import { ArrowUp, ArrowDown, ArrowUpDown, Search, Loader2, ChevronLeft, ChevronRight, Undo2 } from 'lucide-react'
+import { ArrowUp, ArrowDown, ArrowUpDown, Search, Loader2, ChevronLeft, ChevronRight, Columns3, RotateCcw, EyeOff } from 'lucide-react'
 import { Input } from './ui/input'
 import {
   Table,
@@ -21,26 +21,58 @@ import {
   TableHead,
   TableCell,
 } from './ui/table'
-import { MultiSelectFilter } from './ui/multi-select-filter'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu'
 import { cn } from '../lib/utils'
 import { useTableUrlSync } from '../hooks/useTableUrlSync'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip'
+
+declare module '@tanstack/react-table' {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData, TValue> {
+    className?: string
+    rankDesc?: boolean
+    icon?: React.ComponentType<{ className?: string }>
+    iconOnly?: boolean
+    defaultHidden?: boolean
+  }
+}
 
 type ColMeta = {
   className?: string
   rankDesc?: boolean
   icon?: React.ComponentType<{ className?: string }>
+  iconOnly?: boolean
+  defaultHidden?: boolean
 }
 
-export type FilterableColumn = {
-  id: string
-  label: string
-  options: { label: string; value: string; icon?: React.ReactNode }[]
+export function col<T>(
+  def: ColumnDef<T> & { meta: { icon: React.ComponentType<{ className?: string }> } },
+): ColumnDef<T> {
+  return def
 }
 
-export type SyncedFilter = {
-  key: string
-  value: string[]
-  onChange: (values: string[]) => void
+export function actionCol<T>(def: ColumnDef<T>): ColumnDef<T> {
+  return { ...def, enableHiding: false }
+}
+
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
+
+function pageSizeOptions(current: number): number[] {
+  return [...new Set([...PAGE_SIZE_OPTIONS, current])].sort((a, b) => a - b)
 }
 
 export type ServerPagination = {
@@ -48,6 +80,7 @@ export type ServerPagination = {
   page: number
   pageSize: number
   onPageChange: (page: number) => void
+  onPageSizeChange?: (pageSize: number) => void
 }
 
 function parseSortParam(sortParam: string | undefined): SortingState {
@@ -69,8 +102,9 @@ type DataTableProps<T> = {
   columns: ColumnDef<T>[]
   data: T[]
   globalFilterPlaceholder?: string
-  filterableColumns?: FilterableColumn[]
   filtersSlot?: React.ReactNode
+  searchSlot?: React.ReactNode
+  compact?: boolean
   hideSearch?: boolean
   pageSize?: number
   initialSorting?: SortingState
@@ -79,11 +113,7 @@ type DataTableProps<T> = {
   emptyMessage?: React.ReactNode
   loading?: boolean
   serverPagination?: ServerPagination
-  onFilterChange?: (id: string, values: string[]) => void
-  filtersActive?: boolean
-  onClearFilters?: () => void
   tableId?: string | false
-  syncedFilters?: SyncedFilter[]
   footerRow?: React.ReactNode
   onFooterRowClick?: () => void
 }
@@ -92,8 +122,9 @@ export function DataTable<T>({
   columns,
   data,
   globalFilterPlaceholder = 'Search…',
-  filterableColumns = [],
   filtersSlot,
+  searchSlot,
+  compact = false,
   hideSearch = false,
   pageSize = 10,
   initialSorting = [],
@@ -102,11 +133,7 @@ export function DataTable<T>({
   emptyMessage = <span className="text-muted-foreground">No results.</span>,
   loading = false,
   serverPagination,
-  onFilterChange,
-  filtersActive = false,
-  onClearFilters,
   tableId,
-  syncedFilters,
   footerRow,
   onFooterRowClick,
 }: DataTableProps<T>): React.ReactElement {
@@ -120,21 +147,16 @@ export function DataTable<T>({
 
   const [globalFilter, setGlobalFilter] = useState<string>(() => getParam('q') ?? '')
 
-  const [filterSelections, setFilterSelections] = useState<Record<string, string[]>>(() => {
-    const init: Record<string, string[]> = {}
-    filterableColumns.forEach((fc) => {
-      const vals = getMultiParam(fc.id)
-      if (vals.length > 0) init[fc.id] = vals
-    })
-    return init
-  })
-
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(() => {
-    const init: ColumnFiltersState = []
-    filterableColumns.forEach((fc) => {
-      const vals = getMultiParam(fc.id)
-      if (vals.length > 0) init.push({ id: fc.id, value: vals })
-    })
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+    const hidden = getMultiParam('hidden')
+    const init: VisibilityState = {}
+    // meta.defaultHidden columns start hidden unless URL overrides them visible
+    for (const col of columns) {
+      if (col.id && (col.meta as ColMeta | undefined)?.defaultHidden) {
+        init[col.id] = false
+      }
+    }
+    hidden.forEach((id) => { init[id] = false })
     return init
   })
 
@@ -151,8 +173,9 @@ export function DataTable<T>({
     state: {
       sorting,
       globalFilter,
-      columnFilters,
+      columnVisibility,
     },
+    onColumnVisibilityChange: setColumnVisibility,
     onSortingChange: (updater) => {
       const next = typeof updater === 'function' ? updater(sorting) : updater
       setSorting(next)
@@ -161,11 +184,6 @@ export function DataTable<T>({
     },
     onGlobalFilterChange: (value: string) => {
       setGlobalFilter(value)
-      table.setPageIndex(0)
-    },
-    onColumnFiltersChange: (updater) => {
-      const next = typeof updater === 'function' ? updater(columnFilters) : updater
-      setColumnFilters(next)
       table.setPageIndex(0)
     },
     globalFilterFn: 'includesString',
@@ -180,65 +198,12 @@ export function DataTable<T>({
     },
   })
 
-  const handleFilterableColumnChange = (id: string, values: string[]): void => {
-    setFilterSelections((prev) => ({ ...prev, [id]: values }))
-    onFilterChange?.(id, values)
-    if (!onFilterChange) {
-      setColumnFilters((prev) => {
-        const without = prev.filter((f) => f.id !== id)
-        if (values.length === 0) return without
-        return [...without, { id, value: values }]
-      })
-      table.setPageIndex(0)
-    }
-    setParams({ [id]: values.length > 0 ? values : null, page: null })
-  }
-
-  // Serialize synced filter values into a stable string so the effect below can use it as a
-  // dependency. We intentionally avoid depending on the syncedFilters array reference (which is
-  // a new object every render) and instead trigger only when the actual values change.
-  const syncedFilterValues = syncedFilters?.map((f) => f.value.join(',')).join('|') ?? ''
-  const syncedFiltersInitializedRef = useRef(false)
   useEffect(() => {
-    if (!syncedFilters?.length) return
-    const updates: Record<string, string | string[] | null> = {}
-    // syncedFilters is captured via closure — always reflects the current render's values
-    // because this effect only runs when syncedFilterValues (the serialised snapshot) changes.
-    syncedFilters.forEach((f) => {
-      updates[f.key] = f.value.length > 0 ? f.value : null
-    })
-    if (syncedFiltersInitializedRef.current) {
-      updates.page = null
-    }
-    syncedFiltersInitializedRef.current = true
-    setParams(updates)
-  // syncedFilters is intentionally omitted — see comment above
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [syncedFilterValues])
-
-  const hasActiveFilters =
-    filtersActive ||
-    globalFilter !== '' ||
-    columnFilters.length > 0 ||
-    Object.values(filterSelections).some((v) => v.length > 0) ||
-    (syncedFilters?.some((f) => f.value.length > 0) ?? false)
-
-  const clearFilters = (): void => {
-    setGlobalFilter('')
-    setColumnFilters([])
-    setFilterSelections({})
-    setSorting(initialSorting)
-    filterableColumns.forEach((fc) => onFilterChange?.(fc.id, []))
-    syncedFilters?.forEach((f) => f.onChange([]))
-    table.setPageIndex(0)
-
-    const toClear: Record<string, null> = { q: null, sort: null, page: null }
-    filterableColumns.forEach((fc) => { toClear[fc.id] = null })
-    syncedFilters?.forEach((f) => { toClear[f.key] = null })
-    setParams(toClear)  // Clear URL first so onClearFilters can write back defaults
-
-    onClearFilters?.()
-  }
+    const hidden = Object.entries(columnVisibility)
+      .filter(([, v]) => v === false)
+      .map(([id]) => id)
+    setParams({ hidden: hidden.length > 0 ? hidden : null })
+  }, [columnVisibility]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { pageIndex } = table.getState().pagination
   const totalFiltered = table.getFilteredRowModel().rows.length
@@ -248,10 +213,10 @@ export function DataTable<T>({
 
   return (
     <div className="flex flex-col gap-3">
-      {(!hideSearch || filtersSlot || filterableColumns.length > 0) && (
-        <div className="flex flex-wrap items-center gap-2">
+      {(!hideSearch || searchSlot || filtersSlot) && (
+        <div className="flex items-center gap-2">
           {!hideSearch && (
-            <div className="relative">
+            <div className="relative shrink-0">
               <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder={globalFilterPlaceholder}
@@ -262,30 +227,102 @@ export function DataTable<T>({
                   table.setPageIndex(0)
                   setParams({ q: val || null, page: null })
                 }}
-                className="h-8 pl-7 text-sm sm:w-56"
+                className="h-8 pl-7 text-xs focus-visible:ring-offset-0 w-28 sm:w-36"
               />
             </div>
           )}
+          {searchSlot}
+          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
           {filtersSlot}
-          {filterableColumns.map((fc) => (
-            <MultiSelectFilter
-              key={fc.id}
-              label={fc.label}
-              options={fc.options}
-              selected={filterSelections[fc.id] ?? []}
-              onChange={(values) => handleFilterableColumnChange(fc.id, values)}
-            />
-          ))}
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Undo2 className="h-3 w-3" />
-              Clear filters
-            </button>
-          )}
+          {(() => {
+            const hideableCols = table.getAllColumns().filter((c) => {
+              if (!c.getCanHide()) return false
+              return !!(c.columnDef.meta as ColMeta | undefined)?.icon
+            })
+            if (hideableCols.length === 0) return null
+            return (
+              <div className="ml-auto flex items-center gap-2">
+                {hideableCols.length > 0 && (() => {
+                  const deviatingCount = hideableCols.filter((c) => {
+                    const defaultHidden = !!(c.columnDef.meta as ColMeta | undefined)?.defaultHidden
+                    return c.getIsVisible() === defaultHidden
+                  }).length
+                  return (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className={cn(
+                          'flex h-8 items-center gap-1.5 rounded-md border text-xs transition-colors hover:bg-accent hover:text-foreground',
+                          compact ? 'px-2' : 'px-2.5',
+                          deviatingCount > 0
+                            ? 'border-foreground/25 text-foreground'
+                            : 'border-input text-muted-foreground',
+                        )}
+                      >
+                        <Columns3 className="h-3 w-3" />
+                        {!compact && 'Columns'}
+                        {deviatingCount > 0 && (
+                          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium leading-none text-primary-foreground tabular-nums">
+                            {deviatingCount}
+                          </span>
+                        )}
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="min-w-40 w-max">
+                      {hideableCols.map((col) => {
+                        const header = col.columnDef.header
+                        const label = typeof header === 'string' && header.trim()
+                          ? header
+                          : col.id.charAt(0).toUpperCase() + col.id.slice(1)
+                        const colMeta = col.columnDef.meta as ColMeta | undefined
+                        const ColIcon = colMeta?.icon
+                        const isDefaultHidden = !!colMeta?.defaultHidden
+                        return (
+                          <DropdownMenuCheckboxItem
+                            key={col.id}
+                            checked={col.getIsVisible()}
+                            onCheckedChange={(val) => col.toggleVisibility(!!val)}
+                            onSelect={(e) => e.preventDefault()}
+                            className="text-xs"
+                          >
+                            {ColIcon && <ColIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                            {label}
+                            {isDefaultHidden && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <EyeOff className="ml-auto h-3 w-3 shrink-0 text-muted-foreground/60" />
+                                </TooltipTrigger>
+                                <TooltipContent side="right">Hidden by default</TooltipContent>
+                              </Tooltip>
+                            )}
+                          </DropdownMenuCheckboxItem>
+                        )
+                      })}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => {
+                          const defaultState: VisibilityState = {}
+                          for (const c of hideableCols) {
+                            if ((c.columnDef.meta as ColMeta | undefined)?.defaultHidden) {
+                              defaultState[c.id] = false
+                            }
+                          }
+                          table.setColumnVisibility(defaultState)
+                        }}
+                        className="text-xs"
+                      >
+                        <RotateCcw className="mr-2 h-3 w-3" />
+                        Reset
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  )
+                })()}
+              </div>
+            )
+          })()}
+          </div>
         </div>
       )}
 
@@ -301,10 +338,19 @@ export function DataTable<T>({
                   const HeaderIcon = colMeta?.icon
                   const renderedHeader = flexRender(h.column.columnDef.header, h.getContext())
                   const headerNode = HeaderIcon ? (
-                    <span className="inline-flex items-center gap-1.5">
-                      <HeaderIcon className="h-3.5 w-3.5" />
-                      {renderedHeader}
-                    </span>
+                    colMeta?.iconOnly ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex"><HeaderIcon className="h-3.5 w-3.5" /></span>
+                        </TooltipTrigger>
+                        <TooltipContent>{renderedHeader}</TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5">
+                        <HeaderIcon className="h-3.5 w-3.5" />
+                        {renderedHeader}
+                      </span>
+                    )
                   ) : renderedHeader
                   return (
                     <TableHead key={h.id} className={cn('whitespace-nowrap', colMeta?.className)}>
@@ -335,8 +381,10 @@ export function DataTable<T>({
           <TableBody>
             {loading && pageRows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-10 text-center">
-                  <Loader2 className="mx-auto h-4 w-4 animate-spin text-muted-foreground" />
+                <TableCell colSpan={columns.length} className="h-10">
+                  <div className="sticky left-1/2 w-fit -translate-x-1/2">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  </div>
                 </TableCell>
               </TableRow>
             )}
@@ -385,17 +433,35 @@ export function DataTable<T>({
         </Table>
         {loading && pageRows.length > 0 && (
           <div
-            className="absolute inset-x-0 bottom-0 flex items-center justify-center rounded-b-md backdrop-blur-[2px] bg-background/40"
+            className="absolute inset-x-0 bottom-0 flex items-center rounded-b-md backdrop-blur-[2px] bg-background/40"
             style={{ top: theadRef.current?.offsetHeight ?? 0 }}
           >
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <div className="sticky left-1/2 -translate-x-1/2">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
           </div>
         )}
       </div>
 
       {serverPagination ? (
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>
+          <div className="flex items-center gap-1.5">
+            <Select
+              value={String(serverPagination.pageSize)}
+              onValueChange={(v) => serverPagination.onPageSizeChange?.(Number(v))}
+            >
+              <SelectTrigger className="h-7 w-auto px-2 text-xs [&>span]:overflow-visible">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {pageSizeOptions(serverPagination.pageSize).map((s) => (
+                  <SelectItem key={s} value={String(s)} className="text-xs">{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span>/ Page</span>
+          </div>
+          <span className="tabular-nums">
             {serverPagination.totalRows === 0
               ? 'No results'
               : `Showing ${(serverPagination.page - 1) * serverPagination.pageSize + 1}–${Math.min(serverPagination.page * serverPagination.pageSize, serverPagination.totalRows)} of ${serverPagination.totalRows}`}
@@ -403,9 +469,7 @@ export function DataTable<T>({
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => {
-                serverPagination.onPageChange(serverPagination.page - 1)
-              }}
+              onClick={() => serverPagination.onPageChange(serverPagination.page - 1)}
               disabled={serverPagination.page <= 1 || loading}
               className="flex items-center gap-0.5 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
             >
@@ -417,9 +481,7 @@ export function DataTable<T>({
             </span>
             <button
               type="button"
-              onClick={() => {
-                serverPagination.onPageChange(serverPagination.page + 1)
-              }}
+              onClick={() => serverPagination.onPageChange(serverPagination.page + 1)}
               disabled={serverPagination.page * serverPagination.pageSize >= serverPagination.totalRows || loading}
               className="flex items-center gap-0.5 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
             >
@@ -430,7 +492,27 @@ export function DataTable<T>({
         </div>
       ) : (
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>
+          <div className="flex items-center gap-1.5">
+            <Select
+              value={String(table.getState().pagination.pageSize)}
+              onValueChange={(v) => {
+                table.setPageSize(Number(v))
+                table.setPageIndex(0)
+                setParams({ page: null })
+              }}
+            >
+              <SelectTrigger className="h-7 w-auto px-2 text-xs [&>span]:overflow-visible">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {pageSizeOptions(table.getState().pagination.pageSize).map((s) => (
+                  <SelectItem key={s} value={String(s)} className="text-xs">{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span>/ Page</span>
+          </div>
+          <span className="tabular-nums">
             {totalFiltered === 0
               ? 'No results'
               : `Showing ${start}–${end} of ${totalFiltered}`}

@@ -1,24 +1,58 @@
+from __future__ import annotations
+
 import sqlalchemy as sa
 
 from app.extensions import db
+from app.table_query import DateFilter, FilterList, RangeFilter, SetFilter
+
+_EMPTY_FILTER = FilterList(op='is')
+
+_STATUS_SQL = {
+    'active':    'r.completed_at IS NULL AND r.aborted_at IS NULL',
+    'completed': 'r.completed_at IS NOT NULL AND r.aborted_at IS NULL',
+    'aborted':   'r.aborted_at IS NOT NULL',
+}
 
 
 def get_run_board(
-    schedule_id: int | None = None,
+    schedule_filter: FilterList | None = None,
+    user_filter: FilterList | None = None,
+    status_filter: FilterList | None = None,
+    started_filter: DateFilter | None = None,
+    avg_rating_filter: RangeFilter | None = None,
+    resolved_filter: RangeFilter | None = None,
     run_index: int | None = None,
     exclude_aborted: bool = False,
-) -> list[dict[str, object]]:
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+) -> tuple[list[dict[str, object]], int]:
+    sch_f = schedule_filter or _EMPTY_FILTER
+    usr_f = user_filter or _EMPTY_FILTER
+    sta_f = status_filter or _EMPTY_FILTER
+
     conditions: list[str] = []
     params: dict[str, object] = {}
 
-    if schedule_id is not None:
-        conditions.append("t.schedule_id = :schedule_id")
-        params["schedule_id"] = schedule_id
+    sch_f.apply(conditions, params, "t.schedule_id", prefix="sched")
+    usr_f.apply(conditions, params, "u.id", prefix="usr")
+
     if run_index is not None:
         conditions.append("r.run_index = :run_index")
         params["run_index"] = run_index
     if exclude_aborted:
         conditions.append("r.aborted_at IS NULL")
+    if search:
+        conditions.append("(u.display_name ILIKE :q OR s.name ILIKE :q)")
+        params["q"] = f"%{search}%"
+    if started_filter:
+        started_filter.apply(conditions, params, "r.started_at", prefix="started")
+    if avg_rating_filter:
+        avg_rating_filter.apply(conditions, params, "rs.avg_rating", prefix="avg_rating")
+    if resolved_filter:
+        resolved_filter.apply(conditions, params, "COALESCE(rs.resolved_count, 0)", prefix="resolved", as_int=True)
+
+    sta_f.apply_status(conditions, _STATUS_SQL)
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
@@ -169,18 +203,36 @@ def get_run_board(
             "avgTimeFailedMs": float(row.avg_time_failed_ms) if row.avg_time_failed_ms is not None else None,
             "deltaAccuracyPct": float(row.delta_accuracy_pct) if row.delta_accuracy_pct is not None else None,
         })
-    return result
+
+    total = len(result)
+    offset = (page - 1) * page_size
+    return result[offset:offset + page_size], total
 
 
-def get_weekly_board(schedule_ids: list[int] | None = None) -> list[dict[str, object]]:
+def get_weekly_board(
+    user_filter: FilterList | None = None,
+    puzzles_filter: RangeFilter | None = None,
+    avg_rating_filter: RangeFilter | None = None,
+    schedules_filter: SetFilter | None = None,
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+) -> tuple[list[dict[str, object]], int]:
+    usr_f = user_filter or _EMPTY_FILTER
+
+    outer_conditions: list[str] = []
     params: dict[str, object] = {}
-    weekly_schedule_where = ""
-    active_schedule_where = ""
-
-    if schedule_ids:
-        weekly_schedule_where = "AND t.schedule_id = ANY(:schedule_ids)"
-        active_schedule_where = "WHERE t.schedule_id = ANY(:schedule_ids)"
-        params["schedule_ids"] = schedule_ids
+    usr_f.apply(outer_conditions, params, "u.id", prefix="usr")
+    if search:
+        outer_conditions.append("u.display_name ILIKE :q")
+        params["q"] = f"%{search}%"
+    if puzzles_filter:
+        puzzles_filter.apply(outer_conditions, params, "COALESCE(ws.resolved_count, 0)", prefix="puzzles", as_int=True)
+    if avg_rating_filter:
+        avg_rating_filter.apply(outer_conditions, params, "ws.avg_rating", prefix="avg_rating")
+    if schedules_filter:
+        schedules_filter.apply(outer_conditions, params, "ws.schedule_ids", prefix="schedules")
+    outer_where = ("WHERE " + " AND ".join(outer_conditions)) if outer_conditions else ""
 
     rows = db.session.execute(
         sa.text(f"""
@@ -206,25 +258,26 @@ def get_weekly_board(schedule_ids: list[int] | None = None) -> list[dict[str, ob
                             ELSE NULL
                         END
                     )                           AS avg_rating,
-                    AVG(pa.time_spent_ms)       AS avg_solve_time_ms
+                    AVG(pa.time_spent_ms)       AS avg_solve_time_ms,
+                    ARRAY_AGG(DISTINCT s.name ORDER BY s.name)           AS schedule_names,
+                    ARRAY_AGG(DISTINCT t.schedule_id ORDER BY t.schedule_id) AS schedule_ids
                 FROM training_attempts pa
                 JOIN run_training_items rp ON rp.id = pa.run_training_item_id
                 JOIN runs r       ON r.id = rp.run_id
                 JOIN trainings t  ON t.id = r.training_id
+                JOIN schedules s  ON s.id = t.schedule_id
                 JOIN training_items ti ON ti.id = rp.training_item_id
                 LEFT JOIN lichess_tactics lt  ON lt.training_item_id = rp.training_item_id
                 LEFT JOIN scraped_positional_puzzles spp ON spp.training_item_id = rp.training_item_id
                 LEFT JOIN scraped_positional_difficulties spd ON spd.id = spp.difficulty_id
                 WHERE pa.completed_at >= NOW() - INTERVAL '7 days'
                   AND pa.status != 'in_progress'
-                  {weekly_schedule_where}
                 GROUP BY t.user_id
             ),
             active_users AS (
                 SELECT DISTINCT t.user_id
                 FROM trainings t
                 JOIN runs r ON r.training_id = t.id AND r.aborted_at IS NULL
-                {active_schedule_where}
             )
             SELECT
                 u.id                                     AS user_id,
@@ -236,10 +289,12 @@ def get_weekly_board(schedule_ids: list[int] | None = None) -> list[dict[str, ob
                 COALESCE(ws.scraped_positional_count, 0)     AS scraped_positional_count,
                 COALESCE(ws.decoy_count, 0)                  AS decoy_count,
                 ws.avg_rating,
-                ws.avg_solve_time_ms
+                ws.avg_solve_time_ms,
+                COALESCE(ws.schedule_names, ARRAY[]::text[]) AS schedule_names
             FROM active_users au
             JOIN users u ON u.id = au.user_id
             LEFT JOIN weekly_stats ws ON ws.user_id = au.user_id
+            {outer_where}
             ORDER BY COALESCE(ws.resolved_count, 0) DESC, u.display_name
         """),
         params,
@@ -272,5 +327,9 @@ def get_weekly_board(schedule_ids: list[int] | None = None) -> list[dict[str, ob
             "avgRating": float(row.avg_rating) if row.avg_rating is not None else None,
             "avgAccuracyPct": accuracy_pct,
             "avgSolveTimeMs": float(row.avg_solve_time_ms) if row.avg_solve_time_ms is not None else None,
+            "scheduleNames": list(row.schedule_names) if row.schedule_names else [],
         })
-    return result
+
+    total = len(result)
+    offset = (page - 1) * page_size
+    return result[offset:offset + page_size], total

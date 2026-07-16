@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { ChevronDown, CircleHelp, CircleOff, Plus, Trash2 } from "lucide-react";
 import {
   ALL_SOURCE_TYPES,
@@ -41,7 +41,8 @@ import { TrainingItemTypeBadge } from "../TrainingItemTypeBadge";
 import { SubsetSelector } from "./SubsetSelector";
 import { SubsetIdentifier, formatLockedDate } from "./SubsetIdentifier";
 import { UserAvatar } from "../UserAvatar";
-import { DataTable } from "../DataTable";
+import { ServerDataTable } from "../ServerDataTable";
+import type { FetchParams } from "../ServerDataTable";
 import type { ColumnDef } from "@tanstack/react-table";
 import { DATA_ICONS } from "../../lib/icons";
 import { cn } from "../../lib/utils";
@@ -453,6 +454,14 @@ function ExcludedSubsetsTable({
 }): React.ReactElement {
   const [selectorOpen, setSelectorOpen] = useState(false);
 
+  const instanceKey = excluded.map((s) => s.id).join(",");
+  const fetchData = useCallback(
+    (_params: FetchParams) =>
+      Promise.resolve({ items: excluded, total: excluded.length }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [instanceKey],
+  );
+
   const columns = useMemo<ColumnDef<Subset>[]>(
     () => [
       {
@@ -523,11 +532,13 @@ function ExcludedSubsetsTable({
 
   return (
     <>
-      <DataTable
+      <ServerDataTable
+        tableId="excluded-subsets"
         columns={columns}
-        data={excluded}
-        hideSearch
+        fetchData={fetchData}
+        instanceKey={instanceKey}
         pageSize={50}
+        initialSorting={[]}
         footerRow={!disabled ? <span className="text-sm text-muted-foreground">+ Add subset</span> : undefined}
         onFooterRowClick={!disabled ? () => setSelectorOpen(true) : undefined}
       />
@@ -572,7 +583,7 @@ export function SourceCompositionEditor({
 
   useEffect(() => {
     api.subsets
-      .list({ lockedOnly: true, pageSize: 200 })
+      .listLocked(200)
       .then((r) => {
         setLockedSubsets(r.items);
         setSubsetMeta((prev) => {

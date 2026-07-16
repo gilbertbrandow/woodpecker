@@ -6,6 +6,7 @@ from typing import Any
 import sqlalchemy as sa
 
 from app.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
+from app.table_query import DateFilter, FilterList, RangeFilter
 from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.subset import Subset, SubsetTrainingItem
@@ -1118,14 +1119,53 @@ def get_stats(subset_id: int, user_id: int) -> dict[str, object]:
 
     return {"sources": sources_out, "totalActive": total}
 
+def suggest_subsets(limit: int = 8) -> list[dict[str, object]]:
+    rows = db.session.scalars(
+        sa.select(Subset).order_by(Subset.created_at.desc()).limit(limit)
+    ).all()
+    return [{"id": s.id, "name": s.name, "status": subset_status(s)} for s in rows]
+
+
+def search_subsets(q: str, limit: int = 10) -> list[dict[str, object]]:
+    rows = db.session.scalars(
+        sa.select(Subset)
+        .where(Subset.name.ilike(f"%{q}%"))
+        .order_by(Subset.name)
+        .limit(limit)
+    ).all()
+    return [{"id": s.id, "name": s.name, "status": subset_status(s)} for s in rows]
+
+
+def get_subsets_by_ids(ids: list[int]) -> list[dict[str, object]]:
+    if not ids:
+        return []
+    rows = db.session.scalars(sa.select(Subset).where(Subset.id.in_(ids))).all()
+    return [{"id": s.id, "name": s.name, "status": subset_status(s)} for s in rows]
+
+
+_SUBSET_STATUS_SQL: dict[str, str] = {
+    "locked": "sub.locked_at IS NOT NULL",
+    "filled": (
+        "sub.locked_at IS NULL"
+        " AND EXISTS (SELECT 1 FROM subset_training_items sti WHERE sti.subset_id = sub.id)"
+    ),
+    "draft": (
+        "sub.locked_at IS NULL"
+        " AND NOT EXISTS (SELECT 1 FROM subset_training_items sti WHERE sti.subset_id = sub.id)"
+    ),
+}
+
+
 def list_subsets(
     user_id: int,
     locked_only: bool = False,
-    statuses: list[str] | None = None,
+    status: FilterList | None = None,
     search: str | None = None,
     page: int = 1,
     page_size: int = 20,
-    user_ids: list[int] | None = None,
+    user_ids: FilterList | None = None,
+    date: DateFilter | None = None,
+    puzzle_count: RangeFilter | None = None,
 ) -> dict[str, object]:
     if locked_only:
         access_clause = "sub.locked_at IS NOT NULL"
@@ -1133,32 +1173,21 @@ def list_subsets(
         access_clause = "(sub.user_id = :uid OR (sub.locked_at IS NOT NULL AND sub.user_id != :uid))"
 
     params: dict[str, object] = {"uid": user_id}
-    conditions: list[str] = [f"WHERE {access_clause}"]
+    conditions: list[str] = [access_clause]
 
     if search:
-        conditions.append("AND sub.name ILIKE :search")
+        conditions.append("sub.name ILIKE :search")
         params["search"] = f"%{search}%"
-    if user_ids:
-        uid_list = ",".join(str(int(uid)) for uid in user_ids)
-        conditions.append(f"AND sub.user_id IN ({uid_list})")
-    if statuses and not locked_only:
-        status_parts: list[str] = []
-        if "locked" in statuses:
-            status_parts.append("sub.locked_at IS NOT NULL")
-        if "filled" in statuses:
-            status_parts.append(
-                "(sub.locked_at IS NULL AND EXISTS "
-                "(SELECT 1 FROM subset_training_items sti WHERE sti.subset_id = sub.id))"
-            )
-        if "draft" in statuses:
-            status_parts.append(
-                "(sub.locked_at IS NULL AND NOT EXISTS "
-                "(SELECT 1 FROM subset_training_items sti WHERE sti.subset_id = sub.id))"
-            )
-        if status_parts:
-            conditions.append(f"AND ({' OR '.join(status_parts)})")
+    if user_ids is not None:
+        user_ids.apply(conditions, params, "sub.user_id", prefix="uid")
+    if date is not None:
+        date.apply(conditions, params, "DATE(COALESCE(sub.locked_at, sub.created_at))", prefix="date")
+    if puzzle_count is not None:
+        puzzle_count.apply(conditions, params, "COALESCE(sub.locked_puzzle_count, sub.puzzle_count)", prefix="pc", as_int=True)
+    if status is not None and not locked_only:
+        status.apply_status(conditions, _SUBSET_STATUS_SQL)
 
-    where_sql = " ".join(conditions)
+    where_sql = "WHERE " + " AND ".join(conditions)
     base_sql = f"""
         FROM subsets sub
         JOIN users u ON u.id = sub.user_id

@@ -3,7 +3,7 @@ import * as React from 'react'
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams, Link } from '@tanstack/react-router'
 import { toast } from '../lib/toast'
-import { Ban, ChevronDown, Loader2, Play } from 'lucide-react'
+import { Activity, Ban, CheckCircle2, ChevronDown, Loader2, Play, XCircle } from 'lucide-react'
 import { type ColumnDef } from '@tanstack/react-table'
 import {
   ComposedChart,
@@ -28,6 +28,7 @@ import {
   type ChartConfig,
 } from '../components/ui/chart'
 import { useSetBreadcrumbTitle } from '../hooks/useSetBreadcrumbTitle'
+import { useServerTable } from '../hooks/useServerTable'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
 import {
   Collapsible,
@@ -46,9 +47,10 @@ import {
 } from '../components/ui/alert-dialog'
 import { Button } from '../components/ui/button'
 import { UserAvatar } from '../components/UserAvatar'
-import { StatusBadge, runStatusToStatusValue, trainingStateToStatusValue, type StatusValue } from '../components/StatusBadge'
+import { StatusBadge, runStatusToStatusValue, trainingStateToStatusValue } from '../components/StatusBadge'
 import { ProgressBar } from '../components/ProgressBar'
-import { DataTable } from '../components/DataTable'
+import { col, actionCol } from '../components/DataTable'
+import { ServerDataTable } from '../components/ServerDataTable'
 import { formatDuration } from '../components/schedules/DurationInput'
 import { formatDate, formatStartedAt } from '../lib/utils'
 import { TrainingProgressCard } from '../components/TrainingProgressCard'
@@ -65,6 +67,12 @@ const SOLVE_TIME_CONFIG: ChartConfig = {
   bar: { label: 'Avg solve time', color: 'hsl(var(--chart-1))' },
   trend: { label: 'Trend', color: 'hsl(var(--chart-2))' },
 }
+
+const RUN_STATUS_OPTIONS = [
+  { value: 'active',    label: 'Active',    icon: <Activity className="h-3.5 w-3.5 text-blue-600" /> },
+  { value: 'completed', label: 'Completed', icon: <CheckCircle2 className="h-3.5 w-3.5 text-green-600" /> },
+  { value: 'aborted',   label: 'Aborted',   icon: <XCircle className="h-3.5 w-3.5 text-red-600" /> },
+]
 
 type RunStatPoint = { label: string; value: number; trend: number | null; completed: boolean; inProgress: boolean }
 
@@ -102,26 +110,6 @@ function formatSolveSeconds(secs: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-type RunSlotRow = {
-  index: number
-  targetHours: number
-  breakAfterHours: number
-  slotStatus: 'not_started' | 'active' | 'completed' | 'aborted'
-  run: Run | null
-  progressValue: number
-  progressTooltip: string
-  canStart: boolean
-  isStarting: boolean
-}
-
-
-function getRunForSlot(runs: Run[], slotIndex: number): Run | null {
-  const slotRuns = runs.filter((r) => r.runIndex === slotIndex)
-  const live = slotRuns.find((r) => r.status === 'active' || r.status === 'completed')
-  if (live) return live
-  return slotRuns.sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0] ?? null
-}
-
 
 export function TrainingPage(): React.ReactElement | null {
   const { user, loading: authLoading } = useAuth()
@@ -132,6 +120,7 @@ export function TrainingPage(): React.ReactElement | null {
   const [training, setTraining] = useState<Training | null>(null)
   const [runs, setRuns] = useState<Run[]>([])
   const [pageLoading, setPageLoading] = useState(true)
+  const { refreshKey: runsRefreshKey, refetch: refetchRunsTable } = useServerTable()
   const [activeTab, setActiveTab] = useState('configure')
   const [runsOpen, setRunsOpen] = useState(true)
   const [progressOpen, setProgressOpen] = useState(true)
@@ -190,6 +179,7 @@ export function TrainingPage(): React.ReactElement | null {
 
   const handleRunStarted = (run: Run): void => {
     setRuns((prev) => [...prev, run])
+    refetchRunsTable()
   }
 
   const handleStartRun = async (runIndex: number): Promise<void> => {
@@ -233,156 +223,102 @@ export function TrainingPage(): React.ReactElement | null {
   )
   const solveTimeCompletedCount = solveTimeData.filter((d) => d.completed).length
 
-  const runRows = useMemo<RunSlotRow[]>(() => {
-    if (!training || !user) return []
+  const nextStartableIndex = useMemo(() => {
+    if (!training || !user) return null
     const sch = training.schedule
-    const defs = sch.runs
     const isOwner = training.ownerId === user.id
     const canManage = isOwner && (training.status === 'not_started' || training.status === 'in_progress')
+    if (!canManage) return null
     const completedCount = runs.filter((r) => r.status === 'completed').length
     const hasActive = runs.some((r) => r.status === 'active')
-    const startableIdx = (canManage && !hasActive && completedCount < sch.runCount) ? completedCount : null
-    return Array.from({ length: sch.runCount }, (_, i) => {
-      const runDef = defs[i] ?? { target_hours: 0, break_after_hours: 0 }
-      const run = getRunForSlot(runs, i)
-      const slotStatus: RunSlotRow['slotStatus'] =
-        run === null ? 'not_started'
-        : run.status === 'active' ? 'active'
-        : run.status === 'completed' ? 'completed'
-        : 'aborted'
-      const resolved = run !== null ? run.solvedCount + run.solvedWithRetriesCount + run.failedCount : 0
-      const progressValue = run !== null && run.totalItems > 0 ? (resolved / run.totalItems) * 100 : 0
-      return {
-        index: i,
-        targetHours: runDef.target_hours,
-        breakAfterHours: runDef.break_after_hours,
-        slotStatus,
-        run,
-        progressValue,
-        progressTooltip: run !== null ? `${resolved} / ${run.totalItems} puzzles completed` : 'Not started yet',
-        canStart: startableIdx === i && slotStatus !== 'active' && slotStatus !== 'completed',
-        isStarting: startingIndex === i,
-      }
-    })
-  }, [training, user, runs, startingIndex])
+    if (hasActive || completedCount >= sch.runCount) return null
+    return completedCount
+  }, [training, user, runs])
 
-  const runColumns = useMemo<ColumnDef<RunSlotRow>[]>(() => {
+  const runColumns = useMemo<ColumnDef<Run>[]>(() => {
     const canManage = !!training && !!user && training.ownerId === user.id && (training.status === 'not_started' || training.status === 'in_progress')
     return [
-      {
-        id: 'index',
+      col({
+        id: 'runIndex',
+        accessorKey: 'runIndex',
         header: 'Run',
         meta: { icon: CONCEPT_ICONS.Run },
         enableSorting: false,
         cell: ({ row }) => (
-          <span className="tabular-nums text-sm text-muted-foreground">Run {row.original.index + 1}</span>
+          <span className="tabular-nums text-sm text-muted-foreground">Run {row.original.runIndex + 1}</span>
         ),
-      },
-      {
+      }),
+      col({
         id: 'status',
+        accessorKey: 'status',
         header: 'Status',
         meta: { icon: DATA_ICONS.status },
         enableSorting: false,
-        cell: ({ row }) => {
-          const { slotStatus } = row.original
-          const statusValue: StatusValue = slotStatus === 'not_started'
-            ? 'not_started'
-            : runStatusToStatusValue(slotStatus)
-          return <StatusBadge status={statusValue} />
-        },
-      },
-      {
+        cell: ({ row }) => (
+          <StatusBadge status={runStatusToStatusValue(row.original.status)} />
+        ),
+      }),
+      col({
         id: 'progress',
         header: 'Progress',
         meta: { icon: DATA_ICONS.progress },
         enableSorting: false,
-        cell: ({ row }) => (
-          <ProgressBar value={row.original.progressValue} tooltipLabel={row.original.progressTooltip} className="w-28" />
-        ),
-      },
-      {
-        id: 'duration',
-        header: 'Duration',
-        meta: { icon: DATA_ICONS.time },
-        enableSorting: false,
-        cell: ({ row }) => (
-          <span className="text-sm text-muted-foreground">{formatDuration(row.original.targetHours)}</span>
-        ),
-      },
-      {
-        id: 'break',
-        header: 'Break',
-        meta: { icon: DATA_ICONS.breakTime },
-        enableSorting: false,
-        cell: ({ row }) => (
-          <span className="text-sm text-muted-foreground">
-            {row.original.breakAfterHours > 0
-              ? formatDuration(row.original.breakAfterHours)
-              : <span className="text-muted-foreground/40">—</span>}
-          </span>
-        ),
-      },
-      {
+        cell: ({ row }) => {
+          const { totalItems, solvedCount, solvedWithRetriesCount, failedCount } = row.original
+          const resolved = solvedCount + solvedWithRetriesCount + failedCount
+          const progressValue = totalItems > 0 ? (resolved / totalItems) * 100 : 0
+          const tooltipLabel = `${resolved} / ${totalItems} puzzles completed`
+          return <ProgressBar value={progressValue} tooltipLabel={tooltipLabel} className="w-28" />
+        },
+      }),
+      col({
         id: 'startedAt',
+        accessorKey: 'startedAt',
         header: 'Started',
         meta: { icon: DATA_ICONS.started },
         enableSorting: false,
         cell: ({ row }) => (
-          <span className="text-sm text-muted-foreground">
-            {row.original.run?.startedAt
-              ? formatDate(row.original.run.startedAt)
-              : <span className="text-muted-foreground/40">—</span>}
-          </span>
+          <span className="text-sm text-muted-foreground">{formatDate(row.original.startedAt)}</span>
         ),
-      },
-      {
+      }),
+      col({
         id: 'completedAt',
+        accessorKey: 'completedAt',
         header: 'Completed',
-        meta: { icon: DATA_ICONS.finished },
+        meta: { icon: DATA_ICONS.finished, defaultHidden: true },
         enableSorting: false,
         cell: ({ row }) => (
           <span className="text-sm text-muted-foreground">
-            {row.original.run?.completedAt
-              ? formatDate(row.original.run.completedAt)
+            {row.original.completedAt
+              ? formatDate(row.original.completedAt)
               : <span className="text-muted-foreground/40">—</span>}
           </span>
         ),
-      },
-      ...(canManage ? [{
+      }),
+      ...(canManage ? [actionCol<Run>({
         id: 'actions',
         header: '',
         enableSorting: false,
         meta: { className: 'sticky right-0 bg-background w-0' },
-        cell: ({ row }: { row: { original: RunSlotRow } }) => {
-          const { canStart, isStarting, slotStatus, run, index } = row.original
+        cell: ({ row }) => {
+          const run = row.original
+          if (run.status !== 'active') return null
           return (
             <div className="flex items-center justify-end gap-1.5">
-              {canStart && (
-                <Button
-                  size="sm"
-                  disabled={startingIndex !== null}
-                  onClick={(e) => { e.stopPropagation(); void handleStartRun(index) }}
-                  className="h-6 px-2 text-xs bg-foreground text-background hover:bg-foreground/90"
-                >
-                  {isStarting ? 'Starting…' : 'Start run'}
-                </Button>
-              )}
-              {slotStatus === 'active' && run !== null && (
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); void navigate({ to: '/app/runs/$runId/solve', params: { runId: String(run.id) } }) }}
-                  className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-                  aria-label="Continue run"
-                >
-                  <Play className="h-3 w-3" />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); void navigate({ to: '/app/runs/$runId/solve', params: { runId: String(run.id) } }) }}
+                className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                aria-label="Continue run"
+              >
+                <Play className="h-3 w-3" />
+              </button>
             </div>
           )
         },
-      } as ColumnDef<RunSlotRow>] : []),
+      })] : []),
     ]
-  }, [training, user, startingIndex, handleStartRun, navigate])
+  }, [training, user, navigate])
 
   if (authLoading || !user) return null
 
@@ -502,15 +438,37 @@ export function TrainingPage(): React.ReactElement | null {
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="mt-6">
-                <DataTable
+                {nextStartableIndex !== null && (
+                  <div className="mb-4 flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      Run {nextStartableIndex + 1} is ready to start.
+                    </span>
+                    <Button
+                      size="sm"
+                      disabled={startingIndex !== null}
+                      onClick={() => void handleStartRun(nextStartableIndex)}
+                      className="h-7 px-3 text-xs bg-foreground text-background hover:bg-foreground/90"
+                    >
+                      {startingIndex === nextStartableIndex ? 'Starting…' : 'Start run'}
+                    </Button>
+                  </div>
+                )}
+                <ServerDataTable
+                  tableId="runs"
                   columns={runColumns}
-                  data={runRows}
-                  hideSearch={true}
                   pageSize={schedule.runCount}
-                  onRowClick={(row) => {
-                    if (row.run !== null) void navigate({ to: '/app/runs/$runId', params: { runId: String(row.run.id) } })
-                  }}
-                  getRowClassName={(row) => row.run !== null ? 'cursor-pointer' : ''}
+                  refreshKey={runsRefreshKey}
+                  instanceKey={String(id)}
+                  filters={[
+                    { type: 'multi', key: 'status', label: 'Status', options: RUN_STATUS_OPTIONS, icon: DATA_ICONS.status },
+                    { type: 'date', key: 'startedAt', label: 'Started', icon: DATA_ICONS.started },
+                    { type: 'date', key: 'completedAt', label: 'Completed', icon: DATA_ICONS.finished },
+                  ]}
+                  fetchData={(params) => api.training.listRuns(id, params)}
+                  onRowClick={(run) => void navigate({ to: '/app/runs/$runId', params: { runId: String(run.id) } })}
+                  getRowClassName={() => 'cursor-pointer'}
+                  initialSorting={[]}
+                  emptyMessage="No runs yet."
                 />
               </div>
             </CollapsibleContent>

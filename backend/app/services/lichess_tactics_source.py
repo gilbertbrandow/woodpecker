@@ -1,4 +1,4 @@
-from sqlalchemy import func, select, exists
+from sqlalchemy import func, or_, select, exists
 from sqlalchemy.orm import selectinload
 
 from app.extensions import db
@@ -15,8 +15,8 @@ from app.models.source_import_run import (
     SourceImportStatus,
 )
 from app.models.opening import Opening
+from app.table_query import FilterList, RangeFilter, SetFilter
 
-ITEMS_PAGE_SIZE = 20
 TOP_THEMES_LIMIT = 25
 
 
@@ -34,28 +34,72 @@ def _serialize_tactic(t: LichessTactic) -> dict:
 
 def list_items(
     page: int,
-    rating_min: int | None,
-    rating_max: int | None,
-    theme_name: str | None,
-    opening_names: list[str],
+    page_size: int,
+    rating: RangeFilter,
+    theme: SetFilter,
+    opening: FilterList,
 ) -> dict:
     conditions = []
 
-    if rating_min is not None:
-        conditions.append(LichessTactic.rating >= rating_min)
-    if rating_max is not None:
-        conditions.append(LichessTactic.rating <= rating_max)
-    if theme_name:
-        conditions.append(
-            exists(
+    if rating.is_set and rating.op not in ('set', 'not_set') and rating.from_val is not None:
+        if rating.op in ('between', 'not_between') and rating.to_val is not None:
+            if rating.op == 'between':
+                conditions.append(LichessTactic.rating >= int(rating.from_val))
+                conditions.append(LichessTactic.rating <= int(rating.to_val))
+            else:
+                conditions.append(
+                    or_(
+                        LichessTactic.rating < int(rating.from_val),
+                        LichessTactic.rating > int(rating.to_val),
+                    )
+                )
+        elif rating.op == 'is':
+            conditions.append(LichessTactic.rating == int(rating.from_val))
+        elif rating.op == 'is_not':
+            conditions.append(LichessTactic.rating != int(rating.from_val))
+        elif rating.op == 'gt':
+            conditions.append(LichessTactic.rating > int(rating.from_val))
+        elif rating.op == 'gte':
+            conditions.append(LichessTactic.rating >= int(rating.from_val))
+        elif rating.op == 'lt':
+            conditions.append(LichessTactic.rating < int(rating.from_val))
+        elif rating.op == 'lte':
+            conditions.append(LichessTactic.rating <= int(rating.from_val))
+
+    if theme.is_set and theme.str_values:
+        def _theme_subq(names: list[str]):
+            return (
                 select(lichess_tactic_theme_links.c.lichess_tactic_id)
                 .join(LichessTacticTheme, LichessTacticTheme.id == lichess_tactic_theme_links.c.lichess_tactic_theme_id)
                 .where(
                     lichess_tactic_theme_links.c.lichess_tactic_id == LichessTactic.id,
-                    LichessTacticTheme.name == theme_name,
+                    LichessTacticTheme.name.in_(names),
                 )
             )
-        )
+        if theme.op == 'overlaps':
+            # has at least one of the selected themes
+            conditions.append(exists(_theme_subq(theme.str_values)))
+        elif theme.op == 'disjoint':
+            # has none of the selected themes
+            conditions.append(~exists(_theme_subq(theme.str_values)))
+        elif theme.op == 'superset':
+            # has all selected themes (one subquery per name)
+            for name in theme.str_values:
+                conditions.append(exists(_theme_subq([name])))
+        elif theme.op == 'subset':
+            # all puzzle themes are within the selection (no theme outside the selection)
+            conditions.append(
+                ~exists(
+                    select(lichess_tactic_theme_links.c.lichess_tactic_id)
+                    .join(LichessTacticTheme, LichessTacticTheme.id == lichess_tactic_theme_links.c.lichess_tactic_theme_id)
+                    .where(
+                        lichess_tactic_theme_links.c.lichess_tactic_id == LichessTactic.id,
+                        LichessTacticTheme.name.notin_(theme.str_values),
+                    )
+                )
+            )
+
+    opening_names = opening.str_values
     if opening_names:
         conditions.append(
             exists(
@@ -72,7 +116,7 @@ def list_items(
         select(func.count()).select_from(LichessTactic).where(*conditions)
     ).scalar_one()
 
-    offset = (page - 1) * ITEMS_PAGE_SIZE
+    offset = (page - 1) * page_size
     tactics = list(
         db.session.execute(
             select(LichessTactic)
@@ -82,17 +126,17 @@ def list_items(
                 selectinload(LichessTactic.openings),
             )
             .order_by(LichessTactic.rating)
-            .limit(ITEMS_PAGE_SIZE)
+            .limit(page_size)
             .offset(offset)
         ).scalars()
     )
 
-    total_pages = max(1, (total + ITEMS_PAGE_SIZE - 1) // ITEMS_PAGE_SIZE)
+    total_pages = max(1, (total + page_size - 1) // page_size)
 
     return {
         "puzzles": [_serialize_tactic(t) for t in tactics],
         "page": page,
-        "pageSize": ITEMS_PAGE_SIZE,
+        "pageSize": page_size,
         "totalPages": total_pages,
         "total": total,
     }

@@ -1,11 +1,12 @@
 import * as React from 'react'
 import { useMemo, useRef, useState } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Loader2, UserCheck } from 'lucide-react'
+import { CheckCircle2, Clock, Loader2, UserCheck } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { PageWrapper } from '../components/PageWrapper'
 import { ServerDataTable } from '../components/ServerDataTable'
+import { col, actionCol } from '../components/DataTable'
 import { AdminUserCapBanner } from '../components/AdminUserCapBanner'
 import { api, type AdminWaitlistEntry } from '../lib/api'
 import { formatDate } from '../lib/utils'
@@ -24,6 +25,11 @@ import {
 } from '../components/ui/alert-dialog'
 
 const PAGE_SIZE = 20
+
+const WAITLIST_STATUS_OPTIONS = [
+  { value: 'whitelisted', label: 'Whitelisted', icon: <CheckCircle2 className="h-3.5 w-3.5 text-green-600" /> },
+  { value: 'pending', label: 'Pending', icon: <Clock className="h-3.5 w-3.5 text-muted-foreground" /> },
+]
 
 export function AdminWaitlistPage(): React.ReactElement {
   const [refreshKey, setRefreshKey] = useState(0)
@@ -48,15 +54,15 @@ export function AdminWaitlistPage(): React.ReactElement {
 
   const columns = useMemo<ColumnDef<AdminWaitlistEntry>[]>(
     () => [
-      {
+      col({
         accessorKey: 'lichessUsername',
         header: 'Lichess username',
         meta: { icon: DATA_ICONS.lichessUsername },
         cell: ({ row }) => (
           <span className="font-medium">{row.original.lichessUsername}</span>
         ),
-      },
-      {
+      }),
+      col({
         id: 'status',
         header: 'Status',
         meta: { icon: DATA_ICONS.status },
@@ -71,16 +77,16 @@ export function AdminWaitlistPage(): React.ReactElement {
               Pending
             </Badge>
           ),
-      },
-      {
+      }),
+      col({
         accessorKey: 'email',
         header: 'Email',
         meta: { icon: DATA_ICONS.email },
         cell: ({ row }) => (
           <span className="text-muted-foreground">{row.original.email ?? '—'}</span>
         ),
-      },
-      {
+      }),
+      col({
         accessorKey: 'createdAt',
         header: 'Joined',
         meta: { icon: DATA_ICONS.started },
@@ -89,8 +95,8 @@ export function AdminWaitlistPage(): React.ReactElement {
             {formatDate(row.original.createdAt)}
           </span>
         ),
-      },
-      {
+      }),
+      col({
         accessorKey: 'updatedAt',
         header: 'Last attempt',
         meta: { icon: DATA_ICONS.lastAttempt },
@@ -99,8 +105,8 @@ export function AdminWaitlistPage(): React.ReactElement {
             {formatDate(row.original.updatedAt)}
           </span>
         ),
-      },
-      {
+      }),
+      actionCol({
         id: 'actions',
         header: '',
         enableSorting: false,
@@ -143,13 +149,18 @@ export function AdminWaitlistPage(): React.ReactElement {
             </AlertDialog>
           )
         },
-      },
+      }),
     ],
     [],
   )
 
   const filters = useMemo(
-    () => [{ type: 'search' as const, key: 'q', placeholder: 'Search by username…' }],
+    () => [
+      { type: 'search' as const, key: 'q' },
+      { type: 'multi' as const, key: 'status', label: 'Status', icon: DATA_ICONS.status, options: WAITLIST_STATUS_OPTIONS },
+      { type: 'date' as const, key: 'createdAt', label: 'Joined', icon: DATA_ICONS.started },
+      { type: 'date' as const, key: 'updatedAt', label: 'Last attempt', icon: DATA_ICONS.lastAttempt },
+    ],
     [],
   )
 
@@ -162,9 +173,8 @@ export function AdminWaitlistPage(): React.ReactElement {
         pageSize={PAGE_SIZE}
         refreshKey={refreshKey}
         filters={filters}
-        fetchData={({ filters: f, page }) =>
-          api.admin.waitlist({ page, q: f.q?.[0] || undefined })
-        }
+        fetchData={(params) => api.admin.waitlist(params)}
+        initialSorting={[{ id: 'createdAt', desc: true }]}
         emptyMessage="Nobody on the waitlist."
       />
     </PageWrapper>

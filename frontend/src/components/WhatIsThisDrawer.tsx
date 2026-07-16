@@ -13,7 +13,7 @@ export function WhatIsThisDrawer({ title, description, triggerLabel = 'What is t
   return (
     <Drawer>
       <DrawerTrigger asChild>
-        <button className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
+        <button className="inline-flex w-fit items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
           <Info className="h-3.5 w-3.5 shrink-0" />
           {triggerLabel}
         </button>

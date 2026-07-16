@@ -10,6 +10,7 @@ from app.models.training import Training
 from app.models.subset import Subset
 from app.models.user import User
 from app.exceptions import ConflictError, ValidationError, NotFoundError, ForbiddenError
+from app.table_query import DateFilter, FilterList
 from app.services.schedule_config import ScheduleConfig, RunDefinition
 from app.services.training_state import compute_training_state
 
@@ -360,36 +361,49 @@ _COMPUTED_STATES = frozenset({
 
 
 def list_all_trainings(
-    schedule_id: int | None = None,
-    user_ids: list[int] | None = None,
-    statuses: list[str] | None = None,
+    schedule_ids: FilterList | None = None,
+    subset_ids: FilterList | None = None,
+    user_ids: FilterList | None = None,
+    status: FilterList | None = None,
+    started_at: DateFilter | None = None,
+    completed_at: DateFilter | None = None,
     search: str | None = None,
     page: int = 1,
     page_size: int = 20,
     tz_str: str = "UTC",
 ) -> dict[str, object]:
-    conditions = []
+    conditions: list[str] = []
     params: dict[str, object] = {}
 
-    if schedule_id is not None:
-        conditions.append("t.schedule_id = :sid")
-        params["sid"] = schedule_id
+    if schedule_ids is not None:
+        schedule_ids.apply(conditions, params, "t.schedule_id", prefix="sch")
+    if subset_ids is not None:
+        subset_ids.apply(conditions, params, "s.subset_id", prefix="ssid")
+    if user_ids is not None:
+        user_ids.apply(conditions, params, "t.user_id", prefix="uid")
+    if started_at is not None:
+        started_at.apply(conditions, params, "DATE(t.started_at)", prefix="sa")
+    if completed_at is not None:
+        completed_at.apply(conditions, params, "DATE(t.completed_at)", prefix="ca")
 
-    if user_ids:
-        placeholders = ", ".join(f":uid{i}" for i in range(len(user_ids)))
-        conditions.append(f"t.user_id IN ({placeholders})")
-        for i, uid in enumerate(user_ids):
-            params[f"uid{i}"] = uid
+    # Separate SQL-filterable statuses from computed ones that need Python resolution.
+    _status_values = status.str_values if status is not None else []
+    valid_sql_statuses = [s for s in _status_values if s in _SQL_FILTERABLE]
+    has_computed_filter = status is not None and any(s in _COMPUTED_STATES for s in _status_values)
 
-    # Separate SQL-filterable statuses from computed ones
-    valid_sql_statuses = [s for s in (statuses or []) if s in _SQL_FILTERABLE]
-    has_computed_filter = statuses is not None and any(s in _COMPUTED_STATES for s in statuses)
-
-    if valid_sql_statuses or has_computed_filter:
-        parts = [f"({_SQL_FILTERABLE[s]})" for s in valid_sql_statuses]
+    if status is not None and status.op == 'is_not':
         if has_computed_filter:
-            parts.append(f"({_IN_PROGRESS_SQL})")
-        conditions.append("(" + " OR ".join(parts) + ")")
+            # Computed states can't be safely negated in SQL — fetch all and filter in Python
+            pass
+        elif valid_sql_statuses:
+            parts = [f"({_SQL_FILTERABLE[s]})" for s in valid_sql_statuses]
+            conditions.append("NOT (" + " OR ".join(parts) + ")")
+    else:
+        if valid_sql_statuses or has_computed_filter:
+            parts = [f"({_SQL_FILTERABLE[s]})" for s in valid_sql_statuses]
+            if has_computed_filter:
+                parts.append(f"({_IN_PROGRESS_SQL})")
+            conditions.append("(" + " OR ".join(parts) + ")")
 
     if search:
         conditions.append("s.name ILIKE :search")
@@ -397,14 +411,16 @@ def list_all_trainings(
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
-    # When computed states are in the filter, fetch all matching rows and paginate in Python
-    # (resolved counts need Python computation; SQL pagination would produce wrong totals)
+    # When computed states are in the filter (is or is_not), fetch all matching rows and
+    # paginate in Python — resolved counts need Python computation, and is_not can't safely
+    # negate the computed SQL pre-filter without excluding valid candidates.
     needs_python_pagination = has_computed_filter
 
     select_sql = f"""
         SELECT t.id, t.schedule_id, t.user_id,
                t.started_at, t.completed_at, t.aborted_at,
                s.name AS schedule_name, s.subset_id, s.config,
+               sub.name AS subset_name,
                u.display_name, u.avatar_url,
                CASE
                  WHEN t.aborted_at IS NOT NULL THEN 'aborted'
@@ -434,6 +450,7 @@ def list_all_trainings(
                ) AS completed_puzzles
         FROM trainings t
         JOIN schedules s ON s.id = t.schedule_id
+        JOIN subsets sub ON sub.id = s.subset_id
         JOIN users u ON u.id = t.user_id
         {where}
         ORDER BY t.started_at DESC
@@ -549,6 +566,7 @@ def list_all_trainings(
             "scheduleId": row.schedule_id,
             "scheduleName": row.schedule_name,
             "subsetId": row.subset_id,
+            "subsetName": row.subset_name,
             "status": row.status,
             "totalRuns": total_runs,
             "completedPuzzles": row.completed_puzzles,
@@ -564,9 +582,12 @@ def list_all_trainings(
             },
         })
 
-    if needs_python_pagination:
-        requested_states = set(statuses or [])
-        items = [i for i in items if i["trainingState"]["state"] in requested_states]  # type: ignore[index]
+    if needs_python_pagination and status is not None:
+        requested_states = set(status.str_values)
+        if status.op == 'is_not':
+            items = [i for i in items if i["trainingState"]["state"] not in requested_states]  # type: ignore[index]
+        else:
+            items = [i for i in items if i["trainingState"]["state"] in requested_states]  # type: ignore[index]
         total = len(items)
         start = (page - 1) * page_size
         items = items[start : start + page_size]

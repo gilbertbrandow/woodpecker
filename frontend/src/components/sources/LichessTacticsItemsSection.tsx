@@ -1,25 +1,19 @@
 import * as React from "react";
-import { useState, useEffect, useRef } from "react";
-import { ExternalLink, X } from "lucide-react";
+import { useMemo, useState, useEffect } from "react";
+import { ExternalLink, Compass, Zap, X } from "lucide-react";
+import { type ColumnDef } from "@tanstack/react-table";
 import {
   api,
-  type LichessTacticPage,
+  type LichessTactic,
   type Theme,
-  type Opening,
 } from "../../lib/api";
+import { ServerDataTable, type FetchParams } from "../ServerDataTable";
+import { col, actionCol } from "../DataTable";
 import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
-import { Skeleton } from "../ui/skeleton";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "../ui/table";
-import { FilterSelect } from "../ui/filter-select";
-import { formatNumber } from "../../lib/utils";
+import type { RangeFilterSpec, SetFilterSpec } from "../filters/types";
+import { DATA_ICONS } from "../../lib/icons";
+import { useOpeningFilterSpec } from "../../hooks/useOpeningFilterSpec";
 
 const OPENING_MAX_CHARS = 24;
 
@@ -46,324 +40,222 @@ function ThemeBadges({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Theme selector content — multi-select, loads all themes on mount
+// ---------------------------------------------------------------------------
+
+function ThemeSelectorContent({
+  value,
+  onChange,
+}: {
+  value: Theme[]
+  onChange: (items: Theme[]) => void
+}): React.ReactElement {
+  const [allThemes, setAllThemes] = useState<Theme[]>([])
+  const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    api.themes.list().then(setAllThemes).catch(() => {})
+  }, [])
+
+  const selectedNames = new Set(value.map((t) => t.name))
+  const filtered = search
+    ? allThemes.filter((t) =>
+        (t.displayName ?? t.name).toLowerCase().includes(search.toLowerCase())
+      )
+    : allThemes
+  const unselected = filtered.filter((t) => !selectedNames.has(t.name))
+
+  const toggle = (theme: Theme): void => {
+    if (selectedNames.has(theme.name)) {
+      onChange(value.filter((t) => t.name !== theme.name))
+    } else {
+      onChange([...value, theme])
+    }
+  }
+
+  return (
+    <div className="w-64 p-2">
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-1 border-b pb-2 mb-1">
+          {value.map((t) => (
+            <span
+              key={t.name}
+              className="flex items-center overflow-hidden rounded-full bg-muted pl-2 pr-1 text-xs"
+            >
+              <span>{t.displayName ?? t.name}</span>
+              <button
+                type="button"
+                onClick={() => onChange(value.filter((v) => v.name !== t.name))}
+                className="ml-1 rounded-full hover:text-foreground"
+                aria-label={`Remove ${t.displayName ?? t.name}`}
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <Input
+        type="text"
+        placeholder="Search themes…"
+        value={search}
+        autoFocus
+        onChange={(e) => setSearch(e.target.value)}
+        className="h-8 text-xs mb-1"
+      />
+      <ul className="max-h-48 overflow-y-auto">
+        {unselected.map((t) => (
+          <li key={t.name}>
+            <button
+              type="button"
+              onClick={() => toggle(t)}
+              className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-accent rounded"
+            >
+              {t.displayName ?? t.name}
+            </button>
+          </li>
+        ))}
+        {unselected.length === 0 && (
+          <li className="px-2 py-1.5 text-xs text-muted-foreground">No themes found.</li>
+        )}
+      </ul>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Columns
+// ---------------------------------------------------------------------------
+
+const COLUMNS: ColumnDef<LichessTactic>[] = [
+  col({
+    id: "rating",
+    accessorKey: "rating",
+    header: "Rating",
+    meta: { icon: DATA_ICONS.rating },
+    enableSorting: false,
+    cell: ({ row }) => (
+      <span className="tabular-nums">{row.original.rating}</span>
+    ),
+  }),
+  col({
+    id: "themes",
+    header: "Themes",
+    meta: { icon: Zap },
+    enableSorting: false,
+    cell: ({ row }) => <ThemeBadges themes={row.original.themes} />,
+  }),
+  col({
+    id: "opening",
+    header: "Opening",
+    meta: { icon: Compass, defaultHidden: true },
+    enableSorting: false,
+    cell: ({ row }) => {
+      const opening = row.original.openings[0]
+      if (!opening) return <span className="text-xs text-muted-foreground">—</span>
+      const label =
+        opening.displayName.length > OPENING_MAX_CHARS
+          ? opening.displayName.slice(0, OPENING_MAX_CHARS - 1) + "…"
+          : opening.displayName
+      return <span className="text-xs text-muted-foreground">{label}</span>
+    },
+  }),
+  col({
+    id: "popularity",
+    accessorKey: "popularity",
+    header: "Popularity",
+    meta: { icon: DATA_ICONS.rating, defaultHidden: true },
+    enableSorting: false,
+    cell: ({ row }) => (
+      <span className="tabular-nums text-xs text-muted-foreground">
+        {row.original.popularity}
+      </span>
+    ),
+  }),
+  actionCol({
+    id: "link",
+    header: "",
+    enableSorting: false,
+    cell: ({ row }) => (
+      <a
+        href={row.original.gameUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-muted-foreground hover:text-foreground"
+        aria-label="View game on Lichess"
+      >
+        <ExternalLink className="h-3.5 w-3.5" />
+      </a>
+    ),
+  }),
+]
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+const PAGE_SIZE = 20
+
 export function LichessTacticsItemsSection(): React.ReactElement {
-  const [allThemes, setAllThemes] = useState<Theme[]>([]);
+  const ratingFilterSpec = useMemo<RangeFilterSpec>(() => ({
+    type: 'range',
+    key: 'rating',
+    label: 'Rating',
+    min: 0,
+    max: 3000,
+    step: 50,
+    icon: DATA_ICONS.rating,
+  }), [])
 
-  const [ratingMin, setRatingMin] = useState("");
-  const [ratingMax, setRatingMax] = useState("");
-  const [themeFilter, setThemeFilter] = useState("");
-  const [selectedOpenings, setSelectedOpenings] = useState<Opening[]>([]);
-  const [openingSearch, setOpeningSearch] = useState("");
-  const [openingResults, setOpeningResults] = useState<Opening[]>([]);
-  const [openingDropdownOpen, setOpeningDropdownOpen] = useState(false);
+  const themeFilterSpec = useMemo<SetFilterSpec<Theme>>(() => ({
+    type: 'set',
+    key: 'theme',
+    label: 'Theme',
+    icon: Zap,
+    serialize: (items) => items.map((t) => t.name),
+    resolveInstant: (name) => ({ name, displayName: null, description: null }),
+    render: (value, onChange) => (
+      <ThemeSelectorContent value={value} onChange={onChange} />
+    ),
+    getChipLabel: (items) => {
+      if (items.length === 0) return ''
+      if (items.length === 1) return items[0].displayName ?? items[0].name
+      return `${items.length} themes`
+    },
+    renderChipValue: (items) => {
+      if (items.length === 0) return null
+      const label = items.length === 1
+        ? (items[0].displayName ?? items[0].name)
+        : `${items.length} themes`
+      return <span className="font-medium text-foreground">{label}</span>
+    },
+  }), [])
 
-  // Committed rating — updated after debounce so typing doesn't spam requests
-  const [committedMin, setCommittedMin] = useState("");
-  const [committedMax, setCommittedMax] = useState("");
-  const ratingMounted = useRef(false);
+  const openingFilterSpec = useOpeningFilterSpec('opening')
 
-  const [page, setPage] = useState(1);
-  const [result, setResult] = useState<LichessTacticPage | null>(null);
-  const [loading, setLoading] = useState(true);
+  const filters = useMemo(
+    () => [ratingFilterSpec, themeFilterSpec, openingFilterSpec],
+    [ratingFilterSpec, themeFilterSpec, openingFilterSpec],
+  )
 
-  // Load theme list once
-  useEffect(() => {
-    api.themes
-      .list()
-      .then(setAllThemes)
-      .catch(() => {});
-  }, []);
-
-  // Debounce rating inputs; skip the initial mount to avoid double-fetch
-  useEffect(() => {
-    if (!ratingMounted.current) {
-      ratingMounted.current = true;
-      return;
-    }
-    const t = setTimeout(() => {
-      setCommittedMin(ratingMin);
-      setCommittedMax(ratingMax);
-      setPage(1);
-    }, 400);
-    return () => clearTimeout(t);
-  }, [ratingMin, ratingMax]);
-
-  // Debounce opening search
-  useEffect(() => {
-    if (openingSearch.length < 2) {
-      setOpeningResults([]);
-      return;
-    }
-    const t = setTimeout(() => {
-      api.openings
-        .search(openingSearch)
-        .then(setOpeningResults)
-        .catch(() => {});
-    }, 300);
-    return () => clearTimeout(t);
-  }, [openingSearch]);
-
-  // Fetch items whenever any committed filter or page changes
-  useEffect(() => {
-    setLoading(true);
-    api.sources.lichessTactics
-      .items({
-        page,
-        ratingMin: committedMin ? Number(committedMin) : undefined,
-        ratingMax: committedMax ? Number(committedMax) : undefined,
-        theme: themeFilter || undefined,
-        openings:
-          selectedOpenings.length > 0
-            ? selectedOpenings.map((o) => o.name)
-            : undefined,
-      })
-      .then(setResult)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [page, committedMin, committedMax, themeFilter, selectedOpenings]);
-
-  const hasFilters =
-    ratingMin || ratingMax || themeFilter || selectedOpenings.length > 0;
-
-  const resetFilters = (): void => {
-    setRatingMin("");
-    setRatingMax("");
-    setCommittedMin("");
-    setCommittedMax("");
-    setThemeFilter("");
-    setSelectedOpenings([]);
-    setOpeningSearch("");
-    setOpeningResults([]);
-    setPage(1);
-  };
-
-  const handleThemeChange = (val: string): void => {
-    setThemeFilter(val);
-    setPage(1);
-  };
-
-  const addOpening = (o: Opening): void => {
-    if (selectedOpenings.some((s) => s.name === o.name)) return;
-    setSelectedOpenings((prev) => [...prev, o]);
-    setOpeningSearch("");
-    setOpeningResults([]);
-    setOpeningDropdownOpen(false);
-    setPage(1);
-  };
-
-  const removeOpening = (name: string): void => {
-    setSelectedOpenings((prev) => prev.filter((o) => o.name !== name));
-    setPage(1);
-  };
-
-  // Filter out already-selected openings from dropdown results
-  const filteredResults = openingResults.filter(
-    (o) => !selectedOpenings.some((s) => s.name === o.name),
-  );
+  const fetchData = React.useCallback(async (params: FetchParams) => {
+    const res = await api.sources.lichessTactics.items(params)
+    return { items: res.puzzles, total: res.total }
+  }, [])
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">Example tactics</p>
-        {hasFilters && (
-          <button
-            type="button"
-            onClick={resetFilters}
-            className="text-xs text-muted-foreground hover:text-foreground"
-          >
-            Reset filters
-          </button>
-        )}
-      </div>
-
-      {/* Filter bar */}
-      <div className="flex flex-wrap items-start gap-2">
-        {/* Rating range */}
-        <div className="flex items-center gap-1">
-          <Input
-            type="number"
-            placeholder="Min rating"
-            value={ratingMin}
-            onChange={(e) => setRatingMin(e.target.value)}
-            className="h-8 w-28 text-xs"
-          />
-          <Input
-            type="number"
-            placeholder="Max rating"
-            value={ratingMax}
-            onChange={(e) => setRatingMax(e.target.value)}
-            className="h-8 w-28 text-xs"
-          />
-        </div>
-
-        {/* Theme select */}
-        <FilterSelect
-          value={themeFilter}
-          onValueChange={handleThemeChange}
-          placeholder="All themes"
-          options={allThemes.map((t) => ({
-            value: t.name,
-            label: t.displayName ?? t.name,
-          }))}
-          className="text-xs"
-        />
-
-        {/* Opening multi-select */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          {selectedOpenings.map((o) => (
-            <div
-              key={o.name}
-              className="flex h-8 items-center gap-1 rounded-md border border-input bg-background px-2 text-xs"
-            >
-              <span className="max-w-[140px] truncate">
-                {o.displayName ?? o.name}
-              </span>
-              <button
-                type="button"
-                onClick={() => removeOpening(o.name)}
-                className="ml-0.5 text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          ))}
-          <div className="relative">
-            <Input
-              type="text"
-              placeholder="Add opening…"
-              value={openingSearch}
-              onChange={(e) => {
-                setOpeningSearch(e.target.value);
-                setOpeningDropdownOpen(true);
-              }}
-              onFocus={() => {
-                if (filteredResults.length > 0) setOpeningDropdownOpen(true);
-              }}
-              onBlur={() =>
-                setTimeout(() => setOpeningDropdownOpen(false), 150)
-              }
-              className="h-8 w-44 text-xs"
-            />
-            {openingDropdownOpen && filteredResults.length > 0 && (
-              <ul className="absolute z-50 mt-1 max-h-52 w-72 overflow-y-auto rounded-md border bg-background shadow-md">
-                {filteredResults.map((o) => (
-                  <li key={o.name}>
-                    <button
-                      type="button"
-                      onMouseDown={() => addOpening(o)}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-accent"
-                    >
-                      {o.eco && (
-                        <span className="shrink-0 font-mono text-muted-foreground">
-                          {o.eco}
-                        </span>
-                      )}
-                      <span className="text-foreground">
-                        {o.displayName ?? o.name}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Content */}
-      {loading ? (
-        <div className="flex flex-col gap-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-10 w-full" />
-          ))}
-        </div>
-      ) : result?.puzzles.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No tactics match these filters.
-        </p>
-      ) : result ? (
-        <>
-          <div className="overflow-x-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-20">Rating</TableHead>
-                  <TableHead>Themes</TableHead>
-                  <TableHead className="hidden sm:table-cell">
-                    Opening
-                  </TableHead>
-                  <TableHead className="hidden sm:table-cell w-24">
-                    Popularity
-                  </TableHead>
-                  <TableHead className="w-10" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {result.puzzles.map((p) => {
-                  const opening = p.openings[0];
-                  const openingLabel = opening
-                    ? opening.displayName.length > OPENING_MAX_CHARS
-                      ? opening.displayName.slice(0, OPENING_MAX_CHARS - 1) +
-                        "…"
-                      : opening.displayName
-                    : "—";
-                  return (
-                    <TableRow key={p.puzzleId}>
-                      <TableCell className="tabular-nums">{p.rating}</TableCell>
-                      <TableCell>
-                        <ThemeBadges themes={p.themes} />
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell text-xs text-muted-foreground">
-                        {openingLabel}
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell tabular-nums text-xs text-muted-foreground">
-                        {p.popularity}
-                      </TableCell>
-                      <TableCell>
-                        <a
-                          href={p.gameUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-muted-foreground hover:text-foreground"
-                          aria-label="View game on Lichess"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-
-          {result.totalPages > 1 && (
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-                className="rounded px-2 py-1 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Previous
-              </button>
-              <span>
-                {formatNumber((page - 1) * result.pageSize + 1)}–
-                {formatNumber(Math.min(page * result.pageSize, result.total))}{" "}
-                of {formatNumber(result.total)}
-              </span>
-              <button
-                type="button"
-                disabled={page >= result.totalPages}
-                onClick={() => setPage((p) => p + 1)}
-                className="rounded px-2 py-1 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
-          )}
-        </>
-      ) : null}
+      <p className="text-sm font-semibold">Example tactics</p>
+      <ServerDataTable
+        tableId="lichess-tactics"
+        columns={COLUMNS}
+        pageSize={PAGE_SIZE}
+        filters={filters}
+        fetchData={fetchData}
+        initialSorting={[]}
+        emptyMessage="No tactics match these filters."
+      />
     </div>
-  );
+  )
 }

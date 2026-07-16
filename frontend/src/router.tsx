@@ -33,7 +33,6 @@ import { AdminUsersPage } from './pages/AdminUsersPage'
 import { AdminWaitlistPage } from './pages/AdminWaitlistPage'
 import { AdminWhitelistPage } from './pages/AdminWhitelistPage'
 import { AdminWhitelistNewPage } from './pages/AdminWhitelistNewPage'
-
 type RouterContext = {
   auth: AuthContextValue
 }

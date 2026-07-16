@@ -8,6 +8,7 @@ from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.user import User
 from app.services import schedule as schedule_svc
+from app.table_query import TableQuery
 from app.services import training as training_svc
 
 schedules_bp = Blueprint("schedules", __name__, url_prefix="/schedules")
@@ -18,6 +19,23 @@ def _load_creator(schedule: Schedule) -> User:
     if creator is None:
         raise NotFoundError("User not found", "The schedule creator's account could not be found.")
     return creator
+
+
+@schedules_bp.get("/suggest")
+@login_required
+def suggest_schedules() -> Response:
+    limit = min(20, max(1, int(request.args.get("limit", "8"))))
+    return jsonify(schedule_svc.suggest_schedules(limit=limit))
+
+
+@schedules_bp.get("/search")
+@login_required
+def search_schedules() -> Response:
+    q = request.args.get("q", "").strip()
+    limit = min(50, max(1, int(request.args.get("limit", "10"))))
+    if not q:
+        return jsonify([])
+    return jsonify(schedule_svc.search_schedules(q, limit=limit))
 
 
 @schedules_bp.get("/by-ids")
@@ -48,27 +66,19 @@ def create_schedule() -> tuple[Response, int]:
 @schedules_bp.get("")
 @login_required
 def list_schedules() -> Response:
-    subset_id_raw = request.args.get("subsetId")
-    subset_id = int(subset_id_raw) if subset_id_raw and subset_id_raw.isdigit() else None
-    locked_only = request.args.get("locked") == "true"
-    search = request.args.get("search") or None
-    page_raw = request.args.get("page")
-    page_size_raw = request.args.get("pageSize")
-    page = int(page_raw) if page_raw and page_raw.isdigit() else 1
-    page_size = int(page_size_raw) if page_size_raw and page_size_raw.isdigit() else 20
-    user_ids_raw = request.args.get("userIds")
-    user_ids = [int(x) for x in user_ids_raw.split(",") if x.strip().isdigit()] if user_ids_raw else None
-    statuses_raw = request.args.get("statuses")
-    statuses = [s.strip() for s in statuses_raw.split(",") if s.strip()] if statuses_raw else None
+    q = TableQuery(request)
     result = schedule_svc.list_schedules(
         session["user_id"],
-        subset_id=subset_id,
-        locked_only=locked_only,
-        statuses=statuses,
-        search=search,
-        page=page,
-        page_size=page_size,
-        user_ids=user_ids,
+        subset_ids=q.int_filter("subsetId"),
+        locked_only=q.flag("locked"),
+        status=q.str_filter("status"),
+        search=q.q,
+        page=q.page,
+        page_size=q.page_size,
+        user_ids=q.int_filter("userId"),
+        date=q.date_filter("date"),
+        run_count=q.range_filter("runCount"),
+        puzzle_count=q.range_filter("puzzleCount"),
     )
     return jsonify(result)
 

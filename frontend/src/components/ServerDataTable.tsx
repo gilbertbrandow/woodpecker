@@ -3,51 +3,40 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { type ColumnDef, type SortingState } from '@tanstack/react-table'
 import { Search } from 'lucide-react'
 import { DataTable } from './DataTable'
-import { MultiSelectFilter } from './ui/multi-select-filter'
+import { FilterChipBar } from './FilterChipBar'
 import { Input } from './ui/input'
 import { useTableUrlSync } from '../hooks/useTableUrlSync'
 import { useDebounce } from '../hooks/useDebounce'
+import { getHandler } from './filters'
+import type { FilterValues } from './filters'
 
 // ---------------------------------------------------------------------------
-// Public types
+// Public types — defined in ./filters, re-exported here for backward compat
 // ---------------------------------------------------------------------------
+export type {
+  FilterSpec,
+  SearchFilterSpec,
+  MultiFilterSpec,
+  CustomFilterSpec,
+  EntityFilterSpec,
+  EntityVal,
+  DateFilterSpec,
+  RangeFilterSpec,
+  DateVal,
+  RangeVal,
+  MultiVal,
+  FilterValues,
+  FilterHandler,
+} from './filters'
 
-export type SearchFilterSpec = {
-  type: 'search'
-  key: string
-  placeholder?: string
-}
-
-export type MultiFilterSpec = {
-  type: 'multi'
-  key: string
-  label: string
-  options: { label: string; value: string; icon?: React.ReactNode }[]
-}
-
-// General-purpose filter for entity-hydrated values (UserSelector, ScheduleSelector, …).
-// TItem is the display-layer type (e.g. SelectableUser). The URL and fetchData always use
-// the string[] produced by serialize().
-export type CustomFilterSpec<TItem> = {
-  type: 'custom'
-  key: string
-  // Renders the filter UI. Called with the current hydrated items and an onChange handler.
-  render: (value: TItem[], onChange: (items: TItem[]) => void) => React.ReactNode
-  // Converts hydrated items → string IDs for the URL and for fetchData params.
-  serialize: (items: TItem[]) => string[]
-  // Fast synchronous resolution from in-memory data (e.g. current user from auth context,
-  // the special token 'me'). Return null to fall through to resolveIds.
-  resolveInstant?: (id: string) => TItem | null
-  // Async fallback for IDs that couldn't be resolved synchronously (e.g. GET /users/by-ids).
-  resolveIds?: (ids: string[]) => Promise<TItem[]>
-}
-
-export type FilterSpec = SearchFilterSpec | MultiFilterSpec | CustomFilterSpec<any>
+// Re-export for consumers that import filter types from this module
+import type { FilterSpec, CustomFilterSpec, EntityFilterSpec, EntityVal } from './filters'
 
 export type FetchParams = {
   // Every filter's current value as string[]. Search filters produce a single-element array.
   filters: Record<string, string[]>
   page: number
+  pageSize: number
   // Reserved for future server-side sorting support — always undefined for now.
   sort?: { key: string; dir: 'asc' | 'desc' }
 }
@@ -55,7 +44,8 @@ export type FetchParams = {
 export type ServerDataTableProps<T> = {
   // Optional namespace that prefixes all URL params, e.g. "run" → ?run_userId=…
   // Use when multiple ServerDataTables appear on the same page.
-  tableId?: string
+  // Pass false to disable URL sync entirely (wizard/picker tables).
+  tableId?: string | false
   // Pre-seed custom filter values when no URL param is present for that key.
   // Useful for "default filter" scenarios (e.g. current user pre-selected).
   // Only applied at mount; ignored if the URL already carries a value for the key.
@@ -71,7 +61,7 @@ export type ServerDataTableProps<T> = {
   columns: ColumnDef<T>[]
   // Declared filter slots, rendered left-to-right in the filter bar.
   filters?: FilterSpec[]
-  pageSize?: number
+  pageSize: number
   // Called whenever filter state is settled (after hydration on mount, on every change).
   // Receive fetchData via ref internally — identity changes don't trigger re-fetches.
   fetchData: (params: FetchParams) => Promise<{ items: T[]; total: number }>
@@ -82,7 +72,10 @@ export type ServerDataTableProps<T> = {
   onRowClick?: (row: T) => void
   getRowClassName?: (row: T) => string
   emptyMessage?: React.ReactNode
-  initialSorting?: SortingState
+  initialSorting: SortingState
+  compact?: boolean
+  footerRow?: React.ReactNode
+  onFooterRowClick?: () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -93,7 +86,7 @@ export function ServerDataTable<T>({
   tableId,
   columns,
   filters: filtersProp,
-  pageSize = 20,
+  pageSize: pageSizeProp,
   fetchData,
   onDataChange,
   refreshKey,
@@ -104,6 +97,9 @@ export function ServerDataTable<T>({
   initialSorting,
   initialCustomValues,
   initialData,
+  compact,
+  footerRow,
+  onFooterRowClick,
 }: ServerDataTableProps<T>): React.ReactElement {
   const { getParam, getMultiParam, setParams } = useTableUrlSync(tableId)
 
@@ -114,7 +110,7 @@ export function ServerDataTable<T>({
   const specMapRef = useRef(
     Object.fromEntries(
       specs
-        .filter((s): s is CustomFilterSpec<unknown> => s.type === 'custom')
+        .filter((s): s is CustomFilterSpec<unknown> | EntityFilterSpec<unknown> => s.type === 'custom' || s.type === 'entity')
         .map((s) => [s.key, s]),
     ),
   )
@@ -130,31 +126,29 @@ export function ServerDataTable<T>({
   // Synchronous URL → state initialisation (runs once during first render)
   // ---------------------------------------------------------------------------
   type InitData = {
-    searchValues: Record<string, string>
-    multiValues: Record<string, string[]>
-    customInstant: Record<string, unknown[]>   // immediately resolved from memory
-    customUnresolved: Record<string, string[]> // need async fetch
+    filterValues: FilterValues
+    customUnresolved: Record<string, string[]>
     initialPage: number
+    initialPageSize: number
   }
 
   const initRef = useRef<InitData | null>(null)
   if (!initRef.current) {
-    const searchValues: Record<string, string> = {}
-    const multiValues: Record<string, string[]> = {}
-    const customInstant: Record<string, unknown[]> = {}
+    const filterValues: FilterValues = {}
     const customUnresolved: Record<string, string[]> = {}
 
     for (const spec of specs) {
+      const handler = getHandler(spec)
       if (spec.type === 'search') {
-        searchValues[spec.key] = getParam(spec.key) ?? ''
-      } else if (spec.type === 'multi') {
-        multiValues[spec.key] = getMultiParam(spec.key)
-      } else {
-        const s = spec as CustomFilterSpec<unknown>
-        const ids = getMultiParam(spec.key)
+        const raw = getParam(spec.key)
+        filterValues[spec.key] = raw ? handler.fromUrl([raw], spec) : handler.defaultValue(spec)
+      } else if (spec.type === 'entity') {
+        const s = spec as EntityFilterSpec<unknown>
+        const tokens = getMultiParam(spec.key)
+        const op = tokens[0] === 'is' || tokens[0] === 'is_not' ? (tokens[0] as 'is' | 'is_not') : 'is'
+        const ids = op === tokens[0] ? tokens.slice(1) : tokens
         if (ids.length === 0 && initialCustomValues?.[spec.key]?.length) {
-          // No URL param present — use caller-provided initial values directly.
-          customInstant[spec.key] = initialCustomValues[spec.key]
+          filterValues[spec.key] = { op: 'is', items: initialCustomValues[spec.key] } satisfies EntityVal
           customUnresolved[spec.key] = []
         } else {
           const instant: unknown[] = []
@@ -164,32 +158,52 @@ export function ServerDataTable<T>({
             if (item !== null) instant.push(item)
             else unresolved.push(id)
           }
-          customInstant[spec.key] = instant
+          filterValues[spec.key] = { op, items: instant } satisfies EntityVal
           customUnresolved[spec.key] = unresolved
         }
+      } else if (spec.type === 'custom') {
+        const s = spec as CustomFilterSpec<unknown>
+        const ids = getMultiParam(spec.key)
+        if (ids.length === 0 && initialCustomValues?.[spec.key]?.length) {
+          filterValues[spec.key] = initialCustomValues[spec.key]
+          customUnresolved[spec.key] = []
+        } else {
+          const instant: unknown[] = []
+          const unresolved: string[] = []
+          for (const id of ids) {
+            const item = s.resolveInstant?.(id) ?? null
+            if (item !== null) instant.push(item)
+            else unresolved.push(id)
+          }
+          filterValues[spec.key] = instant
+          customUnresolved[spec.key] = unresolved
+        }
+      } else {
+        const tokens = getMultiParam(spec.key)
+        const val = tokens.length > 0 ? handler.fromUrl(tokens, spec) : null
+        filterValues[spec.key] = val ?? handler.defaultValue(spec)
       }
     }
 
     const pageStr = getParam('page')
+    const pageSizeStr = getParam('pageSize')
     initRef.current = {
-      searchValues,
-      multiValues,
-      customInstant,
+      filterValues,
       customUnresolved,
       initialPage: pageStr ? Math.max(1, parseInt(pageStr, 10)) : 1,
+      initialPageSize: pageSizeStr ? Math.max(1, parseInt(pageSizeStr, 10)) : pageSizeProp,
     }
   }
 
   // ---------------------------------------------------------------------------
-  // Filter state
+  // Filter state — single dict for all filter types
   // ---------------------------------------------------------------------------
-  const [rawSearch, setRawSearch] = useState(initRef.current.searchValues)
-  const [multiValues, setMultiValues] = useState(initRef.current.multiValues)
-  const [customValues, setCustomValues] = useState(initRef.current.customInstant)
+  const [filterValues, setFilterValues] = useState<FilterValues>(initRef.current.filterValues)
   const [isHydrating, setIsHydrating] = useState(() =>
     Object.values(initRef.current!.customUnresolved).some((ids) => ids.length > 0),
   )
   const [page, setPage] = useState(initRef.current.initialPage)
+  const [pageSize, setPageSize] = useState(initRef.current.initialPageSize)
   const [data, setData] = useState<T[]>(() => initialData?.items ?? [])
   const [total, setTotal] = useState(() => initialData?.total ?? 0)
   const [loading, setLoading] = useState(() => !initialData)
@@ -211,12 +225,17 @@ export function ServerDataTable<T>({
       ),
     )
       .then((results) => {
-        // Guard: if the user cleared filters while the fetch was in flight, don't inject
-        // stale hydrated items back into state.
         if (cancelled) return
-        setCustomValues((prev) => {
+        setFilterValues((prev) => {
           const next = { ...prev }
-          for (const [key, items] of results) next[key] = [...(prev[key] ?? []), ...items]
+          for (const [key, items] of results) {
+            if (specMapRef.current[key]?.type === 'entity') {
+              const cur = prev[key] as EntityVal | undefined
+              next[key] = { op: cur?.op ?? 'is', items: [...(cur?.items ?? []), ...items] } satisfies EntityVal
+            } else {
+              next[key] = [...((prev[key] as unknown[]) ?? []), ...items]
+            }
+          }
           return next
         })
       })
@@ -228,43 +247,37 @@ export function ServerDataTable<T>({
 
   // ---------------------------------------------------------------------------
   // Stable serialisations used as effect dependencies
-  // These only produce a new string when actual values change, not on every render.
   // ---------------------------------------------------------------------------
   const searchSerialized = useMemo(
     () =>
-      Object.entries(rawSearch)
+      specs
+        .filter((s) => s.type === 'search')
+        .map((s) => `${s.key}=${(filterValues[s.key] as string) ?? ''}`)
         .sort()
-        .map(([k, v]) => `${k}=${v}`)
         .join('&'),
-    [rawSearch],
+    [filterValues], // specs is stable
   )
   // Debounce search: URL and fetch are both delayed while the user is typing.
   const debouncedSearchSerialized = useDebounce(searchSerialized, 300)
 
-  const multiSerialized = useMemo(
+  const nonSearchSerialized = useMemo(
     () =>
-      Object.entries(multiValues)
+      specs
+        .filter((s) => s.type !== 'search')
+        .map((s) => {
+          const handler = getHandler(s)
+          const val = filterValues[s.key] ?? handler.defaultValue(s)
+          return `${s.key}=${handler.toUrl(val, s).join(',')}`
+        })
         .sort()
-        .map(([k, v]) => `${k}=${v.join(',')}`)
         .join('&'),
-    [multiValues],
-  )
-
-  const customSerialized = useMemo(
-    () =>
-      Object.entries(customValues)
-        .sort()
-        .map(([k, v]) => `${k}=${(specMapRef.current[k]?.serialize(v) ?? []).join(',')}`)
-        .join('&'),
-    [customValues],
+    [filterValues], // specs is stable
   )
 
   // When initialData is provided we skip the first fetch — the data is already loaded.
-  // Using a params-snapshot instead of a consumed-once flag so React Strict Mode's
-  // double-invoke of effects doesn't bypass the skip on the second invocation.
   const initialFetchParamsRef = useRef<string | null>(
     initialData !== undefined
-      ? `${debouncedSearchSerialized}|${multiSerialized}|${customSerialized}|${page}|${refreshKey ?? ''}|${instanceKey ?? ''}`
+      ? `${debouncedSearchSerialized}|${nonSearchSerialized}|${page}|${pageSize}|${refreshKey ?? ''}|${instanceKey ?? ''}`
       : null,
   )
 
@@ -276,21 +289,16 @@ export function ServerDataTable<T>({
     const updates: Record<string, string | string[] | null> = {}
 
     for (const spec of specs) {
-      if (spec.type === 'search') {
-        updates[spec.key] = rawSearch[spec.key] || null
-      } else if (spec.type === 'multi') {
-        const vals = multiValues[spec.key] ?? []
-        updates[spec.key] = vals.length > 0 ? vals : null
-      } else {
-        const s = spec as CustomFilterSpec<unknown>
-        const ids = s.serialize(customValues[spec.key] ?? [])
-        updates[spec.key] = ids.length > 0 ? ids : null
-      }
+      const handler = getHandler(spec)
+      const val = filterValues[spec.key] ?? handler.defaultValue(spec)
+      const tokens = handler.toUrl(val, spec)
+      updates[spec.key] = tokens.length > 0 ? tokens : null
     }
     updates.page = page > 1 ? String(page) : null
+    updates.pageSize = pageSize !== pageSizeProp ? String(pageSize) : null
 
     setParams(updates)
-  }, [debouncedSearchSerialized, multiSerialized, customSerialized, page]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [debouncedSearchSerialized, nonSearchSerialized, page, pageSize]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------------------
   // Fetch: called when settled filter params, page, or refreshKey change.
@@ -299,30 +307,23 @@ export function ServerDataTable<T>({
   useEffect(() => {
     if (isHydrating) return
 
-    // Skip the fetch if params haven't changed from the initial seeded state.
-    // Clearing the ref after any change ensures all subsequent fetches run normally.
     if (initialFetchParamsRef.current !== null) {
-      const sig = `${debouncedSearchSerialized}|${multiSerialized}|${customSerialized}|${page}|${refreshKey ?? ''}|${instanceKey ?? ''}`
+      const sig = `${debouncedSearchSerialized}|${nonSearchSerialized}|${page}|${pageSize}|${refreshKey ?? ''}|${instanceKey ?? ''}`
       if (sig === initialFetchParamsRef.current) return
       initialFetchParamsRef.current = null
     }
 
     const filters: Record<string, string[]> = {}
     for (const spec of specs) {
-      if (spec.type === 'search') {
-        const v = rawSearch[spec.key]
-        if (v) filters[spec.key] = [v]
-      } else if (spec.type === 'multi') {
-        filters[spec.key] = multiValues[spec.key] ?? []
-      } else {
-        const s = spec as CustomFilterSpec<unknown>
-        filters[spec.key] = s.serialize(customValues[spec.key] ?? [])
-      }
+      const handler = getHandler(spec)
+      const val = filterValues[spec.key] ?? handler.defaultValue(spec)
+      const params = handler.getFetchParams(val, spec)
+      if (params.length > 0) filters[spec.key] = params
     }
 
     let cancelled = false
     setLoading(true)
-    fetchDataRef.current({ filters, page })
+    fetchDataRef.current({ filters, page, pageSize })
       .then(({ items, total: t }) => {
         if (cancelled) return
         setData(items)
@@ -333,88 +334,65 @@ export function ServerDataTable<T>({
       .finally(() => { if (!cancelled) setLoading(false) })
 
     return () => { cancelled = true }
-  }, [isHydrating, debouncedSearchSerialized, multiSerialized, customSerialized, page, refreshKey, instanceKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isHydrating, debouncedSearchSerialized, nonSearchSerialized, page, pageSize, refreshKey, instanceKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------------------
-  // Filter change handlers — stable across renders (empty dep arrays, use specsRef)
+  // Filter change handlers
   // ---------------------------------------------------------------------------
-  const handleSearchChange = useCallback((key: string, value: string) => {
-    setRawSearch((prev) => ({ ...prev, [key]: value }))
-    setPage(1)
-  }, [])
-
-  const handleMultiChange = useCallback((key: string, values: string[]) => {
-    setMultiValues((prev) => ({ ...prev, [key]: values }))
-    setPage(1)
-  }, [])
-
-  const handleCustomChange = useCallback((key: string, items: unknown[]) => {
-    setCustomValues((prev) => ({ ...prev, [key]: items }))
+  const handleFilterChange = useCallback((key: string, value: unknown) => {
+    setFilterValues((prev) => ({ ...prev, [key]: value }))
     setPage(1)
   }, [])
 
   const handleClearFilters = useCallback(() => {
-    setRawSearch({})
-    setMultiValues({})
-    setCustomValues({})
+    setFilterValues((prev) => {
+      const next = { ...prev }
+      for (const spec of specsRef.current) {
+        if (spec.type !== 'search') next[spec.key] = getHandler(spec).defaultValue(spec)
+      }
+      return next
+    })
     setPage(1)
   }, [])
 
-  // ---------------------------------------------------------------------------
-  // Active filter check — drives the "Clear filters" button visibility in DataTable
-  // ---------------------------------------------------------------------------
-  const hasActiveFilters = useMemo(() => {
-    for (const spec of specs) {
-      if (spec.type === 'search' && rawSearch[spec.key]) return true
-      if (spec.type === 'multi' && (multiValues[spec.key] ?? []).length > 0) return true
-      if (spec.type === 'custom' && (customValues[spec.key] ?? []).length > 0) return true
-    }
-    return false
-  }, [rawSearch, multiValues, customValues]) // specs is stable
+  const searchSpecs = specs.filter((s) => s.type === 'search')
+  const chipSpecs = specs.filter((s) => s.type !== 'search')
 
-  // ---------------------------------------------------------------------------
-  // Filter bar — rendered inline; DataTable is not React.memo'd so memoising the
-  // JSX reference here would not prevent DataTable re-renders anyway.
-  // ---------------------------------------------------------------------------
-  const filtersSlot = (
-    <>
-      {specs.map((spec) => {
-        if (spec.type === 'search') {
-          return (
-            <div key={spec.key} className="relative">
-              <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder={spec.placeholder ?? 'Search…'}
-                value={rawSearch[spec.key] ?? ''}
-                onChange={(e) => handleSearchChange(spec.key, e.target.value)}
-                className="h-8 pl-7 text-sm sm:w-56"
-              />
-            </div>
-          )
-        }
-        if (spec.type === 'multi') {
-          return (
-            <MultiSelectFilter
-              key={spec.key}
-              label={spec.label}
-              options={spec.options}
-              selected={multiValues[spec.key] ?? []}
-              onChange={(values) => handleMultiChange(spec.key, values)}
-            />
-          )
-        }
-        // custom
-        return (
-          <React.Fragment key={spec.key}>
-            {(spec as CustomFilterSpec<unknown>).render(
-              customValues[spec.key] ?? [],
-              (items) => handleCustomChange(spec.key, items),
-            )}
-          </React.Fragment>
-        )
-      })}
-    </>
+  const hasActiveFilters = useMemo(
+    () =>
+      chipSpecs.some((spec) => {
+        const handler = getHandler(spec)
+        return !handler.isEmpty(filterValues[spec.key] ?? handler.defaultValue(spec))
+      }),
+    [filterValues], // specs and chipSpecs are stable
   )
+
+  const searchSlot = searchSpecs.length > 0 ? (
+    <>
+      {searchSpecs.map((spec) => (
+        <div key={spec.key} className="relative shrink-0">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search…"
+            value={(filterValues[spec.key] as string) ?? ''}
+            onChange={(e) => handleFilterChange(spec.key, e.target.value)}
+            className="h-8 pl-7 text-xs focus-visible:ring-offset-0 w-28 sm:w-36"
+          />
+        </div>
+      ))}
+    </>
+  ) : undefined
+
+  const filtersSlot = chipSpecs.length > 0 ? (
+    <FilterChipBar
+      specs={chipSpecs}
+      values={filterValues}
+      onChange={handleFilterChange}
+      onClear={handleClearFilters}
+      hasActiveFilters={hasActiveFilters}
+      compact={compact}
+    />
+  ) : undefined
 
   return (
     <DataTable
@@ -423,15 +401,17 @@ export function ServerDataTable<T>({
       data={data}
       loading={loading}
       hideSearch
+      searchSlot={searchSlot}
       filtersSlot={filtersSlot}
-      filtersActive={hasActiveFilters}
-      onClearFilters={handleClearFilters}
-      serverPagination={{ totalRows: total, page, pageSize, onPageChange: setPage }}
+      serverPagination={{ totalRows: total, page, pageSize, onPageChange: setPage, onPageSizeChange: (s) => { setPageSize(s); setPage(1) } }}
       pageSize={pageSize}
       onRowClick={onRowClick}
       getRowClassName={getRowClassName}
       emptyMessage={emptyMessage}
       initialSorting={initialSorting}
+      compact={compact}
+      footerRow={footerRow}
+      onFooterRowClick={onFooterRowClick}
     />
   )
 }

@@ -218,3 +218,20 @@ _Avoid_: last active, last seen (both conflate login with training activity)
 - "puzzle" appears in the UI, old docs, and issue history — resolved: use **TrainingItem** for the stored record; "puzzle" is acceptable only in user-facing UI copy.
 - "cycle" is used loosely in the Woodpecker Method description — resolved: use **Run** for the software concept.
 - "nickname" was the prior code-level field name for user display identity — resolved: renamed to `display_name` everywhere (DB column, model, API, frontend) as part of issue #10.
+
+## Table Infrastructure
+
+Every paginated list in the app uses two paired components:
+
+**ServerDataTable** (`frontend/src/components/ServerDataTable.tsx`) — the standard React component for all server-side tables. Owns filter state, URL sync, debouncing, pagination, and async entity hydration. All filter/page state lives in the URL, enabling deep links and browser-back. Every new table with server pagination must use this component rather than building its own state.
+
+**TableQuery** (`backend/app/table_query.py`) — the Flask-side counterpart. Parses the wire format emitted by ServerDataTable from `request.args`: `page`, `pageSize`, `q` (search), and typed filter methods (`str_filter`, `int_filter`, `date_filter`, `range_filter`, `set_filter`). Calling a filter method on the instance IS the declaration that the endpoint supports that filter — no registration step. All new list endpoints must use `TableQuery`.
+
+Wire format: repeated query params with an op-prefix token (`userId=is&userId=1&userId=2`). The frontend emits this automatically; the backend parses it via the filter methods.
+
+Key non-obvious constraints:
+
+- `tableId` namespaces URL params — required when two `ServerDataTable` instances share a page; `false` disables URL sync for embedded/picker tables.
+- Filter specs passed to `ServerDataTable` are frozen at mount and must be stable references.
+- `instanceKey` forces a re-fetch when a parent prop (e.g. `scheduleId`) changes without the component unmounting.
+- Search is always the `q` param — never `search`. Rename when migrating existing endpoints.

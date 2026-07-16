@@ -17,8 +17,11 @@ import { StatusBadge, trainingStateToStatusValue } from "../StatusBadge";
 import { ProgressBar } from "../ProgressBar";
 import { UserAvatar } from "../UserAvatar";
 import { ServerDataTable } from "../ServerDataTable";
+import { col } from "../DataTable";
 import { api, type AllTrainingSummary } from "../../lib/api";
 import { useUserFilterSpec } from "../../hooks/useUserFilterSpec";
+import { useSubsetFilterSpec } from "../../hooks/useSubsetFilterSpec";
+import { useScheduleFilterSpec } from "../../hooks/useScheduleFilterSpec";
 import { CONCEPT_ICONS, DATA_ICONS } from "../../lib/icons";
 
 const PAGE_SIZE = 20;
@@ -48,10 +51,12 @@ export function TrainingTable({
 }: TrainingTableProps): React.ReactElement {
   const navigate = useNavigate();
   const userFilterSpec = useUserFilterSpec('userId');
+  const subsetFilterSpec = useSubsetFilterSpec('subsetId');
+  const scheduleFilterSpec = useScheduleFilterSpec('scheduleId');
 
   const columns = useMemo<ColumnDef<AllTrainingSummary>[]>(
     () => [
-      {
+      col({
         id: "user",
         accessorFn: (row) => row.user.displayName,
         header: "User",
@@ -63,8 +68,8 @@ export function TrainingTable({
             avatarUrl={row.original.user.avatarUrl}
           />
         ),
-      },
-      {
+      }),
+      col({
         accessorKey: "status",
         header: "Status",
         meta: { icon: DATA_ICONS.status },
@@ -76,8 +81,8 @@ export function TrainingTable({
             )}
           />
         ),
-      },
-      {
+      }),
+      col({
         id: "progress",
         accessorFn: (row) =>
           row.totalPuzzles > 0 ? row.completedPuzzles / row.totalPuzzles : 0,
@@ -98,29 +103,44 @@ export function TrainingTable({
             />
           );
         },
-      },
+      }),
       ...(!hideSchedule
-        ? ([
-            {
-              id: "schedule",
-              accessorFn: (row: AllTrainingSummary) => row.scheduleName,
-              header: "Schedule",
-              meta: { icon: CONCEPT_ICONS.Schedule },
-              cell: ({ row }: { row: { original: AllTrainingSummary } }) => (
-                <Link
-                  to="/app/schedules/$scheduleId"
-                  params={{ scheduleId: String(row.original.scheduleId) }}
-                  className="font-medium hover:underline"
-                  title={row.original.scheduleName}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {row.original.scheduleName}
-                </Link>
-              ),
-            },
-          ] as ColumnDef<AllTrainingSummary>[])
+        ? [col<AllTrainingSummary>({
+            id: "schedule",
+            accessorFn: (row) => row.scheduleName,
+            header: "Schedule",
+            meta: { icon: CONCEPT_ICONS.Schedule },
+            cell: ({ row }) => (
+              <Link
+                to="/app/schedules/$scheduleId"
+                params={{ scheduleId: String(row.original.scheduleId) }}
+                className="font-medium hover:underline"
+                title={row.original.scheduleName}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {row.original.scheduleName}
+              </Link>
+            ),
+          }),
+          col<AllTrainingSummary>({
+            id: "subset",
+            accessorFn: (row) => row.subsetName,
+            header: "Subset",
+            meta: { icon: CONCEPT_ICONS.Subset },
+            cell: ({ row }) => (
+              <Link
+                to="/app/subsets/$subsetId"
+                params={{ subsetId: String(row.original.subsetId) }}
+                className="font-medium hover:underline"
+                title={row.original.subsetName}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {row.original.subsetName}
+              </Link>
+            ),
+          })]
         : []),
-      {
+      col({
         id: "startedAt",
         accessorFn: (row) => new Date(row.startedAt).getTime(),
         header: "Started",
@@ -130,8 +150,8 @@ export function TrainingTable({
             {formatDate(row.original.startedAt)}
           </span>
         ),
-      },
-      {
+      }),
+      col({
         id: "completedAt",
         accessorFn: (row) =>
           row.completedAt ? new Date(row.completedAt).getTime() : 0,
@@ -142,7 +162,7 @@ export function TrainingTable({
             {row.original.completedAt ? formatDate(row.original.completedAt) : "—"}
           </span>
         ),
-      },
+      }),
     ],
     [hideSchedule],
   );
@@ -155,19 +175,21 @@ export function TrainingTable({
       instanceKey={scheduleId}
       filters={[
         userFilterSpec,
-        { type: 'multi', key: 'status', label: 'statuses', options: STATUS_OPTIONS },
-        { type: 'search', key: 'q', placeholder: 'Search by schedule…' },
+        subsetFilterSpec,
+        ...(scheduleId === undefined ? [scheduleFilterSpec] : []),
+        { type: 'multi', key: 'status', label: 'Status', options: STATUS_OPTIONS, icon: DATA_ICONS.status },
+        { type: 'date', key: 'startedAt', label: 'Started', icon: DATA_ICONS.started },
+        { type: 'date', key: 'completedAt', label: 'Finished', icon: DATA_ICONS.finished, nullable: true },
+        { type: 'search', key: 'q' },
       ]}
-      fetchData={({ filters, page }) =>
-        api.training.listAll({
-          scheduleId,
-          userIds: filters.userId?.map(Number),
-          statuses: filters.status?.length ? filters.status : undefined,
-          search: filters.q?.[0] || undefined,
-          page,
-          pageSize: PAGE_SIZE,
-        })
+      fetchData={(params) =>
+        api.training.listAll(
+          scheduleId !== undefined
+            ? { ...params, filters: { ...params.filters, scheduleId: ['is', String(scheduleId)] } }
+            : params,
+        )
       }
+      initialSorting={[{ id: 'startedAt', desc: true }]}
       onRowClick={(t) =>
         void navigate({
           to: "/app/training/$trainingId",

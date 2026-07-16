@@ -8,7 +8,6 @@ import { useAuth } from '../context/auth'
 import {
   api,
   type Run,
-  type RunTrainingItemList,
   type Training,
 } from '../lib/api'
 import { formatNumber, formatSolveTime, formatSolveTimeMs, formatStartedAt } from '../lib/utils'
@@ -33,7 +32,7 @@ import { RunPaceCard } from '../features/board/RunPaceCard'
 import { UserAvatar } from '../components/UserAvatar'
 import { ConceptIcon } from '../components/ConceptIcon'
 
-function InsightsTab({ run, puzzleList }: { run: Run; puzzleList: RunTrainingItemList }): React.ReactElement {
+function InsightsTab({ run }: { run: Run }): React.ReactElement {
   const [breakdownOpen, setBreakdownOpen] = useState(true)
   const [paceOpen, setPaceOpen] = useState(true)
 
@@ -43,16 +42,8 @@ function InsightsTab({ run, puzzleList }: { run: Run; puzzleList: RunTrainingIte
   const completionPct =
     run.totalItems > 0 ? ((resolvedCount / run.totalItems) * 100).toFixed(1) : null
 
-  const solvedTimes = puzzleList.trainingItems
-    .filter((p) => p.positionStatus === 'solved' || p.positionStatus === 'solved_with_retries')
-    .map((p) => p.timeMs)
-    .filter((ms): ms is number => ms !== null)
-
-  const avgMs =
-    solvedTimes.length > 0
-      ? Math.round(solvedTimes.reduce((a, b) => a + b, 0) / solvedTimes.length)
-      : null
-  const fastestMs = solvedTimes.length > 0 ? Math.min(...solvedTimes) : null
+  const avgMs = run.avgSolveTimeMs
+  const fastestMs = run.fastestSolveTimeMs
 
   if (resolvedCount === 0) {
     return (
@@ -288,7 +279,6 @@ export function RunPage(): React.ReactElement | null {
   const runId = parseInt(runIdStr, 10)
 
   const [run, setRun] = useState<Run | null>(null)
-  const [puzzleList, setPuzzleList] = useState<RunTrainingItemList | null>(null)
   const [participation, setParticipation] = useState<Training | null>(null)
   const [pageLoading, setPageLoading] = useState(true)
   const breadcrumbParents = useMemo(
@@ -308,10 +298,9 @@ export function RunPage(): React.ReactElement | null {
 
   useEffect(() => {
     if (!user) return
-    Promise.all([api.runs.get(runId), api.runs.trainingItems(runId)])
-      .then(([fetchedRun, fetchedPuzzles]) => {
+    api.runs.get(runId)
+      .then((fetchedRun) => {
         setRun(fetchedRun)
-        setPuzzleList(fetchedPuzzles)
         api.training
           .get(fetchedRun.trainingId)
           .then(setParticipation)
@@ -331,7 +320,7 @@ export function RunPage(): React.ReactElement | null {
     )
   }
 
-  if (!run || !puzzleList) {
+  if (!run) {
     return (
       <PageWrapper>
         <p className="text-sm text-muted-foreground">Run not found.</p>
@@ -383,7 +372,7 @@ export function RunPage(): React.ReactElement | null {
         <TabsList className="mb-6">
           <TabsTrigger value="configure">Configure</TabsTrigger>
           <TabsTrigger value="puzzles">
-            Puzzles{puzzleList.trainingItems.length > 0 ? ` (${puzzleList.trainingItems.length})` : ''}
+            Puzzles{run.totalItems > 0 ? ` (${run.totalItems})` : ''}
           </TabsTrigger>
           <TabsTrigger value="insights">Insights</TabsTrigger>
         </TabsList>
@@ -392,13 +381,13 @@ export function RunPage(): React.ReactElement | null {
         </TabsContent>
         <TabsContent value="puzzles">
           <RunTrainingItemTable
-            trainingItems={puzzleList.trainingItems}
+            runId={runId}
             runIdStr={runIdStr}
             isActive={run.status === 'active'}
           />
         </TabsContent>
         <TabsContent value="insights">
-          <InsightsTab run={run} puzzleList={puzzleList} />
+          <InsightsTab run={run} />
         </TabsContent>
       </Tabs>
 

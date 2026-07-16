@@ -1,4 +1,4 @@
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, jsonify, request, session
 
 from app.decorators import login_required
 from app.services import user as user_svc
@@ -12,6 +12,14 @@ def get_users_by_ids() -> Response:
     ids_raw = request.args.get("ids", "")
     ids = [int(x) for x in ids_raw.split(",") if x.strip().isdigit()]
     return jsonify(user_svc.get_users_by_ids(ids))
+
+
+@users_bp.get("/suggest")
+@login_required
+def suggest_users() -> Response:
+    limit_raw = request.args.get("limit", "5")
+    limit = min(20, max(1, int(limit_raw))) if limit_raw.isdigit() else 5
+    return jsonify(user_svc.suggest_users(exclude_id=session.get("user_id"), limit=limit))
 
 
 @users_bp.get("/search")

@@ -78,6 +78,53 @@ try {
 
 `request()` is the only place that should ever call `toast.error`, `navigateTo('/')`, or `Sentry.captureException`. Adding any of these three in feature code is always wrong.
 
+## Data tables
+
+All server-paginated, filterable tables use `ServerDataTable` from
+`src/components/ServerDataTable.tsx`. Never build ad-hoc pagination loops;
+always reach for this component.
+
+### Minimal wiring
+
+```typescript
+<ServerDataTable
+  columns={columns}
+  pageSize={20}
+  initialSorting={[{ id: 'createdAt', desc: true }]}
+  fetchData={async ({ filters, page, pageSize }) =>
+    api.things.list({ ...filters, page, pageSize })
+  }
+/>
+```
+
+`fetchData` receives `{ filters: Record<string, string[]>, page, pageSize }`.
+Pass it straight to the API layer — never parse filters in the component.
+
+### Filter specs → backend methods
+
+Declare filters as `FilterSpec[]` on the `filters` prop. Each type maps to a specific backend `TableQuery` method:
+
+| Frontend `type` | Value type | Backend method |
+| --------------- | ---------- | -------------- |
+| `'search'` — key **must** be `'q'` | `string` | `q.q` (not a filter method) |
+| `'multi'` | `MultiVal` (`op` + `values: string[]`) | `q.str_filter(key)` |
+| `'entity'` | `EntityVal` (`op` + `items: T[]`) | `q.int_filter(key)` |
+| `'set'` | `SetVal` (`op` + `items: T[]`) | `q.set_filter(key)` |
+| `'date'` | `DateVal` (`op` + `from`/`to`) | `q.date_filter(key)` |
+| `'range'` | `RangeVal` (`op` + `from`/`to`) | `q.range_filter(key)` |
+| `'custom'` | `T[]` | `q.str_filter(key)` or `q.int_filter(key)` (depends on `serialize`) |
+
+### Key props
+
+| Prop | Purpose |
+| ---- | ------- |
+| `tableId` | Namespaces URL params when multiple tables share a page — e.g. `"run"` → `?run_userId=…` |
+| `initialData` | Pre-seeds data to skip the first fetch; the component only re-fetches when filters/page change |
+| `refreshKey` | Increment to imperatively trigger a re-fetch (e.g. after a delete) |
+| `instanceKey` | Change when the data source identity changes without unmounting (e.g. a `scheduleId` prop changes) |
+| `onDataChange` | Side-effect callback `(items, total)` — sync a count badge or parent state without lifting all data up |
+| `initialCustomValues` | Pre-seed a filter value at mount when no URL param is present (e.g. current user pre-selected) |
+
 ## Sentry
 
 - **Captures:** JSON parse failures on 2xx responses (backend contract violation) and React render crashes via `Sentry.ErrorBoundary`
