@@ -10,7 +10,7 @@ import { UserAvatar } from '../UserAvatar'
 import { formatSolveTimeMs } from '../../lib/utils'
 import { PositionBadge, getGlobalPosition } from '../leaderboard/PositionBadge'
 
-const PAGE_SIZE = 5
+const PAGE_SIZE = 10
 
 function formatDelta(delta: number | null): React.ReactElement {
   if (delta === null) return <span className="text-muted-foreground">—</span>
