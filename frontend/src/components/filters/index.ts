@@ -11,6 +11,7 @@ export type {
   SetVal,
   DateFilterSpec,
   RangeFilterSpec,
+  DurationFilterSpec,
   DateVal,
   RangeVal,
   MultiVal,

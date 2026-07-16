@@ -6,6 +6,7 @@ import { entityHandler } from './entity'
 import { setHandler } from './set'
 import { dateHandler } from './date'
 import { rangeHandler } from './range'
+import { durationHandler } from './duration'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const FILTER_HANDLERS: Record<FilterSpec['type'], FilterHandler<any, any>> = {
@@ -16,6 +17,7 @@ const FILTER_HANDLERS: Record<FilterSpec['type'], FilterHandler<any, any>> = {
   set: setHandler,
   date: dateHandler,
   range: rangeHandler,
+  duration: durationHandler,
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

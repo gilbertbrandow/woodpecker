@@ -119,6 +119,17 @@ export type RangeFilterSpec = {
   nullable?: boolean
 }
 
+export type DurationFilterSpec = {
+  type: 'duration'
+  key: string
+  label: string
+  min: number
+  max: number
+  step?: number
+  icon?: React.ComponentType<{ className?: string }>
+  nullable?: boolean
+}
+
 export type FilterSpec =
   | SearchFilterSpec
   | MultiFilterSpec
@@ -127,6 +138,7 @@ export type FilterSpec =
   | SetFilterSpec<any>
   | DateFilterSpec
   | RangeFilterSpec
+  | DurationFilterSpec
 
 // ---------------------------------------------------------------------------
 // Handler interface
