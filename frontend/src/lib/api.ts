@@ -1329,20 +1329,8 @@ export const api = {
     scrapedPositional: {
       sourceRunMetadata: (): Promise<{ metadata: ScrapedPositionalSourceRunMetadata | null }> =>
         request('/sources/scraped-positional/source-run-metadata'),
-      items: (params: {
-        page?: number
-        difficulty?: number
-        theme?: string
-        opening?: string
-      }): Promise<ScrapedPositionalPage> => {
-        const p = new URLSearchParams()
-        if (params.page !== undefined) p.set('page', String(params.page))
-        if (params.difficulty !== undefined) p.set('difficulty', String(params.difficulty))
-        if (params.theme) p.set('theme', params.theme)
-        if (params.opening) p.set('opening', params.opening)
-        const qs = p.toString()
-        return request(`/sources/scraped-positional/items${qs ? `?${qs}` : ''}`)
-      },
+      items: (params: TableParams): Promise<{ items: ScrapedPositionalPuzzle[]; total: number }> =>
+        request(`/sources/scraped-positional/items?${tableParamsToUrl(params)}`),
     },
     decoys: {
       sourceRunMetadata: (): Promise<{ metadata: DecoySourceRunMetadata | null }> =>
