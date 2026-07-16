@@ -1278,16 +1278,9 @@ export const api = {
   trainingItems: {
     getAttemptHistory: (
       trainingItemId: number,
-      opts?: { page?: number; pageSize?: number; userId?: string[]; result?: string[] },
-    ): Promise<{ attempts: AttemptHistoryRow[]; total: number }> => {
-      const p = new URLSearchParams()
-      if (opts?.page) p.set('page', String(opts.page))
-      if (opts?.pageSize) p.set('pageSize', String(opts.pageSize))
-      opts?.userId?.forEach((v) => p.append('userId', v))
-      opts?.result?.forEach((r) => p.append('result', r))
-      const qs = p.toString()
-      return request(`/training-items/${trainingItemId}/attempt-history${qs ? `?${qs}` : ''}`)
-    },
+      params: TableParams,
+    ): Promise<{ attempts: AttemptHistoryRow[]; total: number }> =>
+      request(`/training-items/${trainingItemId}/attempt-history?${tableParamsToUrl(params)}`),
     getSpectateView: (trainingItemId: number, attemptId: number): Promise<AttemptSpectateView> =>
       request(`/training-items/${trainingItemId}/attempts/${attemptId}`),
   },
@@ -1363,27 +1356,12 @@ export const api = {
     },
   },
   admin: {
-    users: (params: { page?: number; q?: string }): Promise<{ items: AdminUser[]; total: number }> => {
-      const p = new URLSearchParams()
-      if (params.page !== undefined) p.set('page', String(params.page))
-      if (params.q) p.set('q', params.q)
-      const qs = p.toString()
-      return request(`/admin/users${qs ? `?${qs}` : ''}`)
-    },
-    waitlist: (params: { page?: number; q?: string }): Promise<{ items: AdminWaitlistEntry[]; total: number }> => {
-      const p = new URLSearchParams()
-      if (params.page !== undefined) p.set('page', String(params.page))
-      if (params.q) p.set('q', params.q)
-      const qs = p.toString()
-      return request(`/admin/waitlist${qs ? `?${qs}` : ''}`)
-    },
-    whitelist: (params: { page?: number; q?: string }): Promise<{ items: AdminWhitelistEntry[]; total: number }> => {
-      const p = new URLSearchParams()
-      if (params.page !== undefined) p.set('page', String(params.page))
-      if (params.q) p.set('q', params.q)
-      const qs = p.toString()
-      return request(`/admin/whitelist${qs ? `?${qs}` : ''}`)
-    },
+    users: (params: TableParams): Promise<{ items: AdminUser[]; total: number }> =>
+      request(`/admin/users?${tableParamsToUrl(params)}`),
+    waitlist: (params: TableParams): Promise<{ items: AdminWaitlistEntry[]; total: number }> =>
+      request(`/admin/waitlist?${tableParamsToUrl(params)}`),
+    whitelist: (params: TableParams): Promise<{ items: AdminWhitelistEntry[]; total: number }> =>
+      request(`/admin/whitelist?${tableParamsToUrl(params)}`),
     addWhitelist: (lichessUsername: string): Promise<AdminWhitelistEntry> =>
       request('/admin/whitelist', { method: 'POST', body: JSON.stringify({ lichessUsername }) }),
     deleteWhitelist: (username: string): Promise<void> =>

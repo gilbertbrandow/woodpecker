@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useMemo, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Loader2, Plus, Trash2 } from 'lucide-react'
+import { CheckCircle2, Clock, Loader2, Plus, Trash2 } from 'lucide-react'
 import { Badge } from '../components/ui/badge'
 import { PageWrapper } from '../components/PageWrapper'
 import { ServerDataTable } from '../components/ServerDataTable'
@@ -25,6 +25,11 @@ import {
 } from '../components/ui/alert-dialog'
 
 const PAGE_SIZE = 20
+
+const WHITELIST_STATUS_OPTIONS = [
+  { value: 'registered', label: 'Registered', icon: <CheckCircle2 className="h-3.5 w-3.5 text-green-600" /> },
+  { value: 'pending', label: 'Pending', icon: <Clock className="h-3.5 w-3.5 text-muted-foreground" /> },
+]
 
 export function AdminWhitelistPage(): React.ReactElement {
   const [refreshKey, setRefreshKey] = useState(0)
@@ -130,7 +135,11 @@ export function AdminWhitelistPage(): React.ReactElement {
   )
 
   const filters = useMemo(
-    () => [{ type: 'search' as const, key: 'q' }],
+    () => [
+      { type: 'search' as const, key: 'q' },
+      { type: 'multi' as const, key: 'status', label: 'Status', icon: DATA_ICONS.status, options: WHITELIST_STATUS_OPTIONS },
+      { type: 'date' as const, key: 'createdAt', label: 'Added', icon: DATA_ICONS.started },
+    ],
     [],
   )
 
@@ -154,9 +163,7 @@ export function AdminWhitelistPage(): React.ReactElement {
         pageSize={PAGE_SIZE}
         refreshKey={refreshKey}
         filters={filters}
-        fetchData={({ filters: f, page }) =>
-          api.admin.whitelist({ page, q: f.q?.[0] || undefined })
-        }
+        fetchData={(params) => api.admin.whitelist(params)}
         initialSorting={[{ id: 'createdAt', desc: true }]}
         emptyMessage="The whitelist is empty."
       />

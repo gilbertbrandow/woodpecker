@@ -176,12 +176,7 @@ export function OverviewAttemptHistoryTable({
 
   const fetchData = React.useCallback(
     async (params: FetchParams): Promise<{ items: OverviewAttemptHistoryRow[]; total: number }> => {
-      const { attempts, total } = await api.trainingItems.getAttemptHistory(trainingItemId, {
-        page: params.page,
-        pageSize: PAGE_SIZE,
-        userId: params.filters.userId,
-        result: params.filters.result ?? [],
-      })
+      const { attempts, total } = await api.trainingItems.getAttemptHistory(trainingItemId, params)
       return {
         items: attempts.map((a) => ({
           attemptId: a.attemptId,

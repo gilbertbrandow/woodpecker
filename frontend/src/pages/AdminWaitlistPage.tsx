@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useMemo, useRef, useState } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Loader2, UserCheck } from 'lucide-react'
+import { CheckCircle2, Clock, Loader2, UserCheck } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { PageWrapper } from '../components/PageWrapper'
@@ -25,6 +25,11 @@ import {
 } from '../components/ui/alert-dialog'
 
 const PAGE_SIZE = 20
+
+const WAITLIST_STATUS_OPTIONS = [
+  { value: 'whitelisted', label: 'Whitelisted', icon: <CheckCircle2 className="h-3.5 w-3.5 text-green-600" /> },
+  { value: 'pending', label: 'Pending', icon: <Clock className="h-3.5 w-3.5 text-muted-foreground" /> },
+]
 
 export function AdminWaitlistPage(): React.ReactElement {
   const [refreshKey, setRefreshKey] = useState(0)
@@ -150,7 +155,12 @@ export function AdminWaitlistPage(): React.ReactElement {
   )
 
   const filters = useMemo(
-    () => [{ type: 'search' as const, key: 'q' }],
+    () => [
+      { type: 'search' as const, key: 'q' },
+      { type: 'multi' as const, key: 'status', label: 'Status', icon: DATA_ICONS.status, options: WAITLIST_STATUS_OPTIONS },
+      { type: 'date' as const, key: 'createdAt', label: 'Joined', icon: DATA_ICONS.started },
+      { type: 'date' as const, key: 'updatedAt', label: 'Last attempt', icon: DATA_ICONS.lastAttempt },
+    ],
     [],
   )
 
@@ -163,9 +173,7 @@ export function AdminWaitlistPage(): React.ReactElement {
         pageSize={PAGE_SIZE}
         refreshKey={refreshKey}
         filters={filters}
-        fetchData={({ filters: f, page }) =>
-          api.admin.waitlist({ page, q: f.q?.[0] || undefined })
-        }
+        fetchData={(params) => api.admin.waitlist(params)}
         initialSorting={[{ id: 'createdAt', desc: true }]}
         emptyMessage="Nobody on the waitlist."
       />
