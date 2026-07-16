@@ -9,19 +9,9 @@ from app.decorators import admin_required
 from app.exceptions import ConflictError, NotFoundError
 from app.extensions import db
 from app.models.user import User, WaitlistEntry, WhitelistEntry
+from app.table_query import TableQuery
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
-
-PAGE_SIZE = 20
-
-
-def _parse_page() -> int:
-    raw = request.args.get("page", "1")
-    try:
-        page = int(raw)
-        return max(1, page)
-    except ValueError:
-        return 1
 
 
 @admin_bp.get("/stats")
@@ -47,12 +37,28 @@ def get_stats() -> Response:
 @admin_bp.get("/users")
 @admin_required
 def list_users() -> Response:
-    page = _parse_page()
-    q = request.args.get("q", "").strip().lower()
+    tq = TableQuery(request)
+    role = tq.str_filter("role")
+    created_at = tq.date_filter("createdAt")
+    last_login_at = tq.date_filter("lastLoginAt")
+    last_seen_at = tq.date_filter("lastSeenAt")
 
     query = sa.select(User)
-    if q:
-        query = query.where(User.lichess_username.ilike(f"%{q}%"))
+    if tq.q:
+        query = query.where(User.lichess_username.ilike(f"%{tq.q.lower()}%"))
+
+    if role.str_values:
+        valid = set(role.str_values) & {'admin', 'default'}
+        if valid:
+            role_bools = [v == 'admin' for v in valid]
+            if role.op == 'is_not':
+                query = query.where(User.is_superadmin.not_in(role_bools))
+            else:
+                query = query.where(User.is_superadmin.in_(role_bools))
+
+    query = created_at.apply_orm(query, User.created_at)
+    query = last_login_at.apply_orm(query, User.last_login_at)
+    query = last_seen_at.apply_orm(query, User.last_seen_at)
 
     total = db.session.scalar(
         sa.select(sa.func.count()).select_from(query.subquery())
@@ -60,8 +66,8 @@ def list_users() -> Response:
 
     users = db.session.scalars(
         query.order_by(User.created_at.desc())
-        .offset((page - 1) * PAGE_SIZE)
-        .limit(PAGE_SIZE)
+        .offset((tq.page - 1) * tq.page_size)
+        .limit(tq.page_size)
     ).all()
 
     return jsonify({
@@ -85,12 +91,29 @@ def list_users() -> Response:
 @admin_bp.get("/waitlist")
 @admin_required
 def list_waitlist() -> Response:
-    page = _parse_page()
-    q = request.args.get("q", "").strip().lower()
+    tq = TableQuery(request)
+    status = tq.str_filter("status")
+    created_at = tq.date_filter("createdAt")
+    updated_at = tq.date_filter("updatedAt")
 
     query = sa.select(WaitlistEntry)
-    if q:
-        query = query.where(WaitlistEntry.lichess_username.ilike(f"%{q}%"))
+    if tq.q:
+        query = query.where(WaitlistEntry.lichess_username.ilike(f"%{tq.q.lower()}%"))
+
+    if status.str_values:
+        selected = set(status.str_values) & {'whitelisted', 'pending'}
+        if selected and selected != {'whitelisted', 'pending'}:
+            in_whitelist = WaitlistEntry.lichess_username.in_(
+                sa.select(WhitelistEntry.lichess_username)
+            )
+            want_whitelisted = 'whitelisted' in selected
+            cond = in_whitelist if want_whitelisted else ~in_whitelist
+            if status.op == 'is_not':
+                cond = ~cond
+            query = query.where(cond)
+
+    query = created_at.apply_orm(query, WaitlistEntry.created_at)
+    query = updated_at.apply_orm(query, WaitlistEntry.updated_at)
 
     total = db.session.scalar(
         sa.select(sa.func.count()).select_from(query.subquery())
@@ -98,8 +121,8 @@ def list_waitlist() -> Response:
 
     entries = db.session.scalars(
         query.order_by(WaitlistEntry.created_at.desc())
-        .offset((page - 1) * PAGE_SIZE)
-        .limit(PAGE_SIZE)
+        .offset((tq.page - 1) * tq.page_size)
+        .limit(tq.page_size)
     ).all()
 
     whitelisted_usernames: set[str] = set(
@@ -140,12 +163,27 @@ def delete_waitlist(username: str) -> tuple[str, int]:
 @admin_bp.get("/whitelist")
 @admin_required
 def list_whitelist() -> Response:
-    page = _parse_page()
-    q = request.args.get("q", "").strip().lower()
+    tq = TableQuery(request)
+    status = tq.str_filter("status")
+    created_at = tq.date_filter("createdAt")
 
     query = sa.select(WhitelistEntry)
-    if q:
-        query = query.where(WhitelistEntry.lichess_username.ilike(f"%{q}%"))
+    if tq.q:
+        query = query.where(WhitelistEntry.lichess_username.ilike(f"%{tq.q.lower()}%"))
+
+    if status.str_values:
+        selected = set(status.str_values) & {'registered', 'pending'}
+        if selected and selected != {'registered', 'pending'}:
+            in_users = WhitelistEntry.lichess_username.in_(
+                sa.select(User.lichess_username)
+            )
+            want_registered = 'registered' in selected
+            cond = in_users if want_registered else ~in_users
+            if status.op == 'is_not':
+                cond = ~cond
+            query = query.where(cond)
+
+    query = created_at.apply_orm(query, WhitelistEntry.created_at)
 
     total = db.session.scalar(
         sa.select(sa.func.count()).select_from(query.subquery())
@@ -153,8 +191,8 @@ def list_whitelist() -> Response:
 
     entries = db.session.scalars(
         query.order_by(WhitelistEntry.created_at.desc())
-        .offset((page - 1) * PAGE_SIZE)
-        .limit(PAGE_SIZE)
+        .offset((tq.page - 1) * tq.page_size)
+        .limit(tq.page_size)
     ).all()
 
     registered_usernames: set[str] = set(

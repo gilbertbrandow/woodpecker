@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal, cast
 
+import sqlalchemy as sa
 from flask import Request
 
 from app.utils import FilterOp, parse_multi_filter
@@ -138,6 +139,23 @@ class DateFilter:
             _apply_comparison(conditions, params, column_expr, prefix, '<', self.from_date)
         elif self.op in ('between', 'not_between') and self.to_date:
             _apply_between(conditions, params, column_expr, prefix, self.from_date, self.to_date, self.op == 'not_between')
+
+    def apply_orm(self, stmt: Any, column: Any) -> Any:
+        if not self.is_set:
+            return stmt
+        if self.op == 'set':
+            return stmt.where(column.is_not(None))
+        if self.op == 'not_set':
+            return stmt.where(column.is_(None))
+        date_col = sa.func.date(column)
+        if self.op == 'after':
+            return stmt.where(date_col > self.from_date)
+        if self.op == 'before':
+            return stmt.where(date_col < self.from_date)
+        if self.op in ('between', 'not_between') and self.to_date:
+            cond = date_col.between(self.from_date, self.to_date)
+            return stmt.where(~cond if self.op == 'not_between' else cond)
+        return stmt
 
 
 # ---------------------------------------------------------------------------
