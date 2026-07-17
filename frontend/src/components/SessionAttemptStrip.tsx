@@ -22,9 +22,10 @@ type SessionAttemptStripProps = {
   interactive?: boolean
   maxVisible?: number
   pulseActive?: boolean
+  noMargin?: boolean
 }
 
-export function SessionAttemptStrip({ items, runId, activeAttemptId, interactive = true, maxVisible = 20, pulseActive = false }: SessionAttemptStripProps): React.ReactElement | null {
+export function SessionAttemptStrip({ items, runId, activeAttemptId, interactive = true, maxVisible = 20, pulseActive = false, noMargin = false }: SessionAttemptStripProps): React.ReactElement | null {
   const visibleItems = React.useMemo(() => items.slice(-maxVisible), [items, maxVisible])
 
   if (visibleItems.length === 0) {
@@ -32,7 +33,7 @@ export function SessionAttemptStrip({ items, runId, activeAttemptId, interactive
   }
 
   return (
-    <div className="mt-3 h-6 w-full">
+    <div className={`${noMargin ? '' : 'mt-3 '}h-6 w-full`}>
       <div className="flex h-6 items-center gap-1 overflow-hidden pl-0.5">
         {visibleItems.map((item) => {
           const statusLabel = STATUS_LABEL[item.status]

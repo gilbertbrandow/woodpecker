@@ -26,7 +26,8 @@ import { usePgnNavigation } from '../features/board/usePgnNavigation'
 import { resolveDisplayBoard, formatTimer, formatTargetSolveTime } from '../features/board/boardPage.helpers'
 import type { BoardState } from '../features/board/useBoardPageController'
 import { api } from '../lib/api'
-import type { AttemptSpectateView, SelectableUser } from '../lib/api'
+import type { AttemptSpectateView, SelectableUser, TrainingItemMetaPgnDisplay } from '../lib/api'
+import { useBoardSounds, sanToSoundEvents } from '../features/board/useBoardSounds'
 
 function parsePositiveInt(value: unknown): number | null {
   if (typeof value === 'number') {
@@ -40,7 +41,7 @@ function parsePositiveInt(value: unknown): number | null {
 }
 
 export function BoardPage(): React.ReactElement | null {
-  const { user } = useAuth()
+  const { user, updateUser } = useAuth()
   const showTenths = user?.showTimerTenths ?? true
   const ZERO_TIMER = formatTimer(0, showTenths)
 
@@ -60,6 +61,17 @@ export function BoardPage(): React.ReactElement | null {
     return parsePositiveInt(search.attempt)
   }, [routeKind, search.attempt])
 
+  const playSound = useBoardSounds(user?.soundEnabled ?? false, user?.soundTheme ?? 'standard')
+
+  const handleToggleSound = React.useCallback((pressed: boolean): void => {
+    if (!user) return
+    const prev = user
+    updateUser({ ...prev, soundEnabled: pressed })
+    void api.settings.update({ soundEnabled: pressed })
+      .then(updateUser)
+      .catch(() => updateUser(prev))
+  }, [user, updateUser])
+
   const ctrl = useBoardPageController({
     runId,
     runTrainingItemId,
@@ -67,6 +79,7 @@ export function BoardPage(): React.ReactElement | null {
     runIdStr,
     runTrainingItemIdStr,
     routeKind,
+    onPlaySound: playSound,
   })
 
   const isOverviewPath = React.useMemo(
@@ -188,6 +201,26 @@ export function BoardPage(): React.ReactElement | null {
     overviewPgnDisplayOverride: spectateState?.view.pgnDisplay,
   })
 
+  const pgnDisplayRef = React.useRef<TrainingItemMetaPgnDisplay | null>(null)
+  pgnDisplayRef.current = pgnDisplay
+
+  const handlePlyClick = React.useCallback((ply: typeof selectedPly): void => {
+    setSelectedPly(ply)
+    if (ply === null) return
+    const pgn = pgnDisplayRef.current
+    if (!pgn) return
+    let san: string | undefined
+    if (ply.line === 'subvariation') {
+      san = pgn.subvariations?.[ply.subIndex]?.[ply.index]?.san
+    } else {
+      const list = ply.line === 'main' ? pgn.mainline : (pgn.variation ?? [])
+      san = list[ply.index]?.san
+    }
+    if (!san) return
+    for (const event of sanToSoundEvents(san)) {
+      playSound(event)
+    }
+  }, [setSelectedPly, playSound])
 
   const overviewPgnDisplay = ctrl.mode === 'overview'
     ? (spectateState?.view.pgnDisplay ?? selectedAttempt?.pgnDisplay ?? null)
@@ -414,7 +447,7 @@ export function BoardPage(): React.ReactElement | null {
         pgnDisplay={overviewPgnDisplay}
         trainingItemId={overviewData.runTrainingItem.trainingItemId}
         selectedPly={selectedPly}
-        onPlyClick={setSelectedPly}
+        onPlyClick={handlePlyClick}
       />
     ) : ctrl.solvingView !== null ? (
       <AttemptTypeCard
@@ -531,7 +564,7 @@ export function BoardPage(): React.ReactElement | null {
           runPosition={ctrl.solvingView?.runTrainingItem.position}
           focusMode={ctrl.mode !== 'overview'}
           selectedPly={ctrl.mode === 'overview' ? selectedPly : null}
-          onPlyClick={ctrl.mode === 'overview' ? setSelectedPly : undefined}
+          onPlyClick={ctrl.mode === 'overview' ? handlePlyClick : undefined}
         />
       )}
       {ctrl.mode === 'focus' && (
@@ -615,6 +648,8 @@ export function BoardPage(): React.ReactElement | null {
       timerBar={timerBar}
       overlay={overlayNode}
       spectateLabel={spectateLabelNode}
+      soundEnabled={user?.soundEnabled ?? false}
+      onToggleSound={user !== null ? handleToggleSound : undefined}
     />
   )
 
