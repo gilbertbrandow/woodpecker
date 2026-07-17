@@ -12,5 +12,7 @@ def user_to_dict(user: User) -> dict[str, object]:
         "boardTheme": user.board_theme,
         "pieceTheme": user.piece_theme,
         "showTimerTenths": user.show_timer_tenths,
+        "soundEnabled": user.sound_enabled,
+        "soundTheme": user.sound_theme,
         "isSuperAdmin": user.is_superadmin,
     }

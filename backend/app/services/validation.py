@@ -14,6 +14,7 @@ AVATAR_PIECES = {"bk", "bq", "br", "bb", "bn"}
 AVATAR_COLORS = {"navy", "sky", "forest", "sage", "amber", "straw", "crimson", "rust"}
 BOARD_THEMES = {"blue", "blue2", "brown", "green", "green-plastic", "maple", "wood", "wood4"}
 PIECE_SETS = {"alpha", "anarcandy", "companion", "maestro", "merida"}
+SOUND_THEMES = {"standard", "piano", "robot", "woodland", "futuristic", "nes", "sfx"}
 
 
 def validate_email(value: str) -> str:
@@ -67,4 +68,10 @@ def validate_board_theme(value: str) -> str:
 def validate_piece_set(value: str) -> str:
     if value not in PIECE_SETS:
         raise ValidationError("Invalid piece set", f"The piece set {value!r} is not recognised.")
+    return value
+
+
+def validate_sound_theme(value: str) -> str:
+    if value not in SOUND_THEMES:
+        raise ValidationError("Invalid sound theme", f"The sound theme {value!r} is not recognised.")
     return value

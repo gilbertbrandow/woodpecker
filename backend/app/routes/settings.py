@@ -17,6 +17,8 @@ def patch_settings() -> tuple[Response, int] | Response:
     board_theme = data.get("boardTheme")
     piece_theme = data.get("pieceTheme")
     show_timer_tenths = data.get("showTimerTenths")
+    sound_enabled = data.get("soundEnabled")
+    sound_theme = data.get("soundTheme")
 
     user = update_user_settings(
         user_id,
@@ -25,5 +27,7 @@ def patch_settings() -> tuple[Response, int] | Response:
         str(board_theme) if board_theme is not None else None,
         str(piece_theme) if piece_theme is not None else None,
         bool(show_timer_tenths) if show_timer_tenths is not None else None,
+        bool(sound_enabled) if sound_enabled is not None else None,
+        str(sound_theme) if sound_theme is not None else None,
     )
     return jsonify(user_to_dict(user))

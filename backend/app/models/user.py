@@ -15,6 +15,8 @@ class User(Base):
     board_theme: Mapped[str] = mapped_column(String(64), nullable=False, default="green", server_default="green")
     piece_theme: Mapped[str] = mapped_column(String(64), nullable=False, default="cburnett", server_default="cburnett")
     show_timer_tenths: Mapped[bool] = mapped_column(nullable=False, default=True, server_default=sa.true())
+    sound_enabled: Mapped[bool] = mapped_column(nullable=False, default=False, server_default=sa.false())
+    sound_theme: Mapped[str] = mapped_column(String(32), nullable=False, default="standard", server_default="standard")
     is_superadmin: Mapped[bool] = mapped_column(nullable=False, default=False, server_default=sa.false())
     last_login_at: Mapped[datetime | None] = mapped_column(nullable=True, default=None)
     last_seen_at: Mapped[datetime | None] = mapped_column(nullable=True, default=None)

@@ -6,6 +6,7 @@ from app.services.validation import (
     validate_avatar_url,
     validate_board_theme,
     validate_piece_set,
+    validate_sound_theme,
 )
 
 
@@ -16,6 +17,8 @@ def update_user_settings(
     board_theme: str | None,
     piece_theme: str | None,
     show_timer_tenths: bool | None = None,
+    sound_enabled: bool | None = None,
+    sound_theme: str | None = None,
 ) -> User:
     user = db.session.get(User, user_id)
     if not user:
@@ -31,6 +34,10 @@ def update_user_settings(
         user.piece_theme = validate_piece_set(piece_theme)
     if show_timer_tenths is not None:
         user.show_timer_tenths = show_timer_tenths
+    if sound_enabled is not None:
+        user.sound_enabled = sound_enabled
+    if sound_theme is not None:
+        user.sound_theme = validate_sound_theme(sound_theme)
 
     db.session.commit()
     return user
