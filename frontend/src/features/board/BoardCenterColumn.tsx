@@ -1,4 +1,6 @@
 import * as React from 'react'
+import { Volume2, VolumeOff } from 'lucide-react'
+import { Toggle } from '../../components/ui/toggle'
 import { BoardSurface } from './BoardSurface'
 import { SessionAttemptStrip } from '../../components/SessionAttemptStrip'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
@@ -21,6 +23,8 @@ type BoardCenterColumnProps = {
   timerBar?: { leftPct: number; color: string; tooltipText: string } | null
   overlay?: React.ReactNode
   spectateLabel?: React.ReactNode
+  soundEnabled?: boolean
+  onToggleSound?: (pressed: boolean) => void
 }
 
 export function BoardCenterColumn({
@@ -38,6 +42,8 @@ export function BoardCenterColumn({
   timerBar,
   overlay,
   spectateLabel,
+  soundEnabled = false,
+  onToggleSound,
 }: BoardCenterColumnProps): React.ReactElement {
   const boardSurfaceProps: BoardSurfaceProps = {
     boardKey: board.boardKey,
@@ -84,7 +90,24 @@ export function BoardCenterColumn({
         <BoardSurface {...boardSurfaceProps} />
         {overlay}
       </div>
-      <SessionAttemptStrip items={attemptHistory} runId={runId} activeAttemptId={activeAttemptId} interactive={stripInteractive} maxVisible={stripMaxVisible} pulseActive={pulseActive} />
+      <div className="mt-3 flex h-6 items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <SessionAttemptStrip items={attemptHistory} runId={runId} activeAttemptId={activeAttemptId} interactive={stripInteractive} maxVisible={stripMaxVisible} pulseActive={pulseActive} noMargin />
+        </div>
+        {onToggleSound !== undefined && (
+          <Toggle
+            size="sm"
+            variant="outline"
+            pressed={soundEnabled}
+            onPressedChange={onToggleSound}
+            aria-label={soundEnabled ? 'Mute board sounds' : 'Unmute board sounds'}
+            className="shrink-0 h-6 gap-1 px-2 text-xs"
+          >
+            {soundEnabled ? <Volume2 className="h-3 w-3" /> : <VolumeOff className="h-3 w-3" />}
+            {soundEnabled ? 'Sound' : 'Muted'}
+          </Toggle>
+        )}
+      </div>
       {mobileExtras && (
         <div className="lg:hidden">
           {mobileExtras}

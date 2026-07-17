@@ -37,6 +37,8 @@ export type AuthUser = {
   boardTheme: string
   pieceTheme: string
   showTimerTenths: boolean
+  soundEnabled: boolean
+  soundTheme: string
   isSuperAdmin: boolean
 }
 
@@ -93,6 +95,8 @@ export type SettingsPayload = {
   boardTheme?: string
   pieceTheme?: string
   showTimerTenths?: boolean
+  soundEnabled?: boolean
+  soundTheme?: string
 }
 
 export type Subset = {
