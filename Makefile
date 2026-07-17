@@ -53,6 +53,7 @@ seed-dev:
 	$(MAKE) -C pipeline import-openings
 	$(MAKE) -C pipeline import-lichess-tactics ARGS="--limit $(SEED_DEV_LIMIT)"
 	$(MAKE) -C pipeline import-scraped-positional
+	$(MAKE) -C pipeline import-decoy-positions ARGS="--limit $(SEED_DEV_LIMIT)"
 
 setup:
 	$(MAKE) -C backend setup

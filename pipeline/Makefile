@@ -58,8 +58,10 @@ import-scraped-positional: build-scraped-positional
 #                            Takes 3-6 hours. Requires LICHESS_TOKEN + HF credentials.
 #                            Only needs to run once (or when refreshing the dataset).
 #
-#   import-decoy-positions   Imports a decoy_positions.jsonl into the database.
-#                            Fast and repeatable.
+#   import-decoy-positions   Imports decoy positions into the database. Downloads
+#                            decoy_positions.jsonl from HuggingFace automatically
+#                            (cached in pipeline/data/raw/). Pass FILE=<path> to
+#                            use a local file instead. Fast and repeatable.
 
 generate-decoy-dataset:
 	@echo "⚠  WARNING: This takes 3-6 hours and requires LICHESS_TOKEN and HuggingFace credentials."
@@ -69,8 +71,6 @@ generate-decoy-dataset:
 
 import-decoy-positions:
 	docker build -f $(PIPELINE_DIR)/sources/decoy/Dockerfile -t woodpecker-pipeline-decoy $(REPO_DIR)
-	@[ -n "$(FILE)" ] || (echo "error: FILE is required  Usage: make import-decoy-positions FILE=<path/to/decoy_positions.jsonl>" >&2 && exit 1)
-	docker run --rm --add-host=host.docker.internal:host-gateway \
-		-v $(FILE):/data/decoys.jsonl:ro \
+	docker run --rm --add-host=host.docker.internal:host-gateway $(RAW_MOUNT) \
 		-e DATABASE_URL=$(DOCKER_DB_URL) \
-		woodpecker-pipeline-decoy decoy puzzles import --file /data/decoys.jsonl $(ARGS)
+		woodpecker-pipeline-decoy decoy puzzles import $(if $(FILE),--file $(FILE),) $(ARGS)
