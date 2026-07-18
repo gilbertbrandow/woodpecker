@@ -29,6 +29,7 @@ import { api } from '../lib/api'
 import type { AttemptSpectateView, SelectableUser, TrainingItemMetaPgnDisplay } from '../lib/api'
 import { useBoardSounds, sanToSoundEvents } from '../features/board/useBoardSounds'
 import { BoardPageSkeleton } from '../features/board/BoardPageSkeleton'
+import { useIsDesktop } from '../hooks/use-mobile'
 
 function parsePositiveInt(value: unknown): number | null {
   if (typeof value === 'number') {
@@ -43,6 +44,7 @@ function parsePositiveInt(value: unknown): number | null {
 
 export function BoardPage(): React.ReactElement | null {
   const { user, updateUser } = useAuth()
+  const isDesktop = useIsDesktop()
   const showTenths = user?.showTimerTenths ?? true
   const ZERO_TIMER = formatTimer(0, showTenths)
 
@@ -495,10 +497,9 @@ export function BoardPage(): React.ReactElement | null {
               : null
           }
         />
-        {user !== null && (
+        {user !== null && !isDesktop && (
           <OverviewAttemptHistoryTable
             key={overviewData.runTrainingItem.trainingItemId}
-            tableId="hist-mob"
             trainingItemId={overviewData.runTrainingItem.trainingItemId}
             currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl }}
             selectedAttemptId={spectateState?.view.attemptId ?? selectedAttemptId}
@@ -587,6 +588,7 @@ export function BoardPage(): React.ReactElement | null {
       {ctrl.mode === 'overview' && overviewData !== null && user !== null && (
         <OverviewSidebarRight
           key={runTrainingItemId}
+          showTable={isDesktop}
           selectedAttemptId={spectateState?.view.attemptId ?? selectedAttemptId}
           onRowClick={handleRowClick}
           onUserFilterChange={handleUserFilterChange}

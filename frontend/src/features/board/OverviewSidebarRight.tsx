@@ -16,6 +16,7 @@ type OverviewSidebarRightProps = {
   trainingItemId: number
   currentUser: SelectableUser
   topSlot?: React.ReactNode
+  showTable: boolean
 }
 
 export function OverviewSidebarRight({
@@ -30,19 +31,22 @@ export function OverviewSidebarRight({
   trainingItemId,
   currentUser,
   topSlot,
+  showTable,
 }: OverviewSidebarRightProps): React.ReactElement {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex flex-col gap-2">
           {topSlot}
-          <OverviewAttemptHistoryTable
-            trainingItemId={trainingItemId}
-            currentUser={currentUser}
-            selectedAttemptId={selectedAttemptId}
-            onRowClick={onRowClick}
-            onUserFilterChange={onUserFilterChange}
-          />
+          {showTable && (
+            <OverviewAttemptHistoryTable
+              trainingItemId={trainingItemId}
+              currentUser={currentUser}
+              selectedAttemptId={selectedAttemptId}
+              onRowClick={onRowClick}
+              onUserFilterChange={onUserFilterChange}
+            />
+          )}
         </div>
       </div>
       <OverviewActionsSection
