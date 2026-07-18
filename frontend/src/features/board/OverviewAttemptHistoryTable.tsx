@@ -247,6 +247,7 @@ export function OverviewAttemptHistoryTable({
       pageSize={PAGE_SIZE}
       fetchData={fetchData}
       initialCustomValues={initialCustomValues}
+      persistFilters={tableId ? `table-filters:${tableId}` : undefined}
       onRowClick={onRowClick}
       getRowClassName={getRowClassName}
       initialSorting={[{ id: 'startedAt', desc: true }]}

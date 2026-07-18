@@ -9,6 +9,7 @@ import { useTableUrlSync } from '../hooks/useTableUrlSync'
 import { useDebounce } from '../hooks/useDebounce'
 import { getHandler } from './filters'
 import type { FilterValues } from './filters'
+import { getStored, setStored, removeStored } from '../lib/storage'
 
 // ---------------------------------------------------------------------------
 // Public types — defined in ./filters, re-exported here for backward compat
@@ -58,6 +59,10 @@ export type ServerDataTableProps<T> = {
   // the component unmounting — changing instanceKey causes an immediate re-fetch with the
   // current fetchData closure.
   instanceKey?: string | number
+  // localStorage key under which active filter state is persisted across remounts and
+  // page reloads. URL params take priority over stored values; stored values take priority
+  // over initialCustomValues. Cleared automatically when all filters are reset to default.
+  persistFilters?: string
   columns: ColumnDef<T>[]
   // Declared filter slots, rendered left-to-right in the filter bar.
   filters?: FilterSpec[]
@@ -100,6 +105,7 @@ export function ServerDataTable<T>({
   compact,
   footerRow,
   onFooterRowClick,
+  persistFilters,
 }: ServerDataTableProps<T>): React.ReactElement {
   const { getParam, getMultiParam, setParams } = useTableUrlSync(tableId)
 
@@ -137,14 +143,24 @@ export function ServerDataTable<T>({
     const filterValues: FilterValues = {}
     const customUnresolved: Record<string, string[]> = {}
 
+    // URL params take priority; stored values fill in what the URL doesn't carry.
+    const persistedFilters = persistFilters
+      ? getStored<Record<string, string[]>>(persistFilters)
+      : null
+    const getTokens = (key: string): string[] => {
+      const urlTokens = getMultiParam(key)
+      if (urlTokens.length > 0) return urlTokens
+      return persistedFilters?.[key] ?? []
+    }
+
     for (const spec of specs) {
       const handler = getHandler(spec)
       if (spec.type === 'search') {
-        const raw = getParam(spec.key)
+        const raw = getParam(spec.key) ?? persistedFilters?.[spec.key]?.[0]
         filterValues[spec.key] = raw ? handler.fromUrl([raw], spec) : handler.defaultValue(spec)
       } else if (spec.type === 'entity') {
         const s = spec as EntityFilterSpec<unknown>
-        const tokens = getMultiParam(spec.key)
+        const tokens = getTokens(spec.key)
         const op = tokens[0] === 'is' || tokens[0] === 'is_not' ? (tokens[0] as 'is' | 'is_not') : 'is'
         const ids = op === tokens[0] ? tokens.slice(1) : tokens
         if (ids.length === 0 && initialCustomValues?.[spec.key]?.length) {
@@ -163,7 +179,7 @@ export function ServerDataTable<T>({
         }
       } else if (spec.type === 'custom') {
         const s = spec as CustomFilterSpec<unknown>
-        const ids = getMultiParam(spec.key)
+        const ids = getTokens(spec.key)
         if (ids.length === 0 && initialCustomValues?.[spec.key]?.length) {
           filterValues[spec.key] = initialCustomValues[spec.key]
           customUnresolved[spec.key] = []
@@ -179,7 +195,7 @@ export function ServerDataTable<T>({
           customUnresolved[spec.key] = unresolved
         }
       } else {
-        const tokens = getMultiParam(spec.key)
+        const tokens = getTokens(spec.key)
         const val = tokens.length > 0 ? handler.fromUrl(tokens, spec) : null
         filterValues[spec.key] = val ?? handler.defaultValue(spec)
       }
@@ -287,17 +303,27 @@ export function ServerDataTable<T>({
   // ---------------------------------------------------------------------------
   useEffect(() => {
     const updates: Record<string, string | string[] | null> = {}
+    const stored: Record<string, string[]> = {}
 
     for (const spec of specs) {
       const handler = getHandler(spec)
       const val = filterValues[spec.key] ?? handler.defaultValue(spec)
       const tokens = handler.toUrl(val, spec)
       updates[spec.key] = tokens.length > 0 ? tokens : null
+      if (tokens.length > 0) stored[spec.key] = tokens
     }
     updates.page = page > 1 ? String(page) : null
     updates.pageSize = pageSize !== pageSizeProp ? String(pageSize) : null
 
     setParams(updates)
+
+    if (persistFilters) {
+      if (Object.keys(stored).length > 0) {
+        setStored(persistFilters, stored)
+      } else {
+        removeStored(persistFilters)
+      }
+    }
   }, [debouncedSearchSerialized, nonSearchSerialized, page, pageSize]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------------------
