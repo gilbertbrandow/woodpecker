@@ -1153,19 +1153,21 @@ def _compute_attempt_impact(
 
     training_progress_delta_pct: float | None = None
     if is_qualifying:
-        all_training_runs = list(
-            db.session.scalars(
-                sa.select(Run).where(Run.training_id == training_id)
-            ).all()
-        )
-        total_training_puzzles = sum(
-            db.session.scalar(
-                sa.select(sa.func.count()).where(RunTrainingItem.run_id == r.id)
-            ) or 0
-            for r in all_training_runs
-        )
-        if total_training_puzzles > 0:
-            training_progress_delta_pct = round(1.0 / total_training_puzzles * 100, 2)
+        training = db.session.get(Training, training_id)
+        if training is not None:
+            schedule = db.session.get(Schedule, training.schedule_id)
+            if schedule is not None and isinstance(schedule.config, dict):
+                subset = db.session.get(Subset, schedule.subset_id)
+                if subset is not None:
+                    run_count = len(ScheduleConfig.from_dict(schedule.config).runs)
+                    puzzle_count = (
+                        subset.locked_puzzle_count
+                        if subset.locked_puzzle_count is not None
+                        else subset.puzzle_count
+                    ) or 0
+                    total_training_puzzles = run_count * puzzle_count
+                    if total_training_puzzles > 0:
+                        training_progress_delta_pct = round(1.0 / total_training_puzzles * 100, 2)
 
     return {
         "runProgressDeltaPct": run_progress_delta_pct,
