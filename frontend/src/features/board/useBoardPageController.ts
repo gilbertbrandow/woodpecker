@@ -259,8 +259,10 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     inputBlockedRef.current = true
     movesPlayedRef.current = []
     allPliesRef.current = []
+    failedRetryPliesRef.current = []
     setMovesPlayed([])
     setAllPliesPlayed([])
+    setFailedRetryPlies([])
     setLiveFocusStatus('in_progress')
     currentAttemptIdRef.current = data.attempt.id
     currentRunTrainingItemIdRef.current = data.runTrainingItem.id

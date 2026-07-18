@@ -74,6 +74,14 @@ export function usePgnNavigation({
     if (lastMove.moveStatus === 'wrong') {
       if (overviewPgnDisplay.variation && overviewPgnDisplay.variation.length > 0) {
         setSelectedPly({ line: 'variation', index: overviewPgnDisplay.variation.length - 1 })
+      } else if (overviewPgnDisplay.subvariations && overviewPgnDisplay.subvariations.length > 0) {
+        // Decoy failed: subvariations hold each accepted move's line.
+        // Prefer the one matching the retry move the user actually played; fall back to the first.
+        const retryUci = session.failedRetryPlies[0] ?? null
+        const matchIdx = retryUci !== null
+          ? overviewPgnDisplay.subvariations.findIndex(sv => sv.length > 0 && sv[0].uci === retryUci)
+          : -1
+        setSelectedPly({ line: 'subvariation', subIndex: matchIdx >= 0 ? matchIdx : 0, index: 0 })
       } else {
         setSelectedPly(null)
       }
@@ -84,7 +92,7 @@ export function usePgnNavigation({
       targetIndex--
     }
     setSelectedPly({ line: 'main', index: targetIndex })
-  }, [overviewPgnDisplay, mode])
+  }, [overviewPgnDisplay, mode, session.failedRetryPlies])
 
   const isAtHead =
     selectedPly === null ||
