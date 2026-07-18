@@ -3,14 +3,14 @@ import { useAuth } from '../context/auth'
 import { UserSelector, UserSelectorContent } from '../components/UserSelector'
 import { api, type SelectableUser } from '../lib/api'
 import type { EntityFilterSpec } from '../components/ServerDataTable'
-import { Users } from 'lucide-react'
+import { User } from 'lucide-react'
 import { AvatarGroup, AvatarGroupCount } from '../components/ui/avatar'
 import { UserAvatar } from '../components/UserAvatar'
 
 // Returns a ready-made ServerDataTable EntityFilterSpec for a user selector filter.
 // Handles 'me' token resolution, numeric ID hydration, and renders a UserSelector.
 // Pass the urlKey that matches the backend query param (e.g. 'userId').
-export function useUserFilterSpec(urlKey: string, label = 'Users'): EntityFilterSpec<SelectableUser> {
+export function useUserFilterSpec(urlKey: string, label = 'User'): EntityFilterSpec<SelectableUser> {
   const { user } = useAuth()
 
   return useMemo<EntityFilterSpec<SelectableUser>>(() => {
@@ -22,7 +22,7 @@ export function useUserFilterSpec(urlKey: string, label = 'Users'): EntityFilter
       type: 'entity',
       key: urlKey,
       label,
-      icon: Users,
+      icon: User,
       render: (value, onChange) => (
         <UserSelector value={value} onChange={onChange} />
       ),

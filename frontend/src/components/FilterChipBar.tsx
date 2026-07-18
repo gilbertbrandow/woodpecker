@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Funnel, FunnelPlus, FunnelX, X, Check, ChevronDown } from 'lucide-react'
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover'
 import { Command, CommandList, CommandGroup, CommandItem } from './ui/command'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip'
 import { cn } from '../lib/utils'
 import type { FilterSpec, FilterValues } from './filters'
 import { getHandler } from './filters'
@@ -95,27 +96,32 @@ export function FilterChipBar({
       {/* ── Filter picker button ─────────────────────────────────────── */}
       {!allFiltered && (
         <Popover open={addOpen} onOpenChange={setAddOpen}>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              className={cn(
-                showContainer
-                  ? 'flex h-6 items-center gap-1.5 rounded-md text-xs text-muted-foreground transition-colors hover:bg-background hover:text-foreground'
-                  : 'flex h-8 items-center gap-1.5 rounded-md border border-input text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
-                showContainer
-                  ? compact ? 'px-1.5' : 'px-2'
-                  : compact ? 'px-2' : 'px-2.5',
-                addOpen && 'bg-accent text-foreground',
-              )}
-            >
-              {showContainer ? (
-                <FunnelPlus className="h-3 w-3" />
-              ) : (
-                <Funnel className="h-3 w-3" />
-              )}
-              {!compact && (showContainer ? 'Add' : 'Filter')}
-            </button>
-          </PopoverTrigger>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    showContainer
+                      ? 'flex h-6 items-center gap-1.5 rounded-md text-xs text-muted-foreground transition-colors hover:bg-background hover:text-foreground'
+                      : 'flex h-8 items-center gap-1.5 rounded-md border border-input text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+                    showContainer
+                      ? compact ? 'px-1.5' : 'px-2'
+                      : compact ? 'px-2' : 'px-2.5',
+                    addOpen && 'bg-accent text-foreground',
+                  )}
+                >
+                  {showContainer ? (
+                    <FunnelPlus className="h-3 w-3" />
+                  ) : (
+                    <Funnel className="h-3 w-3" />
+                  )}
+                  {!compact && (showContainer ? 'Add' : 'Filter')}
+                </button>
+              </PopoverTrigger>
+            </TooltipTrigger>
+            {compact && <TooltipContent>{showContainer ? 'Add filter' : 'Filter'}</TooltipContent>}
+          </Tooltip>
 
           <PopoverContent align="start" className="w-44 p-0">
             <Command>
@@ -296,17 +302,22 @@ export function FilterChipBar({
 
       {/* Quick clear */}
       {hasActiveFilters && (
-        <button
-          type="button"
-          onClick={() => { onClear(); setPendingKey(null); setValueOpenKey(null) }}
-          className={cn(
-            'flex h-6 items-center gap-1.5 rounded-md bg-destructive text-xs text-destructive-foreground transition-colors hover:bg-destructive/90',
-            compact ? 'px-1.5' : 'px-2',
-          )}
-        >
-          <FunnelX className="h-3 w-3" />
-          {!compact && 'Clear'}
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={() => { onClear(); setPendingKey(null); setValueOpenKey(null) }}
+              className={cn(
+                'flex h-6 items-center gap-1.5 rounded-md bg-destructive text-xs text-destructive-foreground transition-colors hover:bg-destructive/90',
+                compact ? 'px-1.5' : 'px-2',
+              )}
+            >
+              <FunnelX className="h-3 w-3" />
+              {!compact && 'Clear'}
+            </button>
+          </TooltipTrigger>
+          {compact && <TooltipContent>Clear filters</TooltipContent>}
+        </Tooltip>
       )}
     </div>
   )

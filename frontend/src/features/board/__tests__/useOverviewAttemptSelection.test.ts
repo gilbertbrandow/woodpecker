@@ -25,7 +25,6 @@ function makeOverviewData(attempts: OverviewAttemptView[], selectedAttemptId: nu
     trainingItem: { fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', solution: ['e2e4'], source: { sourceType: 'SCRAPED_POSITIONAL', internalId: 1, lichessUrl: 'https://lichess.org/training/1', difficulty: { value: 1, label: 'Easy', minRating: null, maxRating: null }, themes: [], opening: null } },
     selectedAttemptId,
     attempts,
-    sameTrainingItemAcrossRuns: [],
     runPace: { chartData: null, isRunActive: true },
     stats: { runIndex: 0, accuracy: { valuePct: null, deltaPct: null, solvedCount: 0, resolvedCount: 0 }, averageSolveTime: { valueMs: null, deltaMs: null, timeCount: 0 } },
     progress: { runProgress: { label: '', value: 0, tooltipLabel: '', delta: null }, trainingProgress: null },

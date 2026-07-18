@@ -101,26 +101,13 @@ export function BoardPage(): React.ReactElement | null {
     [isOverviewPath, navigate, runIdStr, runTrainingItemIdStr],
   )
 
-  const { selectedAttemptId, selectedAttempt, allAttempts, historyRows, handleSelectAttempt } =
+  const { selectedAttemptId, selectedAttempt, allAttempts, handleSelectAttempt } =
     useOverviewAttemptSelection({
       overviewData: ctrl.overview.data,
       runTrainingItemId,
       requestedAttemptId: requestedOverviewAttemptId,
       onUrlAttemptChange: setAttemptInUrl,
     })
-
-  const enrichedHistoryRows = React.useMemo(
-    () =>
-      user !== null
-        ? historyRows.map((r) => ({
-            ...r,
-            userId: user.id,
-            displayName: user.displayName,
-            avatarUrl: user.avatarUrl,
-          }))
-        : historyRows,
-    [historyRows, user],
-  )
 
   const [spectateState, setSpectateState] = React.useState<{
     displayName: string
@@ -513,7 +500,6 @@ export function BoardPage(): React.ReactElement | null {
             key={overviewData.runTrainingItem.trainingItemId}
             tableId="hist-mob"
             trainingItemId={overviewData.runTrainingItem.trainingItemId}
-            initialRows={enrichedHistoryRows}
             currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl }}
             selectedAttemptId={spectateState?.view.attemptId ?? selectedAttemptId}
             onRowClick={handleRowClick}
@@ -601,7 +587,6 @@ export function BoardPage(): React.ReactElement | null {
       {ctrl.mode === 'overview' && overviewData !== null && user !== null && (
         <OverviewSidebarRight
           key={runTrainingItemId}
-          historyRows={enrichedHistoryRows}
           selectedAttemptId={spectateState?.view.attemptId ?? selectedAttemptId}
           onRowClick={handleRowClick}
           onUserFilterChange={handleUserFilterChange}

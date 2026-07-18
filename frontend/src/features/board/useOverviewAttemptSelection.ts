@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import type { RunTrainingItemOverview, OverviewAttemptView } from '../../lib/api'
-import type { OverviewAttemptHistoryRow } from './OverviewAttemptHistoryTable'
 
 type UseOverviewAttemptSelectionParams = {
   overviewData: RunTrainingItemOverview | null
@@ -13,7 +12,6 @@ export type OverviewAttemptSelectionResult = {
   selectedAttemptId: number | null
   selectedAttempt: OverviewAttemptView | null
   allAttempts: OverviewAttemptView[]
-  historyRows: OverviewAttemptHistoryRow[]
   handleSelectAttempt: (attemptId: number) => void
 }
 
@@ -27,32 +25,8 @@ export function useOverviewAttemptSelection({
 
   const allAttempts = useMemo((): OverviewAttemptView[] => {
     if (!overviewData) return []
-    const result: OverviewAttemptView[] = []
-    for (const attempt of overviewData.attempts) {
-      if (attempt.status !== 'in_progress') result.push(attempt)
-    }
-    for (const samePuzzle of overviewData.sameTrainingItemAcrossRuns) {
-      for (const attempt of samePuzzle.attempts) {
-        if (attempt.status !== 'in_progress') result.push(attempt)
-      }
-    }
-    return result
+    return overviewData.attempts.filter((a) => a.status !== 'in_progress')
   }, [overviewData])
-
-  const historyRows = useMemo((): OverviewAttemptHistoryRow[] => {
-    return allAttempts.map((attempt) => ({
-      attemptId: attempt.id,
-      runId: attempt.runId,
-      runLabel: `Run ${attempt.runIndex + 1}`,
-      runOrder: attempt.runIndex,
-      runTrainingItemId: attempt.runTrainingItemId,
-      tryNumber: attempt.tryNumber,
-      countsTowardsTraining: attempt.countsTowardsTraining,
-      result: attempt.status as 'solved' | 'failed',
-      timeSpentMs: attempt.timeSpentMs,
-      startedAt: attempt.startedAt,
-    }))
-  }, [allAttempts])
 
   const selectedAttempt = useMemo(
     () => allAttempts.find((a) => a.id === selectedAttemptId) ?? null,
@@ -84,5 +58,5 @@ export function useOverviewAttemptSelection({
     [selectedAttemptId, onUrlAttemptChange],
   )
 
-  return { selectedAttemptId, selectedAttempt, allAttempts, historyRows, handleSelectAttempt }
+  return { selectedAttemptId, selectedAttempt, allAttempts, handleSelectAttempt }
 }

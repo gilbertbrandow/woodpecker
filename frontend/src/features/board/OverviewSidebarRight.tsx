@@ -8,7 +8,6 @@ type OverviewSidebarRightProps = {
   isLoadingNextPuzzle: boolean
   onNextPuzzle: () => void
   onRetake: () => void
-  historyRows: OverviewAttemptHistoryRow[]
   selectedAttemptId: number | null
   onRowClick: (row: OverviewAttemptHistoryRow) => void
   onUserFilterChange?: (users: SelectableUser[]) => void
@@ -23,7 +22,6 @@ export function OverviewSidebarRight({
   isLoadingNextPuzzle,
   onNextPuzzle,
   onRetake,
-  historyRows,
   selectedAttemptId,
   onRowClick,
   onUserFilterChange,
@@ -40,7 +38,6 @@ export function OverviewSidebarRight({
           {topSlot}
           <OverviewAttemptHistoryTable
             trainingItemId={trainingItemId}
-            initialRows={historyRows}
             currentUser={currentUser}
             selectedAttemptId={selectedAttemptId}
             onRowClick={onRowClick}
