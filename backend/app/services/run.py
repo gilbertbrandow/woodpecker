@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from app.extensions import db
-from app.models.run import MAX_PUZZLE_TIME_MS, TrainingAttempt, Run, RunTrainingItem
+from app.models.run import TrainingAttempt, Run, RunTrainingItem
 from app.models.schedule import Schedule
 from app.models.training import Training
 from app.models.subset import Subset, SubsetTrainingItem
@@ -1651,11 +1651,9 @@ def complete_attempt(
     attempt.status = outcome
     attempt.completed_at = now
     if client_time_spent_ms is not None:
-        attempt.time_spent_ms = min(client_time_spent_ms, MAX_PUZZLE_TIME_MS)
+        attempt.time_spent_ms = client_time_spent_ms
     else:
-        attempt.time_spent_ms = min(
-            int((now - attempt.started_at).total_seconds() * 1000), MAX_PUZZLE_TIME_MS
-        )
+        attempt.time_spent_ms = int((now - attempt.started_at).total_seconds() * 1000)
     attempt.moves = uci_moves
 
     position_status = derive_position_status(run_puzzle.attempts, total_queue)
