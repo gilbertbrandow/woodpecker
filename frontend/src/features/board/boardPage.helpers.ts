@@ -38,6 +38,16 @@ export const MIN_SIDEBAR = 96
 export const LG_BREAKPOINT = 1024
 export const V_PAD_DESKTOP = 96
 export const MOBILE_H_PAD = 24
+
+export function computeBoardSize(): number {
+  const isDesktop = window.innerWidth >= LG_BREAKPOINT
+  if (isDesktop) {
+    const availH = window.innerHeight - HEADER_H - FOOTER_H - V_PAD_DESKTOP
+    const availW = window.innerWidth - H_PAD_MD - 2 * MIN_SIDEBAR - 2 * BOARD_GAP
+    return Math.max(200, Math.min(availH, availW))
+  }
+  return Math.max(200, window.innerWidth - MOBILE_H_PAD)
+}
 export const MOVE_FEEDBACK_SUCCESS_MS = 200
 export const WRONG_REVERT_MS = 500
 export const FAILED_TO_OVERVIEW_MS = 300

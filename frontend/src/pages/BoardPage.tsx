@@ -28,6 +28,7 @@ import type { BoardState } from '../features/board/useBoardPageController'
 import { api } from '../lib/api'
 import type { AttemptSpectateView, SelectableUser, TrainingItemMetaPgnDisplay } from '../lib/api'
 import { useBoardSounds, sanToSoundEvents } from '../features/board/useBoardSounds'
+import { BoardPageSkeleton } from '../features/board/BoardPageSkeleton'
 
 function parsePositiveInt(value: unknown): number | null {
   if (typeof value === 'number') {
@@ -262,11 +263,7 @@ export function BoardPage(): React.ReactElement | null {
   }, [runTrainingItemId, ZERO_TIMER])
 
   if ((!ctrl.overview.data && !ctrl.solvingView) || ctrl.mode === 'loading') {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      </div>
-    )
+    return <BoardPageSkeleton boardSize={ctrl.board.boardSize} />
   }
 
   const overviewData = ctrl.overview.data

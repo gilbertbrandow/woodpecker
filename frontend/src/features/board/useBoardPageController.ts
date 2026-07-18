@@ -24,6 +24,7 @@ import {
   LG_BREAKPOINT,
   V_PAD_DESKTOP,
   MOBILE_H_PAD,
+  computeBoardSize,
   MOVE_FEEDBACK_SUCCESS_MS,
   WRONG_REVERT_MS,
   FAILED_TO_OVERVIEW_MS,
@@ -151,7 +152,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const [lastMoveResult, setLastMoveResult] = useState<MoveFeedbackResult | null>(null)
   const [lastMoveSquare, setLastMoveSquare] = useState<string | null>(null)
   const [isShowingMoveFeedback, setIsShowingMoveFeedback] = useState(false)
-  const [boardSize, setBoardSize] = useState(480)
+  const [boardSize, setBoardSize] = useState(() => computeBoardSize())
 
   useEffect(() => {
     const compute = (): void => {

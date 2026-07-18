@@ -162,9 +162,13 @@ export function BoardSurface({
   })
 
   const check = React.useMemo((): CheckColor => {
-    const chess = new Chess(fen)
-    if (!chess.inCheck()) return false
-    return chess.turn() === 'w' ? 'white' : 'black'
+    try {
+      const chess = new Chess(fen)
+      if (!chess.inCheck()) return false
+      return chess.turn() === 'w' ? 'white' : 'black'
+    } catch {
+      return false
+    }
   }, [fen])
 
   return (
