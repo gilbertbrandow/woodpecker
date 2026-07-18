@@ -634,7 +634,6 @@ export function BoardPage(): React.ReactElement | null {
       board={displayBoard}
       actions={ctrl.actions}
       attemptHistory={ctrl.session.attemptHistory}
-      stripMaxVisible={8}
       runId={runIdStr}
       activeAttemptId={ctrl.mode === 'overview' ? selectedAttemptId : undefined}
       stripInteractive={ctrl.mode === 'overview'}

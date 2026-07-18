@@ -55,12 +55,12 @@ describe('SessionAttemptStrip', () => {
     expect(screen.getByRole('link', { name: 'Attempt for puzzle 5: Solved' })).toBeInTheDocument()
   })
 
-  it('caps visible items at maxVisible', () => {
+  it('renders all items regardless of count', () => {
     const items = Array.from({ length: 25 }, (_, i) =>
       makeItem({ attemptId: i + 1, puzzlePosition: i + 1, status: 'solved', finishedAt: Date.now() }),
     )
-    renderWithProvider(<SessionAttemptStrip items={items} runId="1" maxVisible={10} />)
-    expect(screen.getAllByRole('link')).toHaveLength(10)
+    renderWithProvider(<SessionAttemptStrip items={items} runId="1" />)
+    expect(screen.getAllByRole('link')).toHaveLength(25)
   })
 
   it('renders dots for attempts across multiple runTrainingItemIds without filtering', () => {

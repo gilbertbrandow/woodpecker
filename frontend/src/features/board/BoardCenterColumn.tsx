@@ -15,7 +15,6 @@ type BoardCenterColumnProps = {
   runId: string
   activeAttemptId?: number | null
   stripInteractive?: boolean
-  stripMaxVisible?: number
   pulseActive?: boolean
   boardAnimationEnabled?: boolean
   mobileHeader?: React.ReactNode
@@ -34,7 +33,6 @@ export function BoardCenterColumn({
   runId,
   activeAttemptId,
   stripInteractive = true,
-  stripMaxVisible = 20,
   pulseActive = false,
   boardAnimationEnabled = true,
   mobileHeader,
@@ -92,7 +90,7 @@ export function BoardCenterColumn({
       </div>
       <div className="mt-3 flex h-6 items-center gap-2">
         <div className="min-w-0 flex-1">
-          <SessionAttemptStrip items={attemptHistory} runId={runId} activeAttemptId={activeAttemptId} interactive={stripInteractive} maxVisible={stripMaxVisible} pulseActive={pulseActive} noMargin />
+          <SessionAttemptStrip items={attemptHistory} runId={runId} activeAttemptId={activeAttemptId} interactive={stripInteractive} pulseActive={pulseActive} noMargin />
         </div>
         {onToggleSound !== undefined && (
           <Toggle
