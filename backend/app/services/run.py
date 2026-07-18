@@ -1219,63 +1219,6 @@ def _overview_attempt_view(
     }
 
 
-def _same_puzzle_run_overview_items(
-    run_puzzle: RunTrainingItem,
-    training_id: int,
-    total_queue: int,
-) -> list[dict[str, object]]:
-    other_run_puzzles = list(
-        db.session.scalars(
-            sa.select(RunTrainingItem)
-            .options(selectinload(RunTrainingItem.attempts))
-            .join(Run, RunTrainingItem.run_id == Run.id)
-            .where(
-                Run.training_id == training_id,
-                RunTrainingItem.training_item_id == run_puzzle.training_item_id,
-                RunTrainingItem.id != run_puzzle.id,
-            )
-        ).all()
-    )
-
-    items: list[dict[str, object]] = []
-    for rp in other_run_puzzles:
-        other_run = db.session.get(Run, rp.run_id)
-        if other_run is None:
-            continue
-        rp_payload = get_content(rp.training_item_id)
-
-        sorted_attempts = sorted(rp.attempts, key=lambda a: a.try_number)
-        q_id = qualifying_attempt_id(sorted_attempts, total_queue)
-
-        other_run_puzzles_for_run = list(
-            db.session.scalars(
-                sa.select(RunTrainingItem)
-                .options(selectinload(RunTrainingItem.attempts))
-                .where(RunTrainingItem.run_id == other_run.id)
-            ).all()
-        )
-
-        attempt_views = [
-            _overview_attempt_view(
-                a, other_run, rp, q_id, total_queue,
-                rp_payload.contract,
-                other_run_puzzles_for_run, training_id,
-            )
-            for a in sorted_attempts
-            if a.status != "in_progress"
-        ]
-
-        items.append({
-            "runId": other_run.id,
-            "runIndex": other_run.run_index,
-            "runTrainingItemId": rp.id,
-            "runTrainingItemStatus": derive_position_status(sorted_attempts, total_queue),
-            "attempts": attempt_views,
-        })
-
-    items.sort(key=lambda x: x["runIndex"] if isinstance(x["runIndex"], int) else 0)
-    return items
-
 
 def _compute_progress_card(
     run: Run,
@@ -1555,9 +1498,6 @@ def _build_run_puzzle_overview(
         },
         "selectedAttemptId": resolved_selected_id,
         "attempts": attempt_views,
-        "sameTrainingItemAcrossRuns": _same_puzzle_run_overview_items(
-            run_puzzle, training_id, total_queue
-        ),
         "runPace": {
             "chartData": _pace_chart_data(run, all_run_puzzles, config, tz),
         },

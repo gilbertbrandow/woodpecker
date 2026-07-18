@@ -18,6 +18,11 @@ def get_attempt_history(training_item_id: int) -> tuple[Response, int] | Respons
         page_size=q.page_size,
         user_ids=q.int_filter("userId"),
         result=q.str_filter("result"),
+        schedule_ids=q.int_filter("scheduleId"),
+        subset_ids=q.int_filter("subsetId"),
+        run_number=q.range_filter("runNumber"),
+        try_number=q.range_filter("tryNumber"),
+        time_spent_ms=q.range_filter("timeSpentMs"),
     )
     return jsonify(result)
 
