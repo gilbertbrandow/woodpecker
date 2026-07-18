@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useAuth } from '../context/auth'
-import { Clock, CheckCircle2, XCircle, ClockArrowUp, ClockArrowDown } from 'lucide-react'
+import { Clock, CheckCircle2, XCircle, ClockArrowUp, ClockArrowDown, ExternalLink } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
 import { Button } from '../components/ui/button'
 import { UserAvatar } from '../components/UserAvatar'
@@ -111,19 +111,26 @@ export function BoardPage(): React.ReactElement | null {
       onUrlAttemptChange: setAttemptInUrl,
     })
 
-  const [spectateState, setSpectateState] = React.useState<{
-    displayName: string
-    avatarUrl: string | null
-    view: AttemptSpectateView
-  } | null>(null)
+  type SpectateState =
+    | { kind: 'other'; displayName: string; avatarUrl: string | null; view: AttemptSpectateView }
+    | { kind: 'self'; runId: number; runTrainingItemId: number; view: AttemptSpectateView }
+
+  const [spectateState, setSpectateState] = React.useState<SpectateState | null>(null)
 
   React.useEffect(() => {
     setSpectateState(null)
   }, [runTrainingItemId])
 
-  const handleSpectateAttempt = React.useCallback(
-    (view: AttemptSpectateView, user: { displayName: string; avatarUrl: string | null }): void => {
-      setSpectateState({ view, displayName: user.displayName, avatarUrl: user.avatarUrl })
+  const handleSpectateOther = React.useCallback(
+    (view: AttemptSpectateView, otherUser: { displayName: string; avatarUrl: string | null }): void => {
+      setSpectateState({ kind: 'other', view, displayName: otherUser.displayName, avatarUrl: otherUser.avatarUrl })
+    },
+    [],
+  )
+
+  const handleSpectateSelf = React.useCallback(
+    (view: AttemptSpectateView, runId: number, runTrainingItemId: number): void => {
+      setSpectateState({ kind: 'self', view, runId, runTrainingItemId })
     },
     [],
   )
@@ -135,42 +142,38 @@ export function BoardPage(): React.ReactElement | null {
   const handleSelectAttemptForTable = React.useCallback(
     (row: OverviewAttemptHistoryRow): void => {
       handleClearSpectate()
-      if (row.runId === Number(runIdStr)) {
-        handleSelectAttempt(row.attemptId)
-      } else {
-        void navigate({
-          to: '/app/runs/$runId/training-items/$runTrainingItemId/overview',
-          params: { runId: String(row.runId), runTrainingItemId: String(row.runTrainingItemId) },
-          search: { attempt: row.attemptId },
-        })
-      }
+      handleSelectAttempt(row.attemptId)
     },
-    [runIdStr, handleSelectAttempt, navigate, handleClearSpectate],
+    [handleSelectAttempt, handleClearSpectate],
   )
 
   const trainingItemId = ctrl.overview.data?.runTrainingItem.trainingItemId ?? null
 
   // Shared handler for both desktop sidebar and mobile drawer tables.
-  // Own-user rows select/navigate normally; other-user rows enter spectate mode.
+  // Other-user rows enter Attempt Spectate (other variant).
+  // Own-user rows from a different run enter Attempt Spectate (self variant).
+  // Own-user rows from the current run select the attempt normally.
   const handleRowClick = React.useCallback(
     (row: OverviewAttemptHistoryRow): void => {
       if (user === null) return
+      if (trainingItemId === null) return
       if (row.userId !== undefined && row.userId !== user.id) {
-        if (trainingItemId === null) return
         void api.trainingItems
           .getSpectateView(trainingItemId, row.attemptId)
-          .then((view) =>
-            handleSpectateAttempt(view, {
-              displayName: row.displayName ?? '',
-              avatarUrl: row.avatarUrl ?? null,
-            }),
-          )
+          .then((view) => handleSpectateOther(view, { displayName: row.displayName ?? '', avatarUrl: row.avatarUrl ?? null }))
+          .catch(() => {})
+        return
+      }
+      if (row.runId !== Number(runIdStr)) {
+        void api.trainingItems
+          .getSpectateView(trainingItemId, row.attemptId)
+          .then((view) => handleSpectateSelf(view, row.runId, row.runTrainingItemId))
           .catch(() => {})
         return
       }
       handleSelectAttemptForTable(row)
     },
-    [user, trainingItemId, handleSelectAttemptForTable, handleSpectateAttempt],
+    [user, trainingItemId, runIdStr, handleSelectAttemptForTable, handleSpectateOther, handleSpectateSelf],
   )
 
   const handleUserFilterChange = React.useCallback(
@@ -618,14 +621,40 @@ export function BoardPage(): React.ReactElement | null {
 
   const spectateLabelNode =
     ctrl.mode === 'overview' && spectateState !== null ? (
-      <div className="flex items-center gap-1.5 rounded-full border bg-background/90 px-3 py-1 text-xs font-medium shadow-sm backdrop-blur-sm">
-        <span>Inspecting</span>
-        <UserAvatar
-          displayName={spectateState.displayName}
-          avatarUrl={spectateState.avatarUrl}
-          className="h-4 w-4"
-        />
-        <span>{spectateState.displayName}</span>
+      <div className="flex items-center overflow-hidden rounded-full border bg-background/90 text-xs font-medium shadow-sm backdrop-blur-sm">
+        <div className="flex items-center gap-1.5 px-3 py-1">
+          <span>Inspecting</span>
+          <UserAvatar
+            displayName={spectateState.kind === 'other' ? spectateState.displayName : (user?.displayName ?? '')}
+            avatarUrl={spectateState.kind === 'other' ? spectateState.avatarUrl : (user?.avatarUrl ?? null)}
+            className="h-4 w-4"
+          />
+          <span>{spectateState.kind === 'other' ? spectateState.displayName : (user?.displayName ?? '')}</span>
+        </div>
+        {spectateState.kind === 'self' && (
+          <>
+            <div className="self-stretch w-px bg-border" />
+            <Tooltip delayDuration={100}>
+              <TooltipTrigger asChild>
+                <a
+                  href={`/app/runs/${spectateState.runId}/training-items/${spectateState.runTrainingItemId}/overview?attempt=${spectateState.view.attemptId}`}
+                  className="flex self-stretch items-center px-2 hover:bg-muted/60"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    void navigate({
+                      to: '/app/runs/$runId/training-items/$runTrainingItemId/overview',
+                      params: { runId: String(spectateState.runId), runTrainingItemId: String(spectateState.runTrainingItemId) },
+                      search: { attempt: spectateState.view.attemptId },
+                    })
+                  }}
+                >
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </TooltipTrigger>
+              <TooltipContent>Go to attempt</TooltipContent>
+            </Tooltip>
+          </>
+        )}
       </div>
     ) : undefined
 

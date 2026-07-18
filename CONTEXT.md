@@ -178,8 +178,8 @@ _Avoid_: status banner, current status (ambiguous with TrainingDetailStatus)
 ## Overview
 
 **Attempt Spectate**:
-A mode within the TrainingItem overview panel where the board, PGN display, and solve time are replaced with those of another user's completed TrainingAttempt. The current user's run context (attempt history table, Next Puzzle / Retake actions) remains intact — spectating does not interrupt the current Training. Entered by clicking another user's row in the attempt history table when the user filter is set to "all users"; exited by clicking the user's own row or switching the filter back to "me". A centred label above the board identifies whose attempt is being viewed. Access-gated: the requesting user must have at least one completed TrainingAttempt on the same TrainingItem.
-_Avoid_: replay mode, watch mode, other-user view
+A mode within the TrainingItem overview panel where the board, PGN display, and solve time are replaced with those of a completed TrainingAttempt that is not the user's current-run attempt. Covers two variants: (1) another user's attempt — entered by clicking that user's row when the filter is set to "all users"; badge reads "Inspecting [avatar] [DisplayName]". (2) the current user's own attempt from a different Run — entered by clicking their own row from a different run; badge reads "Inspecting your attempt from other run, go to run" where "go to run" is a link to the full overview for that run. In both variants the current user's run context (attempt history table, Next Puzzle / Retake actions) remains intact — spectating does not interrupt the current Training. Exited by clicking the user's own current-run row, or switching the filter back to "me". Access-gated: the requesting user must have at least one completed TrainingAttempt on the same TrainingItem.
+_Avoid_: replay mode, watch mode, other-user view, self-spectate (internal variant — not a separate term)
 
 ## Leaderboards
 
