@@ -1077,8 +1077,9 @@ def _compute_overview_stats(
                 all_solved += 1
                 if queue_completed and queue_completed[0].status == "solved" and queue_completed[0].try_number == 1:
                     first_solved += 1
-                if completed and completed[-1].time_spent_ms is not None:
-                    times.append(completed[-1].time_spent_ms)
+                qualifying = next((a for a in queue_completed if a.status == "solved"), None)
+                if qualifying is not None and qualifying.time_spent_ms is not None:
+                    times.append(qualifying.time_spent_ms)
 
         return first_solved, all_solved, resolved, times
 
@@ -1412,12 +1413,13 @@ def _compute_run_complete_overlay(
 
     all_times: list[int] = []
     for rp in run_puzzles:
-        completed = sorted(
-            [a for a in rp.attempts if a.status != "in_progress"],
+        queue_completed = sorted(
+            [a for a in rp.attempts if a.status != "in_progress" and a.try_number <= total_queue],
             key=lambda a: a.try_number,
         )
-        if completed and completed[-1].time_spent_ms is not None:
-            all_times.append(completed[-1].time_spent_ms)
+        qualifying = next((a for a in queue_completed if a.status == "solved"), None)
+        if qualifying is not None and qualifying.time_spent_ms is not None:
+            all_times.append(qualifying.time_spent_ms)
 
     resolved = solved + solved_with_retries + failed
     acc_pct: float | None = (
