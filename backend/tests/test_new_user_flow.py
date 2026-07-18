@@ -297,6 +297,31 @@ class TestOnboardingEndpoint:
             )
             assert response.status_code == 401
 
+    def test_onboarding_recovers_existing_user(self, app: Flask, db_session) -> None:  # type: ignore[misc]
+        # If a user already exists but somehow has an onboarding session (e.g. a
+        # stale session from a previous incomplete signup), the endpoint should
+        # activate the session and return the existing user rather than erroring.
+        user = User(
+            lichess_username="alreadyexists",
+            display_name="Already Exists",
+            created_at=datetime.now(timezone.utc),
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        with app.test_client() as client:
+            with client.session_transaction() as sess:
+                sess["pending_onboarding"] = {
+                    "lichess_username": "alreadyexists",
+                    "avatar_url": None,
+                }
+
+            response = client.post("/auth/onboarding", json={})
+            assert response.status_code == 200
+            data = response.get_json()
+            assert data["status"] == "active"
+            assert data["displayName"] == "Already Exists"
+
 
 # ── API response privacy ──────────────────────────────────────────────────────
 
