@@ -25,13 +25,20 @@ type SessionAttemptStripProps = {
 }
 
 export function SessionAttemptStrip({ items, runId, activeAttemptId, interactive = true, pulseActive = false, noMargin = false }: SessionAttemptStripProps): React.ReactElement | null {
+  const containerRef = React.useRef<HTMLDivElement>(null)
+
+  React.useLayoutEffect(() => {
+    const el = containerRef.current
+    if (el) el.scrollLeft = el.scrollWidth
+  }, [items.length])
+
   if (items.length === 0) {
     return null
   }
 
   return (
-    <div className={`${noMargin ? '' : 'mt-3 '}h-6 w-full overflow-x-auto [direction:rtl] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}>
-      <div className="flex h-6 w-max items-center gap-1 pl-0.5 [direction:ltr]">
+    <div ref={containerRef} className={`${noMargin ? '' : 'mt-3 '}h-6 w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}>
+      <div className="flex h-6 w-max items-center gap-1 pl-0.5">
         {items.map((item) => {
           const statusLabel = STATUS_LABEL[item.status]
           const tooltip = `Attempt for puzzle ${item.puzzlePosition}: ${statusLabel}`
