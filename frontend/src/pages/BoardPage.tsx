@@ -553,15 +553,15 @@ export function BoardPage(): React.ReactElement | null {
         targetMaxSolveTenths={timerTargetMaxSolveTenths}
         rightSlot={timerRightSlot}
       />
-      {sourceForMetaCard !== null && (
+      {sourceForMetaCard !== null && ctrl.mode !== 'overview' && (
         <TrainingItemMetaCard
           source={sourceForMetaCard}
           pgnDisplay={pgnDisplay}
           trainingItemId={trainingItemIdForMetaCard}
           runPosition={ctrl.solvingView?.runTrainingItem.position}
-          focusMode={ctrl.mode !== 'overview'}
-          selectedPly={ctrl.mode === 'overview' ? selectedPly : null}
-          onPlyClick={ctrl.mode === 'overview' ? handlePlyClick : undefined}
+          focusMode={true}
+          selectedPly={null}
+          onPlyClick={undefined}
         />
       )}
       {ctrl.mode === 'focus' && (
@@ -612,6 +612,18 @@ export function BoardPage(): React.ReactElement | null {
           analyzeUrl={overviewData.actions.analyze.url}
           trainingItemId={overviewData.runTrainingItem.trainingItemId}
           currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl }}
+          topSlot={
+            sourceForMetaCard !== null ? (
+              <TrainingItemMetaCard
+                source={sourceForMetaCard}
+                pgnDisplay={pgnDisplay}
+                trainingItemId={trainingItemIdForMetaCard}
+                focusMode={false}
+                selectedPly={selectedPly}
+                onPlyClick={handlePlyClick}
+              />
+            ) : undefined
+          }
         />
       )}
     </>
