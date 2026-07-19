@@ -13,8 +13,11 @@ up:
 up-build:
 	$(LOCAL_COMPOSE) up --build
 
-down:
+down:  ## stops containers; local DB data in woodpecker-local-pgdata is preserved
 	$(LOCAL_COMPOSE) down
+
+reset-db:  ## destroys local DB data (woodpecker-local-pgdata)
+	$(LOCAL_COMPOSE) down -v
 
 logs:
 	$(LOCAL_COMPOSE) logs -f
@@ -84,5 +87,5 @@ test-all:
 	$(MAKE) -C frontend test
 	$(TEST_COMPOSE) down -v
 
-.PHONY: up up-build down logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade migrate-current migrate-history migrate-rollback seed-dev setup lint test test-integration test-all
+.PHONY: up up-build down reset-db logs ps build shell-backend shell-db migrate-init migrate migrate-upgrade migrate-current migrate-history migrate-rollback seed-dev setup lint test test-integration test-all
 

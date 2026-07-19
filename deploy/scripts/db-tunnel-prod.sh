@@ -22,8 +22,8 @@ start() {
     if [[ -f "$PID_FILE" ]]; then
         PID=$(cat "$PID_FILE")
         if kill -0 "$PID" 2>/dev/null; then
-            echo "Tunnel already running (PID $PID). Run 'make -C deploy db-tunnel-stop' to stop it." >&2
-            exit 1
+            echo "[PRODUCTION] Tunnel already running (PID $PID)."
+            return 0
         fi
         rm "$PID_FILE"
     fi

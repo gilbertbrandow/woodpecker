@@ -34,3 +34,4 @@ services:
 
 volumes:
   pgdata:
+    name: woodpecker-local-pgdata

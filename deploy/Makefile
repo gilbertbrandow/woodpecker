@@ -17,6 +17,10 @@ up-local-prod-db:
 	read confirm; \
 	[ "$$confirm" = "yes" ] || { echo "Aborted."; exit 1; }
 	@$(MAKE) -s db-tunnel-start
+	@$(COMPOSE) \
+	  -f $(DEPLOY_DIR)/../docker-compose.yml \
+	  -f $(DEPLOY_DIR)/../docker-compose-local.yml \
+	  down
 	@PROD_DB_PASSWORD=$(PROD_DB_PASSWORD) \
 	  $(COMPOSE) -f $(DEPLOY_DIR)/../docker-compose.yml \
 	  -f $(DEPLOY_DIR)/../docker-compose-local.yml \
