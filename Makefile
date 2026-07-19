@@ -16,7 +16,7 @@ up-build:
 down:  ## stops containers; local DB data in woodpecker-local-pgdata is preserved
 	$(LOCAL_COMPOSE) down
 
-reset-db:  ## destroys local DB data (woodpecker-local-pgdata) — run seed-dev afterwards
+reset-db:  ## destroys local DB data (woodpecker-local-pgdata)
 	$(LOCAL_COMPOSE) down -v
 
 logs:
