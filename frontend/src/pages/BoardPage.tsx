@@ -307,7 +307,13 @@ export function BoardPage(): React.ReactElement | null {
     : displayedAttempt?.status === 'solved'
 
   const selectedAccuracyDelta = selectedAttempt?.impact?.accuracyDeltaPct ?? null
-  const selectedSolveTimeDelta = selectedAttempt?.impact?.averageSolveTimeDeltaMs ?? null
+  const selectedSolveTimeDelta = (() => {
+    if (!selectedAttempt?.countsTowardsAverageTime) return null
+    const puzzleTimeMs = selectedAttempt.timeSpentMs
+    const runAvgMs = overviewData?.stats.averageSolveTime.valueMs ?? null
+    if (puzzleTimeMs === null || runAvgMs === null) return null
+    return puzzleTimeMs - runAvgMs
+  })()
   const selectedRunProgressDelta = selectedAttempt?.impact?.runProgressDeltaPct ?? null
   const selectedTrainingProgressDelta = selectedAttempt?.impact?.trainingProgressDeltaPct ?? null
 
