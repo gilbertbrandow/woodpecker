@@ -1,12 +1,16 @@
-import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
 import { useEffect } from 'react'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { api } from '../lib/api'
+import { BoardPageSkeleton } from '../features/board/BoardPageSkeleton'
+import { useChessTheme } from '../hooks/useChessTheme'
+import { useAuth } from '../context/auth'
 
 const TERMINAL_STATUSES = new Set(['solved', 'solved_with_retries', 'failed'])
 
 export function TrainingItemResolverPage(): React.ReactElement {
+  const { user } = useAuth()
+  useChessTheme(user?.boardTheme, user?.pieceTheme)
   const navigate = useNavigate()
   const { runId: runIdStr, runTrainingItemId: runTrainingItemIdStr } = useParams({
     from: '/app/solve-flow/runs/$runId/training-items/$runTrainingItemId',
@@ -53,9 +57,5 @@ export function TrainingItemResolverPage(): React.ReactElement {
       })
   }, [runId, runTrainingItemId])
 
-  return (
-    <PageWrapper>
-      <p className="text-sm text-muted-foreground">Loading…</p>
-    </PageWrapper>
-  )
+  return <BoardPageSkeleton />
 }

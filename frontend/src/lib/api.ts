@@ -797,6 +797,10 @@ export type AttemptHistoryRow = {
   result: 'solved' | 'failed'
   timeSpentMs: number | null
   startedAt: string
+  scheduleId: number
+  scheduleName: string
+  subsetId: number
+  subsetName: string
 }
 
 export type AttemptSpectateView = {
@@ -806,13 +810,6 @@ export type AttemptSpectateView = {
   pgnDisplay: TrainingItemMetaPgnDisplay | null
 }
 
-export type SameTrainingItemRunOverview = {
-  runId: number
-  runIndex: number
-  runTrainingItemId: number
-  runTrainingItemStatus: PositionStatus
-  attempts: OverviewAttemptView[]
-}
 
 export type ProgressRowView = {
   label: string
@@ -842,7 +839,6 @@ export type RunTrainingItemOverview = {
   }
   selectedAttemptId: number | null
   attempts: OverviewAttemptView[]
-  sameTrainingItemAcrossRuns: SameTrainingItemRunOverview[]
   runPace: {
     chartData: PaceChartData | null
   }

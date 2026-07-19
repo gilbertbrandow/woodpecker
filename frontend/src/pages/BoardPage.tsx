@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useAuth } from '../context/auth'
-import { Clock, CheckCircle2, XCircle, ClockArrowUp, ClockArrowDown } from 'lucide-react'
+import { Clock, CheckCircle2, XCircle, ClockArrowUp, ClockArrowDown, ExternalLink, Lightbulb, Eye } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
 import { Button } from '../components/ui/button'
 import { UserAvatar } from '../components/UserAvatar'
@@ -28,6 +28,8 @@ import type { BoardState } from '../features/board/useBoardPageController'
 import { api } from '../lib/api'
 import type { AttemptSpectateView, SelectableUser, TrainingItemMetaPgnDisplay } from '../lib/api'
 import { useBoardSounds, sanToSoundEvents } from '../features/board/useBoardSounds'
+import { BoardPageSkeleton } from '../features/board/BoardPageSkeleton'
+import { useIsDesktop } from '../hooks/use-mobile'
 
 function parsePositiveInt(value: unknown): number | null {
   if (typeof value === 'number') {
@@ -42,6 +44,7 @@ function parsePositiveInt(value: unknown): number | null {
 
 export function BoardPage(): React.ReactElement | null {
   const { user, updateUser } = useAuth()
+  const isDesktop = useIsDesktop()
   const showTenths = user?.showTimerTenths ?? true
   const ZERO_TIMER = formatTimer(0, showTenths)
 
@@ -100,7 +103,7 @@ export function BoardPage(): React.ReactElement | null {
     [isOverviewPath, navigate, runIdStr, runTrainingItemIdStr],
   )
 
-  const { selectedAttemptId, selectedAttempt, allAttempts, historyRows, handleSelectAttempt } =
+  const { selectedAttemptId, selectedAttempt, allAttempts, handleSelectAttempt } =
     useOverviewAttemptSelection({
       overviewData: ctrl.overview.data,
       runTrainingItemId,
@@ -108,32 +111,26 @@ export function BoardPage(): React.ReactElement | null {
       onUrlAttemptChange: setAttemptInUrl,
     })
 
-  const enrichedHistoryRows = React.useMemo(
-    () =>
-      user !== null
-        ? historyRows.map((r) => ({
-            ...r,
-            userId: user.id,
-            displayName: user.displayName,
-            avatarUrl: user.avatarUrl,
-          }))
-        : historyRows,
-    [historyRows, user],
-  )
+  type SpectateState =
+    | { kind: 'other'; displayName: string; avatarUrl: string | null; view: AttemptSpectateView }
+    | { kind: 'self'; runId: number; runTrainingItemId: number; view: AttemptSpectateView }
 
-  const [spectateState, setSpectateState] = React.useState<{
-    displayName: string
-    avatarUrl: string | null
-    view: AttemptSpectateView
-  } | null>(null)
+  const [spectateState, setSpectateState] = React.useState<SpectateState | null>(null)
 
   React.useEffect(() => {
     setSpectateState(null)
   }, [runTrainingItemId])
 
-  const handleSpectateAttempt = React.useCallback(
-    (view: AttemptSpectateView, user: { displayName: string; avatarUrl: string | null }): void => {
-      setSpectateState({ view, displayName: user.displayName, avatarUrl: user.avatarUrl })
+  const handleSpectateOther = React.useCallback(
+    (view: AttemptSpectateView, otherUser: { displayName: string; avatarUrl: string | null }): void => {
+      setSpectateState({ kind: 'other', view, displayName: otherUser.displayName, avatarUrl: otherUser.avatarUrl })
+    },
+    [],
+  )
+
+  const handleSpectateSelf = React.useCallback(
+    (view: AttemptSpectateView, runId: number, runTrainingItemId: number): void => {
+      setSpectateState({ kind: 'self', view, runId, runTrainingItemId })
     },
     [],
   )
@@ -145,42 +142,38 @@ export function BoardPage(): React.ReactElement | null {
   const handleSelectAttemptForTable = React.useCallback(
     (row: OverviewAttemptHistoryRow): void => {
       handleClearSpectate()
-      if (row.runId === Number(runIdStr)) {
-        handleSelectAttempt(row.attemptId)
-      } else {
-        void navigate({
-          to: '/app/runs/$runId/training-items/$runTrainingItemId/overview',
-          params: { runId: String(row.runId), runTrainingItemId: String(row.runTrainingItemId) },
-          search: { attempt: row.attemptId },
-        })
-      }
+      handleSelectAttempt(row.attemptId)
     },
-    [runIdStr, handleSelectAttempt, navigate, handleClearSpectate],
+    [handleSelectAttempt, handleClearSpectate],
   )
 
   const trainingItemId = ctrl.overview.data?.runTrainingItem.trainingItemId ?? null
 
   // Shared handler for both desktop sidebar and mobile drawer tables.
-  // Own-user rows select/navigate normally; other-user rows enter spectate mode.
+  // Other-user rows enter Attempt Spectate (other variant).
+  // Own-user rows from a different run enter Attempt Spectate (self variant).
+  // Own-user rows from the current run select the attempt normally.
   const handleRowClick = React.useCallback(
     (row: OverviewAttemptHistoryRow): void => {
       if (user === null) return
+      if (trainingItemId === null) return
       if (row.userId !== undefined && row.userId !== user.id) {
-        if (trainingItemId === null) return
         void api.trainingItems
           .getSpectateView(trainingItemId, row.attemptId)
-          .then((view) =>
-            handleSpectateAttempt(view, {
-              displayName: row.displayName ?? '',
-              avatarUrl: row.avatarUrl ?? null,
-            }),
-          )
+          .then((view) => handleSpectateOther(view, { displayName: row.displayName ?? '', avatarUrl: row.avatarUrl ?? null }))
+          .catch(() => {})
+        return
+      }
+      if (row.runId !== Number(runIdStr)) {
+        void api.trainingItems
+          .getSpectateView(trainingItemId, row.attemptId)
+          .then((view) => handleSpectateSelf(view, row.runId, row.runTrainingItemId))
           .catch(() => {})
         return
       }
       handleSelectAttemptForTable(row)
     },
-    [user, trainingItemId, handleSelectAttemptForTable, handleSpectateAttempt],
+    [user, trainingItemId, runIdStr, handleSelectAttemptForTable, handleSpectateOther, handleSpectateSelf],
   )
 
   const handleUserFilterChange = React.useCallback(
@@ -262,11 +255,7 @@ export function BoardPage(): React.ReactElement | null {
   }, [runTrainingItemId, ZERO_TIMER])
 
   if ((!ctrl.overview.data && !ctrl.solvingView) || ctrl.mode === 'loading') {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      </div>
-    )
+    return <BoardPageSkeleton boardSize={ctrl.board.boardSize} />
   }
 
   const overviewData = ctrl.overview.data
@@ -318,7 +307,13 @@ export function BoardPage(): React.ReactElement | null {
     : displayedAttempt?.status === 'solved'
 
   const selectedAccuracyDelta = selectedAttempt?.impact?.accuracyDeltaPct ?? null
-  const selectedSolveTimeDelta = selectedAttempt?.impact?.averageSolveTimeDeltaMs ?? null
+  const selectedSolveTimeDelta = (() => {
+    if (!selectedAttempt?.countsTowardsAverageTime) return null
+    const puzzleTimeMs = selectedAttempt.timeSpentMs
+    const runAvgMs = overviewData?.stats.averageSolveTime.valueMs ?? null
+    if (puzzleTimeMs === null || runAvgMs === null) return null
+    return puzzleTimeMs - runAvgMs
+  })()
   const selectedRunProgressDelta = selectedAttempt?.impact?.runProgressDeltaPct ?? null
   const selectedTrainingProgressDelta = selectedAttempt?.impact?.trainingProgressDeltaPct ?? null
 
@@ -466,6 +461,7 @@ export function BoardPage(): React.ReactElement | null {
         lastMoveResult={displayBoard.moveFeedback.result}
         turnToMove={ctrl.board.turnToMove}
         kingPieceUrl={ctrl.board.kingPieceUrl}
+        darkKingPieceUrl={ctrl.board.darkKingPieceUrl}
       />
     ) : ctrl.mode === 'failed' ? (
       <MobileActionsBar
@@ -478,6 +474,7 @@ export function BoardPage(): React.ReactElement | null {
         lastMoveResult={displayBoard.moveFeedback.result}
         turnToMove={ctrl.board.turnToMove}
         kingPieceUrl={ctrl.board.kingPieceUrl}
+        darkKingPieceUrl={ctrl.board.darkKingPieceUrl}
       />
     ) : overviewData !== null ? (
       <MobileActionsBar
@@ -511,12 +508,10 @@ export function BoardPage(): React.ReactElement | null {
               : null
           }
         />
-        {user !== null && (
+        {user !== null && !isDesktop && (
           <OverviewAttemptHistoryTable
             key={overviewData.runTrainingItem.trainingItemId}
-            tableId="hist-mob"
             trainingItemId={overviewData.runTrainingItem.trainingItemId}
-            initialRows={enrichedHistoryRows}
             currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl }}
             selectedAttemptId={spectateState?.view.attemptId ?? selectedAttemptId}
             onRowClick={handleRowClick}
@@ -556,15 +551,15 @@ export function BoardPage(): React.ReactElement | null {
         targetMaxSolveTenths={timerTargetMaxSolveTenths}
         rightSlot={timerRightSlot}
       />
-      {sourceForMetaCard !== null && (
+      {sourceForMetaCard !== null && ctrl.mode !== 'overview' && (
         <TrainingItemMetaCard
           source={sourceForMetaCard}
           pgnDisplay={pgnDisplay}
           trainingItemId={trainingItemIdForMetaCard}
           runPosition={ctrl.solvingView?.runTrainingItem.position}
-          focusMode={ctrl.mode !== 'overview'}
-          selectedPly={ctrl.mode === 'overview' ? selectedPly : null}
-          onPlyClick={ctrl.mode === 'overview' ? handlePlyClick : undefined}
+          focusMode={true}
+          selectedPly={null}
+          onPlyClick={undefined}
         />
       )}
       {ctrl.mode === 'focus' && (
@@ -573,38 +568,44 @@ export function BoardPage(): React.ReactElement | null {
             lastMoveResult={displayBoard.moveFeedback.result}
             turnToMove={ctrl.board.turnToMove}
             kingPieceUrl={ctrl.board.kingPieceUrl}
+            darkKingPieceUrl={ctrl.board.darkKingPieceUrl}
           />
         </div>
       )}
       {ctrl.mode === 'failed' && ctrl.solvingView !== null && (
         <div className="mt-auto flex flex-col gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={ctrl.actions.handleShowHint}
-            disabled={ctrl.inputBlocked || !isAtHead}
-          >
-            Show Hint
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={ctrl.actions.handleShowSolution}
-            disabled={ctrl.inputBlocked || !isAtHead}
-          >
-            Show Solution
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={ctrl.actions.handleShowHint}
+              disabled={ctrl.inputBlocked || !isAtHead}
+            >
+              <Lightbulb className="mr-2 h-4 w-4" />
+              Hint
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={ctrl.actions.handleShowSolution}
+              disabled={ctrl.inputBlocked || !isAtHead}
+            >
+              <Eye className="mr-2 h-4 w-4" />
+              Solution
+            </Button>
+          </div>
           <MoveStatusCard
             lastMoveResult={displayBoard.moveFeedback.result}
             turnToMove={ctrl.board.turnToMove}
             kingPieceUrl={ctrl.board.kingPieceUrl}
+            darkKingPieceUrl={ctrl.board.darkKingPieceUrl}
           />
         </div>
       )}
       {ctrl.mode === 'overview' && overviewData !== null && user !== null && (
         <OverviewSidebarRight
           key={runTrainingItemId}
-          historyRows={enrichedHistoryRows}
+          showTable={isDesktop}
           selectedAttemptId={spectateState?.view.attemptId ?? selectedAttemptId}
           onRowClick={handleRowClick}
           onUserFilterChange={handleUserFilterChange}
@@ -615,6 +616,18 @@ export function BoardPage(): React.ReactElement | null {
           analyzeUrl={overviewData.actions.analyze.url}
           trainingItemId={overviewData.runTrainingItem.trainingItemId}
           currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl }}
+          topSlot={
+            sourceForMetaCard !== null ? (
+              <TrainingItemMetaCard
+                source={sourceForMetaCard}
+                pgnDisplay={pgnDisplay}
+                trainingItemId={trainingItemIdForMetaCard}
+                focusMode={false}
+                selectedPly={selectedPly}
+                onPlyClick={handlePlyClick}
+              />
+            ) : undefined
+          }
         />
       )}
     </>
@@ -622,14 +635,40 @@ export function BoardPage(): React.ReactElement | null {
 
   const spectateLabelNode =
     ctrl.mode === 'overview' && spectateState !== null ? (
-      <div className="flex items-center gap-1.5 rounded-full border bg-background/90 px-3 py-1 text-xs font-medium shadow-sm backdrop-blur-sm">
-        <span>Inspecting</span>
-        <UserAvatar
-          displayName={spectateState.displayName}
-          avatarUrl={spectateState.avatarUrl}
-          className="h-4 w-4"
-        />
-        <span>{spectateState.displayName}</span>
+      <div className="flex items-center overflow-hidden rounded-full border bg-background/90 text-xs font-medium shadow-sm backdrop-blur-sm">
+        <div className="flex items-center gap-1.5 px-3 py-1">
+          <span>Inspecting</span>
+          <UserAvatar
+            displayName={spectateState.kind === 'other' ? spectateState.displayName : (user?.displayName ?? '')}
+            avatarUrl={spectateState.kind === 'other' ? spectateState.avatarUrl : (user?.avatarUrl ?? null)}
+            className="h-4 w-4"
+          />
+          <span>{spectateState.kind === 'other' ? spectateState.displayName : (user?.displayName ?? '')}</span>
+        </div>
+        {spectateState.kind === 'self' && (
+          <>
+            <div className="self-stretch w-px bg-border" />
+            <Tooltip delayDuration={100}>
+              <TooltipTrigger asChild>
+                <a
+                  href={`/app/runs/${spectateState.runId}/training-items/${spectateState.runTrainingItemId}/overview?attempt=${spectateState.view.attemptId}`}
+                  className="flex self-stretch items-center px-2 hover:bg-muted/60"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    void navigate({
+                      to: '/app/runs/$runId/training-items/$runTrainingItemId/overview',
+                      params: { runId: String(spectateState.runId), runTrainingItemId: String(spectateState.runTrainingItemId) },
+                      search: { attempt: spectateState.view.attemptId },
+                    })
+                  }}
+                >
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </TooltipTrigger>
+              <TooltipContent>Go to attempt</TooltipContent>
+            </Tooltip>
+          </>
+        )}
       </div>
     ) : undefined
 
@@ -638,7 +677,6 @@ export function BoardPage(): React.ReactElement | null {
       board={displayBoard}
       actions={ctrl.actions}
       attemptHistory={ctrl.session.attemptHistory}
-      stripMaxVisible={8}
       runId={runIdStr}
       activeAttemptId={ctrl.mode === 'overview' ? selectedAttemptId : undefined}
       stripInteractive={ctrl.mode === 'overview'}
@@ -650,6 +688,7 @@ export function BoardPage(): React.ReactElement | null {
       spectateLabel={spectateLabelNode}
       soundEnabled={user?.soundEnabled ?? false}
       onToggleSound={user !== null ? handleToggleSound : undefined}
+      pieceSetId={user?.pieceTheme}
     />
   )
 

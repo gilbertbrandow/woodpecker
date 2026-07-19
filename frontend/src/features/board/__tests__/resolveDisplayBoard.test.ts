@@ -15,6 +15,7 @@ const BASE_BOARD: BoardState = {
   moveFeedback: { result: null, square: null, visible: false },
   turnToMove: 'white',
   kingPieceUrl: '',
+  darkKingPieceUrl: '',
 }
 
 const PLY_1_FEN = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1'

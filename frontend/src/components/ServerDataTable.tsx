@@ -9,6 +9,7 @@ import { useTableUrlSync } from '../hooks/useTableUrlSync'
 import { useDebounce } from '../hooks/useDebounce'
 import { getHandler } from './filters'
 import type { FilterValues } from './filters'
+import { getStored, setStored } from '../lib/storage'
 
 // ---------------------------------------------------------------------------
 // Public types — defined in ./filters, re-exported here for backward compat
@@ -58,6 +59,11 @@ export type ServerDataTableProps<T> = {
   // the component unmounting — changing instanceKey causes an immediate re-fetch with the
   // current fetchData closure.
   instanceKey?: string | number
+  // localStorage key under which active filter state is persisted across remounts and
+  // page reloads. URL params take priority over stored values; stored values take priority
+  // over initialCustomValues. Written as {} when all filters are cleared (so an explicit
+  // empty state is distinguishable from "never set" on the next mount).
+  persistFilters?: string
   columns: ColumnDef<T>[]
   // Declared filter slots, rendered left-to-right in the filter bar.
   filters?: FilterSpec[]
@@ -100,6 +106,7 @@ export function ServerDataTable<T>({
   compact,
   footerRow,
   onFooterRowClick,
+  persistFilters,
 }: ServerDataTableProps<T>): React.ReactElement {
   const { getParam, getMultiParam, setParams } = useTableUrlSync(tableId)
 
@@ -128,6 +135,9 @@ export function ServerDataTable<T>({
   type InitData = {
     filterValues: FilterValues
     customUnresolved: Record<string, string[]>
+    // Raw stored tokens for entity/custom keys that have unresolved IDs. Used as fetch-param
+    // fallback during hydration so the initial fetch can run in parallel with ID resolution.
+    pendingFetchParams: Record<string, string[]>
     initialPage: number
     initialPageSize: number
   }
@@ -136,18 +146,31 @@ export function ServerDataTable<T>({
   if (!initRef.current) {
     const filterValues: FilterValues = {}
     const customUnresolved: Record<string, string[]> = {}
+    const pendingFetchParams: Record<string, string[]> = {}
+
+    // URL params take priority; stored values fill in what the URL doesn't carry.
+    const persistedFilters = persistFilters
+      ? getStored<Record<string, string[]>>(persistFilters)
+      : null
+    const getTokens = (key: string): string[] => {
+      const urlTokens = getMultiParam(key)
+      if (urlTokens.length > 0) return urlTokens
+      return persistedFilters?.[key] ?? []
+    }
 
     for (const spec of specs) {
       const handler = getHandler(spec)
       if (spec.type === 'search') {
-        const raw = getParam(spec.key)
+        const raw = getParam(spec.key) ?? persistedFilters?.[spec.key]?.[0]
         filterValues[spec.key] = raw ? handler.fromUrl([raw], spec) : handler.defaultValue(spec)
       } else if (spec.type === 'entity') {
         const s = spec as EntityFilterSpec<unknown>
-        const tokens = getMultiParam(spec.key)
+        const tokens = getTokens(spec.key)
         const op = tokens[0] === 'is' || tokens[0] === 'is_not' ? (tokens[0] as 'is' | 'is_not') : 'is'
         const ids = op === tokens[0] ? tokens.slice(1) : tokens
-        if (ids.length === 0 && initialCustomValues?.[spec.key]?.length) {
+        // Only fall back to initialCustomValues when there is no persisted state at all.
+        // An empty persistedFilters ({}) means the user explicitly cleared all filters.
+        if (ids.length === 0 && initialCustomValues?.[spec.key]?.length && persistedFilters === null) {
           filterValues[spec.key] = { op: 'is', items: initialCustomValues[spec.key] } satisfies EntityVal
           customUnresolved[spec.key] = []
         } else {
@@ -158,13 +181,15 @@ export function ServerDataTable<T>({
             if (item !== null) instant.push(item)
             else unresolved.push(id)
           }
-          filterValues[spec.key] = { op, items: instant } satisfies EntityVal
+          filterValues[spec.key] = { op, items: instant, pendingCount: unresolved.length || undefined } satisfies EntityVal
           customUnresolved[spec.key] = unresolved
+          // Store raw tokens so the fetch can proceed in parallel with ID resolution.
+          if (unresolved.length > 0) pendingFetchParams[spec.key] = tokens
         }
       } else if (spec.type === 'custom') {
         const s = spec as CustomFilterSpec<unknown>
-        const ids = getMultiParam(spec.key)
-        if (ids.length === 0 && initialCustomValues?.[spec.key]?.length) {
+        const ids = getTokens(spec.key)
+        if (ids.length === 0 && initialCustomValues?.[spec.key]?.length && persistedFilters === null) {
           filterValues[spec.key] = initialCustomValues[spec.key]
           customUnresolved[spec.key] = []
         } else {
@@ -177,9 +202,10 @@ export function ServerDataTable<T>({
           }
           filterValues[spec.key] = instant
           customUnresolved[spec.key] = unresolved
+          if (unresolved.length > 0) pendingFetchParams[spec.key] = ids
         }
       } else {
-        const tokens = getMultiParam(spec.key)
+        const tokens = getTokens(spec.key)
         const val = tokens.length > 0 ? handler.fromUrl(tokens, spec) : null
         filterValues[spec.key] = val ?? handler.defaultValue(spec)
       }
@@ -190,6 +216,7 @@ export function ServerDataTable<T>({
     initRef.current = {
       filterValues,
       customUnresolved,
+      pendingFetchParams,
       initialPage: pageStr ? Math.max(1, parseInt(pageStr, 10)) : 1,
       initialPageSize: pageSizeStr ? Math.max(1, parseInt(pageSizeStr, 10)) : pageSizeProp,
     }
@@ -199,9 +226,10 @@ export function ServerDataTable<T>({
   // Filter state — single dict for all filter types
   // ---------------------------------------------------------------------------
   const [filterValues, setFilterValues] = useState<FilterValues>(initRef.current.filterValues)
-  const [isHydrating, setIsHydrating] = useState(() =>
-    Object.values(initRef.current!.customUnresolved).some((ids) => ids.length > 0),
-  )
+  // Raw stored tokens for entity/custom keys still being hydrated. Cleared when hydration
+  // completes. Used as fallback in fetch params and serialization so the initial fetch can
+  // run immediately without waiting for display-name resolution.
+  const pendingFetchParamsRef = useRef(initRef.current.pendingFetchParams)
   const [page, setPage] = useState(initRef.current.initialPage)
   const [pageSize, setPageSize] = useState(initRef.current.initialPageSize)
   const [data, setData] = useState<T[]>(() => initialData?.items ?? [])
@@ -240,7 +268,7 @@ export function ServerDataTable<T>({
         })
       })
       .catch(() => {})
-      .finally(() => setIsHydrating(false))
+      .finally(() => { pendingFetchParamsRef.current = {} })
 
     return () => { cancelled = true }
   }, []) // mount-only — initRef captures everything needed at construction time
@@ -267,11 +295,16 @@ export function ServerDataTable<T>({
         .map((s) => {
           const handler = getHandler(s)
           const val = filterValues[s.key] ?? handler.defaultValue(s)
-          return `${s.key}=${handler.toUrl(val, s).join(',')}`
+          const tokens = handler.toUrl(val, s)
+          // Prefer pending tokens over partially-resolved tokens so the serialized value is
+          // stable across hydration: raw stored IDs and resolved-item IDs serialize identically,
+          // and this avoids a double-fetch when some IDs resolve instantly and others don't.
+          const effectiveTokens = pendingFetchParamsRef.current[s.key] ?? tokens
+          return `${s.key}=${effectiveTokens.join(',')}`
         })
         .sort()
         .join('&'),
-    [filterValues], // specs is stable
+    [filterValues], // specs and pendingFetchParamsRef are stable refs
   )
 
   // When initialData is provided we skip the first fetch — the data is already loaded.
@@ -287,26 +320,36 @@ export function ServerDataTable<T>({
   // ---------------------------------------------------------------------------
   useEffect(() => {
     const updates: Record<string, string | string[] | null> = {}
+    const stored: Record<string, string[]> = {}
 
     for (const spec of specs) {
       const handler = getHandler(spec)
       const val = filterValues[spec.key] ?? handler.defaultValue(spec)
       const tokens = handler.toUrl(val, spec)
-      updates[spec.key] = tokens.length > 0 ? tokens : null
+      // Prefer pending tokens: ensures URL and storage are correct during hydration even
+      // when only some IDs resolved instantly (pending always has the full original set).
+      const effectiveTokens = pendingFetchParamsRef.current[spec.key] ?? tokens
+      updates[spec.key] = effectiveTokens.length > 0 ? effectiveTokens : null
+      if (effectiveTokens.length > 0) stored[spec.key] = effectiveTokens
     }
     updates.page = page > 1 ? String(page) : null
     updates.pageSize = pageSize !== pageSizeProp ? String(pageSize) : null
 
     setParams(updates)
+
+    // Always write to storage (even when empty) so an explicit "clear all filters" is
+    // persisted as {} and distinguishable from "never set" (null) on the next mount.
+    if (persistFilters) {
+      setStored(persistFilters, stored)
+    }
   }, [debouncedSearchSerialized, nonSearchSerialized, page, pageSize]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------------------
   // Fetch: called when settled filter params, page, or refreshKey change.
-  // Gated on hydration completing so the first fetch always has the correct values.
+  // Runs immediately on mount — pending fetch params supply correct IDs for any keys
+  // still being hydrated, so hydration and fetch happen in parallel.
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (isHydrating) return
-
     if (initialFetchParamsRef.current !== null) {
       const sig = `${debouncedSearchSerialized}|${nonSearchSerialized}|${page}|${pageSize}|${refreshKey ?? ''}|${instanceKey ?? ''}`
       if (sig === initialFetchParamsRef.current) return
@@ -318,7 +361,10 @@ export function ServerDataTable<T>({
       const handler = getHandler(spec)
       const val = filterValues[spec.key] ?? handler.defaultValue(spec)
       const params = handler.getFetchParams(val, spec)
-      if (params.length > 0) filters[spec.key] = params
+      // Prefer pending raw tokens: ensures the backend always receives the full original ID
+      // set during hydration, even when some IDs resolved instantly (giving non-empty params).
+      const effectiveParams = pendingFetchParamsRef.current[spec.key] ?? params
+      if (effectiveParams.length > 0) filters[spec.key] = effectiveParams
     }
 
     let cancelled = false
@@ -334,17 +380,21 @@ export function ServerDataTable<T>({
       .finally(() => { if (!cancelled) setLoading(false) })
 
     return () => { cancelled = true }
-  }, [isHydrating, debouncedSearchSerialized, nonSearchSerialized, page, pageSize, refreshKey, instanceKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [debouncedSearchSerialized, nonSearchSerialized, page, pageSize, refreshKey, instanceKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------------------
   // Filter change handlers
   // ---------------------------------------------------------------------------
   const handleFilterChange = useCallback((key: string, value: unknown) => {
+    // Clear pending for this key so the user's new selection isn't overridden by stale
+    // hydration tokens if hydration hasn't completed yet.
+    delete pendingFetchParamsRef.current[key]
     setFilterValues((prev) => ({ ...prev, [key]: value }))
     setPage(1)
   }, [])
 
   const handleClearFilters = useCallback(() => {
+    pendingFetchParamsRef.current = {}
     setFilterValues((prev) => {
       const next = { ...prev }
       for (const spec of specsRef.current) {
@@ -362,9 +412,14 @@ export function ServerDataTable<T>({
     () =>
       chipSpecs.some((spec) => {
         const handler = getHandler(spec)
-        return !handler.isEmpty(filterValues[spec.key] ?? handler.defaultValue(spec))
+        // Also check pending params: an entity being hydrated has items:[] (isEmpty → true)
+        // but is still an active filter and should show the clear-all button.
+        return (
+          !handler.isEmpty(filterValues[spec.key] ?? handler.defaultValue(spec)) ||
+          (pendingFetchParamsRef.current[spec.key]?.length ?? 0) > 0
+        )
       }),
-    [filterValues], // specs and chipSpecs are stable
+    [filterValues], // specs, chipSpecs, and pendingFetchParamsRef are stable refs
   )
 
   const searchSlot = searchSpecs.length > 0 ? (

@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Check, X, CircleOff, CheckCheck } from 'lucide-react'
 import { type ColumnDef } from '@tanstack/react-table'
+import { Link } from '@tanstack/react-router'
 import { formatSolveTimeMs } from '../../lib/utils'
 import { api } from '../../lib/api'
 import { UserAvatar } from '../../components/UserAvatar'
@@ -9,6 +10,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/too
 import { ServerDataTable, type FetchParams } from '../../components/ServerDataTable'
 import { col } from '../../components/DataTable'
 import { useUserFilterSpec } from '../../hooks/useUserFilterSpec'
+import { useScheduleFilterSpec } from '../../hooks/useScheduleFilterSpec'
+import { useSubsetFilterSpec } from '../../hooks/useSubsetFilterSpec'
 import { UserSelector } from '../../components/UserSelector'
 import type { SelectableUser } from '../../lib/api'
 
@@ -26,9 +29,13 @@ export type OverviewAttemptHistoryRow = {
   userId?: number
   displayName?: string
   avatarUrl?: string | null
+  scheduleId?: number
+  scheduleName?: string
+  subsetId?: number
+  subsetName?: string
 }
 
-const PAGE_SIZE = 15
+const PAGE_SIZE = 10
 
 const RESULT_OPTIONS = [
   { label: 'Solved', value: 'solved', icon: <Check className="h-3.5 w-3.5 text-green-600" /> },
@@ -105,11 +112,48 @@ const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
     cell: ({ row }) => (row.original.startedAt ? row.original.startedAt.slice(0, 10) : '—'),
     meta: { className: 'px-2 py-1', icon: DATA_ICONS.started },
   }),
+  col({
+    id: 'schedule',
+    accessorKey: 'scheduleName',
+    header: 'Schedule',
+    enableSorting: false,
+    cell: ({ row }) =>
+      row.original.scheduleId && row.original.scheduleName ? (
+        <Link
+          to="/app/schedules/$scheduleId"
+          params={{ scheduleId: String(row.original.scheduleId) }}
+          className="block max-w-[7rem] truncate font-medium hover:underline"
+          title={row.original.scheduleName}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {row.original.scheduleName}
+        </Link>
+      ) : '—',
+    meta: { className: 'px-2 py-1', icon: CONCEPT_ICONS.Schedule, defaultHidden: true },
+  }),
+  col({
+    id: 'subset',
+    accessorKey: 'subsetName',
+    header: 'Subset',
+    enableSorting: false,
+    cell: ({ row }) =>
+      row.original.subsetId && row.original.subsetName ? (
+        <Link
+          to="/app/subsets/$subsetId"
+          params={{ subsetId: String(row.original.subsetId) }}
+          className="block max-w-[7rem] truncate font-medium hover:underline"
+          title={row.original.subsetName}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {row.original.subsetName}
+        </Link>
+      ) : '—',
+    meta: { className: 'px-2 py-1', icon: CONCEPT_ICONS.Subset, defaultHidden: true },
+  }),
 ]
 
 type OverviewAttemptHistoryTableProps = {
   trainingItemId: number
-  initialRows: OverviewAttemptHistoryRow[]
   currentUser: SelectableUser
   selectedAttemptId: number | null
   onRowClick: (row: OverviewAttemptHistoryRow) => void
@@ -119,7 +163,6 @@ type OverviewAttemptHistoryTableProps = {
 
 export function OverviewAttemptHistoryTable({
   trainingItemId,
-  initialRows,
   currentUser,
   selectedAttemptId,
   onRowClick,
@@ -127,6 +170,8 @@ export function OverviewAttemptHistoryTable({
   onUserFilterChange,
 }: OverviewAttemptHistoryTableProps): React.ReactElement {
   const baseUserFilter = useUserFilterSpec('userId')
+  const scheduleFilterSpec = useScheduleFilterSpec('scheduleId')
+  const subsetFilterSpec = useSubsetFilterSpec('subsetId')
 
   const filters = React.useMemo(
     () => [
@@ -143,21 +188,20 @@ export function OverviewAttemptHistoryTable({
           />
         ),
       },
-      { type: 'multi' as const, key: 'result', label: 'Result', options: RESULT_OPTIONS },
+      { type: 'multi' as const, key: 'result', label: 'Result', icon: CheckCheck, options: RESULT_OPTIONS },
+      { type: 'range' as const, key: 'runNumber', label: 'Run', icon: CONCEPT_ICONS.Run, min: 1, max: 20, formatValue: (v: number) => `Run ${v}` },
+      { type: 'range' as const, key: 'tryNumber', label: 'Try', icon: DATA_ICONS.tries, min: 1, max: 10 },
+      { type: 'duration' as const, key: 'timeSpentMs', label: 'Time', icon: DATA_ICONS.time, min: 0, max: 600000, step: 5000 },
+      scheduleFilterSpec,
+      subsetFilterSpec,
     ],
-    [baseUserFilter, onUserFilterChange],
+    [baseUserFilter, onUserFilterChange, scheduleFilterSpec, subsetFilterSpec],
   )
 
   const initialCustomValues = React.useMemo(
     () => ({ userId: [currentUser] }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [], // captured at mount; currentUser provides the default "me" filter
-  )
-
-  const initialData = React.useMemo(
-    () => ({ items: initialRows, total: initialRows.length }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
   )
 
   const fetchData = React.useCallback(
@@ -178,6 +222,10 @@ export function OverviewAttemptHistoryTable({
           userId: a.userId,
           displayName: a.displayName,
           avatarUrl: a.avatarUrl,
+          scheduleId: a.scheduleId,
+          scheduleName: a.scheduleName,
+          subsetId: a.subsetId,
+          subsetName: a.subsetName,
         })),
         total,
       }
@@ -198,8 +246,8 @@ export function OverviewAttemptHistoryTable({
       filters={filters}
       pageSize={PAGE_SIZE}
       fetchData={fetchData}
-      initialData={initialData}
       initialCustomValues={initialCustomValues}
+      persistFilters={tableId ? `table-filters:${tableId}` : undefined}
       onRowClick={onRowClick}
       getRowClassName={getRowClassName}
       initialSorting={[{ id: 'startedAt', desc: true }]}

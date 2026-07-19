@@ -32,24 +32,31 @@ export function OverviewStatsSection({ accuracy, averageSolveTime }: OverviewSta
               : null}
           </TooltipContent>
         </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="flex cursor-default flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Solve time (mm:ss)</span>
-              <div className="flex items-baseline gap-2">
+        <div className="flex cursor-default flex-col gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">Solve time (mm:ss)</span>
+          <div className="flex items-baseline gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <span className="tabular-nums text-2xl font-semibold">
                   {averageSolveTime.valueMs !== null ? formatSolveTimeMs(averageSolveTime.valueMs) : '—'}
                 </span>
-                <DeltaBadge delta={averageSolveTime.deltaMs} goodWhenPositive={false} format={formatSolveTimeMs} />
-              </div>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            {averageSolveTime.timeCount > 0
-              ? `across ${averageSolveTime.timeCount} solved puzzle${averageSolveTime.timeCount !== 1 ? 's' : ''}`
-              : null}
-          </TooltipContent>
-        </Tooltip>
+              </TooltipTrigger>
+              <TooltipContent>
+                {averageSolveTime.timeCount > 0
+                  ? `across ${averageSolveTime.timeCount} solved puzzle${averageSolveTime.timeCount !== 1 ? 's' : ''}`
+                  : null}
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <DeltaBadge delta={averageSolveTime.deltaMs} goodWhenPositive={false} format={formatSolveTimeMs} />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Solve time compared to your average for this run</TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
       </div>
     </div>
   )

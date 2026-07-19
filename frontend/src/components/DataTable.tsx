@@ -249,26 +249,31 @@ export function DataTable<T>({
                   }).length
                   return (
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        className={cn(
-                          'flex h-8 items-center gap-1.5 rounded-md border text-xs transition-colors hover:bg-accent hover:text-foreground',
-                          compact ? 'px-2' : 'px-2.5',
-                          deviatingCount > 0
-                            ? 'border-foreground/25 text-foreground'
-                            : 'border-input text-muted-foreground',
-                        )}
-                      >
-                        <Columns3 className="h-3 w-3" />
-                        {!compact && 'Columns'}
-                        {deviatingCount > 0 && (
-                          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium leading-none text-primary-foreground tabular-nums">
-                            {deviatingCount}
-                          </span>
-                        )}
-                      </button>
-                    </DropdownMenuTrigger>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            className={cn(
+                              'flex h-8 items-center gap-1.5 rounded-md border text-xs transition-colors hover:bg-accent hover:text-foreground',
+                              compact ? 'px-2' : 'px-2.5',
+                              deviatingCount > 0
+                                ? 'border-foreground/25 text-foreground'
+                                : 'border-input text-muted-foreground',
+                            )}
+                          >
+                            <Columns3 className="h-3 w-3" />
+                            {!compact && 'Columns'}
+                            {deviatingCount > 0 && (
+                              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium leading-none text-primary-foreground tabular-nums">
+                                {deviatingCount}
+                              </span>
+                            )}
+                          </button>
+                        </DropdownMenuTrigger>
+                      </TooltipTrigger>
+                      {compact && <TooltipContent>Columns</TooltipContent>}
+                    </Tooltip>
                     <DropdownMenuContent align="end" className="min-w-40 w-max">
                       {hideableCols.map((col) => {
                         const header = col.columnDef.header
@@ -326,7 +331,12 @@ export function DataTable<T>({
         </div>
       )}
 
-      <div className="relative overflow-x-auto rounded-md border">
+      {table.getVisibleLeafColumns().length === 0 ? (
+        <div className="flex items-center justify-center rounded-md border py-8 text-sm text-muted-foreground">
+          No columns selected
+        </div>
+      ) : null}
+      <div className={table.getVisibleLeafColumns().length === 0 ? 'hidden' : 'relative overflow-x-auto rounded-md border'}>
         <Table className="min-w-max">
           <TableHeader ref={theadRef}>
             {table.getHeaderGroups().map((hg) => (
@@ -461,11 +471,13 @@ export function DataTable<T>({
             </Select>
             <span>/ Page</span>
           </div>
-          <span className="tabular-nums">
-            {serverPagination.totalRows === 0
-              ? 'No results'
-              : `Showing ${(serverPagination.page - 1) * serverPagination.pageSize + 1}–${Math.min(serverPagination.page * serverPagination.pageSize, serverPagination.totalRows)} of ${serverPagination.totalRows}`}
-          </span>
+          {!compact && (
+            <span className="tabular-nums">
+              {serverPagination.totalRows === 0
+                ? 'No results'
+                : `Showing ${(serverPagination.page - 1) * serverPagination.pageSize + 1}–${Math.min(serverPagination.page * serverPagination.pageSize, serverPagination.totalRows)} of ${serverPagination.totalRows}`}
+            </span>
+          )}
           <div className="flex items-center gap-3">
             <button
               type="button"

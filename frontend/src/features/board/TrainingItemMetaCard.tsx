@@ -153,15 +153,30 @@ function DecoyEvalSection({
   selectedPly: PlySelection | null | undefined
   pgnDisplay: TrainingItemMetaPgnDisplayMin | null
 }): React.ReactElement {
-  const cpByUci = React.useMemo(() => {
+  const { cpByUci, minCp, maxCp } = React.useMemo(() => {
     const map = new Map<string, number>()
-    for (const m of source.acceptedMoves) map.set(m.uci, m.cp)
-    return map
+    let min = Infinity
+    let max = -Infinity
+    for (const m of source.acceptedMoves) {
+      map.set(m.uci, m.cp)
+      if (m.cp < min) min = m.cp
+      if (m.cp > max) max = m.cp
+    }
+    return {
+      cpByUci: map,
+      minCp: min === Infinity ? null : min,
+      maxCp: max === -Infinity ? null : max,
+    }
   }, [source.acceptedMoves])
 
   const resolvedCp = React.useMemo((): number | null => {
     if (!selectedPly || (selectedPly.line === 'main' && selectedPly.index === 0)) {
-      return source.bestCp
+      // Show the best eval the player can achieve across all accepted moves.
+      // All cp values are normalized to white's perspective (positive = white winning).
+      // mainline[0] is the opponent's move; if white played it, the player is black.
+      const opponentIsWhite = pgnDisplay?.mainline[0]?.isWhite
+      if (opponentIsWhite === undefined) return source.bestCp
+      return opponentIsWhite ? (minCp ?? source.bestCp) : (maxCp ?? source.bestCp)
     }
     if (selectedPly.line === 'subvariation') {
       const sv = pgnDisplay?.subvariations?.[selectedPly.subIndex]?.[0]
@@ -172,7 +187,7 @@ function DecoyEvalSection({
       return move?.uci != null ? (cpByUci.get(move.uci) ?? null) : null
     }
     return source.bestCp
-  }, [selectedPly, pgnDisplay, cpByUci, source.bestCp])
+  }, [selectedPly, pgnDisplay, cpByUci, minCp, maxCp, source.bestCp])
 
   return (
     <div className="flex items-center gap-2 border-t border-border pt-3 pb-1">

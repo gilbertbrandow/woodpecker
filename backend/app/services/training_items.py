@@ -5,15 +5,43 @@ import sqlalchemy as sa
 
 from app.extensions import db
 from app.exceptions import ForbiddenError, NotFoundError
-from app.table_query import FilterList
+from app.table_query import FilterList, RangeFilter
 from app.models.run import TrainingAttempt, Run, RunTrainingItem
 from app.models.training import Training
 from app.models.user import User
 from app.models.schedule import Schedule
+from app.models.subset import Subset
 from app.services.attempt_state import attempt_type_fields
 from app.services.chess_board import compute_attempt_board, compute_attempt_pgn
 from app.services.schedule_config import ScheduleConfig
 from app.services.training_item_content import get_content
+
+
+def _range_matches(f: RangeFilter, value: float | None) -> bool:
+    if not f.is_set:
+        return True
+    if f.op == 'set':
+        return value is not None
+    if f.op == 'not_set':
+        return value is None
+    if value is None or f.from_val is None:
+        return False
+    if f.op == 'is':
+        return value == f.from_val
+    if f.op == 'is_not':
+        return value != f.from_val
+    if f.op == 'gt':
+        return value > f.from_val
+    if f.op == 'gte':
+        return value >= f.from_val
+    if f.op == 'lt':
+        return value < f.from_val
+    if f.op == 'lte':
+        return value <= f.from_val
+    if f.op in ('between', 'not_between') and f.to_val is not None:
+        inside = f.from_val <= value <= f.to_val
+        return not inside if f.op == 'not_between' else inside
+    return True
 
 
 def _require_own_attempt(training_item_id: int, user_id: int) -> None:
@@ -44,20 +72,30 @@ def get_attempt_history(
     page_size: int = 20,
     user_ids: FilterList | None = None,
     result: FilterList | None = None,
+    schedule_ids: FilterList | None = None,
+    subset_ids: FilterList | None = None,
+    run_number: RangeFilter | None = None,
+    try_number: RangeFilter | None = None,
+    time_spent_ms: RangeFilter | None = None,
 ) -> dict[str, object]:
     _require_own_attempt(training_item_id, user_id)
 
     # Single join query — replaces N×4 individual session.get() calls.
     context_stmt = (
-        sa.select(RunTrainingItem, Run, Training, User, Schedule)
+        sa.select(RunTrainingItem, Run, Training, User, Schedule, Subset)
         .join(Run, RunTrainingItem.run_id == Run.id)
         .join(Training, Run.training_id == Training.id)
         .join(User, Training.user_id == User.id)
         .join(Schedule, Training.schedule_id == Schedule.id)
+        .join(Subset, Schedule.subset_id == Subset.id)
         .where(RunTrainingItem.training_item_id == training_item_id)
     )
     if user_ids is not None:
         context_stmt = user_ids.apply_orm(context_stmt, Training.user_id)
+    if schedule_ids is not None:
+        context_stmt = schedule_ids.apply_orm(context_stmt, Schedule.id)
+    if subset_ids is not None:
+        context_stmt = subset_ids.apply_orm(context_stmt, Subset.id)
 
     context_rows = db.session.execute(context_stmt).all()
     if not context_rows:
@@ -80,8 +118,8 @@ def get_attempt_history(
 
     rows: list[dict[str, object]] = []
     for ctx in context_rows:
-        rp, run, training, user, schedule = (
-            ctx.RunTrainingItem, ctx.Run, ctx.Training, ctx.User, ctx.Schedule
+        rp, run, training, user, schedule, subset = (
+            ctx.RunTrainingItem, ctx.Run, ctx.Training, ctx.User, ctx.Schedule, ctx.Subset
         )
         if not isinstance(schedule.config, dict):
             continue
@@ -89,6 +127,7 @@ def get_attempt_history(
         total_queue = config.total_queue
 
         sorted_attempts = sorted(attempts_by_rp.get(rp.id, []), key=lambda a: a.try_number)
+        run_num = run.run_index + 1
         for a in sorted_attempts:
             if result is not None and result.str_values:
                 matches = a.status in result.str_values
@@ -96,6 +135,12 @@ def get_attempt_history(
                     matches = not matches
                 if not matches:
                     continue
+            if run_number is not None and run_number.is_set and not _range_matches(run_number, run_num):
+                continue
+            if try_number is not None and try_number.is_set and not _range_matches(try_number, a.try_number):
+                continue
+            if time_spent_ms is not None and time_spent_ms.is_set and not _range_matches(time_spent_ms, a.time_spent_ms):
+                continue
             type_data = attempt_type_fields(sorted_attempts, a.try_number, total_queue)
             rows.append({
                 "attemptId": a.id,
@@ -109,6 +154,10 @@ def get_attempt_history(
                 "countsTowardsTraining": type_data["countsTowardsTraining"],
                 "result": a.status,
                 "timeSpentMs": a.time_spent_ms,
+                "scheduleId": schedule.id,
+                "scheduleName": schedule.name,
+                "subsetId": subset.id,
+                "subsetName": subset.name,
                 "_started_at": a.started_at,
             })
 

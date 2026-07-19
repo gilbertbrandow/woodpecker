@@ -98,11 +98,11 @@ export function BoardPageShell({
     <div className="flex flex-1 flex-col overflow-x-hidden pb-3 lg:pb-0 lg:px-0">
       <div className="flex flex-1 items-start justify-center lg:items-center lg:overflow-hidden lg:px-6">
         <div className="flex w-full items-start justify-center gap-6 lg:justify-center">
-          <aside className="hidden min-w-0 flex-1 flex-col gap-4 lg:flex" style={{ height: boardSize }}>
+          <aside className="hidden min-w-0 flex-1 flex-col gap-4 lg:flex" style={{ height: boardSize + 36 }}>
             {left}
           </aside>
           {center}
-          <aside className="hidden min-w-0 flex-1 flex-col gap-2 lg:flex" style={{ height: boardSize }}>
+          <aside className="hidden min-w-0 flex-1 flex-col gap-2 lg:flex" style={{ height: boardSize + 36 }}>
             {right}
           </aside>
         </div>
@@ -153,10 +153,12 @@ export function BoardPageShell({
                 <button
                   type="button"
                   aria-label="Close panel"
-                  className="mx-auto mt-4 mb-4 h-2 w-[100px] touch-none rounded-full bg-muted transition-colors hover:bg-muted-foreground/30"
+                  className="group flex w-full items-center justify-center py-4 touch-none"
                   onClick={closePanel}
                   onTouchStart={handleDragHandleTouchStart}
-                />
+                >
+                  <div className="h-2 w-[100px] rounded-full bg-muted transition-colors group-hover:bg-muted-foreground/30" />
+                </button>
                 <div className="flex-1 overflow-y-auto px-4 pb-6">
                   {mobileDrawerContent}
                 </div>

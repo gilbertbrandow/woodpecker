@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { CircleOff, Lightbulb } from 'lucide-react'
+import { CircleOff, Swords } from 'lucide-react'
 
 type AttemptTypeCardProps = {
   isPractice: boolean
@@ -24,7 +24,7 @@ export function AttemptTypeCard({ isPractice, currentTryNumber, maxTriesPerPuzzl
   return (
     <div className={`rounded-lg border border-border bg-transparent text-foreground ${compact ? 'px-3 py-2' : 'p-4'}`}>
       <div className="flex items-center gap-2">
-        <Lightbulb className={`shrink-0 ${compact ? 'h-3 w-3' : 'h-4 w-4'}`} />
+        <Swords className={`shrink-0 ${compact ? 'h-3 w-3' : 'h-4 w-4'}`} />
         <span className={`font-medium ${compact ? 'text-xs' : 'text-sm'}`}>Scored attempt</span>
       </div>
       <p className={`opacity-75 ${compact ? 'mt-1 text-[10px]' : 'mt-1.5 text-xs'}`}>

@@ -15,7 +15,6 @@ type BoardCenterColumnProps = {
   runId: string
   activeAttemptId?: number | null
   stripInteractive?: boolean
-  stripMaxVisible?: number
   pulseActive?: boolean
   boardAnimationEnabled?: boolean
   mobileHeader?: React.ReactNode
@@ -25,6 +24,7 @@ type BoardCenterColumnProps = {
   spectateLabel?: React.ReactNode
   soundEnabled?: boolean
   onToggleSound?: (pressed: boolean) => void
+  pieceSetId?: string
 }
 
 export function BoardCenterColumn({
@@ -34,7 +34,6 @@ export function BoardCenterColumn({
   runId,
   activeAttemptId,
   stripInteractive = true,
-  stripMaxVisible = 20,
   pulseActive = false,
   boardAnimationEnabled = true,
   mobileHeader,
@@ -44,6 +43,7 @@ export function BoardCenterColumn({
   spectateLabel,
   soundEnabled = false,
   onToggleSound,
+  pieceSetId,
 }: BoardCenterColumnProps): React.ReactElement {
   const boardSurfaceProps: BoardSurfaceProps = {
     boardKey: board.boardKey,
@@ -54,6 +54,7 @@ export function BoardCenterColumn({
     lastMove: board.lastMove,
     hintSquare: board.hintSquare,
     pendingPromotion: board.pendingPromotion,
+    pieceSetId,
     moveFeedback: board.moveFeedback,
     animationEnabled: boardAnimationEnabled,
     onMove: actions.handleUserMove,
@@ -70,7 +71,7 @@ export function BoardCenterColumn({
       )}
       <div className="relative shrink-0" style={{ width: board.boardSize }}>
         {spectateLabel && (
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex -translate-y-1/2 justify-center">
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex -translate-y-1/2 justify-center">
             <div className="pointer-events-auto">{spectateLabel}</div>
           </div>
         )}
@@ -92,7 +93,7 @@ export function BoardCenterColumn({
       </div>
       <div className="mt-3 flex h-6 items-center gap-2">
         <div className="min-w-0 flex-1">
-          <SessionAttemptStrip items={attemptHistory} runId={runId} activeAttemptId={activeAttemptId} interactive={stripInteractive} maxVisible={stripMaxVisible} pulseActive={pulseActive} noMargin />
+          <SessionAttemptStrip items={attemptHistory} runId={runId} activeAttemptId={activeAttemptId} interactive={stripInteractive} pulseActive={pulseActive} noMargin />
         </div>
         {onToggleSound !== undefined && (
           <Toggle

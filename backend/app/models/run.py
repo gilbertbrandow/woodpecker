@@ -7,8 +7,6 @@ from sqlalchemy.sql import func
 
 from app.extensions import Base
 
-MAX_PUZZLE_TIME_MS: int = 600_000
-
 
 class Run(Base):
     __tablename__ = "runs"

@@ -8,7 +8,6 @@ type OverviewSidebarRightProps = {
   isLoadingNextPuzzle: boolean
   onNextPuzzle: () => void
   onRetake: () => void
-  historyRows: OverviewAttemptHistoryRow[]
   selectedAttemptId: number | null
   onRowClick: (row: OverviewAttemptHistoryRow) => void
   onUserFilterChange?: (users: SelectableUser[]) => void
@@ -16,13 +15,14 @@ type OverviewSidebarRightProps = {
   analyzeUrl: string | null
   trainingItemId: number
   currentUser: SelectableUser
+  topSlot?: React.ReactNode
+  showTable: boolean
 }
 
 export function OverviewSidebarRight({
   isLoadingNextPuzzle,
   onNextPuzzle,
   onRetake,
-  historyRows,
   selectedAttemptId,
   onRowClick,
   onUserFilterChange,
@@ -30,18 +30,24 @@ export function OverviewSidebarRight({
   analyzeUrl,
   trainingItemId,
   currentUser,
+  topSlot,
+  showTable,
 }: OverviewSidebarRightProps): React.ReactElement {
   return (
-    <>
-      <div className="mt-4 flex flex-col gap-2">
-        <OverviewAttemptHistoryTable
-          trainingItemId={trainingItemId}
-          initialRows={historyRows}
-          currentUser={currentUser}
-          selectedAttemptId={selectedAttemptId}
-          onRowClick={onRowClick}
-          onUserFilterChange={onUserFilterChange}
-        />
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="flex flex-col gap-2">
+          {topSlot}
+          {showTable && (
+            <OverviewAttemptHistoryTable
+              trainingItemId={trainingItemId}
+              currentUser={currentUser}
+              selectedAttemptId={selectedAttemptId}
+              onRowClick={onRowClick}
+              onUserFilterChange={onUserFilterChange}
+            />
+          )}
+        </div>
       </div>
       <OverviewActionsSection
         nextPuzzleDisabledReason={nextPuzzleDisabledReason}
@@ -50,6 +56,6 @@ export function OverviewSidebarRight({
         onNextPuzzle={onNextPuzzle}
         onRetake={onRetake}
       />
-    </>
+    </div>
   )
 }

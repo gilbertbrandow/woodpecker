@@ -119,6 +119,13 @@ def onboarding() -> tuple[Response, int] | Response:
     if state is None or state["kind"] != "onboarding":
         return jsonify({"error": "no pending onboarding session"}), 401
 
+    existing = db.session.execute(
+        db.select(User).filter_by(lichess_username=state["lichess_username"])
+    ).scalar_one_or_none()
+    if existing:
+        auth_session.set_active(existing.id)
+        return jsonify(user_to_dict(existing))
+
     data: dict[str, object] = request.get_json(silent=True) or {}
     raw_display_name = data.get("displayName")
     if not isinstance(raw_display_name, str):

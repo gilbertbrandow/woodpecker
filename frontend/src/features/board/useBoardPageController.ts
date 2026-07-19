@@ -24,6 +24,7 @@ import {
   LG_BREAKPOINT,
   V_PAD_DESKTOP,
   MOBILE_H_PAD,
+  computeBoardSize,
   MOVE_FEEDBACK_SUCCESS_MS,
   WRONG_REVERT_MS,
   FAILED_TO_OVERVIEW_MS,
@@ -151,7 +152,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const [lastMoveResult, setLastMoveResult] = useState<MoveFeedbackResult | null>(null)
   const [lastMoveSquare, setLastMoveSquare] = useState<string | null>(null)
   const [isShowingMoveFeedback, setIsShowingMoveFeedback] = useState(false)
-  const [boardSize, setBoardSize] = useState(480)
+  const [boardSize, setBoardSize] = useState(() => computeBoardSize())
 
   useEffect(() => {
     const compute = (): void => {
@@ -258,8 +259,10 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     inputBlockedRef.current = true
     movesPlayedRef.current = []
     allPliesRef.current = []
+    failedRetryPliesRef.current = []
     setMovesPlayed([])
     setAllPliesPlayed([])
+    setFailedRetryPlies([])
     setLiveFocusStatus('in_progress')
     currentAttemptIdRef.current = data.attempt.id
     currentRunTrainingItemIdRef.current = data.runTrainingItem.id
@@ -831,6 +834,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const turnToMove: Orientation = displayFen.split(' ')[1] === 'b' ? 'black' : 'white'
   const pieceSet = resolvePieceSet(user?.pieceTheme ?? '')
   const kingPieceUrl = turnToMove === 'white' ? pieceSet.pieces.wK : pieceSet.pieces.bK
+  const darkKingPieceUrl = turnToMove === 'white' ? pieceSet.pieces.bK : pieceSet.pieces.wK
 
   return {
     mode,
@@ -847,6 +851,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       moveFeedback: { result: lastMoveResult, square: lastMoveSquare, visible: isShowingMoveFeedback },
       turnToMove,
       kingPieceUrl,
+      darkKingPieceUrl,
     },
     timer: {
       elapsedTenths: elapsedSeconds,

@@ -20,22 +20,26 @@ type SessionAttemptStripProps = {
   runId: string
   activeAttemptId?: number | null
   interactive?: boolean
-  maxVisible?: number
   pulseActive?: boolean
   noMargin?: boolean
 }
 
-export function SessionAttemptStrip({ items, runId, activeAttemptId, interactive = true, maxVisible = 20, pulseActive = false, noMargin = false }: SessionAttemptStripProps): React.ReactElement | null {
-  const visibleItems = React.useMemo(() => items.slice(-maxVisible), [items, maxVisible])
+export function SessionAttemptStrip({ items, runId, activeAttemptId, interactive = true, pulseActive = false, noMargin = false }: SessionAttemptStripProps): React.ReactElement | null {
+  const containerRef = React.useRef<HTMLDivElement>(null)
 
-  if (visibleItems.length === 0) {
+  React.useLayoutEffect(() => {
+    const el = containerRef.current
+    if (el) el.scrollLeft = el.scrollWidth
+  }, [items.length])
+
+  if (items.length === 0) {
     return null
   }
 
   return (
-    <div className={`${noMargin ? '' : 'mt-3 '}h-6 w-full`}>
-      <div className="flex h-6 items-center gap-1 overflow-hidden pl-0.5">
-        {visibleItems.map((item) => {
+    <div ref={containerRef} className={`${noMargin ? '' : 'mt-3 '}h-6 w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}>
+      <div className="flex h-6 w-max items-center gap-1 pl-0.5">
+        {items.map((item) => {
           const statusLabel = STATUS_LABEL[item.status]
           const tooltip = `Attempt for puzzle ${item.puzzlePosition}: ${statusLabel}`
 

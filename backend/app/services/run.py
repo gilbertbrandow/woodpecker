@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from app.extensions import db
-from app.models.run import MAX_PUZZLE_TIME_MS, TrainingAttempt, Run, RunTrainingItem
+from app.models.run import TrainingAttempt, Run, RunTrainingItem
 from app.models.schedule import Schedule
 from app.models.training import Training
 from app.models.subset import Subset, SubsetTrainingItem
@@ -1077,8 +1077,9 @@ def _compute_overview_stats(
                 all_solved += 1
                 if queue_completed and queue_completed[0].status == "solved" and queue_completed[0].try_number == 1:
                     first_solved += 1
-                if completed and completed[-1].time_spent_ms is not None:
-                    times.append(completed[-1].time_spent_ms)
+                qualifying = next((a for a in queue_completed if a.status == "solved"), None)
+                if qualifying is not None and qualifying.time_spent_ms is not None:
+                    times.append(qualifying.time_spent_ms)
 
         return first_solved, all_solved, resolved, times
 
@@ -1153,19 +1154,21 @@ def _compute_attempt_impact(
 
     training_progress_delta_pct: float | None = None
     if is_qualifying:
-        all_training_runs = list(
-            db.session.scalars(
-                sa.select(Run).where(Run.training_id == training_id)
-            ).all()
-        )
-        total_training_puzzles = sum(
-            db.session.scalar(
-                sa.select(sa.func.count()).where(RunTrainingItem.run_id == r.id)
-            ) or 0
-            for r in all_training_runs
-        )
-        if total_training_puzzles > 0:
-            training_progress_delta_pct = round(1.0 / total_training_puzzles * 100, 2)
+        training = db.session.get(Training, training_id)
+        if training is not None:
+            schedule = db.session.get(Schedule, training.schedule_id)
+            if schedule is not None and isinstance(schedule.config, dict):
+                subset = db.session.get(Subset, schedule.subset_id)
+                if subset is not None:
+                    run_count = len(ScheduleConfig.from_dict(schedule.config).runs)
+                    puzzle_count = (
+                        subset.locked_puzzle_count
+                        if subset.locked_puzzle_count is not None
+                        else subset.puzzle_count
+                    ) or 0
+                    total_training_puzzles = run_count * puzzle_count
+                    if total_training_puzzles > 0:
+                        training_progress_delta_pct = round(1.0 / total_training_puzzles * 100, 2)
 
     return {
         "runProgressDeltaPct": run_progress_delta_pct,
@@ -1215,63 +1218,6 @@ def _overview_attempt_view(
         "impact": impact,
     }
 
-
-def _same_puzzle_run_overview_items(
-    run_puzzle: RunTrainingItem,
-    training_id: int,
-    total_queue: int,
-) -> list[dict[str, object]]:
-    other_run_puzzles = list(
-        db.session.scalars(
-            sa.select(RunTrainingItem)
-            .options(selectinload(RunTrainingItem.attempts))
-            .join(Run, RunTrainingItem.run_id == Run.id)
-            .where(
-                Run.training_id == training_id,
-                RunTrainingItem.training_item_id == run_puzzle.training_item_id,
-                RunTrainingItem.id != run_puzzle.id,
-            )
-        ).all()
-    )
-
-    items: list[dict[str, object]] = []
-    for rp in other_run_puzzles:
-        other_run = db.session.get(Run, rp.run_id)
-        if other_run is None:
-            continue
-        rp_payload = get_content(rp.training_item_id)
-
-        sorted_attempts = sorted(rp.attempts, key=lambda a: a.try_number)
-        q_id = qualifying_attempt_id(sorted_attempts, total_queue)
-
-        other_run_puzzles_for_run = list(
-            db.session.scalars(
-                sa.select(RunTrainingItem)
-                .options(selectinload(RunTrainingItem.attempts))
-                .where(RunTrainingItem.run_id == other_run.id)
-            ).all()
-        )
-
-        attempt_views = [
-            _overview_attempt_view(
-                a, other_run, rp, q_id, total_queue,
-                rp_payload.contract,
-                other_run_puzzles_for_run, training_id,
-            )
-            for a in sorted_attempts
-            if a.status != "in_progress"
-        ]
-
-        items.append({
-            "runId": other_run.id,
-            "runIndex": other_run.run_index,
-            "runTrainingItemId": rp.id,
-            "runTrainingItemStatus": derive_position_status(sorted_attempts, total_queue),
-            "attempts": attempt_views,
-        })
-
-    items.sort(key=lambda x: x["runIndex"] if isinstance(x["runIndex"], int) else 0)
-    return items
 
 
 def _compute_progress_card(
@@ -1410,12 +1356,13 @@ def _compute_run_complete_overlay(
 
     all_times: list[int] = []
     for rp in run_puzzles:
-        completed = sorted(
-            [a for a in rp.attempts if a.status != "in_progress"],
+        queue_completed = sorted(
+            [a for a in rp.attempts if a.status != "in_progress" and a.try_number <= total_queue],
             key=lambda a: a.try_number,
         )
-        if completed and completed[-1].time_spent_ms is not None:
-            all_times.append(completed[-1].time_spent_ms)
+        qualifying = next((a for a in queue_completed if a.status == "solved"), None)
+        if qualifying is not None and qualifying.time_spent_ms is not None:
+            all_times.append(qualifying.time_spent_ms)
 
     resolved = solved + solved_with_retries + failed
     acc_pct: float | None = (
@@ -1551,9 +1498,6 @@ def _build_run_puzzle_overview(
         },
         "selectedAttemptId": resolved_selected_id,
         "attempts": attempt_views,
-        "sameTrainingItemAcrossRuns": _same_puzzle_run_overview_items(
-            run_puzzle, training_id, total_queue
-        ),
         "runPace": {
             "chartData": _pace_chart_data(run, all_run_puzzles, config, tz),
         },
@@ -1647,11 +1591,9 @@ def complete_attempt(
     attempt.status = outcome
     attempt.completed_at = now
     if client_time_spent_ms is not None:
-        attempt.time_spent_ms = min(client_time_spent_ms, MAX_PUZZLE_TIME_MS)
+        attempt.time_spent_ms = client_time_spent_ms
     else:
-        attempt.time_spent_ms = min(
-            int((now - attempt.started_at).total_seconds() * 1000), MAX_PUZZLE_TIME_MS
-        )
+        attempt.time_spent_ms = int((now - attempt.started_at).total_seconds() * 1000)
     attempt.moves = uci_moves
 
     position_status = derive_position_status(run_puzzle.attempts, total_queue)

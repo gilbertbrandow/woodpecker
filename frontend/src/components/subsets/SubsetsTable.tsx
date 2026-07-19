@@ -46,7 +46,7 @@ type SubsetsTableProps = {
 export function SubsetsTable({ selectedId, onSelect, onCountChange }: SubsetsTableProps = {}): React.ReactElement {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const userFilterSpec = useUserFilterSpec('userId', 'Owner')
+  const userFilterSpec = useUserFilterSpec('userId', 'Creator')
   const pickerMode = onSelect !== undefined
 
   const [deletingId, setDeletingId] = useState<number | null>(null)

@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Clock, CheckCircle2, XCircle, RotateCcw, ExternalLink, SkipForward, ClockArrowUp, ClockArrowDown } from 'lucide-react'
+import { Clock, CheckCircle2, XCircle, RotateCcw, ExternalLink, SkipForward, ClockArrowUp, ClockArrowDown, Lightbulb, Eye } from 'lucide-react'
 import { Button, buttonVariants } from '../../components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 import { cn } from '../../lib/utils'
@@ -14,6 +14,7 @@ type FocusModeProps = {
   lastMoveResult: MoveFeedbackResult | null
   turnToMove: Orientation
   kingPieceUrl: string
+  darkKingPieceUrl: string
 }
 
 type FailedModeProps = {
@@ -26,6 +27,7 @@ type FailedModeProps = {
   lastMoveResult: MoveFeedbackResult | null
   turnToMove: Orientation
   kingPieceUrl: string
+  darkKingPieceUrl: string
 }
 
 type OverviewModeProps = {
@@ -51,6 +53,7 @@ export function MobileActionsBar(props: MobileActionsBarProps): React.ReactEleme
           lastMoveResult={props.lastMoveResult}
           turnToMove={props.turnToMove}
           kingPieceUrl={props.kingPieceUrl}
+          darkKingPieceUrl={props.darkKingPieceUrl}
           compact={true}
         />
       </div>
@@ -58,7 +61,7 @@ export function MobileActionsBar(props: MobileActionsBarProps): React.ReactEleme
   }
 
   if (props.mode === 'failed') {
-    const { timerText, timeTargetState, inputBlocked, onHint, onSolution, lastMoveResult, turnToMove, kingPieceUrl } = props
+    const { timerText, timeTargetState, inputBlocked, onHint, onSolution, lastMoveResult, turnToMove, kingPieceUrl, darkKingPieceUrl } = props
     const timeClasses =
       timeTargetState === 'fast'
         ? 'border-stone-400/30 bg-stone-500/10 text-stone-600 dark:text-stone-400'
@@ -84,9 +87,11 @@ export function MobileActionsBar(props: MobileActionsBarProps): React.ReactEleme
         </div>
         <div className="flex gap-2">
           <Button variant="outline" className="flex-1" onClick={onHint} disabled={inputBlocked}>
+            <Lightbulb className="mr-2 h-4 w-4" />
             Hint
           </Button>
           <Button variant="outline" className="flex-1" onClick={onSolution} disabled={inputBlocked}>
+            <Eye className="mr-2 h-4 w-4" />
             Solution
           </Button>
         </div>
@@ -94,6 +99,7 @@ export function MobileActionsBar(props: MobileActionsBarProps): React.ReactEleme
           lastMoveResult={lastMoveResult}
           turnToMove={turnToMove}
           kingPieceUrl={kingPieceUrl}
+          darkKingPieceUrl={darkKingPieceUrl}
           compact={true}
         />
       </div>

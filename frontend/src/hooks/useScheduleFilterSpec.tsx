@@ -26,7 +26,10 @@ export function useScheduleFilterSpec(urlKey: string, label = 'Schedule'): Entit
       if (schedules.length === 1) return schedules[0].name
       return `${schedules.length} schedules`
     },
-    renderChipValue: (schedules) => {
+    renderChipValue: (schedules, pendingCount) => {
+      if (schedules.length === 0 && pendingCount > 0) {
+        return <span className="inline-block h-3 w-16 animate-pulse rounded bg-muted" />
+      }
       if (schedules.length === 0) return null
       const label = schedules.length === 1 ? schedules[0].name : `${schedules.length} schedules`
       return <span className="font-medium text-foreground">{label}</span>
