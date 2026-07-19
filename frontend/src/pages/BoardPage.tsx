@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useAuth } from '../context/auth'
-import { Clock, CheckCircle2, XCircle, ClockArrowUp, ClockArrowDown, ExternalLink } from 'lucide-react'
+import { Clock, CheckCircle2, XCircle, ClockArrowUp, ClockArrowDown, ExternalLink, Lightbulb, Eye } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
 import { Button } from '../components/ui/button'
 import { UserAvatar } from '../components/UserAvatar'
@@ -461,6 +461,7 @@ export function BoardPage(): React.ReactElement | null {
         lastMoveResult={displayBoard.moveFeedback.result}
         turnToMove={ctrl.board.turnToMove}
         kingPieceUrl={ctrl.board.kingPieceUrl}
+        darkKingPieceUrl={ctrl.board.darkKingPieceUrl}
       />
     ) : ctrl.mode === 'failed' ? (
       <MobileActionsBar
@@ -473,6 +474,7 @@ export function BoardPage(): React.ReactElement | null {
         lastMoveResult={displayBoard.moveFeedback.result}
         turnToMove={ctrl.board.turnToMove}
         kingPieceUrl={ctrl.board.kingPieceUrl}
+        darkKingPieceUrl={ctrl.board.darkKingPieceUrl}
       />
     ) : overviewData !== null ? (
       <MobileActionsBar
@@ -566,31 +568,37 @@ export function BoardPage(): React.ReactElement | null {
             lastMoveResult={displayBoard.moveFeedback.result}
             turnToMove={ctrl.board.turnToMove}
             kingPieceUrl={ctrl.board.kingPieceUrl}
+            darkKingPieceUrl={ctrl.board.darkKingPieceUrl}
           />
         </div>
       )}
       {ctrl.mode === 'failed' && ctrl.solvingView !== null && (
         <div className="mt-auto flex flex-col gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={ctrl.actions.handleShowHint}
-            disabled={ctrl.inputBlocked || !isAtHead}
-          >
-            Show Hint
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={ctrl.actions.handleShowSolution}
-            disabled={ctrl.inputBlocked || !isAtHead}
-          >
-            Show Solution
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={ctrl.actions.handleShowHint}
+              disabled={ctrl.inputBlocked || !isAtHead}
+            >
+              <Lightbulb className="mr-2 h-4 w-4" />
+              Hint
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={ctrl.actions.handleShowSolution}
+              disabled={ctrl.inputBlocked || !isAtHead}
+            >
+              <Eye className="mr-2 h-4 w-4" />
+              Solution
+            </Button>
+          </div>
           <MoveStatusCard
             lastMoveResult={displayBoard.moveFeedback.result}
             turnToMove={ctrl.board.turnToMove}
             kingPieceUrl={ctrl.board.kingPieceUrl}
+            darkKingPieceUrl={ctrl.board.darkKingPieceUrl}
           />
         </div>
       )}
