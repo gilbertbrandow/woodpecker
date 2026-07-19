@@ -9,26 +9,41 @@ const SOUND_FILES: Record<SoundEvent, string> = {
 }
 
 export function useBoardSounds(enabled: boolean, theme: string): (event: SoundEvent) => void {
-  const audioRef = useRef<Partial<Record<SoundEvent, HTMLAudioElement>>>({})
+  const ctxRef = useRef<AudioContext | null>(null)
+  const buffersRef = useRef<Partial<Record<SoundEvent, AudioBuffer>>>({})
   const enabledRef = useRef(enabled)
   enabledRef.current = enabled
 
   useEffect(() => {
-    const audio: Partial<Record<SoundEvent, HTMLAudioElement>> = {}
+    if (!ctxRef.current || ctxRef.current.state === 'closed') ctxRef.current = new AudioContext()
+    const ctx = ctxRef.current
+    buffersRef.current = {}
+    const controller = new AbortController()
     for (const [event, file] of Object.entries(SOUND_FILES) as [SoundEvent, string][]) {
-      const el = new Audio(`/sounds/${theme}/${file}`)
-      el.preload = 'auto'
-      audio[event as SoundEvent] = el
+      void fetch(`/sounds/${theme}/${file}`, { signal: controller.signal })
+        .then((r) => r.arrayBuffer())
+        .then((ab) => ctx.decodeAudioData(ab))
+        .then((buf) => { buffersRef.current[event as SoundEvent] = buf })
+        .catch(() => {})
     }
-    audioRef.current = audio
+    return () => { controller.abort() }
   }, [theme])
+
+  useEffect(() => {
+    return () => { void ctxRef.current?.close() }
+  }, [])
 
   return useCallback((event: SoundEvent) => {
     if (!enabledRef.current) return
-    const el = audioRef.current[event]
-    if (!el) return
-    el.currentTime = 0
-    void el.play().catch(() => {})
+    const buf = buffersRef.current[event]
+    if (!buf) return
+    const ctx = ctxRef.current
+    if (!ctx) return
+    if (ctx.state === 'suspended') void ctx.resume()
+    const src = ctx.createBufferSource()
+    src.buffer = buf
+    src.connect(ctx.destination)
+    src.start()
   }, [])
 }
 
