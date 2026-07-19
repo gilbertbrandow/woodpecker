@@ -27,6 +27,7 @@ export type BoardState = {
   }
   turnToMove: Orientation
   kingPieceUrl: string
+  darkKingPieceUrl: string
 }
 
 export const HEADER_H = 56

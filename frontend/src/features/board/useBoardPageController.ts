@@ -834,6 +834,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const turnToMove: Orientation = displayFen.split(' ')[1] === 'b' ? 'black' : 'white'
   const pieceSet = resolvePieceSet(user?.pieceTheme ?? '')
   const kingPieceUrl = turnToMove === 'white' ? pieceSet.pieces.wK : pieceSet.pieces.bK
+  const darkKingPieceUrl = turnToMove === 'white' ? pieceSet.pieces.bK : pieceSet.pieces.wK
 
   return {
     mode,
@@ -850,6 +851,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       moveFeedback: { result: lastMoveResult, square: lastMoveSquare, visible: isShowingMoveFeedback },
       turnToMove,
       kingPieceUrl,
+      darkKingPieceUrl,
     },
     timer: {
       elapsedTenths: elapsedSeconds,
