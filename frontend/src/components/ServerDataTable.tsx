@@ -181,7 +181,7 @@ export function ServerDataTable<T>({
             if (item !== null) instant.push(item)
             else unresolved.push(id)
           }
-          filterValues[spec.key] = { op, items: instant } satisfies EntityVal
+          filterValues[spec.key] = { op, items: instant, pendingCount: unresolved.length || undefined } satisfies EntityVal
           customUnresolved[spec.key] = unresolved
           // Store raw tokens so the fetch can proceed in parallel with ID resolution.
           if (unresolved.length > 0) pendingFetchParams[spec.key] = tokens

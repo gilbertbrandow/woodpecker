@@ -57,11 +57,11 @@ export type EntityFilterSpec<TItem> = {
   defaultItems?: TItem[]
   renderContent?: (value: TItem[], onChange: (items: TItem[]) => void) => React.ReactNode
   getChipLabel?: (items: TItem[]) => string
-  renderChipValue?: (items: TItem[]) => React.ReactNode
+  renderChipValue?: (items: TItem[], pendingCount: number) => React.ReactNode
   nullable?: boolean
 }
 
-export type EntityVal = { op: 'is' | 'is_not' | 'set' | 'not_set'; items: unknown[] }
+export type EntityVal = { op: 'is' | 'is_not' | 'set' | 'not_set'; items: unknown[]; pendingCount?: number }
 
 // Set filter: the row value is a set; operators describe the relationship between
 // the filter selection (F) and the row's set (R).

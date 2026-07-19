@@ -26,7 +26,10 @@ export function useSubsetFilterSpec(urlKey: string, label = 'Subset'): EntityFil
       if (subsets.length === 1) return subsets[0].name
       return `${subsets.length} subsets`
     },
-    renderChipValue: (subsets) => {
+    renderChipValue: (subsets, pendingCount) => {
+      if (subsets.length === 0 && pendingCount > 0) {
+        return <span className="inline-block h-3 w-16 animate-pulse rounded bg-muted" />
+      }
       if (subsets.length === 0) return null
       const label = subsets.length === 1 ? subsets[0].name : `${subsets.length} subsets`
       return <span className="font-medium text-foreground">{label}</span>

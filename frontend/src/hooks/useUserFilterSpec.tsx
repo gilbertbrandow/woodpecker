@@ -39,14 +39,19 @@ export function useUserFilterSpec(urlKey: string, label = 'User'): EntityFilterS
         if (users.length === 1) return users[0].displayName
         return `${users.length} users`
       },
-      renderChipValue: (users) => {
-        if (users.length === 0) return null
+      renderChipValue: (users, pendingCount) => {
+        const total = users.length + pendingCount
+        if (total === 0) return null
         const visible = users.slice(0, 3)
-        const overflow = users.length - 3
+        const skeletonCount = Math.max(0, Math.min(pendingCount, 3 - visible.length))
+        const overflow = total - 3
         return (
           <AvatarGroup>
             {visible.map((u) => (
               <UserAvatar key={u.id} displayName={u.displayName} avatarUrl={u.avatarUrl} className="h-4 w-4" />
+            ))}
+            {Array.from({ length: skeletonCount }).map((_, i) => (
+              <span key={`p${i}`} className="inline-block h-4 w-4 animate-pulse rounded-full bg-muted" />
             ))}
             {overflow > 0 && (
               <AvatarGroupCount className="h-4 w-4 text-[9px]">+{overflow}</AvatarGroupCount>

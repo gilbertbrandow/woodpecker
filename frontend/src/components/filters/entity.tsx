@@ -8,7 +8,7 @@ const baseEntityHandler: FilterHandler<EntityVal, EntityFilterSpec<unknown>> = {
     { value: 'is_not', label: 'is not', symbol: '≠', symbolPlural: '∉' },
   ],
   defaultValue: () => ({ op: 'is', items: [] }),
-  isEmpty: (value) => value.items.length === 0,
+  isEmpty: (value) => value.items.length === 0 && !value.pendingCount,
   toUrl: (value, spec) => {
     const ids = spec.serialize(value.items)
     return ids.length > 0 ? [value.op, ...ids] : []
@@ -28,7 +28,9 @@ const baseEntityHandler: FilterHandler<EntityVal, EntityFilterSpec<unknown>> = {
     openEditor: false,
   }),
   chipSummary: (value, spec) => {
-    if (value.items.length === 0) return null
+    const pendingCount = value.pendingCount ?? 0
+    if (value.items.length === 0 && pendingCount === 0) return null
+    if (value.items.length === 0) return 'loading'
     return spec.getChipLabel
       ? spec.getChipLabel(value.items)
       : value.items.length === 1
@@ -36,7 +38,10 @@ const baseEntityHandler: FilterHandler<EntityVal, EntityFilterSpec<unknown>> = {
         : `${value.items.length} selected`
   },
   renderChipValue: (value, spec) => {
-    if (spec.renderChipValue && value.items.length > 0) return spec.renderChipValue(value.items)
+    const pendingCount = value.pendingCount ?? 0
+    if (spec.renderChipValue && (value.items.length > 0 || pendingCount > 0)) {
+      return spec.renderChipValue(value.items, pendingCount)
+    }
     if (value.items.length === 0) return <span className="italic text-muted-foreground">…</span>
     const label = spec.getChipLabel
       ? spec.getChipLabel(value.items)
@@ -54,7 +59,7 @@ const baseEntityHandler: FilterHandler<EntityVal, EntityFilterSpec<unknown>> = {
   getLabel: (spec) =>
     spec.label ?? (spec.key.charAt(0).toUpperCase() + spec.key.slice(1)),
   getIcon: (spec) => spec.icon ?? null,
-  selectionCount: (value) => value.items.length,
+  selectionCount: (value) => value.items.length + (value.pendingCount ?? 0),
 }
 
 export const entityHandler = withNullable(
