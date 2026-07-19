@@ -674,6 +674,7 @@ export function BoardPage(): React.ReactElement | null {
       spectateLabel={spectateLabelNode}
       soundEnabled={user?.soundEnabled ?? false}
       onToggleSound={user !== null ? handleToggleSound : undefined}
+      pieceSetId={user?.pieceTheme}
     />
   )
 

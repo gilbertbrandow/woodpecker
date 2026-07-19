@@ -11,6 +11,7 @@ import ReactChessground from 'react-chessground'
 const Chessground = (ReactChessground as any).default ?? ReactChessground
 import { Check, X } from 'lucide-react'
 import type { Orientation, PendingPromotion, MoveFeedbackResult } from './boardPage.helpers'
+import { resolvePieceSet } from '../../lib/themes'
 
 type CheckColor = 'white' | 'black' | false
 
@@ -19,14 +20,17 @@ type ChessgroundInstance = { cg: { set: (config: { drawable?: { shapes?: DrawSha
 type PromotionPickerProps = {
   pending: PendingPromotion
   orientation: Orientation
+  squareSize: number
+  pieceUrls: Record<string, string>
   onSelect: (piece: 'q' | 'r' | 'b' | 'n') => void
   onCancel: () => void
 }
 
-function PromotionPicker({ pending, orientation, onSelect, onCancel }: PromotionPickerProps): React.ReactElement {
+function PromotionPicker({ pending, orientation, squareSize, pieceUrls, onSelect, onCancel }: PromotionPickerProps): React.ReactElement {
   const fileIndex = pending.dest.charCodeAt(0) - 97
   const colIndex = orientation === 'white' ? fileIndex : 7 - fileIndex
   const leftPct = colIndex * 12.5
+  const colorPrefix = orientation === 'white' ? 'w' : 'b'
 
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => { if (e.key === 'Escape') onCancel() }
@@ -34,32 +38,42 @@ function PromotionPicker({ pending, orientation, onSelect, onCancel }: Promotion
     return () => window.removeEventListener('keydown', handler)
   }, [onCancel])
 
-  const pieces: Array<{ piece: 'q' | 'r' | 'b' | 'n'; label: string }> = [
-    { piece: 'q', label: 'Q' },
-    { piece: 'r', label: 'R' },
-    { piece: 'b', label: 'B' },
-    { piece: 'n', label: 'N' },
+  const pieces: Array<{ piece: 'q' | 'r' | 'b' | 'n'; label: string; pieceKey: string }> = [
+    { piece: 'q', label: 'Queen', pieceKey: `${colorPrefix}Q` },
+    { piece: 'r', label: 'Rook', pieceKey: `${colorPrefix}R` },
+    { piece: 'b', label: 'Bishop', pieceKey: `${colorPrefix}B` },
+    { piece: 'n', label: 'Knight', pieceKey: `${colorPrefix}N` },
   ]
 
   return (
     <div
-      className="absolute inset-0 z-10"
+      className="absolute inset-0 z-10 bg-background/70"
       onClick={onCancel}
       onContextMenu={(e) => { e.preventDefault(); onCancel() }}
     >
       <div
-        className="absolute top-0 flex flex-col border border-border bg-background shadow-md"
-        style={{ left: `${leftPct}%`, width: '12.5%' }}
+        className="absolute top-0 flex flex-col"
+        style={{ left: `${leftPct}%`, width: squareSize }}
         onClick={(e) => e.stopPropagation()}
       >
-        {pieces.map(({ piece, label }) => (
+        {pieces.map(({ piece, label, pieceKey }) => (
           <button
             key={piece}
             type="button"
-            className="flex w-full items-center justify-center border-b border-border py-2 text-sm font-semibold hover:bg-accent last:border-b-0"
+            className="promotion-square flex shrink-0 items-center justify-center"
+            style={{ width: squareSize, height: squareSize }}
             onClick={() => onSelect(piece)}
           >
-            {label}
+            {pieceUrls[pieceKey] ? (
+              <img
+                src={pieceUrls[pieceKey]}
+                alt={label}
+                draggable={false}
+                style={{ width: '100%', height: '100%' }}
+              />
+            ) : (
+              <span className="text-sm font-semibold">{piece.toUpperCase()}</span>
+            )}
           </button>
         ))}
       </div>
@@ -113,6 +127,7 @@ export type BoardSurfaceProps = {
   lastMove: [string, string] | undefined
   hintSquare: string | null
   pendingPromotion: PendingPromotion | null
+  pieceSetId?: string
   moveFeedback: {
     result: MoveFeedbackResult | null
     square: string | null
@@ -133,12 +148,14 @@ export function BoardSurface({
   lastMove,
   hintSquare,
   pendingPromotion,
+  pieceSetId,
   moveFeedback,
   animationEnabled = true,
   onMove,
   onPromotionSelect,
   onPromotionCancel,
 }: BoardSurfaceProps): React.ReactElement {
+  const pieceUrls = React.useMemo(() => resolvePieceSet(pieceSetId ?? '').pieces, [pieceSetId])
   const cgRef = React.useRef<ChessgroundInstance | null>(null)
   const drawnShapesRef = React.useRef<DrawShape[]>([])
   const prevBoardKeyRef = React.useRef(boardKey)
@@ -208,6 +225,8 @@ export function BoardSurface({
         <PromotionPicker
           pending={pendingPromotion}
           orientation={orientation}
+          squareSize={boardSize / 8}
+          pieceUrls={pieceUrls}
           onSelect={onPromotionSelect}
           onCancel={onPromotionCancel}
         />

@@ -24,6 +24,7 @@ type BoardCenterColumnProps = {
   spectateLabel?: React.ReactNode
   soundEnabled?: boolean
   onToggleSound?: (pressed: boolean) => void
+  pieceSetId?: string
 }
 
 export function BoardCenterColumn({
@@ -42,6 +43,7 @@ export function BoardCenterColumn({
   spectateLabel,
   soundEnabled = false,
   onToggleSound,
+  pieceSetId,
 }: BoardCenterColumnProps): React.ReactElement {
   const boardSurfaceProps: BoardSurfaceProps = {
     boardKey: board.boardKey,
@@ -52,6 +54,7 @@ export function BoardCenterColumn({
     lastMove: board.lastMove,
     hintSquare: board.hintSquare,
     pendingPromotion: board.pendingPromotion,
+    pieceSetId,
     moveFeedback: board.moveFeedback,
     animationEnabled: boardAnimationEnabled,
     onMove: actions.handleUserMove,
