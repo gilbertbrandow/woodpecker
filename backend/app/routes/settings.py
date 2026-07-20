@@ -19,6 +19,8 @@ def patch_settings() -> tuple[Response, int] | Response:
     show_timer_tenths = data.get("showTimerTenths")
     sound_enabled = data.get("soundEnabled")
     sound_theme = data.get("soundTheme")
+    opponent_move_delay_ms = data.get("opponentMoveDelayMs")
+    animation_duration_ms = data.get("animationDurationMs")
 
     user = update_user_settings(
         user_id,
@@ -29,5 +31,7 @@ def patch_settings() -> tuple[Response, int] | Response:
         bool(show_timer_tenths) if show_timer_tenths is not None else None,
         bool(sound_enabled) if sound_enabled is not None else None,
         str(sound_theme) if sound_theme is not None else None,
+        int(str(opponent_move_delay_ms)) if opponent_move_delay_ms is not None else None,
+        int(str(animation_duration_ms)) if animation_duration_ms is not None else None,
     )
     return jsonify(user_to_dict(user))

@@ -1,4 +1,4 @@
-from app.exceptions import NotFoundError
+from app.exceptions import NotFoundError, ValidationError
 from app.extensions import db
 from app.models.user import User
 from app.services.validation import (
@@ -19,6 +19,8 @@ def update_user_settings(
     show_timer_tenths: bool | None = None,
     sound_enabled: bool | None = None,
     sound_theme: str | None = None,
+    opponent_move_delay_ms: int | None = None,
+    animation_duration_ms: int | None = None,
 ) -> User:
     user = db.session.get(User, user_id)
     if not user:
@@ -38,6 +40,14 @@ def update_user_settings(
         user.sound_enabled = sound_enabled
     if sound_theme is not None:
         user.sound_theme = validate_sound_theme(sound_theme)
+    if opponent_move_delay_ms is not None:
+        if not (0 <= opponent_move_delay_ms <= 1000):
+            raise ValidationError("Invalid delay", "Opponent move delay must be between 0 and 1000 ms.")
+        user.opponent_move_delay_ms = opponent_move_delay_ms
+    if animation_duration_ms is not None:
+        if not (0 <= animation_duration_ms <= 500):
+            raise ValidationError("Invalid duration", "Animation duration must be between 0 and 500 ms.")
+        user.animation_duration_ms = animation_duration_ms
 
     db.session.commit()
     return user
