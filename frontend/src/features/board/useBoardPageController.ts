@@ -122,6 +122,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   })
   const concludeFnRef = useRef<() => Promise<void>>(async () => {})
   const concludingRef = useRef(false)
+  const concludePromiseRef = useRef<Promise<void> | null>(null)
   const skipNextLoadRef = useRef(false)
   const cachedOverviewPuzzleRef = useRef<RunTrainingItemOverview | null>(null)
   const loadRequestIdRef = useRef(0)
@@ -527,12 +528,14 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       if (result.outcome === 'solved') {
         skipNextLoadRef.current = true
         navigateToOverview(id, false)
-      } else {
+      } else if (modeRef.current !== 'failed') {
         enterFailed()
       }
     } catch {
     } finally {
       concludingRef.current = false
+      inputBlockedRef.current = false
+      setInputBlocked(false)
     }
   }, [enterFailed, markAttemptResolved, navigateToOverview, runId])
 
@@ -595,8 +598,14 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
           void concludeFnRef.current()
         } else {
           scheduleTimeout(() => {
-            skipNextLoadRef.current = true
-            navigateToOverview(latestResolvedAttemptIdRef.current, false)
+            void (async () => {
+              if (concludePromiseRef.current !== null) {
+                await concludePromiseRef.current
+                concludePromiseRef.current = null
+              }
+              skipNextLoadRef.current = true
+              navigateToOverview(latestResolvedAttemptIdRef.current, false)
+            })()
           }, FAILED_TO_OVERVIEW_MS)
         }
       }, MOVE_FEEDBACK_SUCCESS_MS)
@@ -645,17 +654,22 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       setLastMove(committedLastMoveRef.current)
       hideMoveFeedbackBadge()
       setHintSquare(null)
-      inputBlockedRef.current = false
-      setInputBlocked(false)
       if (modeRef.current === 'focus') {
-        void concludeFnRef.current()
+        inputBlockedRef.current = false
+        setInputBlocked(false)
+        concludePromiseRef.current = concludeFnRef.current()
+        enterFailed()
+      } else {
+        // 'failed' retry mode: no conclude, unblock immediately
+        inputBlockedRef.current = false
+        setInputBlocked(false)
       }
     }, WRONG_REVERT_MS)
-  }, [setFen, setMoveFeedback, hideMoveFeedbackBadge, scheduleTimeout])
+  }, [setFen, setMoveFeedback, hideMoveFeedbackBadge, scheduleTimeout, enterFailed])
 
   const handleUserMove = useCallback((orig: string, dest: string): void => {
     if (inputBlockedRef.current) return
-    if (concludingRef.current) return
+    if (concludingRef.current && modeRef.current === 'focus') return
     const chess = chessRef.current
     if (!chess) return
     if (modeRef.current !== 'focus' && modeRef.current !== 'failed') return
