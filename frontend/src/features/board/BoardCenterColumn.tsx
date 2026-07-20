@@ -63,7 +63,7 @@ export function BoardCenterColumn({
   }
 
   return (
-    <div className="flex shrink-0 flex-col">
+    <div className="flex shrink-0 flex-col" style={{ width: board.boardSize }}>
       {mobileHeader && (
         <div className="relative z-30 mt-4 mb-6 lg:hidden" style={{ width: board.boardSize }}>
           {mobileHeader}
