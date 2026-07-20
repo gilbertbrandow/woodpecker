@@ -96,7 +96,7 @@ export function BoardPageShell({
 
   return (
     <div className="flex flex-1 flex-col overflow-x-hidden pb-3 lg:pb-0 lg:px-0">
-      <div className="flex flex-1 items-start justify-center lg:items-center lg:overflow-hidden lg:px-6">
+      <div className="flex flex-1 items-start justify-center lg:items-center lg:overflow-hidden lg:px-4">
         <div className="flex w-full items-start justify-center gap-6 lg:justify-center">
           <aside className="hidden min-w-0 flex-1 flex-col gap-4 lg:flex" style={{ height: boardSize + 36 }}>
             {left}
