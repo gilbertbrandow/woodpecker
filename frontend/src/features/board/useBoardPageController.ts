@@ -30,7 +30,6 @@ import {
   FAILED_TO_OVERVIEW_MS,
   TIMER_UPDATE_MS,
   INITIAL_OPPONENT_MOVE_DELAY_MS,
-  OPPONENT_MOVE_ANIM_MS,
 } from './boardPage.helpers'
 import type { Mode, Orientation, PendingPromotion, MoveFeedbackResult, MoveFeedbackState, BoardState } from './boardPage.helpers'
 
@@ -96,6 +95,11 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const { attemptHistory, registerAttemptStart, markAttemptResolved } = useSolveSession()
   useChessTheme(user?.boardTheme, user?.pieceTheme)
 
+  const opponentMoveDelayRef = useRef(user?.opponentMoveDelayMs ?? 300)
+  opponentMoveDelayRef.current = user?.opponentMoveDelayMs ?? 300
+  const animationDurationRef = useRef(user?.animationDurationMs ?? 150)
+  animationDurationRef.current = user?.animationDurationMs ?? 150
+
   const chessRef = useRef<Chess | null>(null)
   const modeRef = useRef<Mode>('loading')
   const moveIndexRef = useRef(1)
@@ -118,6 +122,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   })
   const concludeFnRef = useRef<() => Promise<void>>(async () => {})
   const concludingRef = useRef(false)
+  const concludePromiseRef = useRef<Promise<void> | null>(null)
   const skipNextLoadRef = useRef(false)
   const cachedOverviewPuzzleRef = useRef<RunTrainingItemOverview | null>(null)
   const loadRequestIdRef = useRef(0)
@@ -310,7 +315,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
         setIsAttemptReady(true)
         inputBlockedRef.current = false
         setInputBlocked(false)
-      }, OPPONENT_MOVE_ANIM_MS)
+      }, animationDurationRef.current)
     }, INITIAL_OPPONENT_MOVE_DELAY_MS)
   }, [clearMoveFeedback, clearPendingTimeouts, setFen, setBlocked, setPendingPromotionBoth])
 
@@ -523,12 +528,14 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       if (result.outcome === 'solved') {
         skipNextLoadRef.current = true
         navigateToOverview(id, false)
-      } else {
+      } else if (modeRef.current !== 'failed') {
         enterFailed()
       }
     } catch {
     } finally {
       concludingRef.current = false
+      inputBlockedRef.current = false
+      setInputBlocked(false)
     }
   }, [enterFailed, markAttemptResolved, navigateToOverview, runId])
 
@@ -591,8 +598,14 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
           void concludeFnRef.current()
         } else {
           scheduleTimeout(() => {
-            skipNextLoadRef.current = true
-            navigateToOverview(latestResolvedAttemptIdRef.current, false)
+            void (async () => {
+              if (concludePromiseRef.current !== null) {
+                await concludePromiseRef.current
+                concludePromiseRef.current = null
+              }
+              skipNextLoadRef.current = true
+              navigateToOverview(latestResolvedAttemptIdRef.current, false)
+            })()
           }, FAILED_TO_OVERVIEW_MS)
         }
       }, MOVE_FEEDBACK_SUCCESS_MS)
@@ -603,7 +616,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     scheduleTimeout(() => {
       hideMoveFeedbackBadge()
       applyOpponentMove(opponentUci)
-    }, MOVE_FEEDBACK_SUCCESS_MS)
+    }, opponentMoveDelayRef.current)
   }, [setFen, applyOpponentMove, hideMoveFeedbackBadge, setMoveFeedback, navigateToOverview, scheduleTimeout])
 
   const resolveWrongMove = useCallback((
@@ -641,17 +654,22 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       setLastMove(committedLastMoveRef.current)
       hideMoveFeedbackBadge()
       setHintSquare(null)
-      inputBlockedRef.current = false
-      setInputBlocked(false)
       if (modeRef.current === 'focus') {
-        void concludeFnRef.current()
+        inputBlockedRef.current = false
+        setInputBlocked(false)
+        concludePromiseRef.current = concludeFnRef.current()
+        enterFailed()
+      } else {
+        // 'failed' retry mode: no conclude, unblock immediately
+        inputBlockedRef.current = false
+        setInputBlocked(false)
       }
     }, WRONG_REVERT_MS)
-  }, [setFen, setMoveFeedback, hideMoveFeedbackBadge, scheduleTimeout])
+  }, [setFen, setMoveFeedback, hideMoveFeedbackBadge, scheduleTimeout, enterFailed])
 
   const handleUserMove = useCallback((orig: string, dest: string): void => {
     if (inputBlockedRef.current) return
-    if (concludingRef.current) return
+    if (concludingRef.current && modeRef.current === 'focus') return
     const chess = chessRef.current
     if (!chess) return
     if (modeRef.current !== 'focus' && modeRef.current !== 'failed') return

@@ -689,6 +689,7 @@ export function BoardPage(): React.ReactElement | null {
       soundEnabled={user?.soundEnabled ?? false}
       onToggleSound={user !== null ? handleToggleSound : undefined}
       pieceSetId={user?.pieceTheme}
+      animationDuration={user?.animationDurationMs ?? 150}
     />
   )
 

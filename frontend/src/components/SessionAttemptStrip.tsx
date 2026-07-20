@@ -15,6 +15,10 @@ const STATUS_LABEL: Record<SessionAttemptHistoryItem['status'], string> = {
   failed: 'Failed',
 }
 
+// Each dot slot is w-4 (16px) + gap-1 (4px) = 20px. Inner has px-0.5 (4px total padding).
+// containerWidth = 4 + N*16 + (N-1)*4 = 20N → N = containerWidth / 20
+const DOT_SLOT_PX = 20
+
 type SessionAttemptStripProps = {
   items: SessionAttemptHistoryItem[]
   runId: string
@@ -26,20 +30,54 @@ type SessionAttemptStripProps = {
 
 export function SessionAttemptStrip({ items, runId, activeAttemptId, interactive = true, pulseActive = false, noMargin = false }: SessionAttemptStripProps): React.ReactElement | null {
   const containerRef = React.useRef<HTMLDivElement>(null)
+  const [containerWidth, setContainerWidth] = React.useState<number | null>(null)
 
   React.useLayoutEffect(() => {
     const el = containerRef.current
-    if (el) el.scrollLeft = el.scrollWidth
-  }, [items.length])
+    if (!el) return
+    setContainerWidth(el.offsetWidth)
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => setContainerWidth(el.offsetWidth))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   if (items.length === 0) {
     return null
   }
 
+  // null = not yet measured (before first paint); show all so useLayoutEffect re-render is correct.
+  // 0 = jsdom/test env where offsetWidth is 0; show all to keep tests working.
+  const maxDots = containerWidth !== null && containerWidth > 0
+    ? Math.max(1, Math.floor(containerWidth / DOT_SLOT_PX))
+    : items.length
+
+  const hiddenCount = Math.max(0, items.length - maxDots)
+  const visibleItems = items.slice(-maxDots)
+
   return (
-    <div ref={containerRef} className={`${noMargin ? '' : 'mt-3 '}h-6 w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}>
-      <div className="flex h-6 w-max items-center gap-1 pl-0.5">
-        {items.map((item) => {
+    <div ref={containerRef} className={`${noMargin ? '' : 'mt-3 '}h-6 w-full overflow-hidden`}>
+      <div className="flex h-6 w-max items-center gap-1 px-0.5">
+        {visibleItems.map((item, idx) => {
+          const isOverflowBadge = hiddenCount > 0 && idx === 0
+
+          if (isOverflowBadge) {
+            return (
+              <Tooltip key="overflow" delayDuration={70} disableHoverableContent={true}>
+                <TooltipTrigger asChild>
+                  <span
+                    role="img"
+                    aria-label={`${hiddenCount} earlier attempt${hiddenCount === 1 ? '' : 's'} not shown`}
+                    className="flex h-4 min-w-[1rem] cursor-default items-center justify-center rounded-full bg-muted px-1 text-[10px] font-medium leading-none text-muted-foreground"
+                  >
+                    +{hiddenCount}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{hiddenCount} earlier attempt{hiddenCount === 1 ? '' : 's'} not shown</TooltipContent>
+              </Tooltip>
+            )
+          }
+
           const statusLabel = STATUS_LABEL[item.status]
           const tooltip = `Attempt for puzzle ${item.puzzlePosition}: ${statusLabel}`
 

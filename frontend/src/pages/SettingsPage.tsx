@@ -1,12 +1,14 @@
 import { PageWrapper } from '../components/PageWrapper'
 import * as React from 'react'
-import { useEffect } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useAuth } from '../context/auth'
 import { api } from '../lib/api'
 import { BOARD_THEMES, PIECE_SETS, resolvePieceSet, resolveBoardTheme } from '../lib/themes'
 import { ThemeToggle } from '../components/ThemeToggle'
+import { Slider } from '../components/ui/slider'
+import { Input } from '../components/ui/input'
 
 const SOUND_THEMES = [
   { id: 'standard', label: 'Standard' },
@@ -26,6 +28,28 @@ export function SettingsPage(): React.ReactElement | null {
   const [savingTimerTenths, setSavingTimerTenths] = useState(false)
   const [savingSound, setSavingSound] = useState(false)
   const [savingSoundTheme, setSavingSoundTheme] = useState(false)
+  const [localOpponentDelay, setLocalOpponentDelay] = useState<number>(() => user?.opponentMoveDelayMs ?? 300)
+  const [localAnimationDuration, setLocalAnimationDuration] = useState<number>(() => user?.animationDurationMs ?? 150)
+  const opponentDelayDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const animationDurationDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleOpponentDelayChange = useCallback((value: number): void => {
+    const clamped = Math.max(0, Math.min(1000, value))
+    setLocalOpponentDelay(clamped)
+    if (opponentDelayDebounceRef.current) clearTimeout(opponentDelayDebounceRef.current)
+    opponentDelayDebounceRef.current = setTimeout(() => {
+      void api.settings.update({ opponentMoveDelayMs: clamped }).then(updateUser).catch(() => {})
+    }, 500)
+  }, [updateUser])
+
+  const handleAnimationDurationChange = useCallback((value: number): void => {
+    const clamped = Math.max(0, Math.min(500, value))
+    setLocalAnimationDuration(clamped)
+    if (animationDurationDebounceRef.current) clearTimeout(animationDurationDebounceRef.current)
+    animationDurationDebounceRef.current = setTimeout(() => {
+      void api.settings.update({ animationDurationMs: clamped }).then(updateUser).catch(() => {})
+    }, 500)
+  }, [updateUser])
 
   useEffect(() => {
     if (!loading && !user) {
@@ -222,6 +246,56 @@ export function SettingsPage(): React.ReactElement | null {
               </button>
             )
           })}
+        </div>
+
+        <div className="mt-8 max-w-sm">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-sm">Opponent response delay</p>
+            <div className="flex items-center gap-1.5">
+              <Input
+                type="number"
+                min={0}
+                max={1000}
+                value={localOpponentDelay}
+                onChange={(e) => handleOpponentDelayChange(Number(e.target.value))}
+                className="h-7 w-16 px-2 text-right text-xs"
+              />
+              <span className="text-xs text-muted-foreground">ms</span>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">Pause before the opponent plays their response move (0–1000 ms).</p>
+          <Slider
+            min={0}
+            max={1000}
+            step={10}
+            value={[localOpponentDelay]}
+            onValueChange={([v]) => handleOpponentDelayChange(v)}
+          />
+        </div>
+
+        <div className="mt-8 max-w-sm">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-sm">Move animation speed</p>
+            <div className="flex items-center gap-1.5">
+              <Input
+                type="number"
+                min={0}
+                max={500}
+                value={localAnimationDuration}
+                onChange={(e) => handleAnimationDurationChange(Number(e.target.value))}
+                className="h-7 w-16 px-2 text-right text-xs"
+              />
+              <span className="text-xs text-muted-foreground">ms</span>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">Duration of the piece slide animation (0–500 ms).</p>
+          <Slider
+            min={0}
+            max={500}
+            step={10}
+            value={[localAnimationDuration]}
+            onValueChange={([v]) => handleAnimationDurationChange(v)}
+          />
         </div>
       </section>
 

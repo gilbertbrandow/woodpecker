@@ -14,5 +14,7 @@ def user_to_dict(user: User) -> dict[str, object]:
         "showTimerTenths": user.show_timer_tenths,
         "soundEnabled": user.sound_enabled,
         "soundTheme": user.sound_theme,
+        "opponentMoveDelayMs": user.opponent_move_delay_ms,
+        "animationDurationMs": user.animation_duration_ms,
         "isSuperAdmin": user.is_superadmin,
     }
