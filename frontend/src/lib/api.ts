@@ -39,6 +39,8 @@ export type AuthUser = {
   showTimerTenths: boolean
   soundEnabled: boolean
   soundTheme: string
+  opponentMoveDelayMs: number
+  animationDurationMs: number
   isSuperAdmin: boolean
 }
 
@@ -97,6 +99,8 @@ export type SettingsPayload = {
   showTimerTenths?: boolean
   soundEnabled?: boolean
   soundTheme?: string
+  opponentMoveDelayMs?: number
+  animationDurationMs?: number
 }
 
 export type Subset = {

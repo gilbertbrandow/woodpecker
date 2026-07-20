@@ -134,6 +134,7 @@ export type BoardSurfaceProps = {
     visible: boolean
   }
   animationEnabled?: boolean
+  animationDuration?: number
   onMove: (orig: string, dest: string) => void
   onPromotionSelect: (piece: 'q' | 'r' | 'b' | 'n') => void
   onPromotionCancel: () => void
@@ -151,6 +152,7 @@ export function BoardSurface({
   pieceSetId,
   moveFeedback,
   animationEnabled = true,
+  animationDuration = 150,
   onMove,
   onPromotionSelect,
   onPromotionCancel,
@@ -209,7 +211,7 @@ export function BoardSurface({
         draggable={{ showGhost: true }}
         lastMove={lastMove}
         check={check}
-        animation={{ enabled: animationEnabled, duration: 150 }}
+        animation={{ enabled: animationEnabled, duration: animationDuration }}
         highlight={{ lastMove: true, check: true }}
         premovable={{ enabled: false }}
         drawable={{

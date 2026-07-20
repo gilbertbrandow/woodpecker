@@ -25,6 +25,7 @@ type BoardCenterColumnProps = {
   soundEnabled?: boolean
   onToggleSound?: (pressed: boolean) => void
   pieceSetId?: string
+  animationDuration?: number
 }
 
 export function BoardCenterColumn({
@@ -44,6 +45,7 @@ export function BoardCenterColumn({
   soundEnabled = false,
   onToggleSound,
   pieceSetId,
+  animationDuration,
 }: BoardCenterColumnProps): React.ReactElement {
   const boardSurfaceProps: BoardSurfaceProps = {
     boardKey: board.boardKey,
@@ -57,6 +59,7 @@ export function BoardCenterColumn({
     pieceSetId,
     moveFeedback: board.moveFeedback,
     animationEnabled: boardAnimationEnabled,
+    animationDuration,
     onMove: actions.handleUserMove,
     onPromotionSelect: actions.onPromotionPieceSelected,
     onPromotionCancel: actions.onPromotionCancel,

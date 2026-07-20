@@ -30,7 +30,6 @@ import {
   FAILED_TO_OVERVIEW_MS,
   TIMER_UPDATE_MS,
   INITIAL_OPPONENT_MOVE_DELAY_MS,
-  OPPONENT_MOVE_ANIM_MS,
 } from './boardPage.helpers'
 import type { Mode, Orientation, PendingPromotion, MoveFeedbackResult, MoveFeedbackState, BoardState } from './boardPage.helpers'
 
@@ -95,6 +94,11 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const { user } = useAuth()
   const { attemptHistory, registerAttemptStart, markAttemptResolved } = useSolveSession()
   useChessTheme(user?.boardTheme, user?.pieceTheme)
+
+  const opponentMoveDelayRef = useRef(user?.opponentMoveDelayMs ?? 300)
+  opponentMoveDelayRef.current = user?.opponentMoveDelayMs ?? 300
+  const animationDurationRef = useRef(user?.animationDurationMs ?? 150)
+  animationDurationRef.current = user?.animationDurationMs ?? 150
 
   const chessRef = useRef<Chess | null>(null)
   const modeRef = useRef<Mode>('loading')
@@ -310,7 +314,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
         setIsAttemptReady(true)
         inputBlockedRef.current = false
         setInputBlocked(false)
-      }, OPPONENT_MOVE_ANIM_MS)
+      }, animationDurationRef.current)
     }, INITIAL_OPPONENT_MOVE_DELAY_MS)
   }, [clearMoveFeedback, clearPendingTimeouts, setFen, setBlocked, setPendingPromotionBoth])
 
@@ -603,7 +607,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     scheduleTimeout(() => {
       hideMoveFeedbackBadge()
       applyOpponentMove(opponentUci)
-    }, MOVE_FEEDBACK_SUCCESS_MS)
+    }, opponentMoveDelayRef.current)
   }, [setFen, applyOpponentMove, hideMoveFeedbackBadge, setMoveFeedback, navigateToOverview, scheduleTimeout])
 
   const resolveWrongMove = useCallback((
