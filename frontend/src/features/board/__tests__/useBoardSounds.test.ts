@@ -64,7 +64,7 @@ describe('useBoardSounds pending-queue behaviour', () => {
       resume: vi.fn().mockResolvedValue(undefined),
       close: vi.fn().mockResolvedValue(undefined),
     }
-    vi.stubGlobal('AudioContext', vi.fn(() => mockCtx))
+    vi.stubGlobal('AudioContext', vi.fn(function () { return mockCtx }))
   })
 
   afterEach(() => {
