@@ -1,7 +1,7 @@
 import bisect
 import random
 from datetime import datetime, timedelta, timezone
-from typing import cast
+from typing import Any, cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import sqlalchemy as sa
@@ -874,7 +874,7 @@ def list_runs_paged(
     return {"items": items, "total": total}
 
 
-def list_run_slots(training_id: int) -> dict[str, object]:
+def list_run_slots(training_id: int) -> dict[str, Any]:
     training = db.session.get(Training, training_id)
     if training is None:
         raise NotFoundError("Training not found", "The requested training does not exist.")
