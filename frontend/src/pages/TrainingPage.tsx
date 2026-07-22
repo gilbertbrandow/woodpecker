@@ -3,7 +3,7 @@ import * as React from 'react'
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams, Link } from '@tanstack/react-router'
 import { toast } from '../lib/toast'
-import { Activity, Ban, CheckCircle2, ChevronDown, Loader2, Play, XCircle } from 'lucide-react'
+import { Ban, ChevronDown, Loader2, Play } from 'lucide-react'
 import { type ColumnDef } from '@tanstack/react-table'
 import {
   ComposedChart,
@@ -16,7 +16,7 @@ import {
 import { useAuth } from '../context/auth'
 import {
   api,
-  type Run,
+  type RunSlot,
   type Training,
   type TrainingInsights,
   type TrainingProgressData,
@@ -28,7 +28,6 @@ import {
   type ChartConfig,
 } from '../components/ui/chart'
 import { useSetBreadcrumbTitle } from '../hooks/useSetBreadcrumbTitle'
-import { useServerTable } from '../hooks/useServerTable'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
 import {
   Collapsible,
@@ -49,8 +48,7 @@ import { Button } from '../components/ui/button'
 import { UserAvatar } from '../components/UserAvatar'
 import { StatusBadge, runStatusToStatusValue, trainingStateToStatusValue } from '../components/StatusBadge'
 import { ProgressBar } from '../components/ProgressBar'
-import { col, actionCol } from '../components/DataTable'
-import { ServerDataTable } from '../components/ServerDataTable'
+import { col, actionCol, DataTable } from '../components/DataTable'
 import { formatDuration } from '../components/schedules/DurationInput'
 import { formatDate, formatStartedAt } from '../lib/utils'
 import { TrainingProgressCard } from '../components/TrainingProgressCard'
@@ -68,20 +66,17 @@ const SOLVE_TIME_CONFIG: ChartConfig = {
   trend: { label: 'Trend', color: 'hsl(var(--chart-2))' },
 }
 
-const RUN_STATUS_OPTIONS = [
-  { value: 'active',    label: 'Active',    icon: <Activity className="h-3.5 w-3.5 text-blue-600" /> },
-  { value: 'completed', label: 'Completed', icon: <CheckCircle2 className="h-3.5 w-3.5 text-green-600" /> },
-  { value: 'aborted',   label: 'Aborted',   icon: <XCircle className="h-3.5 w-3.5 text-red-600" /> },
-]
-
 type RunStatPoint = { label: string; value: number; trend: number | null; completed: boolean; inProgress: boolean }
 
-function buildAccuracyData(runs: Run[], runCount: number): RunStatPoint[] {
+function buildAccuracyData(runs: RunSlot[], runCount: number): RunStatPoint[] {
   return Array.from({ length: runCount }, (_, i) => {
-    const run = runs.find((r) => r.runIndex === i && r.status !== 'aborted') ?? null
+    const run = runs.find((r) => r.runIndex === i && r.status !== 'aborted' && r.status !== 'not_started') ?? null
     if (run === null) return { label: `Run ${i + 1}`, value: 0, trend: null, completed: false, inProgress: false }
-    const resolved = run.solvedCount + run.solvedWithRetriesCount + run.failedCount
-    const acc = resolved > 0 ? Math.round((run.solvedCount / resolved) * 1000) / 10 : 0
+    const solved = run.solvedCount ?? 0
+    const solvedWithRetries = run.solvedWithRetriesCount ?? 0
+    const failed = run.failedCount ?? 0
+    const resolved = solved + solvedWithRetries + failed
+    const acc = resolved > 0 ? Math.round((solved / resolved) * 1000) / 10 : 0
     if (run.status === 'active') {
       return { label: `Run ${i + 1}`, value: acc, trend: null, completed: false, inProgress: true }
     }
@@ -89,7 +84,7 @@ function buildAccuracyData(runs: Run[], runCount: number): RunStatPoint[] {
   })
 }
 
-function buildSolveTimeData(insights: TrainingInsights | null, runs: Run[], runCount: number): RunStatPoint[] {
+function buildSolveTimeData(insights: TrainingInsights | null, runs: RunSlot[], runCount: number): RunStatPoint[] {
   return Array.from({ length: runCount }, (_, i) => {
     const entry = insights?.runs.find((r) => r.runIndex === i)
     const isActive = runs.some((r) => r.runIndex === i && r.status === 'active')
@@ -118,9 +113,8 @@ export function TrainingPage(): React.ReactElement | null {
   const id = parseInt(trainingId, 10)
 
   const [training, setTraining] = useState<Training | null>(null)
-  const [runs, setRuns] = useState<Run[]>([])
+  const [runs, setRuns] = useState<RunSlot[]>([])
   const [pageLoading, setPageLoading] = useState(true)
-  const { refreshKey: runsRefreshKey, refetch: refetchRunsTable } = useServerTable()
   const [activeTab, setActiveTab] = useState('configure')
   const [runsOpen, setRunsOpen] = useState(true)
   const [progressOpen, setProgressOpen] = useState(true)
@@ -177,9 +171,8 @@ export function TrainingPage(): React.ReactElement | null {
   }, [id, user])
 
 
-  const handleRunStarted = (run: Run): void => {
-    setRuns((prev) => [...prev, run])
-    refetchRunsTable()
+  const reloadRunSlots = (): void => {
+    api.runs.list(id).then(setRuns).catch(() => {})
   }
 
   const handleStartRun = async (runIndex: number): Promise<void> => {
@@ -187,7 +180,7 @@ export function TrainingPage(): React.ReactElement | null {
     setStartingIndex(runIndex)
     try {
       const newRun = await api.runs.start(training.id, runIndex)
-      handleRunStarted(newRun)
+      reloadRunSlots()
       void navigate({
         to: '/app/runs/$runId/solve',
         params: { runId: String(newRun.id) },
@@ -223,20 +216,11 @@ export function TrainingPage(): React.ReactElement | null {
   )
   const solveTimeCompletedCount = solveTimeData.filter((d) => d.completed).length
 
-  const nextStartableIndex = useMemo(() => {
-    if (!training || !user) return null
-    const sch = training.schedule
-    const isOwner = training.ownerId === user.id
-    const canManage = isOwner && (training.status === 'not_started' || training.status === 'in_progress')
-    if (!canManage) return null
+  const runColumns = useMemo<ColumnDef<RunSlot>[]>(() => {
+    const canManage = !!training && !!user && training.ownerId === user.id && (training.status === 'not_started' || training.status === 'in_progress')
     const completedCount = runs.filter((r) => r.status === 'completed').length
     const hasActive = runs.some((r) => r.status === 'active')
-    if (hasActive || completedCount >= sch.runCount) return null
-    return completedCount
-  }, [training, user, runs])
-
-  const runColumns = useMemo<ColumnDef<Run>[]>(() => {
-    const canManage = !!training && !!user && training.ownerId === user.id && (training.status === 'not_started' || training.status === 'in_progress')
+    const startableIndex = canManage && !hasActive && completedCount < (training?.schedule.runCount ?? 0) ? completedCount : null
     return [
       col({
         id: 'runIndex',
@@ -265,7 +249,8 @@ export function TrainingPage(): React.ReactElement | null {
         enableSorting: false,
         cell: ({ row }) => {
           const { totalItems, solvedCount, solvedWithRetriesCount, failedCount } = row.original
-          const resolved = solvedCount + solvedWithRetriesCount + failedCount
+          if (totalItems === null) return <span className="text-sm text-muted-foreground/40">—</span>
+          const resolved = (solvedCount ?? 0) + (solvedWithRetriesCount ?? 0) + (failedCount ?? 0)
           const progressValue = totalItems > 0 ? (resolved / totalItems) * 100 : 0
           const tooltipLabel = `${resolved} / ${totalItems} puzzles completed`
           return <ProgressBar value={progressValue} tooltipLabel={tooltipLabel} className="w-28" />
@@ -277,9 +262,12 @@ export function TrainingPage(): React.ReactElement | null {
         header: 'Started',
         meta: { icon: DATA_ICONS.started },
         enableSorting: false,
-        cell: ({ row }) => (
-          <span className="text-sm text-muted-foreground">{formatDate(row.original.startedAt)}</span>
-        ),
+        cell: ({ row }) => {
+          const slot = row.original
+          if (slot.startedAt) return <span className="text-sm text-muted-foreground">{formatDate(slot.startedAt)}</span>
+          if (slot.scheduledStartAt) return <span className="text-sm text-muted-foreground">{formatDate(slot.scheduledStartAt)}</span>
+          return <span className="text-sm text-muted-foreground/40">—</span>
+        },
       }),
       col({
         id: 'completedAt',
@@ -295,30 +283,49 @@ export function TrainingPage(): React.ReactElement | null {
           </span>
         ),
       }),
-      ...(canManage ? [actionCol<Run>({
+      actionCol<RunSlot>({
         id: 'actions',
         header: '',
         enableSorting: false,
         meta: { className: 'sticky right-0 bg-background w-0' },
         cell: ({ row }) => {
-          const run = row.original
-          if (run.status !== 'active') return null
-          return (
-            <div className="flex items-center justify-end gap-1.5">
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); void navigate({ to: '/app/runs/$runId/solve', params: { runId: String(run.id) } }) }}
-                className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-                aria-label="Continue run"
-              >
-                <Play className="h-3 w-3" />
-              </button>
-            </div>
-          )
+          const slot = row.original
+          if (slot.status === 'active' && slot.id !== null) {
+            return (
+              <div className="flex items-center justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); void navigate({ to: '/app/runs/$runId/solve', params: { runId: String(slot.id) } }) }}
+                  className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                  aria-label="Continue run"
+                >
+                  <Play className="h-3 w-3" />
+                </button>
+              </div>
+            )
+          }
+          if (slot.status === 'not_started' && slot.runIndex === startableIndex) {
+            const isStarting = startingIndex === slot.runIndex
+            return (
+              <div className="flex items-center justify-end gap-1.5">
+                <button
+                  type="button"
+                  disabled={isStarting}
+                  onClick={(e) => { e.stopPropagation(); void handleStartRun(slot.runIndex) }}
+                  className="flex h-6 items-center gap-1 rounded bg-primary px-2 text-xs text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+                  aria-label="Start run"
+                >
+                  <Play className="h-3 w-3" />
+                  {isStarting ? 'Starting…' : slot.scheduledStartAt && new Date(slot.scheduledStartAt) > new Date() ? 'Start run early' : 'Start run'}
+                </button>
+              </div>
+            )
+          }
+          return null
         },
-      })] : []),
+      }),
     ]
-  }, [training, user, navigate])
+  }, [training, user, navigate, runs, startingIndex, handleStartRun])
 
   if (authLoading || !user) return null
 
@@ -438,36 +445,15 @@ export function TrainingPage(): React.ReactElement | null {
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="mt-6">
-                {nextStartableIndex !== null && (
-                  <div className="mb-4 flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">
-                      Run {nextStartableIndex + 1} is ready to start.
-                    </span>
-                    <Button
-                      size="sm"
-                      disabled={startingIndex !== null}
-                      onClick={() => void handleStartRun(nextStartableIndex)}
-                      className="h-7 px-3 text-xs bg-foreground text-background hover:bg-foreground/90"
-                    >
-                      {startingIndex === nextStartableIndex ? 'Starting…' : 'Start run'}
-                    </Button>
-                  </div>
-                )}
-                <ServerDataTable
-                  tableId="runs"
+                <DataTable
+                  tableId={false}
                   columns={runColumns}
+                  data={runs}
+                  hideSearch
                   pageSize={schedule.runCount}
-                  refreshKey={runsRefreshKey}
-                  instanceKey={String(id)}
-                  filters={[
-                    { type: 'multi', key: 'status', label: 'Status', options: RUN_STATUS_OPTIONS, icon: DATA_ICONS.status },
-                    { type: 'date', key: 'startedAt', label: 'Started', icon: DATA_ICONS.started },
-                    { type: 'date', key: 'completedAt', label: 'Completed', icon: DATA_ICONS.finished },
-                  ]}
-                  fetchData={(params) => api.training.listRuns(id, params)}
-                  onRowClick={(run) => void navigate({ to: '/app/runs/$runId', params: { runId: String(run.id) } })}
-                  getRowClassName={() => 'cursor-pointer'}
                   initialSorting={[]}
+                  onRowClick={(slot) => { if (slot.id !== null) void navigate({ to: '/app/runs/$runId', params: { runId: String(slot.id) } }) }}
+                  getRowClassName={(slot) => slot.id !== null ? 'cursor-pointer' : ''}
                   emptyMessage="No runs yet."
                 />
               </div>

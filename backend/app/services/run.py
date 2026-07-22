@@ -1,6 +1,6 @@
 import bisect
 import random
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -872,6 +872,76 @@ def list_runs_paged(
 
     items = [run_dict(runs_by_id[rid]) for rid in run_ids if rid in runs_by_id]
     return {"items": items, "total": total}
+
+
+def list_run_slots(training_id: int) -> dict[str, object]:
+    training = db.session.get(Training, training_id)
+    if training is None:
+        raise NotFoundError("Training not found", "The requested training does not exist.")
+
+    schedule = db.session.get(Schedule, training.schedule_id)
+    if schedule is None or not isinstance(schedule.config, dict):
+        return {"items": [], "total": 0}
+
+    schedule_cfg = ScheduleConfig.from_dict(schedule.config)
+    n = len(schedule_cfg.runs)
+
+    all_runs = list(
+        db.session.scalars(
+            sa.select(Run)
+            .where(Run.training_id == training_id)
+            .order_by(Run.started_at.asc())
+        ).all()
+    )
+
+    # For each run_index, prefer active/completed over aborted; within same status take most recent.
+    runs_by_index: dict[int, Run] = {}
+    for run in sorted(all_runs, key=lambda r: (r.aborted_at is not None, -(r.started_at.timestamp()))):
+        if run.run_index not in runs_by_index:
+            runs_by_index[run.run_index] = run
+
+    slots: list[dict] = []
+    for i in range(n):
+        slot_run: Run | None = runs_by_index.get(i)
+        if slot_run is not None:
+            d = dict(run_dict(slot_run))
+            d["scheduledStartAt"] = None
+            slots.append(d)
+        else:
+            scheduled_start: str | None = None
+            if i == 0:
+                scheduled_start = training.started_at.isoformat()
+            else:
+                prev_run = runs_by_index.get(i - 1)
+                if prev_run is not None and prev_run.completed_at is not None:
+                    break_hours = schedule_cfg.runs[i - 1].break_after_hours
+                    break_end = prev_run.completed_at + timedelta(hours=break_hours)
+                    scheduled_start = break_end.isoformat()
+
+            slots.append({
+                "id": None,
+                "trainingId": training_id,
+                "runIndex": i,
+                "status": "not_started",
+                "scheduledStartAt": scheduled_start,
+                "startedAt": None,
+                "completedAt": None,
+                "abortedAt": None,
+                "totalItems": None,
+                "solvedCount": None,
+                "solvedWithRetriesCount": None,
+                "failedCount": None,
+                "inProgressCount": None,
+                "avgSolveTimeMs": None,
+                "fastestSolveTimeMs": None,
+                "currentRunTrainingItemId": None,
+                "targetAccuracy": None,
+                "targetMinSolveSeconds": None,
+                "targetMaxSolveSeconds": None,
+                "paceChart": None,
+            })
+
+    return {"items": slots, "total": n}
 
 
 def get_run(run_id: int) -> Run:

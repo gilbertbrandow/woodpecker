@@ -17,6 +17,7 @@ const STATUS_LABEL: Record<SessionAttemptHistoryItem['status'], string> = {
 
 // Each dot slot is w-4 (16px) + gap-1 (4px) = 20px. Inner has px-0.5 (4px total padding).
 // containerWidth = 4 + N*16 + (N-1)*4 = 20N → N = containerWidth / 20
+// When overflowing the badge occupies one w-4 slot (same 16px), so total stays 20*maxDots.
 const DOT_SLOT_PX = 20
 
 type SessionAttemptStripProps = {
@@ -52,32 +53,31 @@ export function SessionAttemptStrip({ items, runId, activeAttemptId, interactive
     ? Math.max(1, Math.floor(containerWidth / DOT_SLOT_PX))
     : items.length
 
-  const hiddenCount = Math.max(0, items.length - maxDots)
-  const visibleItems = items.slice(-maxDots)
+  // Reserve one dot slot for the badge when overflowing so the badge + remaining dots
+  // still sum to exactly maxDots slots and the layout never exceeds containerWidth.
+  const overflowing = items.length > maxDots
+  const visibleDotCount = overflowing ? maxDots - 1 : maxDots
+  const hiddenCount = overflowing ? items.length - visibleDotCount : 0
+  const visibleItems = visibleDotCount > 0 ? items.slice(-visibleDotCount) : []
 
   return (
     <div ref={containerRef} className={`${noMargin ? '' : 'mt-3 '}h-6 w-full overflow-hidden`}>
       <div className="flex h-6 w-max items-center gap-1 px-0.5">
-        {visibleItems.map((item, idx) => {
-          const isOverflowBadge = hiddenCount > 0 && idx === 0
-
-          if (isOverflowBadge) {
-            return (
-              <Tooltip key="overflow" delayDuration={70} disableHoverableContent={true}>
-                <TooltipTrigger asChild>
-                  <span
-                    role="img"
-                    aria-label={`${hiddenCount} earlier attempt${hiddenCount === 1 ? '' : 's'} not shown`}
-                    className="flex h-4 min-w-[1rem] cursor-default items-center justify-center rounded-full bg-muted px-1 text-[10px] font-medium leading-none text-muted-foreground"
-                  >
-                    +{hiddenCount}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>{hiddenCount} earlier attempt{hiddenCount === 1 ? '' : 's'} not shown</TooltipContent>
-              </Tooltip>
-            )
-          }
-
+        {hiddenCount > 0 && (
+          <Tooltip delayDuration={70} disableHoverableContent={true}>
+            <TooltipTrigger asChild>
+              <span
+                role="img"
+                aria-label={`${hiddenCount} earlier attempt${hiddenCount === 1 ? '' : 's'} not shown`}
+                className="flex h-4 w-4 shrink-0 cursor-default items-center justify-center overflow-hidden rounded-full bg-muted text-[9px] font-medium leading-none text-muted-foreground"
+              >
+                {hiddenCount > 99 ? '99+' : `+${hiddenCount}`}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{hiddenCount} earlier attempt{hiddenCount === 1 ? '' : 's'} not shown</TooltipContent>
+          </Tooltip>
+        )}
+        {visibleItems.map((item) => {
           const statusLabel = STATUS_LABEL[item.status]
           const tooltip = `Attempt for puzzle ${item.puzzlePosition}: ${statusLabel}`
 

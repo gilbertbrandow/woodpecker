@@ -270,6 +270,7 @@ const RUN_STATUS_LABELS: Record<Run['status'], string> = {
   active: 'In progress',
   completed: 'Completed',
   aborted: 'Aborted',
+  not_started: 'Not started',
 }
 
 export function RunPage(): React.ReactElement | null {

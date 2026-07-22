@@ -711,6 +711,65 @@ def _load_training_context(
     return training, schedule_cfg, puzzle_count
 
 
+_INTRA_RUN_ANCHORS = 10
+
+
+def _get_run_resolve_times(run_ids: list[int], active_run_id: int | None) -> dict[int, list[int]]:
+    """Return resolved-at timestamps (ms) per run, sorted ascending.
+
+    For the active run, items that still have an in_progress attempt are excluded.
+    """
+    if not run_ids:
+        return {}
+
+    in_progress_sub = (
+        sa.select(sa.literal(1))
+        .where(
+            TrainingAttempt.run_training_item_id == RunTrainingItem.id,
+            TrainingAttempt.status == "in_progress",
+        )
+        .correlate(RunTrainingItem)
+    )
+
+    rows = db.session.execute(
+        sa.select(RunTrainingItem.run_id, sa.func.max(TrainingAttempt.completed_at).label("resolved_at"))
+        .join(TrainingAttempt, TrainingAttempt.run_training_item_id == RunTrainingItem.id)
+        .where(
+            RunTrainingItem.run_id.in_(run_ids),
+            TrainingAttempt.status != "in_progress",
+            sa.case(
+                (RunTrainingItem.run_id == active_run_id, ~sa.exists(in_progress_sub)),
+                else_=sa.true(),
+            ),
+        )
+        .group_by(RunTrainingItem.run_id, RunTrainingItem.id)
+        .order_by(RunTrainingItem.run_id, sa.text("resolved_at"))
+    ).all()
+
+    result: dict[int, list[int]] = {rid: [] for rid in run_ids}
+    for run_id, resolved_at in rows:
+        if resolved_at is not None:
+            result[run_id].append(_ms(resolved_at))
+    return result
+
+
+def _sample_intra_run_anchors(times_ms: list[int], n: int) -> list[tuple[int, int]]:
+    """Return up to n (time_ms, 1-based puzzle count) pairs, evenly spaced by count.
+
+    The last entry always represents the final resolved puzzle so the sampled
+    segment ends exactly where the run does (or where the active run stands now).
+    """
+    total = len(times_ms)
+    if total == 0:
+        return []
+    if total <= n:
+        return [(t, i + 1) for i, t in enumerate(times_ms)]
+    step = total // n
+    result = [(times_ms[step - 1 + i * step], step - 1 + i * step + 1) for i in range(n - 1)]
+    result.append((times_ms[-1], total))
+    return result
+
+
 def _get_active_run_resolved(active_run: Run) -> tuple[int, int]:
     total_items = db.session.scalar(
         sa.select(sa.func.count()).where(RunTrainingItem.run_id == active_run.id)
@@ -742,6 +801,11 @@ def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
 
     now = datetime.now(timezone.utc)
     now_ms = _ms(now)
+    terminal_ms: int | None = (
+        _ms(training.completed_at) if training.completed_at is not None
+        else _ms(training.aborted_at) if training.aborted_at is not None
+        else None
+    )
 
     all_runs = list(
         db.session.scalars(
@@ -758,10 +822,13 @@ def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
 
     original_anchors = _build_expected_anchors_from(orig_start_ms, 0.0, schedule_cfg.runs, puzzle_count)
 
-    # Pre-compute active run resolved count once; used in both anchors sections.
-    active_resolved = 0
-    if active_run is not None:
-        active_resolved, _ = _get_active_run_resolved(active_run)
+    # Fetch per-puzzle resolve timestamps for all runs in one query; also used
+    # to derive active_resolved so we avoid a separate COUNT round-trip.
+    all_run_ids = [r.id for r in all_runs]
+    active_run_id = active_run.id if active_run is not None else None
+    resolve_times = _get_run_resolve_times(all_run_ids, active_run_id)
+
+    active_resolved = len(resolve_times.get(active_run.id, [])) if active_run is not None else 0
     actual_at_now = len(completed_runs) * puzzle_count + active_resolved
 
     # Updated expected: anchored at the real current solve count at now_ms, then
@@ -770,6 +837,7 @@ def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
     cursor_ms = orig_start_ms
     cumulative = 0.0
     completed_by_index = {r.run_index: r for r in completed_runs}
+    last_anchor_is_break_end = False
 
     for i, run_def in enumerate(schedule_cfg.runs):
         completed = completed_by_index.get(i)
@@ -785,16 +853,26 @@ def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
                 break_end = run_end_ms + int(run_def.break_after_hours * 3_600_000)
                 updated_anchors.append({"timeMs": float(break_end), "value": cumulative})
                 cursor_ms = break_end
+                last_anchor_is_break_end = True
             else:
                 cursor_ms = run_end_ms
+                last_anchor_is_break_end = False
         elif is_active:
             assert active_run is not None
+            run_start_actual = _ms(active_run.started_at)
             target_ms = int(run_def.target_hours * 3_600_000)
             remaining_puzzles = puzzle_count - active_resolved
+            # If the user started early (before the scheduled break ended), remove the
+            # stale break-end anchor so the anchor list stays in chronological order,
+            # then add the actual run start so the flat break period ends at the right time.
+            if run_start_actual < cursor_ms and last_anchor_is_break_end:
+                updated_anchors.pop()
+            if not updated_anchors or updated_anchors[-1]["timeMs"] != float(run_start_actual):
+                updated_anchors.append({"timeMs": float(run_start_actual), "value": cumulative})
             run_end_ms = now_ms + int(remaining_puzzles * target_ms / puzzle_count) if puzzle_count > 0 else now_ms + target_ms
             run_end_ms = max(run_end_ms, now_ms + 1)
             # Anchor at the actual current position so the dotted line starts where the
-            # actual area ends, then slope to completing all run puzzles by the deadline.
+            # actual area ends, then slope to completing remaining puzzles at the planned rate.
             updated_anchors.append({"timeMs": float(now_ms), "value": float(actual_at_now)})
             cumulative += puzzle_count
             updated_anchors.append({"timeMs": float(run_end_ms), "value": cumulative})
@@ -804,6 +882,7 @@ def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
                 cursor_ms = break_end
             else:
                 cursor_ms = run_end_ms
+            last_anchor_is_break_end = False
         else:
             run_start_ms = max(cursor_ms, now_ms)
             if not updated_anchors or updated_anchors[-1]["timeMs"] != float(run_start_ms):
@@ -829,21 +908,36 @@ def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
         run_start_ms = _ms(run.started_at)
         actual_anchors.append({"timeMs": float(run_start_ms), "value": cum_actual})
         if run.completed_at is not None:
+            sampled = _sample_intra_run_anchors(resolve_times.get(run.id, []), _INTRA_RUN_ANCHORS)
+            for t, puzzle_idx in sampled:
+                actual_anchors.append({"timeMs": float(t), "value": float(cum_actual + min(puzzle_idx, puzzle_count))})
             cum_actual += puzzle_count
             run_end_ms = _ms(run.completed_at)
             actual_anchors.append({"timeMs": float(run_end_ms), "value": cum_actual})
             last_actual_ms = run_end_ms
         else:
+            effective_n = max(1, round(_INTRA_RUN_ANCHORS * active_resolved / puzzle_count)) if puzzle_count > 0 else 1
+            sampled = _sample_intra_run_anchors(resolve_times.get(run.id, []), effective_n)
+            for t, puzzle_idx in sampled:
+                actual_anchors.append({"timeMs": float(t), "value": float(cum_actual + min(puzzle_idx, active_resolved))})
             actual_anchors.append({"timeMs": float(now_ms), "value": float(cum_actual + active_resolved)})
             last_actual_ms = now_ms
 
-    if last_actual_ms < now_ms:
-        actual_anchors.append({"timeMs": float(now_ms), "value": cum_actual})
-        last_actual_ms = now_ms
+    if terminal_ms is not None:
+        # Include the original schedule's projected end so an early completion
+        # still shows the full planned window. updated_anchors is excluded here
+        # because for aborted trainings it projects unstarted future runs forward,
+        # which would push the chart far into the future.
+        extend_to = max(terminal_ms, int(original_anchors[-1]["timeMs"]))
+    else:
+        extend_to = now_ms
+    if last_actual_ms < extend_to:
+        actual_anchors.append({"timeMs": float(extend_to), "value": cum_actual})
+        last_actual_ms = extend_to
 
-    # Guarantee the dotted updated-expected line starts exactly at today, not at
-    # the next future anchor (which could be tomorrow or later for non-active runs).
-    if not any(int(a["timeMs"]) == now_ms for a in updated_anchors):
+    # For ongoing trainings, guarantee the dotted updated-expected line starts
+    # exactly at today so it doesn't jump from a future anchor straight to now.
+    if terminal_ms is None and not any(int(a["timeMs"]) == now_ms for a in updated_anchors):
         val_at_now = _interpolate_anchors(updated_anchors, now_ms)
         if val_at_now is not None:
             updated_anchors.append({"timeMs": float(now_ms), "value": val_at_now})

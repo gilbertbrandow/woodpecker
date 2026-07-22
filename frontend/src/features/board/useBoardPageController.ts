@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { SoundEvent } from './useBoardSounds'
+import { sanToSoundEvents } from './useBoardSounds'
 import { useNavigate } from '@tanstack/react-router'
 import { Chess, type Square } from 'chess.js'
 import { toast } from '../../lib/toast'
@@ -296,8 +297,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       const ch = chessRef.current
       if (!ch) return
       const firstMove = resolveStep(solutionMovesRef.current[0] ?? '')
-      const firstIsCapture = !!ch.get(firstMove.slice(2, 4) as Square)
-      applyUci(ch, firstMove)
+      const firstApplied = applyUci(ch, firstMove)
       allPliesRef.current = [firstMove]
       setAllPliesPlayed([firstMove])
       const lm: [string, string] = [firstMove.slice(0, 2), firstMove.slice(2, 4)]
@@ -306,8 +306,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       setLastMove(lm)
       setDests(computeDests(ch))
       moveIndexRef.current = 1
-      playSoundRef.current(firstIsCapture ? 'capture' : 'move')
-      if (ch.inCheck()) playSoundRef.current('check')
+      for (const ev of sanToSoundEvents(firstApplied.san)) playSoundRef.current(ev)
 
       primeTimeoutRef.current = setTimeout(() => {
         primeTimeoutRef.current = null
@@ -544,8 +543,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const applyOpponentMove = useCallback((uci: string): void => {
     const chess = chessRef.current
     if (!chess) return
-    const isCapture = !!chess.get(uci.slice(2, 4) as Square)
-    applyUci(chess, uci)
+    const applied = applyUci(chess, uci)
     if (modeRef.current === 'focus') {
       allPliesRef.current = [...allPliesRef.current, uci]
       setAllPliesPlayed(allPliesRef.current)
@@ -559,16 +557,14 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     committedLastMoveRef.current = lm
     setDests(computeDests(chess))
     moveIndexRef.current += 1
-    playSoundRef.current(isCapture ? 'capture' : 'move')
-    if (chess.inCheck()) playSoundRef.current('check')
+    for (const ev of sanToSoundEvents(applied.san)) playSoundRef.current(ev)
   }, [setFen])
 
   const resolveCorrectMove = useCallback((orig: string, dest: string, uci: string): void => {
     const chess = chessRef.current
     if (!chess) return
 
-    const isCapture = !!chess.get(dest as Square)
-    applyUci(chess, uci)
+    const applied = applyUci(chess, uci)
     if (modeRef.current === 'focus') {
       movesPlayedRef.current = [...movesPlayedRef.current, uci]
       setMovesPlayed(movesPlayedRef.current)
@@ -588,8 +584,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
     const solutionMoves = solutionMovesRef.current
     const isLastMove = moveIndexRef.current >= solutionMoves.length
-    playSoundRef.current(isCapture ? 'capture' : 'move')
-    if (chess.inCheck()) playSoundRef.current('check')
+    for (const ev of sanToSoundEvents(applied.san)) playSoundRef.current(ev)
 
     if (isLastMove) {
       if (modeRef.current === 'focus') setLiveFocusStatus('solved')
@@ -639,12 +634,10 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       setLiveFocusStatus('failed')
     }
 
-    const isCapture = !!chess.get(dest as Square)
-    chess.move({ from: orig, to: dest, promotion: promotionPiece ?? 'q' })
+    const applied = chess.move({ from: orig, to: dest, promotion: promotionPiece ?? 'q' })
     setFen(chess.fen())
     setLastMove([orig, dest])
-    playSoundRef.current(isCapture ? 'capture' : 'move')
-    if (chess.inCheck()) playSoundRef.current('check')
+    for (const ev of sanToSoundEvents(applied.san)) playSoundRef.current(ev)
 
     scheduleTimeout(() => {
       chess.undo()

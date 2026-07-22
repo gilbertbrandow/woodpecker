@@ -508,7 +508,7 @@ export function BoardPage(): React.ReactElement | null {
               : null
           }
         />
-        {user !== null && !isDesktop && (
+        {user !== null && !isDesktop && overviewData.runTrainingItem.id === runTrainingItemId && (
           <OverviewAttemptHistoryTable
             key={overviewData.runTrainingItem.trainingItemId}
             trainingItemId={overviewData.runTrainingItem.trainingItemId}
@@ -602,7 +602,7 @@ export function BoardPage(): React.ReactElement | null {
           />
         </div>
       )}
-      {ctrl.mode === 'overview' && overviewData !== null && user !== null && (
+      {ctrl.mode === 'overview' && overviewData !== null && overviewData.runTrainingItem.id === runTrainingItemId && user !== null && (
         <OverviewSidebarRight
           key={runTrainingItemId}
           showTable={isDesktop}
