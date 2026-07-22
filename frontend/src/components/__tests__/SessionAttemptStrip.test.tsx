@@ -55,12 +55,80 @@ describe('SessionAttemptStrip', () => {
     expect(screen.getByRole('link', { name: 'Attempt for puzzle 5: Solved' })).toBeInTheDocument()
   })
 
-  it('renders all items regardless of count', () => {
+  it('renders all items regardless of count (jsdom: offsetWidth=0 disables overflow logic)', () => {
     const items = Array.from({ length: 25 }, (_, i) =>
       makeItem({ attemptId: i + 1, puzzlePosition: i + 1, status: 'solved', finishedAt: Date.now() }),
     )
     renderWithProvider(<SessionAttemptStrip items={items} runId="1" />)
     expect(screen.getAllByRole('link')).toHaveLength(25)
+  })
+
+  describe('overflow badge (offsetWidth mocked)', () => {
+    function mockOffsetWidth(px: number) {
+      Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, get: () => px })
+    }
+
+    afterEach(() => {
+      Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, get: () => 0 })
+    })
+
+    it('shows no badge when items exactly fill the container', () => {
+      // 100px → maxDots=5; 5 items fit exactly
+      mockOffsetWidth(100)
+      const items = Array.from({ length: 5 }, (_, i) =>
+        makeItem({ attemptId: i + 1, puzzlePosition: i + 1, status: 'solved', finishedAt: Date.now() }),
+      )
+      renderWithProvider(<SessionAttemptStrip items={items} runId="1" />)
+      expect(screen.getAllByRole('link')).toHaveLength(5)
+      expect(screen.queryByRole('img', { name: /earlier attempt/ })).toBeNull()
+    })
+
+    it('shows badge with correct count on first overflow', () => {
+      // 100px → maxDots=5; 6 items → overflowing=true, visibleDotCount=4, hiddenCount=2
+      mockOffsetWidth(100)
+      const items = Array.from({ length: 6 }, (_, i) =>
+        makeItem({ attemptId: i + 1, puzzlePosition: i + 1, status: 'solved', finishedAt: Date.now() }),
+      )
+      renderWithProvider(<SessionAttemptStrip items={items} runId="1" />)
+      expect(screen.getAllByRole('link')).toHaveLength(4)
+      expect(screen.getByRole('img', { name: '2 earlier attempts not shown' })).toBeInTheDocument()
+    })
+
+    it('badge count grows correctly as more items are added', () => {
+      // 100px → maxDots=5; 10 items → visibleDotCount=4, hiddenCount=6
+      mockOffsetWidth(100)
+      const items = Array.from({ length: 10 }, (_, i) =>
+        makeItem({ attemptId: i + 1, puzzlePosition: i + 1, status: 'solved', finishedAt: Date.now() }),
+      )
+      renderWithProvider(<SessionAttemptStrip items={items} runId="1" />)
+      expect(screen.getAllByRole('link')).toHaveLength(4)
+      expect(screen.getByRole('img', { name: '6 earlier attempts not shown' })).toBeInTheDocument()
+    })
+
+    it('badge text caps at 99+ for very large hidden counts', () => {
+      // 20px → maxDots=1; 200 items → visibleDotCount=0, hiddenCount=200
+      mockOffsetWidth(20)
+      const items = Array.from({ length: 200 }, (_, i) =>
+        makeItem({ attemptId: i + 1, puzzlePosition: i + 1, status: 'solved', finishedAt: Date.now() }),
+      )
+      renderWithProvider(<SessionAttemptStrip items={items} runId="1" />)
+      const badge = screen.getByRole('img', { name: '200 earlier attempts not shown' })
+      expect(badge).toBeInTheDocument()
+      expect(badge.textContent).toBe('99+')
+    })
+
+    it('newest items are kept visible; oldest are hidden behind the badge', () => {
+      // 100px → maxDots=5; 7 items → visibleDotCount=4, newest 4 shown as dots
+      mockOffsetWidth(100)
+      const items = Array.from({ length: 7 }, (_, i) =>
+        makeItem({ attemptId: i + 1, puzzlePosition: i + 1, status: 'solved', finishedAt: Date.now() }),
+      )
+      renderWithProvider(<SessionAttemptStrip items={items} runId="1" />)
+      expect(screen.getByRole('link', { name: 'Attempt for puzzle 4: Solved' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Attempt for puzzle 7: Solved' })).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'Attempt for puzzle 1: Solved' })).toBeNull()
+      expect(screen.queryByRole('link', { name: 'Attempt for puzzle 3: Solved' })).toBeNull()
+    })
   })
 
   it('renders dots for attempts across multiple runTrainingItemIds without filtering', () => {
