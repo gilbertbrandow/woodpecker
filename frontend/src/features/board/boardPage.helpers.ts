@@ -1,4 +1,4 @@
-import { Chess } from 'chess.js'
+import { Chess, type Move } from 'chess.js'
 import type { DisplayMove, PositionStatus, TrainingItemMetaPgnDisplay, OverviewAttemptView } from '../../lib/api'
 
 export type Mode = 'loading' | 'focus' | 'failed' | 'overview'
@@ -85,8 +85,8 @@ export function computeDests(chess: Chess): Map<string, string[]> {
   return dests
 }
 
-export function applyUci(chess: Chess, uci: string): void {
-  chess.move({
+export function applyUci(chess: Chess, uci: string): Move {
+  return chess.move({
     from: uci.slice(0, 2),
     to: uci.slice(2, 4),
     promotion: uci.length === 5 ? uci[4] : undefined,
