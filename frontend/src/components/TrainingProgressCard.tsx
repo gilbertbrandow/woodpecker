@@ -89,6 +89,7 @@ export function TrainingProgressCard({
             }}
           />
           <Line
+            type="monotone"
             dataKey="originalExpected"
             stroke="var(--color-originalExpected)"
             strokeWidth={1.5}
@@ -98,6 +99,7 @@ export function TrainingProgressCard({
             isAnimationActive={false}
           />
           <Area
+            type="monotone"
             dataKey="actual"
             stroke="var(--color-actual)"
             strokeWidth={2}
@@ -109,6 +111,7 @@ export function TrainingProgressCard({
           />
           {showUpdated && (
             <Line
+              type="monotone"
               dataKey="updatedExpected"
               stroke="var(--color-updatedExpected)"
               strokeWidth={1.5}
