@@ -1,4 +1,3 @@
-import pytest
 from app.models.run import TrainingAttempt
 from app.services.attempt_state import attempt_type_fields
 

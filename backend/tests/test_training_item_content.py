@@ -2,12 +2,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.models.training_item import TrainingItemSource
 from app.services.solve_contract import SolveContract
 from app.services.training_item_content import (
     DecoyMetadata,
     LichessTacticMetadata,
-    _dispatch,
     _decoy_payload,
     _lichess_tactic_payload,
     get_content_batch,

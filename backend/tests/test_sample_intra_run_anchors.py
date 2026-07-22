@@ -1,6 +1,5 @@
 """Unit tests for _sample_intra_run_anchors."""
 
-import pytest
 from app.services.training import _sample_intra_run_anchors
 
 

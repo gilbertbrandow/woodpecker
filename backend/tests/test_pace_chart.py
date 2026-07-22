@@ -210,7 +210,6 @@ class TestDomainEnd:
         assert result["domainEndMs"] == deadline_ms
 
     def test_completed_after_deadline_extends_domain(self) -> None:
-        deadline_ms = START_MS + int(24 * MS_PER_HOUR)
         completed_offset = int(30 * MS_PER_HOUR)
         result = _call(
             target_hours=24,
