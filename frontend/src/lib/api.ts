@@ -555,7 +555,7 @@ export type MyScheduleTraining = {
   abortedAt: string | null
 }
 
-export type RunStatus = 'active' | 'completed' | 'aborted'
+export type RunStatus = 'active' | 'completed' | 'aborted' | 'not_started'
 
 export type LeaderboardRun = {
   runId: number
@@ -704,6 +704,26 @@ export type Run = {
   solvedWithRetriesCount: number
   failedCount: number
   inProgressCount: number
+  avgSolveTimeMs: number | null
+  fastestSolveTimeMs: number | null
+  currentRunTrainingItemId: number | null
+  paceChart: PaceChartData | null
+}
+
+export type RunSlot = {
+  id: number | null
+  trainingId: number
+  runIndex: number
+  status: RunStatus
+  scheduledStartAt: string | null
+  startedAt: string | null
+  completedAt: string | null
+  abortedAt: string | null
+  totalItems: number | null
+  solvedCount: number | null
+  solvedWithRetriesCount: number | null
+  failedCount: number | null
+  inProgressCount: number | null
   avgSolveTimeMs: number | null
   fastestSolveTimeMs: number | null
   currentRunTrainingItemId: number | null
@@ -1248,8 +1268,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(runIndex === undefined ? {} : { runIndex }),
       }),
-    list: (trainingId: number): Promise<Run[]> =>
-      request<{ items: Run[]; total: number }>(`/training/${trainingId}/runs?page=1&pageSize=100`)
+    list: (trainingId: number): Promise<RunSlot[]> =>
+      request<{ items: RunSlot[]; total: number }>(`/training/${trainingId}/runs`)
         .then((r) => r.items),
     get: (runId: number): Promise<Run> => {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone

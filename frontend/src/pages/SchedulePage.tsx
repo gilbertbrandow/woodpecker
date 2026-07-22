@@ -254,10 +254,15 @@ export function SchedulePage(): React.ReactElement | null {
     setEnrolling(true);
     try {
       const participation = await api.training.create(id);
-      void navigate({
-        to: "/app/training/$trainingId",
-        params: { trainingId: String(participation.id) },
-      });
+      try {
+        const run = await api.runs.start(participation.id, 0);
+        void navigate({ to: "/app/runs/$runId/solve", params: { runId: String(run.id) } });
+      } catch {
+        void navigate({
+          to: "/app/training/$trainingId",
+          params: { trainingId: String(participation.id) },
+        });
+      }
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         const list = await api.training.listMine();

@@ -26,7 +26,12 @@ export function TrainingNewPage(): React.ReactElement | null {
     setEnrolling(true)
     try {
       const training = await api.training.create(selectedSchedule.id)
-      void navigate({ to: '/app/training/$trainingId', params: { trainingId: String(training.id) } })
+      try {
+        const run = await api.runs.start(training.id, 0)
+        void navigate({ to: '/app/runs/$runId/solve', params: { runId: String(run.id) } })
+      } catch {
+        void navigate({ to: '/app/training/$trainingId', params: { trainingId: String(training.id) } })
+      }
     } catch {
       setEnrolling(false)
     }
@@ -49,7 +54,7 @@ export function TrainingNewPage(): React.ReactElement | null {
           disabled={selectedSchedule === null || enrolling}
           onClick={() => void handleEnroll()}
         >
-          {enrolling ? 'Starting…' : 'Enroll in training'}
+          {enrolling ? 'Starting…' : 'Start training'}
         </Button>
       </div>
     </PageWrapper>
