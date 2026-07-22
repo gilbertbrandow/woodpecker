@@ -770,6 +770,7 @@ def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
     cursor_ms = orig_start_ms
     cumulative = 0.0
     completed_by_index = {r.run_index: r for r in completed_runs}
+    last_anchor_is_break_end = False
 
     for i, run_def in enumerate(schedule_cfg.runs):
         completed = completed_by_index.get(i)
@@ -785,16 +786,26 @@ def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
                 break_end = run_end_ms + int(run_def.break_after_hours * 3_600_000)
                 updated_anchors.append({"timeMs": float(break_end), "value": cumulative})
                 cursor_ms = break_end
+                last_anchor_is_break_end = True
             else:
                 cursor_ms = run_end_ms
+                last_anchor_is_break_end = False
         elif is_active:
             assert active_run is not None
+            run_start_actual = _ms(active_run.started_at)
             target_ms = int(run_def.target_hours * 3_600_000)
             remaining_puzzles = puzzle_count - active_resolved
+            # If the user started early (before the scheduled break ended), remove the
+            # stale break-end anchor so the anchor list stays in chronological order,
+            # then add the actual run start so the flat break period ends at the right time.
+            if run_start_actual < cursor_ms and last_anchor_is_break_end:
+                updated_anchors.pop()
+            if not updated_anchors or updated_anchors[-1]["timeMs"] != float(run_start_actual):
+                updated_anchors.append({"timeMs": float(run_start_actual), "value": cumulative})
             run_end_ms = now_ms + int(remaining_puzzles * target_ms / puzzle_count) if puzzle_count > 0 else now_ms + target_ms
             run_end_ms = max(run_end_ms, now_ms + 1)
             # Anchor at the actual current position so the dotted line starts where the
-            # actual area ends, then slope to completing all run puzzles by the deadline.
+            # actual area ends, then slope to completing remaining puzzles at the planned rate.
             updated_anchors.append({"timeMs": float(now_ms), "value": float(actual_at_now)})
             cumulative += puzzle_count
             updated_anchors.append({"timeMs": float(run_end_ms), "value": cumulative})
@@ -804,6 +815,7 @@ def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
                 cursor_ms = break_end
             else:
                 cursor_ms = run_end_ms
+            last_anchor_is_break_end = False
         else:
             run_start_ms = max(cursor_ms, now_ms)
             if not updated_anchors or updated_anchors[-1]["timeMs"] != float(run_start_ms):
