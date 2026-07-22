@@ -6,7 +6,6 @@ from unittest.mock import patch, MagicMock
 import pytest
 import sqlalchemy as sa
 from flask import Flask
-from flask.testing import FlaskClient
 
 from app import auth_session
 from app.exceptions import ValidationError

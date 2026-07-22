@@ -1207,7 +1207,7 @@ class TestRefillRoute:
         user = _make_user(db_session, "rfr_gap")
         _login(client, user.id)
         t_existing = _make_tactic(db_session, "rfr_gap_existing", rating=1500)
-        t_new = _make_tactic(db_session, "rfr_gap_new", rating=1500)
+        _make_tactic(db_session, "rfr_gap_new", rating=1500)
         subset = _make_subset(db_session, user, puzzle_count=5)
         client.patch(
             f"/subsets/{subset.id}/config",

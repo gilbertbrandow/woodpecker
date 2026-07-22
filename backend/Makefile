@@ -4,8 +4,8 @@ setup:
 	.venv/bin/pip install -r requirements.txt
 
 lint:
-	.venv/bin/ruff check app/ migrations/
-	.venv/bin/mypy app/ migrations/
+	.venv/bin/ruff check app/ migrations/ tests/
+	.venv/bin/mypy app/ migrations/ tests/
 
 test:
 	.venv/bin/pytest -m "not integration"
