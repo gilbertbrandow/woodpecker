@@ -7,7 +7,7 @@ Read `deploy/README.md` → **Services** and **Monitoring** sections before draw
 ## Transaction → file mapping
 
 | Transaction prefix | Route file | Service file |
-|---|---|---|
+| --- | --- | --- |
 | `dashboard.*` | `app/routes/dashboard.py` | `app/services/dashboard.py` |
 | `leaderboard.*` | `app/routes/leaderboard.py` | `app/services/leaderboard.py` |
 | `runs.*` | `app/routes/runs.py` | `app/services/run.py` |
@@ -27,7 +27,7 @@ If during an investigation you reach a point where Sentry spans + `db-explain` a
 These have been investigated and deliberately left as-is. Don't re-flag them as new findings — note the current numbers and whether they've improved or regressed since the last investigation.
 
 | Endpoint | Root cause | Why accepted | Next step if it regresses |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `dashboard.get_dashboard` | Bundles leaderboard via `run_stats` CTE in `leaderboard.py:get_run_board()` — 2 EXISTS + 3 LATERAL subqueries per `run_training_item` row | Splitting into a separate request causes layout shift (leaderboard depends on `trainingId`/`runIndex` from the dashboard response, so fetches are inherently sequential). Composite index on `training_attempts(run_training_item_id, status, try_number)` added in #217 to reduce CTE cost. | Cache leaderboard result per `(schedule_id, run_index)` with invalidation on `complete_attempt` |
 
 ## Interpreting frontend signals
@@ -35,7 +35,7 @@ These have been investigated and deliberately left as-is. Don't re-flag them as 
 **Web vitals** (from `span.op:pageload` with `measurements.*`):
 
 | Signal | High value points to |
-|---|---|
+| --- | --- |
 | LCP (Largest Contentful Paint) | Bundle size, blocking resource load, or slow API fetch |
 | TTFB (Time to First Byte) | Server processing time — corroborates backend P95 |
 | FCP (First Contentful Paint) | JS parse/execute time or render-blocking resources |
