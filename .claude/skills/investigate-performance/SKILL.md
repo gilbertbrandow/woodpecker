@@ -25,7 +25,7 @@ search_events(
 )
 ```
 
-**Frontend** (page loads and navigations via `browserTracingIntegration`):
+**Frontend — page load timing** (route navigations via `browserTracingIntegration`):
 ```
 search_events(
   organizationSlug="woodpecker-n0",
@@ -39,7 +39,35 @@ search_events(
 )
 ```
 
-Frontend spans capture page load timing, route transitions, and web vitals (LCP, FCP, TTFB). Investigate both — a fast API can still feel slow if the frontend has expensive mounts or waterfall fetches.
+**Frontend — web vitals per page** (what the user actually perceives):
+```
+search_events(
+  organizationSlug="woodpecker-n0",
+  regionUrl="https://de.sentry.io",
+  dataset="spans",
+  query="environment:production span.op:pageload",
+  fields=["transaction", "avg(measurements.lcp)", "avg(measurements.fcp)", "avg(measurements.ttfb)", "avg(measurements.cls)", "count()"],
+  sort="-avg(measurements.lcp)",
+  period="30d",
+  limit=25
+)
+```
+
+**Frontend — API call timing from the browser** (`http.client` spans include network round-trip):
+```
+search_events(
+  organizationSlug="woodpecker-n0",
+  regionUrl="https://de.sentry.io",
+  dataset="spans",
+  query="environment:production span.op:http.client",
+  fields=["span.description", "avg(span.duration)", "p95(span.duration)", "count()"],
+  sort="-p95(span.duration)",
+  period="30d",
+  limit=25
+)
+```
+
+See [REFERENCE.md](REFERENCE.md) → Interpreting frontend signals for how to read these results.
 
 ## Step 2 — Rank by impact
 
@@ -83,7 +111,7 @@ Then for any SQL span averaging > 50 ms, run `EXPLAIN ANALYZE`:
 make -C deploy db-explain SQL="SELECT ..." ENV=prod
 ```
 
-Look for: sequential scans on large tables, actual rows far exceeding estimated rows (planner misestimate), shared block reads vs hits (disk vs memory).
+See [REFERENCE.md](REFERENCE.md) → Interpreting EXPLAIN output.
 
 ## Step 4b — Drill into individual slow traces
 
@@ -95,16 +123,11 @@ get_sentry_resource(url="https://woodpecker-n0.sentry.io/performance/trace/<trac
 
 This is especially useful for spotting N+1 patterns (many small queries in sequence) and bundled sub-requests that inflate wall time.
 
+**Distributed tracing is enabled**: frontend and backend spans are linked via `tracePropagationTargets`. A `pageload` trace will show `http.client` children (browser fetch timing, including network) each with a nested `http.server` → `db` waterfall. Use this to distinguish: is the page slow because of one genuinely slow endpoint, or because the frontend fires several API calls sequentially that could be parallelised?
+
 ## Step 5 — Read the code
 
-Map each transaction name to its route and service file (e.g. `dashboard.get_dashboard` → `app/routes/dashboard.py` + `app/services/dashboard.py`). Read the full service function to identify:
-
-- Redundant queries (same data fetched twice)
-- N+1 patterns (query inside a loop)
-- Expensive calls bundled into one response that could be parallelised
-- Missing result reuse across sub-functions called in sequence
-
-See [REFERENCE.md](REFERENCE.md) for production constraints to keep in mind while reading the code.
+Use [REFERENCE.md](REFERENCE.md) → Transaction → file mapping to find the route and service file. Read the full service function and look for patterns in REFERENCE.md → Known patterns.
 
 ## Step 6 — Report
 
