@@ -11,6 +11,7 @@ description: Investigate API performance for the Woodpecker project and produce 
 
 ## Step 1 — Fetch latency by endpoint
 
+**Backend** (API endpoints):
 ```
 search_events(
   organizationSlug="woodpecker-n0",
@@ -23,6 +24,22 @@ search_events(
   limit=25
 )
 ```
+
+**Frontend** (page loads and navigations via `browserTracingIntegration`):
+```
+search_events(
+  organizationSlug="woodpecker-n0",
+  regionUrl="https://de.sentry.io",
+  dataset="spans",
+  query="environment:production span.op:pageload OR span.op:navigation",
+  fields=["transaction", "avg(span.duration)", "p75(span.duration)", "p95(span.duration)", "count()"],
+  sort="-p95(span.duration)",
+  period="30d",
+  limit=25
+)
+```
+
+Frontend spans capture page load timing, route transitions, and web vitals (LCP, FCP, TTFB). Investigate both — a fast API can still feel slow if the frontend has expensive mounts or waterfall fetches.
 
 ## Step 2 — Rank by impact
 

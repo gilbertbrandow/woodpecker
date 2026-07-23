@@ -205,14 +205,18 @@ Requires `DOMAIN_NAME` and `CERTBOT_EMAIL` in `~/.woodpecker-prod-env`. Once it 
 
 ### Sentry (application layer)
 
-Errors and performance traces are sent to [woodpecker-n0.sentry.io](https://woodpecker-n0.sentry.io). The backend uses `FlaskIntegration` (request/response lifecycle) and `SqlalchemyIntegration` (every DB query within a sampled request). Tracing is set to 10% sampling (`traces_sample_rate=0.1`) — sufficient to catch slow endpoints while staying within Sentry's free-tier limit of 10 K transactions/month.
+Errors and performance traces are sent to [woodpecker-n0.sentry.io](https://woodpecker-n0.sentry.io).
+
+- **Backend**: `FlaskIntegration` (request/response lifecycle) + `SqlalchemyIntegration` (every DB query within a sampled request). `traces_sample_rate=0.1` (10%).
+- **Frontend**: `browserTracingIntegration` captures page load timing, route navigations, and web vitals (LCP, FCP, TTFB). `tracesSampleRate=0.1` (10%).
 
 **What to look at in Sentry → Performance:**
 
-- P75/P95 per endpoint — `GET /leaderboard/weekly` is the most complex query and will surface first under load
-- DB query spans — each trace shows individual SQL statements with timing; slow scans appear here before they become user-visible
+- P75/P95 per endpoint — `dashboard.get_dashboard` and `leaderboard.get_leaderboard` are the most complex and will surface first under load
+- DB query spans — each backend trace shows individual SQL statements with timing
+- Web vitals — frontend traces show LCP/FCP/TTFB per page navigation
 
-Check current transaction usage at `woodpecker-n0.sentry.io/settings/billing/`. If usage approaches 10 K/month, raise the sample rate threshold or upgrade to the Team plan (~$26/month for 100 K transactions).
+**Quota**: The Developer plan includes 5 M spans per billing period (resets 5th of each month). Current usage is well under 1%. Check `woodpecker-n0.sentry.io/settings/billing/` to monitor. If usage approaches the limit, lower `traces_sample_rate` to 0.05 on both backend and frontend before considering an upgrade.
 
 ### CloudWatch (infrastructure layer)
 
