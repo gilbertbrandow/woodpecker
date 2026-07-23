@@ -480,6 +480,7 @@ export function DashboardPage(): React.ReactElement {
             <DashboardLeaderboard
               trainingId={selectedTrainingId}
               runIndex={selectedRunIndex}
+              initialRows={data.leaderboard}
             />
             {runsAccuracy.length > 0 && (
               <AccuracyChart runsAccuracy={runsAccuracy} />

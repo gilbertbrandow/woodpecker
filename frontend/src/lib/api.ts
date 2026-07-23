@@ -1047,6 +1047,7 @@ export type DashboardData = {
   metricCards: DashboardMetricCards | null
   runsAccuracy: DashboardRunAccuracy[]
   progressCard: TrainingProgressData | null
+  leaderboard: LeaderboardRun[]
 }
 
 export type LichessTacticsThemeDetail = {
