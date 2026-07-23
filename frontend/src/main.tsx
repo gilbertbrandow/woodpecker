@@ -16,6 +16,7 @@ Sentry.init({
   environment: import.meta.env.MODE,
   integrations: [Sentry.browserTracingIntegration()],
   tracesSampleRate: 0.1,
+  tracePropagationTargets: [/woodpeckerchess\.com/, /localhost/],
 });
 
 registerNavigate((opts) => router.navigate(opts));
