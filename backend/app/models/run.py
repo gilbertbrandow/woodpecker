@@ -80,4 +80,5 @@ class TrainingAttempt(Base):
             "run_training_item_id", "try_number", name="uq_attempt_run_training_item_try"
         ),
         Index("ix_training_attempts_run_training_item_id", "run_training_item_id"),
+        Index("ix_training_attempts_rp_status_try", "run_training_item_id", "status", "try_number"),
     )

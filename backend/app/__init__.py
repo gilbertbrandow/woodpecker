@@ -65,23 +65,27 @@ def create_app() -> Flask:
     @app.before_request
     def update_last_seen() -> None:
         from datetime import timedelta
+        from sqlalchemy.exc import OperationalError
         from app.models.user import User
         user_id = session.get("user_id")
         if not user_id:
             return
-        db.session.execute(
-            sa.update(User)
-            .where(
-                User.id == user_id,
-                sa.or_(
-                    User.last_seen_at.is_(None),
-                    User.last_seen_at < datetime.now(timezone.utc) - timedelta(minutes=5),
-                ),
+        try:
+            db.session.execute(
+                sa.update(User)
+                .where(
+                    User.id == user_id,
+                    sa.or_(
+                        User.last_seen_at.is_(None),
+                        User.last_seen_at < datetime.now(timezone.utc) - timedelta(minutes=5),
+                    ),
+                )
+                .values(last_seen_at=datetime.now(timezone.utc))
+                .execution_options(synchronize_session=False)
             )
-            .values(last_seen_at=datetime.now(timezone.utc))
-            .execution_options(synchronize_session=False)
-        )
-        db.session.commit()
+            db.session.commit()
+        except OperationalError:
+            db.session.rollback()
 
     app.register_blueprint(health_bp)
     app.register_blueprint(auth_bp)

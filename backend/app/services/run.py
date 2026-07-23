@@ -1336,25 +1336,29 @@ def _compute_progress_card(
     if training_total == 0:
         return {"runProgress": run_progress_row, "trainingProgress": None}
 
-    all_runs = list(
-        db.session.scalars(
-            sa.select(Run).where(Run.training_id == training_id)
-        ).all()
-    )
-    training_resolved = 0
-    for r in all_runs:
-        all_rps = list(
-            db.session.scalars(
-                sa.select(RunTrainingItem)
-                .options(selectinload(RunTrainingItem.attempts))
-                .where(RunTrainingItem.run_id == r.id)
-            ).all()
-        )
-        for rp in all_rps:
-            if derive_position_status(rp.attempts, total_queue) in (
-                "solved", "solved_with_retries", "failed"
-            ):
-                training_resolved += 1
+    training_resolved: int = db.session.scalar(
+        sa.text("""
+            SELECT COUNT(*)
+            FROM run_training_items rp
+            JOIN runs r ON r.id = rp.run_id
+            WHERE r.training_id = :training_id
+              AND (
+                EXISTS (
+                    SELECT 1 FROM training_attempts pa
+                    WHERE pa.run_training_item_id = rp.id
+                      AND pa.status = 'solved'
+                      AND pa.try_number <= :total_queue
+                )
+                OR (
+                    SELECT COUNT(*) FROM training_attempts pa
+                    WHERE pa.run_training_item_id = rp.id
+                      AND pa.status != 'in_progress'
+                      AND pa.try_number <= :total_queue
+                ) >= :total_queue
+              )
+        """),
+        {"training_id": training_id, "total_queue": total_queue},
+    ) or 0
 
     training_pct = round(training_resolved / training_total * 100, 2) if training_total > 0 else 0.0
     training_delta: float | None = (
@@ -1467,8 +1471,9 @@ def _build_run_puzzle_overview(
     run_just_completed: bool = False,
     completing_attempt_id: int | None = None,
     tz: str = "UTC",
+    _payload=None,
 ) -> dict[str, object]:
-    payload = get_content(run_puzzle.training_item_id)
+    payload = _payload if _payload is not None else get_content(run_puzzle.training_item_id)
 
     _, config = _get_schedule_config(run)
     total_queue = config.total_queue
@@ -1691,6 +1696,7 @@ def complete_attempt(
         run_just_completed=run_just_completed,
         completing_attempt_id=attempt_id,
         tz=tz,
+        _payload=payload,
     )
 
     return {
