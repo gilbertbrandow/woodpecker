@@ -47,15 +47,36 @@ search_events(
 )
 ```
 
-## Step 4 — EXPLAIN ANALYZE slow queries
+## Step 4 — Get DB context
 
-For any SQL span averaging > 50 ms, run `EXPLAIN ANALYZE` against production via the DB tunnel (tunnel must be open — `make -C deploy db-tunnel-start`):
+All `db-*` targets default to `ENV=prod` (production via SSH tunnel). The tunnel must be open first: `make -C deploy db-tunnel-start`.
+
+Before explaining specific queries, get the full picture of table sizes and index health:
 
 ```bash
-make -C deploy db-explain SQL="SELECT ..."
+make -C deploy db-table-sizes ENV=prod   # row counts + disk size per table
+make -C deploy db-index-stats ENV=prod   # seq_scan vs idx_scan per table — high seq_scan = likely missing index
 ```
 
-The output includes `BUFFERS` data — look for sequential scans on large tables, high actual rows vs estimated rows (planner misestimate), and shared block hits vs reads (disk vs memory). This confirms or rules out index gaps before reading the code.
+Use `db-table-sizes` to contextualise EXPLAIN output — a sequential scan on 500 rows is fine; on 500 000 rows it is not. Use `db-index-stats` to spot tables being scanned heavily without index use, even before you know which specific queries are slow.
+
+Then for any SQL span averaging > 50 ms, run `EXPLAIN ANALYZE`:
+
+```bash
+make -C deploy db-explain SQL="SELECT ..." ENV=prod
+```
+
+Look for: sequential scans on large tables, actual rows far exceeding estimated rows (planner misestimate), shared block reads vs hits (disk vs memory).
+
+## Step 4b — Drill into individual slow traces
+
+Aggregate P95 shows an endpoint is slow. A single trace shows the exact query waterfall — how many DB calls, in what order, and whether they're sequential when they could be parallel. Find a slow trace ID from the Sentry Performance tab, then:
+
+```
+get_sentry_resource(url="https://woodpecker-n0.sentry.io/performance/trace/<trace-id>/")
+```
+
+This is especially useful for spotting N+1 patterns (many small queries in sequence) and bundled sub-requests that inflate wall time.
 
 ## Step 5 — Read the code
 

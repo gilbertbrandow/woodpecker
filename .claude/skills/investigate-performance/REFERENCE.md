@@ -16,6 +16,12 @@ Read `deploy/README.md` → **Services** and **Monitoring** sections before draw
 | `auth.*` | `app/routes/auth.py` | `app/services/auth_service.py` |
 | `users.*` | `app/routes/users.py` | — |
 
+## Unavailable tools
+
+**`pg_stat_statements` is not enabled.** It would provide 100% query coverage with accumulated call counts, mean/max execution times, and normalised query fingerprints — more complete than Sentry's 10% sample. It was not enabled because it requires a Postgres restart and adds a small but non-zero CPU overhead on the t3.micro.
+
+If during an investigation you reach a point where Sentry spans + `db-explain` are insufficient to identify the root cause, say so explicitly in your report. The team can evaluate whether enabling `pg_stat_statements` is worth it for that specific investigation.
+
 ## Known patterns to look for
 
 - **Bundled sub-requests**: a service calling another heavy service inline. If the frontend could fetch them in parallel, decoupling reduces P95 to `max(a, b)` instead of `a + b`.
