@@ -1,6 +1,6 @@
 ---
-name: perf
-description: Investigate API performance for the Woodpecker project and produce a ranked findings report. Use when the user asks about slow requests, performance issues, latency, why something feels slow, or wants to know where to focus optimisation efforts. Fetches real P95/count data from Sentry, reads relevant code, and ranks findings by actual impact. Does NOT fix code or commit anything.
+name: investigate-performance
+description: Investigate API performance for the Woodpecker project and produce a ranked findings report. Use when the user asks about slow requests, performance issues, latency, why something feels slow, or wants to know where to focus optimisation efforts. Fetches real P95/count data from Sentry, drills into SQL spans, runs EXPLAIN ANALYZE on slow queries via the DB tunnel, reads relevant code, and ranks findings by actual impact. Does NOT fix code or commit anything.
 ---
 
 # Performance Investigation
@@ -47,7 +47,17 @@ search_events(
 )
 ```
 
-## Step 4 — Read the code
+## Step 4 — EXPLAIN ANALYZE slow queries
+
+For any SQL span averaging > 50 ms, run `EXPLAIN ANALYZE` against production via the DB tunnel (tunnel must be open — `make -C deploy db-tunnel-start`):
+
+```bash
+make -C deploy db-explain SQL="SELECT ..."
+```
+
+The output includes `BUFFERS` data — look for sequential scans on large tables, high actual rows vs estimated rows (planner misestimate), and shared block hits vs reads (disk vs memory). This confirms or rules out index gaps before reading the code.
+
+## Step 5 — Read the code
 
 Map each transaction name to its route and service file (e.g. `dashboard.get_dashboard` → `app/routes/dashboard.py` + `app/services/dashboard.py`). Read the full service function to identify:
 
@@ -58,7 +68,7 @@ Map each transaction name to its route and service file (e.g. `dashboard.get_das
 
 See [REFERENCE.md](REFERENCE.md) for production constraints to keep in mind while reading the code.
 
-## Step 5 — Report
+## Step 6 — Report
 
 Present findings as a ranked list. For each item:
 

@@ -46,6 +46,9 @@ db-shell-ec2:
 db-query:
 	@PGPASSWORD=$(PROD_DB_PASSWORD) psql -h localhost -p 5433 -U woodpecker woodpecker -c "$(SQL)"
 
+db-explain:
+	@PGPASSWORD=$(PROD_DB_PASSWORD) psql -h localhost -p 5433 -U woodpecker woodpecker -c "EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT) $(SQL)"
+
 # ── Pipeline (prod) ────────────────────────────────────────────────────────────
 
 _confirm-prod-mutation:
@@ -106,7 +109,7 @@ whitelist-add:
 
 
 .PHONY: up-local-prod-db \
-        db-tunnel-start db-tunnel-stop db-shell db-shell-ec2 db-query \
+        db-tunnel-start db-tunnel-stop db-shell db-shell-ec2 db-query db-explain \
         _confirm-prod-mutation \
         prod-lichess-tactics-validate prod-lichess-tactics-import \
         prod-lichess-tactics-themes-import prod-openings-import \
