@@ -22,6 +22,14 @@ Read `deploy/README.md` → **Services** and **Monitoring** sections before draw
 
 If during an investigation you reach a point where Sentry spans + `db-explain` are insufficient to identify the root cause, say so explicitly in your report. The team can evaluate whether enabling `pg_stat_statements` is worth it for that specific investigation.
 
+## Known accepted slowness
+
+These have been investigated and deliberately left as-is. Don't re-flag them as new findings — note the current numbers and whether they've improved or regressed since the last investigation.
+
+| Endpoint | Root cause | Why accepted | Next step if it regresses |
+|---|---|---|---|
+| `dashboard.get_dashboard` | Bundles leaderboard via `run_stats` CTE in `leaderboard.py:get_run_board()` — 2 EXISTS + 3 LATERAL subqueries per `run_training_item` row | Splitting into a separate request causes layout shift (leaderboard depends on `trainingId`/`runIndex` from the dashboard response, so fetches are inherently sequential). Composite index on `training_attempts(run_training_item_id, status, try_number)` added in #217 to reduce CTE cost. | Cache leaderboard result per `(schedule_id, run_index)` with invalidation on `complete_attempt` |
+
 ## Known patterns to look for
 
 - **Bundled sub-requests**: a service calling another heavy service inline. If the frontend could fetch them in parallel, decoupling reduces P95 to `max(a, b)` instead of `a + b`.
