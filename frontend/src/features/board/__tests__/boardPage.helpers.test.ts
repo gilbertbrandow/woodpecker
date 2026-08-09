@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { Chess } from 'chess.js'
-import { buildPgnDisplay, computeFinalFen, resolveOverviewBoardPosition, resultsInCheckmate } from '../boardPage.helpers'
+import { buildPgnDisplay, computeFinalFen, resolveOverviewBoardPosition, resolveStep, resultsInCheckmate } from '../boardPage.helpers'
 
 describe('resultsInCheckmate', () => {
   it('returns true when the move results in checkmate', () => {
@@ -149,5 +149,14 @@ describe('resolveOverviewBoardPosition', () => {
     ]
     const { fen } = resolveOverviewBoardPosition(attempts, SOLUTION_MOVES, INITIAL_FEN)
     expect(fen).toBe(computeFinalFen(INITIAL_FEN, SOLUTION_MOVES))
+  })
+})
+
+describe('resolveStep', () => {
+  it('returns the string unchanged for a plain UCI move', () => {
+    expect(resolveStep('e2e4')).toBe('e2e4')
+  })
+  it('returns the first element for a non-empty alternatives array', () => {
+    expect(resolveStep(['e7e5', 'c7c5'])).toBe('e7e5')
   })
 })
