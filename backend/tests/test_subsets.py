@@ -1636,3 +1636,77 @@ class TestSampleDecoysEdgeCases:
 
         assert d3.id in ids
         assert d5.id in ids
+
+
+# ── Route: GET /subsets/{id}/puzzles?sort= ───────────────────────────────────────
+
+@pytest.mark.integration
+class TestListActivePuzzlesSortOrder:
+    def test_sort_by_rating_asc_returns_200(self, client: FlaskClient, db_session) -> None:
+        user = _make_user(db_session, "laps_rating_asc")
+        _login(client, user.id)
+        subset = _make_subset(db_session, user)
+        for i, (pid, rating) in enumerate([("laps_ra_1", 1200), ("laps_ra_2", 1800)]):
+            _add_item_to_subset(db_session, subset, _make_tactic(db_session, pid, rating=rating), position=i)
+
+        resp = client.get(f"/subsets/{subset.id}/puzzles?sort=rating&order=asc")
+
+        assert resp.status_code == 200
+
+    def test_sort_by_rating_desc_returns_200(self, client: FlaskClient, db_session) -> None:
+        user = _make_user(db_session, "laps_rating_desc")
+        _login(client, user.id)
+        subset = _make_subset(db_session, user)
+        for i, (pid, rating) in enumerate([("laps_rd_1", 1200), ("laps_rd_2", 1800)]):
+            _add_item_to_subset(db_session, subset, _make_tactic(db_session, pid, rating=rating), position=i)
+
+        resp = client.get(f"/subsets/{subset.id}/puzzles?sort=rating&order=desc")
+
+        assert resp.status_code == 200
+
+    def test_sort_by_popularity_returns_200(self, client: FlaskClient, db_session) -> None:
+        user = _make_user(db_session, "laps_pop")
+        _login(client, user.id)
+        subset = _make_subset(db_session, user)
+        _add_item_to_subset(db_session, subset, _make_tactic(db_session, "laps_pop_1", rating=1500))
+
+        resp = client.get(f"/subsets/{subset.id}/puzzles?sort=popularity&order=asc")
+
+        assert resp.status_code == 200
+
+    def test_sort_by_nb_plays_returns_200(self, client: FlaskClient, db_session) -> None:
+        user = _make_user(db_session, "laps_nbp")
+        _login(client, user.id)
+        subset = _make_subset(db_session, user)
+        _add_item_to_subset(db_session, subset, _make_tactic(db_session, "laps_nbp_1", rating=1500))
+
+        resp = client.get(f"/subsets/{subset.id}/puzzles?sort=nb_plays&order=asc")
+
+        assert resp.status_code == 200
+
+    def test_sort_by_rating_asc_orders_correctly(self, client: FlaskClient, db_session) -> None:
+        user = _make_user(db_session, "laps_order")
+        _login(client, user.id)
+        subset = _make_subset(db_session, user)
+        low = _make_tactic(db_session, "laps_order_low", rating=1000)
+        high = _make_tactic(db_session, "laps_order_high", rating=2000)
+        _add_item_to_subset(db_session, subset, high, position=0)
+        _add_item_to_subset(db_session, subset, low, position=1)
+
+        resp = client.get(f"/subsets/{subset.id}/puzzles?sort=rating&order=asc")
+
+        assert resp.status_code == 200
+        puzzles = resp.get_json()["puzzles"]
+        assert len(puzzles) == 2
+        ratings = [p["rating"] for p in puzzles]
+        assert ratings == sorted(ratings)
+
+    def test_no_sort_param_still_works(self, client: FlaskClient, db_session) -> None:
+        user = _make_user(db_session, "laps_nosort")
+        _login(client, user.id)
+        subset = _make_subset(db_session, user)
+        _add_item_to_subset(db_session, subset, _make_tactic(db_session, "laps_nosort_1", rating=1500))
+
+        resp = client.get(f"/subsets/{subset.id}/puzzles")
+
+        assert resp.status_code == 200
