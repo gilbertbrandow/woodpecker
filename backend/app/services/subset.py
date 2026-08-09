@@ -17,9 +17,9 @@ DEFAULT_RATING_MAX = 9999
 RATING_BUCKET_SIZE = 50
 PAGE_SIZE = 25
 VALID_SORT_COLUMNS: dict[str, str] = {
-    "rating": "p.rating",
-    "popularity": "p.popularity",
-    "nb_plays": "p.nb_plays",
+    "rating": "lt.rating",
+    "popularity": "lt.popularity",
+    "nb_plays": "lt.nb_plays",
 }
 VALID_SOURCES = {"LICHESS_TACTIC", "SCRAPED_POSITIONAL", "DECOY"}
 
