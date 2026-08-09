@@ -1,5 +1,6 @@
 import pytest
 from flask.testing import FlaskClient
+
 from tests.conftest import _seed_world  # type: ignore[import]
 
 

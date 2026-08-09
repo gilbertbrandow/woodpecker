@@ -1,15 +1,15 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from typing import cast
 
 import sqlalchemy as sa
 
 from app.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
-from app.table_query import DateFilter, FilterList, RangeFilter
 from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.subset import Subset
 from app.models.user import User
 from app.services.schedule_config import ScheduleConfig
+from app.table_query import DateFilter, FilterList, RangeFilter
 
 DEFAULT_CONFIG: dict[str, object] = {
     "runs": [
@@ -168,7 +168,7 @@ def get_schedule_insights(schedule_id: int, user_id: int) -> list[dict[str, obje
 
     schedule_cfg = ScheduleConfig.from_dict(schedule.config)
     result: list[dict[str, object]] = []
-    current = date.today()
+    current = datetime.now(tz=timezone.utc).date()
 
     for run_def in schedule_cfg.runs:
         run_days = max(1, round(run_def.target_hours / 24))

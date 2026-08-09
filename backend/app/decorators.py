@@ -1,6 +1,7 @@
+from collections.abc import Callable
 from functools import wraps
-from typing import Callable
-from flask import session, jsonify
+
+from flask import jsonify, session
 
 
 def login_required(f: Callable) -> Callable:
@@ -15,9 +16,10 @@ def login_required(f: Callable) -> Callable:
 def admin_required(f: Callable) -> Callable:
     @wraps(f)
     def decorated(*args: object, **kwargs: object) -> object:
-        from app.models.user import User
-        from app.extensions import db
         import sqlalchemy as sa
+
+        from app.extensions import db
+        from app.models.user import User
         user_id = session.get("user_id")
         if not user_id:
             return jsonify({"error": "not authenticated"}), 401

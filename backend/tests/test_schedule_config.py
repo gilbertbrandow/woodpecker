@@ -51,7 +51,7 @@ def test_all_valid_puzzle_orders(order: str) -> None:
 
 
 def test_missing_runs_raises() -> None:
-    with pytest.raises(ValueError, match="config.runs must be a list"):
+    with pytest.raises(TypeError, match="config.runs must be a list"):
         ScheduleConfig.from_dict(_with(runs=None))
 
 
@@ -81,7 +81,7 @@ def test_invalid_puzzle_order_raises() -> None:
 
 
 def test_missing_failed_repetition_raises() -> None:
-    with pytest.raises(ValueError, match="config.failed_repetition must be an object"):
+    with pytest.raises(TypeError, match="config.failed_repetition must be an object"):
         ScheduleConfig.from_dict(_with(failed_repetition=None))
 
 

@@ -2,17 +2,18 @@ import math
 from datetime import datetime, timedelta, timezone
 
 import sqlalchemy as sa
+from sqlalchemy.exc import SQLAlchemyError
 
+from app.exceptions import AppError
 from app.extensions import db
 from app.models.run import Run, RunTrainingItem, TrainingAttempt
 from app.models.schedule import Schedule
 from app.models.training import Training
+from app.services import leaderboard as leaderboard_svc
 from app.services.schedule_config import ScheduleConfig
 from app.services.training import get_training_progress
 from app.services.training_state import end_of_today_utc
-from app.services import leaderboard as leaderboard_svc
 from app.table_query import FilterList
-
 
 # ---------------------------------------------------------------------------
 # SQL helper: compute per-run stats in one query for a list of run_ids
@@ -108,7 +109,7 @@ def _load_user_trainings_sorted(user_id: int) -> list[dict]:
         if isinstance(row.config, dict):
             try:
                 run_count = len(ScheduleConfig.from_dict(row.config).runs)
-            except Exception:
+            except (ValueError, TypeError):
                 pass
         result.append({
             "id": int(row.id),
@@ -419,9 +420,8 @@ def get_dashboard(
     selectable = existing_indices if existing_indices else {0}
 
     # --- Resolve run_index ---
-    if run_index is not None:
-        if run_index < 0 or run_index >= run_count or run_index not in selectable:
-            run_index = None  # invalid → use default
+    if run_index is not None and (run_index < 0 or run_index >= run_count or run_index not in selectable):
+        run_index = None  # invalid → use default
     if run_index is None:
         run_index = max_index if max_index is not None else 0
 
@@ -468,7 +468,7 @@ def get_dashboard(
     # --- Progress card ---
     try:
         progress_card = get_training_progress(resolved_training_id, user_id)
-    except Exception:
+    except (AppError, SQLAlchemyError):
         progress_card = None
 
     # --- Leaderboard (first page bundled to avoid waterfall on the frontend) ---

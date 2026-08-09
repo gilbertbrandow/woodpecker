@@ -1,5 +1,6 @@
-from sqlalchemy import Text, Integer, Index, ForeignKey, String
+from sqlalchemy import ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.extensions import Base
 
 

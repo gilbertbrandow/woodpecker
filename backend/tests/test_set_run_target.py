@@ -1,7 +1,9 @@
-import pytest
 from typing import cast
-from tests.conftest import _seed_world  # type: ignore[import]
+
+import pytest
+
 from app.exceptions import ValidationError
+from tests.conftest import _seed_world  # type: ignore[import]
 
 
 def _get_training_id(db_session, run_id: int) -> int:

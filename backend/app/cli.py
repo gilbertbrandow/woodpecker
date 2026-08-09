@@ -18,6 +18,7 @@ def register_commands(app: Flask) -> None:
     @click.option("--username", required=True, help="Lichess username to grant superadmin")
     def superadmin_add(username: str) -> None:
         import sqlalchemy as sa
+
         from app.extensions import db
         from app.models.user import User
 

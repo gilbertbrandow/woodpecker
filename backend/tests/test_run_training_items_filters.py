@@ -5,7 +5,6 @@ import pytest
 import sqlalchemy as sa
 from flask.testing import FlaskClient
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -28,8 +27,8 @@ def _make_user(session, username: str):  # type: ignore[misc]
 
 
 def _make_schedule(session, user, *, total_queue: int = 2):  # type: ignore[misc]
-    from app.models.subset import Subset
     from app.models.schedule import Schedule
+    from app.models.subset import Subset
     max_repeats = total_queue - 1
     rep_config = (
         {"mode": "queue", "max_repeats": max_repeats}
@@ -55,8 +54,8 @@ def _make_schedule(session, user, *, total_queue: int = 2):  # type: ignore[misc
 
 
 def _make_run(session, user, schedule):  # type: ignore[misc]
-    from app.models.training import Training
     from app.models.run import Run
+    from app.models.training import Training
     now = datetime.now(timezone.utc)
     training = Training(user_id=user.id, schedule_id=schedule.id, started_at=now)
     session.add(training)
@@ -68,8 +67,8 @@ def _make_run(session, user, schedule):  # type: ignore[misc]
 
 
 def _make_lichess_tactic(session, *, rating: int = 1500):  # type: ignore[misc]
-    from app.models.training_item import TrainingItem, TrainingItemSource
     from app.models.lichess_tactic import LichessTactic
+    from app.models.training_item import TrainingItem, TrainingItemSource
     item = TrainingItem(source_type=TrainingItemSource.LICHESS_TACTIC)
     session.add(item)
     session.flush()
@@ -109,8 +108,8 @@ def _get_or_create_difficulty(session, *, value: int, min_rating: int | None, ma
 
 
 def _make_scraped_positional(session, *, min_rating: int | None = 1600, max_rating: int | None = 1800):  # type: ignore[misc]
-    from app.models.training_item import TrainingItem, TrainingItemSource
     from app.models.scraped_positional_puzzle import ScrapedPositionalPuzzle
+    from app.models.training_item import TrainingItem, TrainingItemSource
     difficulty = _get_or_create_difficulty(
         session, value=min_rating or 9999, min_rating=min_rating, max_rating=max_rating
     )

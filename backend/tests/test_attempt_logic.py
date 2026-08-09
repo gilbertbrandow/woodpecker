@@ -1,4 +1,5 @@
 import chess as python_chess
+
 from app.models.run import TrainingAttempt
 from app.services.attempt_state import derive_attempt_outcome, derive_position_status
 from app.services.solve_contract import SolveContract

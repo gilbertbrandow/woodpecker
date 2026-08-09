@@ -5,9 +5,8 @@ Revises: i2j3k4l5m6n7
 Create Date: 2026-06-27
 
 """
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 revision: str = "j3k4l5m6n7o8"
 down_revision: str | None = "i2j3k4l5m6n7"

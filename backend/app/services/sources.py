@@ -1,7 +1,11 @@
 from sqlalchemy import case, func, select
 
 from app.extensions import db
-from app.models.source_import_run import SourceImportRun, SourceImportSource, SourceImportStatus
+from app.models.source_import_run import (
+    SourceImportRun,
+    SourceImportSource,
+    SourceImportStatus,
+)
 from app.models.training_item import TrainingItem, TrainingItemSource
 
 _IMPORT_TO_TRAINING_SOURCE: dict[SourceImportSource, TrainingItemSource] = {

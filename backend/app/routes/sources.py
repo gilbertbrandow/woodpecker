@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, Response
+from flask import Blueprint, Response, jsonify, request
 
 from app.decorators import login_required
 from app.services import decoy_source as decoy_svc

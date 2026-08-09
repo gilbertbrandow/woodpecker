@@ -1,6 +1,5 @@
 """Unit tests for table_query filter types — no DB or Flask context needed."""
-from app.table_query import FilterList, DateFilter, RangeFilter, SetFilter
-
+from app.table_query import DateFilter, FilterList, RangeFilter, SetFilter
 
 # ---------------------------------------------------------------------------
 # FilterList.apply_status

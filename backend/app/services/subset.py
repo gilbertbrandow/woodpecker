@@ -6,11 +6,11 @@ from typing import Any
 import sqlalchemy as sa
 
 from app.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
-from app.table_query import DateFilter, FilterList, RangeFilter
 from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.subset import Subset, SubsetTrainingItem
 from app.models.user import User
+from app.table_query import DateFilter, FilterList, RangeFilter
 
 DEFAULT_RATING_MIN = 0
 DEFAULT_RATING_MAX = 9999

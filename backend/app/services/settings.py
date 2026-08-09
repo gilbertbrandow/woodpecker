@@ -2,9 +2,9 @@ from app.exceptions import NotFoundError, ValidationError
 from app.extensions import db
 from app.models.user import User
 from app.services.validation import (
-    validate_display_name,
     validate_avatar_url,
     validate_board_theme,
+    validate_display_name,
     validate_piece_set,
     validate_sound_theme,
 )

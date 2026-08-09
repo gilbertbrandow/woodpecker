@@ -53,14 +53,19 @@ def db_session(app: Flask, _db_schema: None):  # type: ignore[misc]
 
 
 def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
-    from app.models.user import User
-    from app.models.source_import_run import SourceImportRun, SourceImportSource, SourceImportOperation, SourceImportStatus
-    from app.models.training_item import TrainingItem, TrainingItemSource
     from app.models.lichess_tactic import LichessTactic
-    from app.models.subset import Subset, SubsetTrainingItem
-    from app.models.schedule import Schedule
-    from app.models.training import Training
     from app.models.run import Run, RunTrainingItem, TrainingAttempt
+    from app.models.schedule import Schedule
+    from app.models.source_import_run import (
+        SourceImportOperation,
+        SourceImportRun,
+        SourceImportSource,
+        SourceImportStatus,
+    )
+    from app.models.subset import Subset, SubsetTrainingItem
+    from app.models.training import Training
+    from app.models.training_item import TrainingItem, TrainingItemSource
+    from app.models.user import User
 
     PUZZLE_ID = "test_spec17_001"
     PUZZLE_FEN = "4k3/1Q5R/8/8/3K4/8/8/R7 b - - 0 1"

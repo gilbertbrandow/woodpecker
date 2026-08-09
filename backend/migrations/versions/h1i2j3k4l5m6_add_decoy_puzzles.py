@@ -6,8 +6,8 @@ Create Date: 2026-06-21
 
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "h1i2j3k4l5m6"

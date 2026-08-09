@@ -1,7 +1,7 @@
 """Tests for the new user flow: cap, whitelist, waitlist, display name, onboarding."""
 import os
 from datetime import datetime, timezone
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 import sqlalchemy as sa
@@ -10,9 +10,8 @@ from flask import Flask
 from app import auth_session
 from app.exceptions import ValidationError
 from app.models.user import User, WaitlistEntry, WhitelistEntry
-from app.services.validation import validate_display_name
 from app.services.auth_service import decide_access
-
+from app.services.validation import validate_display_name
 
 # ── Access decision (pure, no DB) ─────────────────────────────────────────────
 
@@ -108,12 +107,11 @@ def _patch_berserk(mock_client: MagicMock):  # type: ignore[misc]
 @pytest.mark.integration
 class TestCapBehavior:
     def test_user_below_cap_gets_onboarding(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        with patch.dict(os.environ, {"MAX_USERS": "5"}):
-            with _patch_berserk(_make_lichess_mock("newuser1")):
-                from app.services.auth_service import get_or_create_user
-                result = get_or_create_user("fake_token")
-                assert result["status"] == "onboarding"
-                assert result["lichess_username"] == "newuser1"
+        with patch.dict(os.environ, {"MAX_USERS": "5"}), _patch_berserk(_make_lichess_mock("newuser1")):
+            from app.services.auth_service import get_or_create_user
+            result = get_or_create_user("fake_token")
+            assert result["status"] == "onboarding"
+            assert result["lichess_username"] == "newuser1"
 
     def test_user_at_cap_gets_waitlisted(self, app: Flask, db_session) -> None:  # type: ignore[misc]
         for i in range(3):
@@ -125,18 +123,16 @@ class TestCapBehavior:
             db_session.add(user)
         db_session.commit()
 
-        with patch.dict(os.environ, {"MAX_USERS": "3"}):
-            with _patch_berserk(_make_lichess_mock("newcomer")):
-                from app.services.auth_service import get_or_create_user
-                result = get_or_create_user("fake_token")
-                assert result["status"] == "waitlisted"
+        with patch.dict(os.environ, {"MAX_USERS": "3"}), _patch_berserk(_make_lichess_mock("newcomer")):
+            from app.services.auth_service import get_or_create_user
+            result = get_or_create_user("fake_token")
+            assert result["status"] == "waitlisted"
 
     def test_zero_max_users_waitlists_everyone(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        with patch.dict(os.environ, {"MAX_USERS": "0"}):
-            with _patch_berserk(_make_lichess_mock("zeroucap")):
-                from app.services.auth_service import get_or_create_user
-                result = get_or_create_user("fake_token")
-                assert result["status"] == "waitlisted"
+        with patch.dict(os.environ, {"MAX_USERS": "0"}), _patch_berserk(_make_lichess_mock("zeroucap")):
+            from app.services.auth_service import get_or_create_user
+            result = get_or_create_user("fake_token")
+            assert result["status"] == "waitlisted"
 
 
 # ── Whitelist bypass ──────────────────────────────────────────────────────────
@@ -158,11 +154,10 @@ class TestWhitelistBypass:
         db_session.add(entry)
         db_session.commit()
 
-        with patch.dict(os.environ, {"MAX_USERS": "5"}):
-            with _patch_berserk(_make_lichess_mock("wlspecial")):
-                from app.services.auth_service import get_or_create_user
-                result = get_or_create_user("fake_token")
-                assert result["status"] == "onboarding"
+        with patch.dict(os.environ, {"MAX_USERS": "5"}), _patch_berserk(_make_lichess_mock("wlspecial")):
+            from app.services.auth_service import get_or_create_user
+            result = get_or_create_user("fake_token")
+            assert result["status"] == "onboarding"
 
     def test_whitelist_lookup_is_case_insensitive(self, app: Flask, db_session) -> None:  # type: ignore[misc]
         # Whitelist stores lowercase; Lichess returns canonical mixed-case username.
@@ -174,11 +169,10 @@ class TestWhitelistBypass:
         db_session.add(entry)
         db_session.commit()
 
-        with patch.dict(os.environ, {"MAX_USERS": "0"}):
-            with _patch_berserk(_make_lichess_mock("WlMixed")):
-                from app.services.auth_service import get_or_create_user
-                result = get_or_create_user("fake_token")
-                assert result["status"] == "onboarding"
+        with patch.dict(os.environ, {"MAX_USERS": "0"}), _patch_berserk(_make_lichess_mock("WlMixed")):
+            from app.services.auth_service import get_or_create_user
+            result = get_or_create_user("fake_token")
+            assert result["status"] == "onboarding"
 
 
 # ── Existing user always active ───────────────────────────────────────────────
@@ -195,11 +189,10 @@ class TestExistingUserAlwaysActive:
             db_session.add(user)
         db_session.commit()
 
-        with patch.dict(os.environ, {"MAX_USERS": "1"}):
-            with _patch_berserk(_make_lichess_mock("existingcap0")):
-                from app.services.auth_service import get_or_create_user
-                result = get_or_create_user("fake_token")
-                assert result["status"] == "active"
+        with patch.dict(os.environ, {"MAX_USERS": "1"}), _patch_berserk(_make_lichess_mock("existingcap0")):
+            from app.services.auth_service import get_or_create_user
+            result = get_or_create_user("fake_token")
+            assert result["status"] == "active"
 
     def test_returning_user_casing_is_preserved(self, app: Flask, db_session) -> None:  # type: ignore[misc]
         # Regression: .lower() on the Lichess username broke lookup for users
@@ -212,12 +205,11 @@ class TestExistingUserAlwaysActive:
         db_session.add(user)
         db_session.commit()
 
-        with patch.dict(os.environ, {"MAX_USERS": "1"}):
-            with _patch_berserk(_make_lichess_mock("ChessUser")):
-                from app.services.auth_service import get_or_create_user
-                result = get_or_create_user("fake_token")
-                assert result["status"] == "active"
-                assert result["user_id"] == user.id
+        with patch.dict(os.environ, {"MAX_USERS": "1"}), _patch_berserk(_make_lichess_mock("ChessUser")):
+            from app.services.auth_service import get_or_create_user
+            result = get_or_create_user("fake_token")
+            assert result["status"] == "active"
+            assert result["user_id"] == user.id
 
 
 # ── Waitlist idempotency ──────────────────────────────────────────────────────
@@ -430,8 +422,8 @@ class TestAuthSession:
 
 
 def _seed_participants(db_session) -> dict[str, object]:  # type: ignore[misc]
-    from app.models.subset import Subset
     from app.models.schedule import Schedule
+    from app.models.subset import Subset
     from app.models.training import Training
 
     user = User(

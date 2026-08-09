@@ -21,16 +21,13 @@ def compute_attempt_board(
     if status == "solved":
         try:
             board.push_uci(_resolve(plies[0]))
-            player_idx = 0
-            opponent_idx = 2
-            for uci in moves:
+            for player_idx, uci in enumerate(moves):
                 board.push_uci(uci)
                 is_last_user = player_idx + 1 >= len(moves)
+                opponent_idx = player_idx * 2 + 2
                 if not is_last_user and opponent_idx < len(plies):
                     board.push_uci(_resolve(plies[opponent_idx]))
-                    opponent_idx += 2
-                player_idx += 1
-        except Exception:
+        except ValueError:
             pass
         last_uci = moves[-1] if moves else None
         last_move: list[str] | None = [last_uci[:2], last_uci[2:4]] if last_uci else None
@@ -60,7 +57,7 @@ def compute_attempt_board(
                 }
             if i + 1 < len(moves) and player_positions[i] + 1 < len(plies):
                 board.push_uci(_resolve(plies[player_positions[i] + 1]))
-    except Exception:
+    except ValueError:
         pass
 
     return {"terminalFen": None, "lastMove": None, "result": None}
@@ -98,7 +95,7 @@ def compute_attempt_pgn(
                 "isWhite": is_white,
                 "moveStatus": move_status,
             }
-        except Exception:
+        except ValueError:
             return None
 
     def _decoy_subvariations(player_uci: str | None) -> list[list[dict[str, object]]] | None:
@@ -111,7 +108,7 @@ def compute_attempt_pgn(
             sub_board = chess.Board(contract.fen)
             try:
                 sub_board.push_uci(_resolve(plies[0]))
-            except Exception:
+            except ValueError:
                 continue
             line_str = lines.get(acc_uci)
             line_ucis = line_str.split() if line_str else [acc_uci]
@@ -134,7 +131,7 @@ def compute_attempt_pgn(
         opp_move = _make_display_move(board, _resolve(plies[0]), "opponent")
         if opp_move:
             mainline.append(opp_move)
-    except Exception:
+    except ValueError:
         return {"mainline": mainline, "variation": None, "subvariations": None}
 
     player_positions = list(range(1, len(plies), 2))
@@ -183,7 +180,7 @@ def compute_attempt_pgn(
                         var_board.push_uci(moves[j])
                         if player_positions[j] + 1 < len(plies):
                             var_board.push_uci(_resolve(plies[player_positions[j] + 1]))
-                except Exception:
+                except ValueError:
                     break
                 variation = []
                 var_idx = player_positions[i]

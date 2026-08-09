@@ -3,18 +3,18 @@ from typing import cast
 
 import sqlalchemy as sa
 
-from app.extensions import db
 from app.exceptions import ForbiddenError, NotFoundError
-from app.table_query import FilterList, RangeFilter
-from app.models.run import TrainingAttempt, Run, RunTrainingItem
-from app.models.training import Training
-from app.models.user import User
+from app.extensions import db
+from app.models.run import Run, RunTrainingItem, TrainingAttempt
 from app.models.schedule import Schedule
 from app.models.subset import Subset
+from app.models.training import Training
+from app.models.user import User
 from app.services.attempt_state import attempt_type_fields
 from app.services.chess_board import compute_attempt_board, compute_attempt_pgn
 from app.services.schedule_config import ScheduleConfig
 from app.services.training_item_content import get_content
+from app.table_query import FilterList, RangeFilter
 
 
 def _range_matches(f: RangeFilter, value: float | None) -> bool:

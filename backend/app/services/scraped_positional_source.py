@@ -1,4 +1,4 @@
-from sqlalchemy import func, select, exists
+from sqlalchemy import exists, func, select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
 

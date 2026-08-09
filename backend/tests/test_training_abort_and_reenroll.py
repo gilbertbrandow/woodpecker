@@ -1,19 +1,25 @@
-import pytest
 from datetime import datetime, timezone
 
+import pytest
 from flask.testing import FlaskClient
+
 from tests.conftest import _seed_world  # type: ignore[import]
 
 
 def _seed_base(session):
     """Seed a user, schedule, and training without an active run."""
-    from app.models.user import User
-    from app.models.source_import_run import SourceImportRun, SourceImportSource, SourceImportOperation, SourceImportStatus
-    from app.models.training_item import TrainingItem, TrainingItemSource
     from app.models.lichess_tactic import LichessTactic
-    from app.models.subset import Subset, SubsetTrainingItem
     from app.models.schedule import Schedule
+    from app.models.source_import_run import (
+        SourceImportOperation,
+        SourceImportRun,
+        SourceImportSource,
+        SourceImportStatus,
+    )
+    from app.models.subset import Subset, SubsetTrainingItem
     from app.models.training import Training
+    from app.models.training_item import TrainingItem, TrainingItemSource
+    from app.models.user import User
 
     source_run = SourceImportRun(
         source=SourceImportSource.LICHESS_TACTICS,

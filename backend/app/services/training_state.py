@@ -119,7 +119,7 @@ def compute_training_state(
         return {"state": "completed"}
 
     if completed_runs:
-        last_run = max(completed_runs, key=lambda r: r.completed_at or datetime.min)
+        last_run = max(completed_runs, key=lambda r: r.completed_at or datetime.min.replace(tzinfo=timezone.utc))
         assert last_run.completed_at is not None
         run_idx = last_run.run_index
         run_def = schedule_cfg.runs[run_idx] if run_idx < len(schedule_cfg.runs) else None

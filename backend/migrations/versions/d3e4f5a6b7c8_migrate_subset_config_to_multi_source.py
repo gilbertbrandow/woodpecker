@@ -9,8 +9,8 @@ Create Date: 2026-05-19
 
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision: str = "d3e4f5a6b7c8"
 down_revision: str | None = "c2d3e4f5a6b7"

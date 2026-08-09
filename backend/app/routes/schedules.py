@@ -1,5 +1,4 @@
 import sqlalchemy as sa
-
 from flask import Blueprint, Response, jsonify, request, session
 
 from app.decorators import login_required
@@ -8,8 +7,8 @@ from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.user import User
 from app.services import schedule as schedule_svc
-from app.table_query import TableQuery
 from app.services import training as training_svc
+from app.table_query import TableQuery
 
 schedules_bp = Blueprint("schedules", __name__, url_prefix="/schedules")
 

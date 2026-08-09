@@ -12,7 +12,6 @@ import pytest
 import sqlalchemy as sa
 from flask.testing import FlaskClient
 
-
 # ── Helpers ──────────────────────────────────────────────────────────────────────
 
 def _login(client: FlaskClient, user_id: int) -> None:
@@ -61,8 +60,8 @@ def _get_or_create_theme(session, name: str, display_name: str | None = None):  
 
 
 def _make_tactic(session, puzzle_id: str, rating: int = 1500):  # type: ignore[misc]
-    from app.models.training_item import TrainingItem, TrainingItemSource
     from app.models.lichess_tactic import LichessTactic
+    from app.models.training_item import TrainingItem, TrainingItemSource
     item = TrainingItem(source_type=TrainingItemSource.LICHESS_TACTIC)
     session.add(item)
     session.flush()
@@ -89,9 +88,12 @@ def _make_positional(  # type: ignore[misc]
     theme_names: list[str] | None = None,
     opening_name: str | None = None,
 ):
-    from app.models.training_item import TrainingItem, TrainingItemSource
-    from app.models.scraped_positional_puzzle import ScrapedPositionalPuzzle, scraped_positional_theme_links
     from app.models.opening import Opening
+    from app.models.scraped_positional_puzzle import (
+        ScrapedPositionalPuzzle,
+        scraped_positional_theme_links,
+    )
+    from app.models.training_item import TrainingItem, TrainingItemSource
 
     difficulty = _get_or_create_difficulty(session, difficulty_value)
 
@@ -154,8 +156,8 @@ def _add_item_to_subset(session, subset, training_item, position: int = 0):  # t
 
 
 def _make_decoy(session, accepted_moves: list | None = None):  # type: ignore[misc]
-    from app.models.training_item import TrainingItem, TrainingItemSource
     from app.models.decoy_puzzle import DecoyPuzzle
+    from app.models.training_item import TrainingItem, TrainingItemSource
     item = TrainingItem(source_type=TrainingItemSource.DECOY)
     session.add(item)
     session.flush()

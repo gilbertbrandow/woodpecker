@@ -1,4 +1,4 @@
-from sqlalchemy import func, or_, select, exists
+from sqlalchemy import exists, func, or_, select
 from sqlalchemy.orm import selectinload
 
 from app.extensions import db
@@ -8,13 +8,13 @@ from app.models.lichess_tactic import (
     lichess_tactic_theme_links,
 )
 from app.models.lichess_tactic_theme import LichessTacticTheme
+from app.models.opening import Opening
 from app.models.source_import_run import (
     LichessTacticsSourceRunMetadata,
     SourceImportRun,
     SourceImportSource,
     SourceImportStatus,
 )
-from app.models.opening import Opening
 from app.table_query import FilterList, RangeFilter, SetFilter
 
 TOP_THEMES_LIMIT = 25

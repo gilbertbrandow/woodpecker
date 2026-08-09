@@ -1,13 +1,12 @@
 """Tests for admin routes and admin_required decorator."""
-from datetime import datetime, timezone, timedelta
-from unittest.mock import patch, MagicMock
+from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock, patch
 
 import pytest
 import sqlalchemy as sa
 from flask import Flask
 
 from app.models.user import User, WaitlistEntry, WhitelistEntry
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -114,11 +113,10 @@ class TestAdminStats:
         admin = _make_user(db_session, username="statsenvadmin", is_superadmin=True)
         db_session.commit()
 
-        with patch.dict("os.environ", {"MAX_USERS": ""}):
-            with app.test_client() as client:
-                with client.session_transaction() as sess:
-                    sess["user_id"] = admin.id
-                response = client.get("/admin/stats")
+        with patch.dict("os.environ", {"MAX_USERS": ""}), app.test_client() as client:
+            with client.session_transaction() as sess:
+                sess["user_id"] = admin.id
+            response = client.get("/admin/stats")
 
         assert response.get_json()["maxUsers"] == 0
 
@@ -126,11 +124,10 @@ class TestAdminStats:
         admin = _make_user(db_session, username="statsenvadmin2", is_superadmin=True)
         db_session.commit()
 
-        with patch.dict("os.environ", {"MAX_USERS": "50"}):
-            with app.test_client() as client:
-                with client.session_transaction() as sess:
-                    sess["user_id"] = admin.id
-                response = client.get("/admin/stats")
+        with patch.dict("os.environ", {"MAX_USERS": "50"}), app.test_client() as client:
+            with client.session_transaction() as sess:
+                sess["user_id"] = admin.id
+            response = client.get("/admin/stats")
 
         assert response.get_json()["maxUsers"] == 50
 
@@ -606,10 +603,9 @@ class TestLastLoginAt:
         assert user.last_login_at is not None
 
     def test_onboarding_does_not_create_user(self, app: Flask, db_session) -> None:  # type: ignore[misc]
-        with patch.dict("os.environ", {"MAX_USERS": "10"}):
-            with _patch_berserk(_make_lichess_mock("freshonboarder")):
-                from app.services.auth_service import get_or_create_user
-                result = get_or_create_user("fake_token")
+        with patch.dict("os.environ", {"MAX_USERS": "10"}), _patch_berserk(_make_lichess_mock("freshonboarder")):
+            from app.services.auth_service import get_or_create_user
+            result = get_or_create_user("fake_token")
 
         assert result["status"] == "onboarding"
         count = db_session.scalar(
