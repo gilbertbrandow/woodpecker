@@ -10,8 +10,8 @@ Create Date: 2026-05-19
 
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "b0c1d2e3f4a5"

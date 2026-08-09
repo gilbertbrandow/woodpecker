@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, session, Response
+from flask import Blueprint, Response, jsonify, request, session
 
 from app.decorators import login_required
 from app.extensions import db

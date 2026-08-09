@@ -269,7 +269,7 @@ def _serialize_game(game: Game) -> dict[str, object]:
 
 def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
     if not isinstance(decoy.accepted_moves, list):
-        raise ValueError(
+        raise TypeError(
             f"DecoyPuzzle {decoy.id}: accepted_moves is {type(decoy.accepted_moves).__name__}, "
             "expected list — run migration p9q0r1s2t3u4 to fix corrupt rows"
         )
@@ -290,7 +290,7 @@ def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
             post_board = chess.Board(fen)
             post_board.push_uci(decoy.opponent_move)
             analysis_url = f"https://lichess.org/analysis/{quote(post_board.fen(), safe='/')}"
-        except Exception:
+        except ValueError:
             analysis_url = f"https://lichess.org/analysis/{quote(fen, safe='/')}"
     return TrainingItemPayload(
         contract=SolveContract(

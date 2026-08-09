@@ -7,8 +7,8 @@ Depends On: None
 
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision: str = "e2f3a4b5c6d7"
 down_revision: str | None = "d1e2f3a4b5c6"

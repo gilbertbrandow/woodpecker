@@ -1,29 +1,31 @@
 import os
-import sqlalchemy as sa
-import sentry_sdk
 from datetime import datetime, timezone
+
+import sentry_sdk
+import sqlalchemy as sa
 from flask import Flask, session
 from sentry_sdk.integrations.flask import FlaskIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
-from app.exceptions import AppError
-from app.extensions import db, cors, migrate
-from app.routes.health import health_bp
-from app.routes.auth import auth_bp
-from app.routes.settings import settings_bp
-from app.routes.subsets import subsets_bp
-from app.routes.schedules import schedules_bp
-from app.routes.training import training_bp
-from app.routes.runs import runs_bp
-from app.routes.themes import themes_bp
-from app.routes.openings import openings_bp
-from app.routes.leaderboard import leaderboard_bp
-from app.routes.dashboard import dashboard_bp
-from app.routes.sources import sources_bp
-from app.routes.users import users_bp
-from app.routes.admin import admin_bp
-from app.routes.training_items import training_items_bp
+
 from app.cli import register_commands
 from app.errors import register_error_handlers
+from app.exceptions import AppError
+from app.extensions import cors, db, migrate
+from app.routes.admin import admin_bp
+from app.routes.auth import auth_bp
+from app.routes.dashboard import dashboard_bp
+from app.routes.health import health_bp
+from app.routes.leaderboard import leaderboard_bp
+from app.routes.openings import openings_bp
+from app.routes.runs import runs_bp
+from app.routes.schedules import schedules_bp
+from app.routes.settings import settings_bp
+from app.routes.sources import sources_bp
+from app.routes.subsets import subsets_bp
+from app.routes.themes import themes_bp
+from app.routes.training import training_bp
+from app.routes.training_items import training_items_bp
+from app.routes.users import users_bp
 
 
 def _init_sentry() -> None:
@@ -65,7 +67,9 @@ def create_app() -> Flask:
     @app.before_request
     def update_last_seen() -> None:
         from datetime import timedelta
+
         from sqlalchemy.exc import OperationalError
+
         from app.models.user import User
         user_id = session.get("user_id")
         if not user_id:

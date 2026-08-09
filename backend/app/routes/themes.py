@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, Response
+from flask import Blueprint, Response, jsonify
 
 from app.decorators import login_required
 from app.services import themes as themes_svc

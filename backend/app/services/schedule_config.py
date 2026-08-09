@@ -26,7 +26,7 @@ class ScheduleConfig:
     def from_dict(d: dict[str, object]) -> "ScheduleConfig":
         runs_raw = d.get("runs")
         if not isinstance(runs_raw, list):
-            raise ValueError("config.runs must be a list.")
+            raise TypeError("config.runs must be a list.")
         if not runs_raw:
             raise ValueError("config.runs must have at least one entry.")
         if len(runs_raw) > MAX_RUNS:
@@ -34,7 +34,7 @@ class ScheduleConfig:
         runs: list[RunDefinition] = []
         for i, run_item in enumerate(runs_raw):
             if not isinstance(run_item, dict):
-                raise ValueError(f"config.runs[{i}] must be an object.")
+                raise TypeError(f"config.runs[{i}] must be an object.")
             run = cast(dict[str, object], run_item)
             target_hours = run.get("target_hours")
             break_after = run.get("break_after_hours")
@@ -53,7 +53,7 @@ class ScheduleConfig:
 
         rep_raw = d.get("failed_repetition")
         if not isinstance(rep_raw, dict):
-            raise ValueError("config.failed_repetition must be an object.")
+            raise TypeError("config.failed_repetition must be an object.")
         rep = cast(dict[str, object], rep_raw)
         mode = rep.get("mode")
         if mode not in ("none", "queue"):

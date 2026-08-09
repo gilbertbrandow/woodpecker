@@ -1,20 +1,24 @@
 import os
 
-from flask import Blueprint, redirect, session, request, jsonify, Response
+from berserk.exceptions import ResponseError as BerserkError
+from flask import Blueprint, Response, jsonify, redirect, request, session
+from requests.exceptions import RequestException
+from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.wrappers import Response as WerkzeugResponse
+
+from app import auth_session
 from app.extensions import db
 from app.models.user import User, WaitlistEntry
 from app.services.auth_service import (
     build_lichess_auth_url,
+    create_user_from_onboarding,
     exchange_code_for_token,
     generate_pkce_pair,
     get_or_create_user,
-    create_user_from_onboarding,
-    update_waitlist_email,
     is_access_approved,
+    update_waitlist_email,
 )
 from app.services.validation import validate_display_name, validate_email
-import app.auth_session as auth_session
 from app.user_schema import user_to_dict
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
@@ -46,7 +50,7 @@ def callback() -> WerkzeugResponse:
 
     try:
         result = get_or_create_user(access_token)
-    except Exception:
+    except (BerserkError, RequestException, SQLAlchemyError, KeyError):
         return redirect(f"{APP_ORIGIN}?error=user_fetch_failed")
 
     status = result["status"]

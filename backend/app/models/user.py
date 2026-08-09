@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
+
 import sqlalchemy as sa
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.extensions import Base
 
 

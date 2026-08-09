@@ -7,8 +7,8 @@ Depends On: None
 
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "c0d1e2f3a4b5"

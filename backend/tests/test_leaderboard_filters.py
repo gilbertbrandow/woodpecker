@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 import pytest
 from flask.testing import FlaskClient
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _login(client: FlaskClient, user_id: int) -> None:
@@ -25,8 +24,8 @@ def _make_user(session, username: str, display_name: str | None = None):  # type
 
 
 def _make_schedule(session, user, name: str = "Test schedule"):  # type: ignore[misc]
-    from app.models.subset import Subset
     from app.models.schedule import Schedule
+    from app.models.subset import Subset
     subset = Subset(user_id=user.id, name="s", puzzle_count=5)
     session.add(subset)
     session.flush()
@@ -51,8 +50,8 @@ def _make_run(  # type: ignore[misc]
     completed: bool = False,
     aborted: bool = False,
 ):
-    from app.models.training import Training
     from app.models.run import Run
+    from app.models.training import Training
     now = datetime.now(timezone.utc)
     training = Training(user_id=user.id, schedule_id=schedule.id, started_at=now)
     session.add(training)

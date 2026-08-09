@@ -7,9 +7,10 @@ _interpolate_anchors scans linearly and hit the stale flat-break pair first, ret
 the wrong value (100 instead of 101 in the scenario below).
 """
 
-import pytest
 from datetime import datetime, timezone
 from unittest.mock import patch
+
+import pytest
 
 MS_PER_HOUR = 3_600_000
 BASE = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
@@ -21,15 +22,18 @@ def _dt(hours_offset: float) -> datetime:
 
 
 def _seed_world(session, puzzle_count: int = 100):
-    from app.models.user import User
-    from app.models.source_import_run import (
-        SourceImportRun, SourceImportSource, SourceImportOperation, SourceImportStatus,
-    )
-    from app.models.training_item import TrainingItem, TrainingItemSource
     from app.models.lichess_tactic import LichessTactic
-    from app.models.subset import Subset, SubsetTrainingItem
     from app.models.schedule import Schedule
+    from app.models.source_import_run import (
+        SourceImportOperation,
+        SourceImportRun,
+        SourceImportSource,
+        SourceImportStatus,
+    )
+    from app.models.subset import Subset, SubsetTrainingItem
     from app.models.training import Training
+    from app.models.training_item import TrainingItem, TrainingItemSource
+    from app.models.user import User
 
     source_run = SourceImportRun(
         source=SourceImportSource.LICHESS_TACTICS,

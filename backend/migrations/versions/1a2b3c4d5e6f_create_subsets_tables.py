@@ -6,8 +6,8 @@ Create Date: 2026-03-23
 
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB
 
 revision: str = "1a2b3c4d5e6f"

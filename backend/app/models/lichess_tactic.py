@@ -1,11 +1,10 @@
-from sqlalchemy import Column, ForeignKey, Index, Integer, Text, Table
+from sqlalchemy import Column, ForeignKey, Index, Integer, Table, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.extensions import Base
 from app.models.lichess_tactic_theme import LichessTacticTheme
 from app.models.opening import Opening
 from app.models.training_item import TrainingItem
-
 
 lichess_tactic_theme_links = Table(
     "lichess_tactic_theme_links",

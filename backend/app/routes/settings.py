@@ -1,4 +1,5 @@
-from flask import Blueprint, jsonify, request, session, Response
+from flask import Blueprint, Response, jsonify, request, session
+
 from app.decorators import login_required
 from app.services.settings import update_user_settings
 from app.user_schema import user_to_dict

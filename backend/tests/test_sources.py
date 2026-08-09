@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 import pytest
 from flask.testing import FlaskClient
 
-
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _make_user(session):  # type: ignore[misc]
@@ -21,7 +20,12 @@ def _login(client: FlaskClient, user_id: int) -> None:
 
 
 def _make_source_run(session):  # type: ignore[misc]
-    from app.models.source_import_run import SourceImportRun, SourceImportSource, SourceImportOperation, SourceImportStatus
+    from app.models.source_import_run import (
+        SourceImportOperation,
+        SourceImportRun,
+        SourceImportSource,
+        SourceImportStatus,
+    )
 
     run = SourceImportRun(
         source=SourceImportSource.LICHESS_TACTICS,
@@ -36,8 +40,8 @@ def _make_source_run(session):  # type: ignore[misc]
 
 
 def _make_tactic(session, puzzle_id: str, rating: int = 1500, source_run=None):  # type: ignore[misc]
-    from app.models.training_item import TrainingItem, TrainingItemSource
     from app.models.lichess_tactic import LichessTactic
+    from app.models.training_item import TrainingItem, TrainingItemSource
 
     if source_run is None:
         source_run = _make_source_run(session)
@@ -135,7 +139,12 @@ class TestSourcesList:
         assert lichess["puzzleCount"] == 2
 
     def test_first_imported_is_earliest_started_at(self, client: FlaskClient, db_session) -> None:
-        from app.models.source_import_run import SourceImportRun, SourceImportSource, SourceImportOperation, SourceImportStatus
+        from app.models.source_import_run import (
+            SourceImportOperation,
+            SourceImportRun,
+            SourceImportSource,
+            SourceImportStatus,
+        )
 
         _login(client, _make_user(db_session).id)
         early = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -158,7 +167,12 @@ class TestSourcesList:
         assert lichess["firstImported"].startswith("2024-01-01")
 
     def test_last_synced_ignores_failed_runs(self, client: FlaskClient, db_session) -> None:
-        from app.models.source_import_run import SourceImportRun, SourceImportSource, SourceImportOperation, SourceImportStatus
+        from app.models.source_import_run import (
+            SourceImportOperation,
+            SourceImportRun,
+            SourceImportSource,
+            SourceImportStatus,
+        )
 
         _login(client, _make_user(db_session).id)
         succeeded_at = datetime(2024, 3, 1, tzinfo=timezone.utc)
@@ -186,7 +200,12 @@ class TestSourcesList:
         assert lichess["lastSynced"].startswith("2024-03-01")
 
     def test_last_synced_null_when_only_failed_runs(self, client: FlaskClient, db_session) -> None:
-        from app.models.source_import_run import SourceImportRun, SourceImportSource, SourceImportOperation, SourceImportStatus
+        from app.models.source_import_run import (
+            SourceImportOperation,
+            SourceImportRun,
+            SourceImportSource,
+            SourceImportStatus,
+        )
 
         _login(client, _make_user(db_session).id)
         db_session.add(SourceImportRun(
@@ -335,7 +354,12 @@ class TestLichessTacticsSourceRunMetadata:
         assert len(themes) == 25
 
     def test_returns_null_for_failed_run(self, client: FlaskClient, db_session) -> None:
-        from app.models.source_import_run import SourceImportRun, SourceImportSource, SourceImportOperation, SourceImportStatus
+        from app.models.source_import_run import (
+            SourceImportOperation,
+            SourceImportRun,
+            SourceImportSource,
+            SourceImportStatus,
+        )
 
         _login(client, _make_user(db_session).id)
         failed_run = SourceImportRun(

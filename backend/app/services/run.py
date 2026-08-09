@@ -8,13 +8,12 @@ import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
+from app.exceptions import ConflictError, ForbiddenError, NotFoundError
 from app.extensions import db
-from app.models.run import TrainingAttempt, Run, RunTrainingItem
+from app.models.run import Run, RunTrainingItem, TrainingAttempt
 from app.models.schedule import Schedule
-from app.models.training import Training
 from app.models.subset import Subset, SubsetTrainingItem
-from app.exceptions import ConflictError, NotFoundError, ForbiddenError
-from app.table_query import DateFilter, FilterList, RangeFilter
+from app.models.training import Training
 from app.services.attempt_state import (
     attempt_type_fields,
     derive_attempt_outcome,
@@ -32,6 +31,7 @@ from app.services.training_item_content import (
     get_content,
     get_content_batch,
 )
+from app.table_query import DateFilter, FilterList, RangeFilter
 
 
 def _get_run(run_id: int) -> Run:

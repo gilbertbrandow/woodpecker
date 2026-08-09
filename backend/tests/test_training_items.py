@@ -5,19 +5,19 @@ from flask.testing import FlaskClient
 
 
 def _seed_training_item_world(session) -> dict[str, object]:  # type: ignore[misc]
-    from app.models.user import User
+    from app.models.lichess_tactic import LichessTactic
+    from app.models.run import Run, RunTrainingItem, TrainingAttempt
+    from app.models.schedule import Schedule
     from app.models.source_import_run import (
+        SourceImportOperation,
         SourceImportRun,
         SourceImportSource,
-        SourceImportOperation,
         SourceImportStatus,
     )
-    from app.models.training_item import TrainingItem, TrainingItemSource
-    from app.models.lichess_tactic import LichessTactic
     from app.models.subset import Subset, SubsetTrainingItem
-    from app.models.schedule import Schedule
     from app.models.training import Training
-    from app.models.run import Run, RunTrainingItem, TrainingAttempt
+    from app.models.training_item import TrainingItem, TrainingItemSource
+    from app.models.user import User
 
     PUZZLE_FEN = "4k3/1Q5R/8/8/3K4/8/8/R7 b - - 0 1"
     PUZZLE_SOLUTION = "e8d8 a1a8"
@@ -195,8 +195,9 @@ class TestSpectateView:
         assert resp.status_code == 404
 
     def test_in_progress_attempt_returns_404(self, client: FlaskClient, db_session) -> None:
-        from app.models.run import RunTrainingItem, TrainingAttempt
         import sqlalchemy as sa
+
+        from app.models.run import RunTrainingItem, TrainingAttempt
 
         world = _seed_training_item_world(db_session)
         rp = db_session.execute(
@@ -229,15 +230,15 @@ class TestSpectateView:
         user_a has a completed attempt on item_1 (gate passes), but attempt_b belongs
         to item_2, so the joined query finds no match and returns 404.
         """
+        from app.models.lichess_tactic import LichessTactic
+        from app.models.run import RunTrainingItem, TrainingAttempt
         from app.models.source_import_run import (
+            SourceImportOperation,
             SourceImportRun,
             SourceImportSource,
-            SourceImportOperation,
             SourceImportStatus,
         )
         from app.models.training_item import TrainingItem, TrainingItemSource
-        from app.models.lichess_tactic import LichessTactic
-        from app.models.run import RunTrainingItem, TrainingAttempt
 
         world = _seed_training_item_world(db_session)
 
@@ -275,6 +276,7 @@ class TestSpectateView:
         # Give user_a a RunTrainingItem and a completed attempt on item_2 so the gate
         # passes when we call /training-items/{item_1}/attempts/{attempt_on_item_2}.
         import sqlalchemy as sa
+
         from app.models.run import Run
         run_a_q = db_session.execute(
             sa.select(Run).join(RunTrainingItem, RunTrainingItem.run_id == Run.id).where(
@@ -307,8 +309,9 @@ class TestSpectateView:
 
 def _add_failed_attempt(session, world: dict) -> int:  # type: ignore[misc]
     """Add a second (failed) attempt for user_a and return its id."""
-    from app.models.run import RunTrainingItem, TrainingAttempt
     import sqlalchemy as sa
+
+    from app.models.run import RunTrainingItem, TrainingAttempt
 
     rp = session.execute(
         sa.select(RunTrainingItem).where(
@@ -330,11 +333,11 @@ def _add_failed_attempt(session, world: dict) -> int:  # type: ignore[misc]
 
 def _add_user_with_attempt(session, world: dict, username: str, display_name: str) -> dict:  # type: ignore[misc]
     """Add a second user with a solved attempt on the same training item."""
-    from app.models.user import User
-    from app.models.subset import Subset, SubsetTrainingItem
-    from app.models.schedule import Schedule
-    from app.models.training import Training
     from app.models.run import Run, RunTrainingItem, TrainingAttempt
+    from app.models.schedule import Schedule
+    from app.models.subset import Subset, SubsetTrainingItem
+    from app.models.training import Training
+    from app.models.user import User
 
     schedule_config: dict[str, object] = {
         "runs": [{"target_hours": 168, "break_after_hours": 0}],

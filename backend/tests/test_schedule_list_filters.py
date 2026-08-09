@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 import pytest
 from flask.testing import FlaskClient
 
-
 # ── Helpers ──────────────────────────────────────────────────────────────────────
 
 def _login(client: FlaskClient, user_id: int) -> None:

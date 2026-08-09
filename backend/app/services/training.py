@@ -3,16 +3,16 @@ from datetime import datetime, timezone
 import sqlalchemy as sa
 from sqlalchemy.orm import aliased
 
+from app.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from app.extensions import db
-from app.models.run import TrainingAttempt, Run, RunTrainingItem
+from app.models.run import Run, RunTrainingItem, TrainingAttempt
 from app.models.schedule import Schedule
-from app.models.training import Training
 from app.models.subset import Subset
+from app.models.training import Training
 from app.models.user import User
-from app.exceptions import ConflictError, ValidationError, NotFoundError, ForbiddenError
-from app.table_query import DateFilter, FilterList
-from app.services.schedule_config import ScheduleConfig, RunDefinition
+from app.services.schedule_config import RunDefinition, ScheduleConfig
 from app.services.training_state import compute_training_state
+from app.table_query import DateFilter, FilterList
 
 
 def _get_training(training_id: int) -> Training:
@@ -943,9 +943,9 @@ def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
             updated_anchors.append({"timeMs": float(now_ms), "value": val_at_now})
             updated_anchors.sort(key=lambda a: a["timeMs"])
 
-    all_times = sorted(set(
+    all_times = sorted({
         int(a["timeMs"]) for a in original_anchors + updated_anchors + actual_anchors
-    ))
+    })
 
     total_expected_puzzles = len(schedule_cfg.runs) * puzzle_count
 
