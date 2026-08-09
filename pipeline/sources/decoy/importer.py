@@ -233,6 +233,15 @@ def import_decoys(
                 click.echo(f"Warning: skipping record {rows_read + rows_malformed}: missing fields {missing}")
                 continue
 
+            accepted_moves = item["acceptedMoves"]
+            if not isinstance(accepted_moves, list) or not accepted_moves:
+                rows_malformed += 1
+                click.echo(
+                    f"Warning: skipping record {rows_read + rows_malformed}: "
+                    f"acceptedMoves must be a non-empty list, got {type(accepted_moves).__name__}"
+                )
+                continue
+
             rows_read += 1
             pending.append(item)
 
