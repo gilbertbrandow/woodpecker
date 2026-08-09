@@ -268,6 +268,11 @@ def _serialize_game(game: Game) -> dict[str, object]:
 
 
 def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
+    if not isinstance(decoy.accepted_moves, list):
+        raise ValueError(
+            f"DecoyPuzzle {decoy.id}: accepted_moves is {type(decoy.accepted_moves).__name__}, "
+            "expected list — run migration p9q0r1s2t3u4 to fix corrupt rows"
+        )
     accepted_ucis = [m["uci"] for m in decoy.accepted_moves if isinstance(m, dict) and "uci" in m]
     decoy_lines = {
         m["uci"]: m["line"]
