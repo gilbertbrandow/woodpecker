@@ -1,9 +1,12 @@
 import * as React from 'react'
 import { useState, useEffect, useCallback } from 'react'
 import {
-  useReactTable,
-  getCoreRowModel,
+  useTable,
+  stockFeatures,
   flexRender,
+  createSortedRowModel,
+  createPaginatedRowModel,
+  type StockFeatures,
   type ColumnDef,
   type SortingState,
   type Column,
@@ -25,6 +28,12 @@ import {
   TableCell,
 } from '../ui/table'
 
+const _features = {
+  ...stockFeatures,
+  sortedRowModel: createSortedRowModel(),
+  paginatedRowModel: createPaginatedRowModel(),
+} as unknown as StockFeatures
+
 type ColMeta = { className?: string }
 
 const OPENING_MAX_CHARS = 18
@@ -39,7 +48,7 @@ function SortHeader({
   column,
   label,
 }: {
-  column: Column<TrainingItemRow, unknown>
+  column: Column<StockFeatures, TrainingItemRow, unknown>
   label: string
 }): React.ReactElement {
   const sorted = column.getIsSorted()
@@ -193,7 +202,7 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
     }
   }
 
-  const selectColumn: ColumnDef<TrainingItemRow> = {
+  const selectColumn: ColumnDef<StockFeatures, TrainingItemRow> = {
     id: 'select',
     header: ({ table }) => (
       <Checkbox
@@ -212,7 +221,7 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
     enableSorting: false,
   }
 
-  const actionColumn: ColumnDef<TrainingItemRow> = {
+  const actionColumn: ColumnDef<StockFeatures, TrainingItemRow> = {
     id: 'action',
     header: '',
     enableSorting: false,
@@ -234,7 +243,7 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
     ),
   }
 
-  const columns: ColumnDef<TrainingItemRow>[] = [
+  const columns: ColumnDef<StockFeatures, TrainingItemRow>[] = [
     ...(!locked ? [selectColumn] : []),
     {
       id: 'sourceType',
@@ -301,7 +310,8 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
     ...(!locked ? [actionColumn] : []),
   ]
 
-  const table = useReactTable({
+  const table = useTable({
+    features: _features,
     data: puzzles,
     columns,
     manualSorting: true,
@@ -325,7 +335,6 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
         typeof updater === 'function' ? updater({ pageIndex, pageSize: 25 }) : updater
       setPageIndex(next.pageIndex)
     },
-    getCoreRowModel: getCoreRowModel(),
   })
 
   const selectedCount = table.getFilteredSelectedRowModel().rows.length

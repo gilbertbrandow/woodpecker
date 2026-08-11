@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useRef, useMemo, useCallback } from 'react'
-import { type ColumnDef } from '@tanstack/react-table'
+import { type ColumnDef, type StockFeatures } from '@tanstack/react-table'
 import { useAuth } from '../../context/auth'
 import { ServerDataTable, type FetchParams } from '../ServerDataTable'
 import { col, actionCol } from '../DataTable'
@@ -38,7 +38,7 @@ export function DashboardLeaderboard({ trainingId, runIndex, initialRows }: Prop
   const { user } = useAuth()
   const pageRef = useRef({ page: 1, pageSize: PAGE_SIZE })
 
-  const columns = useMemo<ColumnDef<LeaderboardRun>[]>(
+  const columns = useMemo<ColumnDef<StockFeatures, LeaderboardRun>[]>(
     () => [
       actionCol({
         id: 'position',

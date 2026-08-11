@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useCallback, useMemo, useRef } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { Activity, CheckCircle2, XCircle } from 'lucide-react'
-import { type ColumnDef } from '@tanstack/react-table'
+import { type ColumnDef, type StockFeatures } from '@tanstack/react-table'
 import { PageWrapper } from '../components/PageWrapper'
 import { useAuth } from '../context/auth'
 import { ServerDataTable } from '../components/ServerDataTable'
@@ -131,7 +131,7 @@ export function LeaderboardPage(): React.ReactElement | null {
     return api.leaderboard.listWeekly(params)
   }, [])
 
-  const runColumns = useMemo<ColumnDef<LeaderboardRun>[]>(() => [
+  const runColumns = useMemo<ColumnDef<StockFeatures, LeaderboardRun>[]>(() => [
     actionCol({
       id: 'position',
       enableSorting: false,
@@ -292,7 +292,7 @@ export function LeaderboardPage(): React.ReactElement | null {
     }),
   ], [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const weeklyColumns = useMemo<ColumnDef<WeeklyLeaderboardRow>[]>(() => [
+  const weeklyColumns = useMemo<ColumnDef<StockFeatures, WeeklyLeaderboardRow>[]>(() => [
     actionCol({
       id: 'position',
       enableSorting: false,

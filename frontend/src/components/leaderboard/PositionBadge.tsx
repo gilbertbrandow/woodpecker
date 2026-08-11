@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { type Table } from '@tanstack/react-table'
+import { type Table, type StockFeatures, type RowData } from '@tanstack/react-table'
 import cupGold from '../../assets/medals/cup-gold.svg'
 import cupSilver from '../../assets/medals/cup-silver.svg'
 import cupBronze from '../../assets/medals/cup-bronze.svg'
@@ -25,12 +25,12 @@ export function PositionBadge({ position }: { position: number }): React.ReactEl
   )
 }
 
-export function getGlobalPosition<T>(row: { id: string }, table: Table<T>): number {
-  const { pageIndex, pageSize } = table.getState().pagination
+export function getGlobalPosition<T extends RowData>(row: { id: string }, table: Table<StockFeatures, T>): number {
+  const { pageIndex, pageSize } = table.store.state.pagination
   const localIndex = table.getRowModel().rows.findIndex((r) => r.id === row.id)
   const visualIndex = pageIndex * pageSize + localIndex
 
-  const primarySort = table.getState().sorting[0]
+  const primarySort = table.store.state.sorting[0]
   if (primarySort) {
     const col = table.getColumn(primarySort.id)
     // rankDesc: true = higher value is better (default); false = lower value is better (e.g. time)

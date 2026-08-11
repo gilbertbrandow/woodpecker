@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Check, X, CircleOff, CheckCheck } from 'lucide-react'
-import { type ColumnDef } from '@tanstack/react-table'
+import { type ColumnDef, type StockFeatures } from '@tanstack/react-table'
 import { Link } from '@tanstack/react-router'
 import { formatSolveTimeMs } from '../../lib/utils'
 import { api } from '../../lib/api'
@@ -42,7 +42,7 @@ const RESULT_OPTIONS = [
   { label: 'Failed', value: 'failed', icon: <X className="h-3.5 w-3.5 text-red-500" /> },
 ]
 
-const columns: ColumnDef<OverviewAttemptHistoryRow>[] = [
+const columns: ColumnDef<StockFeatures, OverviewAttemptHistoryRow>[] = [
   col({
     id: 'user',
     header: 'User',

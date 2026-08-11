@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useCallback, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { type ColumnDef } from '@tanstack/react-table'
+import { type ColumnDef, type StockFeatures } from '@tanstack/react-table'
 import { ExternalLink, Play, Eye, Zap, Compass, Check, CheckCheck, Timer, Clock, XCircle } from 'lucide-react'
 import { DATA_ICONS } from '../../lib/icons'
 import { StatusBadge } from '../StatusBadge'
@@ -99,7 +99,7 @@ function ActionButton({ tooltip, onClick, disabled = false, children }: ActionBu
   )
 }
 
-const columns: ColumnDef<RunTrainingItemListItem>[] = [
+const columns: ColumnDef<StockFeatures, RunTrainingItemListItem>[] = [
   actionCol({
     accessorKey: 'position',
     header: '#',
@@ -176,7 +176,7 @@ export function RunTrainingItemTable({ runId, runIdStr, isActive }: Props): Reac
     })
   }
 
-  const actionColumns = useMemo<ColumnDef<RunTrainingItemListItem>[]>(
+  const actionColumns = useMemo<ColumnDef<StockFeatures, RunTrainingItemListItem>[]>(
     () => [
     ...columns,
     actionCol({

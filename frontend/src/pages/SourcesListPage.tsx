@@ -11,7 +11,7 @@ import { DataTable, col } from '../components/DataTable'
 import { FilterChipBar } from '../components/FilterChipBar'
 import { getHandler } from '../components/filters'
 import type { FilterSpec, FilterValues, MultiVal, DateVal } from '../components/filters'
-import { type ColumnDef } from '@tanstack/react-table'
+import { type ColumnDef, type StockFeatures } from '@tanstack/react-table'
 import { type SourceListItem, api } from '../lib/api'
 import { DATA_ICONS } from '../lib/icons'
 import { formatDate, formatNumber } from '../lib/utils'
@@ -71,7 +71,7 @@ function matchesDateFilter(dateStr: string | null, filter: DateVal | null): bool
   }
 }
 
-const columns: ColumnDef<SourceListItem>[] = [
+const columns: ColumnDef<StockFeatures, SourceListItem>[] = [
   col({
     id: 'name',
     header: 'Name',
