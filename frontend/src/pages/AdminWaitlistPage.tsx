@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useMemo, useRef, useState } from 'react'
-import { type ColumnDef } from '@tanstack/react-table'
+import { type ColumnDef, type StockFeatures } from '@tanstack/react-table'
 import { CheckCircle2, Clock, Loader2, UserCheck } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -52,7 +52,7 @@ export function AdminWaitlistPage(): React.ReactElement {
   const handleAllowRef = useRef(handleAllow)
   handleAllowRef.current = handleAllow
 
-  const columns = useMemo<ColumnDef<AdminWaitlistEntry>[]>(
+  const columns = useMemo<ColumnDef<StockFeatures, AdminWaitlistEntry>[]>(
     () => [
       col({
         accessorKey: 'lichessUsername',

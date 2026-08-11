@@ -4,7 +4,7 @@ import { useServerTable } from '../../hooks/useServerTable'
 import { useNavigate } from '@tanstack/react-router'
 import { Loader2, Trash2, PencilLine, Layers, Lock, Activity } from 'lucide-react'
 import { formatDate } from '../../lib/utils'
-import { type ColumnDef } from '@tanstack/react-table'
+import { type ColumnDef, type StockFeatures } from '@tanstack/react-table'
 import { UserAvatar } from '../UserAvatar'
 import { StatusBadge } from '../StatusBadge'
 import { ServerDataTable } from '../ServerDataTable'
@@ -73,8 +73,8 @@ export function SubsetsTable({ selectedId, onSelect, onCountChange }: SubsetsTab
   const handleDeleteRef = useRef(handleDelete)
   handleDeleteRef.current = handleDelete
 
-  const columns = React.useMemo<ColumnDef<Subset>[]>(() => {
-    const cols: ColumnDef<Subset>[] = []
+  const columns = React.useMemo<ColumnDef<StockFeatures, Subset>[]>(() => {
+    const cols: ColumnDef<StockFeatures, Subset>[] = []
 
     if (pickerMode) {
       cols.push(actionCol({

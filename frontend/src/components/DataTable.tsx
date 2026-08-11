@@ -1,15 +1,18 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
+  useTable,
+  stockFeatures,
   flexRender,
+  filterFn_includesString,
+  createSortedRowModel,
+  createFilteredRowModel,
+  createPaginatedRowModel,
+  type StockFeatures,
+  type RowData,
   type ColumnDef,
   type SortingState,
-  type VisibilityState,
+  type ColumnVisibilityState,
 } from '@tanstack/react-table'
 import { ArrowUp, ArrowDown, ArrowUpDown, Search, Loader2, ChevronLeft, ChevronRight, Columns3, RotateCcw, EyeOff } from 'lucide-react'
 import { Input } from './ui/input'
@@ -42,7 +45,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip'
 
 declare module '@tanstack/react-table' {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  interface ColumnMeta<TData, TValue> {
+  interface ColumnMeta<TFeatures, TData, TValue> {
     className?: string
     rankDesc?: boolean
     icon?: React.ComponentType<{ className?: string }>
@@ -59,15 +62,24 @@ type ColMeta = {
   defaultHidden?: boolean
 }
 
-export function col<T>(
-  def: ColumnDef<T> & { meta: { icon: React.ComponentType<{ className?: string }> } },
-): ColumnDef<T> {
+export function col<T extends RowData>(
+  def: ColumnDef<StockFeatures, T> & { meta: { icon: React.ComponentType<{ className?: string }> } },
+): ColumnDef<StockFeatures, T> {
   return def
 }
 
-export function actionCol<T>(def: ColumnDef<T>): ColumnDef<T> {
+export function actionCol<T extends RowData>(def: ColumnDef<StockFeatures, T>): ColumnDef<StockFeatures, T> {
   return { ...def, enableHiding: false }
 }
+
+// Row model factories must be explicitly provided in v9 — stockFeatures only
+// registers the feature state/APIs; the pipeline computation lives here.
+const _features = {
+  ...stockFeatures,
+  filteredRowModel: createFilteredRowModel(),
+  sortedRowModel: createSortedRowModel(),
+  paginatedRowModel: createPaginatedRowModel(),
+} as unknown as StockFeatures
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
 
@@ -98,8 +110,8 @@ function encodeSortParam(sorting: SortingState): string | null {
   return `${sorting[0].id}:${sorting[0].desc ? 'desc' : 'asc'}`
 }
 
-type DataTableProps<T> = {
-  columns: ColumnDef<T>[]
+type DataTableProps<T extends RowData> = {
+  columns: ColumnDef<StockFeatures, T>[]
   data: T[]
   globalFilterPlaceholder?: string
   filtersSlot?: React.ReactNode
@@ -118,7 +130,7 @@ type DataTableProps<T> = {
   onFooterRowClick?: () => void
 }
 
-export function DataTable<T>({
+export function DataTable<T extends RowData>({
   columns,
   data,
   globalFilterPlaceholder = 'Search…',
@@ -147,9 +159,9 @@ export function DataTable<T>({
 
   const [globalFilter, setGlobalFilter] = useState<string>(() => getParam('q') ?? '')
 
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityState>(() => {
     const hidden = getMultiParam('hidden')
-    const init: VisibilityState = {}
+    const init: ColumnVisibilityState = {}
     // meta.defaultHidden columns start hidden unless URL overrides them visible
     for (const col of columns) {
       if (col.id && (col.meta as ColMeta | undefined)?.defaultHidden) {
@@ -167,7 +179,8 @@ export function DataTable<T>({
     return Number.isInteger(n) && n >= 1 ? n - 1 : 0
   })
 
-  const table = useReactTable({
+  const table = useTable({
+    features: _features,
     data,
     columns,
     state: {
@@ -186,12 +199,8 @@ export function DataTable<T>({
       setGlobalFilter(value)
       table.setPageIndex(0)
     },
-    globalFilterFn: 'includesString',
+    globalFilterFn: filterFn_includesString,
     manualPagination: !!serverPagination,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     initialState: {
       pagination: { pageIndex: serverPagination ? 0 : urlPageIndex, pageSize },
       sorting: initialSorting,
@@ -205,7 +214,7 @@ export function DataTable<T>({
     setParams({ hidden: hidden.length > 0 ? hidden : null })
   }, [columnVisibility]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { pageIndex } = table.getState().pagination
+  const { pageIndex } = table.store.state.pagination
   const totalFiltered = table.getFilteredRowModel().rows.length
   const pageRows = table.getRowModel().rows
   const start = totalFiltered === 0 ? 0 : pageIndex * pageSize + 1
@@ -307,7 +316,7 @@ export function DataTable<T>({
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={() => {
-                          const defaultState: VisibilityState = {}
+                          const defaultState: ColumnVisibilityState = {}
                           for (const c of hideableCols) {
                             if ((c.columnDef.meta as ColMeta | undefined)?.defaultHidden) {
                               defaultState[c.id] = false
@@ -506,7 +515,7 @@ export function DataTable<T>({
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center gap-1.5">
             <Select
-              value={String(table.getState().pagination.pageSize)}
+              value={String(table.store.state.pagination.pageSize)}
               onValueChange={(v) => {
                 table.setPageSize(Number(v))
                 table.setPageIndex(0)
@@ -517,7 +526,7 @@ export function DataTable<T>({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {pageSizeOptions(table.getState().pagination.pageSize).map((s) => (
+                {pageSizeOptions(table.store.state.pagination.pageSize).map((s) => (
                   <SelectItem key={s} value={String(s)} className="text-xs">{s}</SelectItem>
                 ))}
               </SelectContent>

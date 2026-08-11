@@ -2,7 +2,7 @@ import * as React from "react";
 import { useMemo } from "react";
 import { useNavigate, Link } from "@tanstack/react-router";
 import { formatDate } from "../../lib/utils";
-import { type ColumnDef } from "@tanstack/react-table";
+import { type ColumnDef, type StockFeatures } from "@tanstack/react-table";
 import {
   Timer,
   TrendingUp,
@@ -54,7 +54,7 @@ export function TrainingTable({
   const subsetFilterSpec = useSubsetFilterSpec('subsetId');
   const scheduleFilterSpec = useScheduleFilterSpec('scheduleId');
 
-  const columns = useMemo<ColumnDef<AllTrainingSummary>[]>(
+  const columns = useMemo<ColumnDef<StockFeatures, AllTrainingSummary>[]>(
     () => [
       col({
         id: "user",

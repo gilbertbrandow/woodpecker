@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { type ColumnDef, type SortingState } from '@tanstack/react-table'
+import { type ColumnDef, type SortingState, type StockFeatures, type RowData } from '@tanstack/react-table'
 import { Search } from 'lucide-react'
 import { DataTable } from './DataTable'
 import { FilterChipBar } from './FilterChipBar'
@@ -42,7 +42,7 @@ export type FetchParams = {
   sort?: { key: string; dir: 'asc' | 'desc' }
 }
 
-export type ServerDataTableProps<T> = {
+export type ServerDataTableProps<T extends RowData> = {
   // Optional namespace that prefixes all URL params, e.g. "run" → ?run_userId=…
   // Use when multiple ServerDataTables appear on the same page.
   // Pass false to disable URL sync entirely (wizard/picker tables).
@@ -64,7 +64,7 @@ export type ServerDataTableProps<T> = {
   // over initialCustomValues. Written as {} when all filters are cleared (so an explicit
   // empty state is distinguishable from "never set" on the next mount).
   persistFilters?: string
-  columns: ColumnDef<T>[]
+  columns: ColumnDef<StockFeatures, T>[]
   // Declared filter slots, rendered left-to-right in the filter bar.
   filters?: FilterSpec[]
   pageSize: number
@@ -88,7 +88,7 @@ export type ServerDataTableProps<T> = {
 // Component
 // ---------------------------------------------------------------------------
 
-export function ServerDataTable<T>({
+export function ServerDataTable<T extends RowData>({
   tableId,
   columns,
   filters: filtersProp,

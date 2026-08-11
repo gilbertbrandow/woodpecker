@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useMemo, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { type ColumnDef } from '@tanstack/react-table'
+import { type ColumnDef, type StockFeatures } from '@tanstack/react-table'
 import { CheckCircle2, Clock, Loader2, Plus, Trash2 } from 'lucide-react'
 import { Badge } from '../components/ui/badge'
 import { PageWrapper } from '../components/PageWrapper'
@@ -52,7 +52,7 @@ export function AdminWhitelistPage(): React.ReactElement {
   const handleDeleteRef = useRef(handleDelete)
   handleDeleteRef.current = handleDelete
 
-  const columns = useMemo<ColumnDef<AdminWhitelistEntry>[]>(
+  const columns = useMemo<ColumnDef<StockFeatures, AdminWhitelistEntry>[]>(
     () => [
       col({
         accessorKey: 'lichessUsername',

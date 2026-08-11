@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useMemo, useState, useEffect } from "react";
 import { ExternalLink, Compass, Zap, X } from "lucide-react";
-import { type ColumnDef } from "@tanstack/react-table";
+import { type ColumnDef, type StockFeatures } from "@tanstack/react-table";
 import {
   api,
   type LichessTactic,
@@ -128,7 +128,7 @@ function ThemeSelectorContent({
 // Columns
 // ---------------------------------------------------------------------------
 
-const COLUMNS: ColumnDef<LichessTactic>[] = [
+const COLUMNS: ColumnDef<StockFeatures, LichessTactic>[] = [
   col({
     id: "rating",
     accessorKey: "rating",

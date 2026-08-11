@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useMemo } from 'react'
 import { ShieldCheck, User } from 'lucide-react'
-import { type ColumnDef } from '@tanstack/react-table'
+import { type ColumnDef, type StockFeatures } from '@tanstack/react-table'
 import { PageWrapper } from '../components/PageWrapper'
 import { ServerDataTable } from '../components/ServerDataTable'
 import { col } from '../components/DataTable'
@@ -13,7 +13,7 @@ import { DATA_ICONS } from '../lib/icons'
 
 const PAGE_SIZE = 20
 
-const COLUMNS: ColumnDef<AdminUser>[] = [
+const COLUMNS: ColumnDef<StockFeatures, AdminUser>[] = [
   col({
     accessorKey: 'displayName',
     header: 'User',

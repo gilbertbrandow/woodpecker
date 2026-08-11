@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useMemo } from 'react'
 import { ExternalLink, Compass } from 'lucide-react'
-import { type ColumnDef } from '@tanstack/react-table'
+import { type ColumnDef, type StockFeatures } from '@tanstack/react-table'
 import { api, type DecoyItem } from '../../lib/api'
 import { ServerDataTable, type FetchParams } from '../ServerDataTable'
 import { col, actionCol } from '../DataTable'
@@ -26,7 +26,7 @@ const PAGE_SIZE = 20
 export function DecoyItemsSection(): React.ReactElement {
   const openingFilterSpec = useOpeningFilterSpec('opening')
 
-  const columns = useMemo<ColumnDef<DecoyItem>[]>(() => [
+  const columns = useMemo<ColumnDef<StockFeatures, DecoyItem>[]>(() => [
     col({
       id: 'position',
       header: 'Position',

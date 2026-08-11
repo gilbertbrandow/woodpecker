@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useMemo, useState, useEffect } from 'react'
 import { Compass, ExternalLink, Gauge, X, Zap } from 'lucide-react'
-import { type ColumnDef } from '@tanstack/react-table'
+import { type ColumnDef, type StockFeatures } from '@tanstack/react-table'
 import {
   api,
   type ScrapedPositionalPuzzle,
@@ -145,7 +145,7 @@ function ThemeSelectorContent({
 // Columns
 // ---------------------------------------------------------------------------
 
-const COLUMNS: ColumnDef<ScrapedPositionalPuzzle>[] = [
+const COLUMNS: ColumnDef<StockFeatures, ScrapedPositionalPuzzle>[] = [
   col({
     id: 'difficulty',
     header: 'Difficulty',

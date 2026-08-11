@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Activity, CheckCircle2, XCircle } from 'lucide-react'
-import { type ColumnDef } from '@tanstack/react-table'
+import { type ColumnDef, type StockFeatures } from '@tanstack/react-table'
 import {
   ServerDataTable,
   type FetchParams,
@@ -92,7 +92,7 @@ export function ScheduleRunLeaderboard({ scheduleId, currentUserId }: Props): Re
   const navigate = useNavigate()
   const pageRef = useRef({ page: 1, pageSize: PAGE_SIZE })
 
-  const columns = useMemo<ColumnDef<LeaderboardRun>[]>(
+  const columns = useMemo<ColumnDef<StockFeatures, LeaderboardRun>[]>(
     () => [
       actionCol({
         id: 'position',

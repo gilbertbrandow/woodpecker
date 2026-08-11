@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams, Link } from '@tanstack/react-router'
 import { toast } from '../lib/toast'
 import { Ban, ChevronDown, Loader2, Play } from 'lucide-react'
-import { type ColumnDef } from '@tanstack/react-table'
+import { type ColumnDef, type StockFeatures } from '@tanstack/react-table'
 import {
   ComposedChart,
   Bar,
@@ -216,7 +216,7 @@ export function TrainingPage(): React.ReactElement | null {
   )
   const solveTimeCompletedCount = solveTimeData.filter((d) => d.completed).length
 
-  const runColumns = useMemo<ColumnDef<RunSlot>[]>(() => {
+  const runColumns = useMemo<ColumnDef<StockFeatures, RunSlot>[]>(() => {
     const canManage = !!training && !!user && training.ownerId === user.id && (training.status === 'not_started' || training.status === 'in_progress')
     const completedCount = runs.filter((r) => r.status === 'completed').length
     const hasActive = runs.some((r) => r.status === 'active')

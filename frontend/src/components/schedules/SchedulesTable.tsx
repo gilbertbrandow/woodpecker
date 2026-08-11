@@ -4,7 +4,7 @@ import { useServerTable } from "../../hooks/useServerTable";
 import { useNavigate, Link } from "@tanstack/react-router";
 import { Loader2, Trash2, PencilLine, Lock, Activity } from "lucide-react";
 import { formatDate } from "../../lib/utils";
-import { type ColumnDef } from "@tanstack/react-table";
+import { type ColumnDef, type StockFeatures } from "@tanstack/react-table";
 import { UserAvatar } from "../UserAvatar";
 import { StatusBadge } from "../StatusBadge";
 import { useAuth } from "../../context/auth";
@@ -81,8 +81,8 @@ export function SchedulesTable({
   const handleDeleteRef = useRef(handleDelete);
   handleDeleteRef.current = handleDelete;
 
-  const columns = React.useMemo<ColumnDef<ScheduleSummary>[]>(() => {
-    const cols: ColumnDef<ScheduleSummary>[] = []
+  const columns = React.useMemo<ColumnDef<StockFeatures, ScheduleSummary>[]>(() => {
+    const cols: ColumnDef<StockFeatures, ScheduleSummary>[] = []
 
     if (pickerMode) {
       cols.push(actionCol({

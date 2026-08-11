@@ -43,7 +43,7 @@ import { SubsetIdentifier, formatLockedDate } from "./SubsetIdentifier";
 import { UserAvatar } from "../UserAvatar";
 import { ServerDataTable } from "../ServerDataTable";
 import type { FetchParams } from "../ServerDataTable";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { ColumnDef, StockFeatures } from "@tanstack/react-table";
 import { DATA_ICONS } from "../../lib/icons";
 import { cn } from "../../lib/utils";
 
@@ -462,7 +462,7 @@ function ExcludedSubsetsTable({
     [instanceKey],
   );
 
-  const columns = useMemo<ColumnDef<Subset>[]>(
+  const columns = useMemo<ColumnDef<StockFeatures, Subset>[]>(
     () => [
       {
         id: "creator",
