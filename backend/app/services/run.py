@@ -1,7 +1,7 @@
 import bisect
 import random
 from datetime import datetime, timedelta, timezone
-from typing import Any, cast
+from typing import Any, NamedTuple, cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import sqlalchemy as sa
@@ -360,6 +360,59 @@ def _parse_tz(tz_str: str) -> ZoneInfo:
         return ZoneInfo("UTC")
 
 
+class RunItemStats(NamedTuple):
+    id: int
+    position: int
+    has_queue_solved: bool
+    has_first_solved: bool
+    queue_done: int
+    solved_at: datetime | None
+    last_terminal_at: datetime | None
+    first_solve_time_ms: int | None
+
+
+def _fetch_run_item_stats(run_id: int, total_queue: int) -> list[RunItemStats]:
+    rows = db.session.execute(
+        sa.text("""
+            SELECT
+                rp.id,
+                rp.position,
+                COALESCE(BOOL_OR(a.status = 'solved' AND a.try_number <= :q), FALSE)
+                    AS has_queue_solved,
+                COALESCE(BOOL_OR(a.status = 'solved' AND a.try_number = 1), FALSE)
+                    AS has_first_solved,
+                COUNT(*) FILTER (WHERE a.status != 'in_progress' AND a.try_number <= :q)
+                    AS queue_done,
+                MIN(a.completed_at) FILTER (WHERE a.status = 'solved' AND a.try_number <= :q)
+                    AS solved_at,
+                MAX(a.completed_at) FILTER (WHERE a.status != 'in_progress' AND a.try_number <= :q)
+                    AS last_terminal_at,
+                (ARRAY_AGG(a.time_spent_ms ORDER BY a.try_number)
+                    FILTER (WHERE a.status = 'solved' AND a.try_number <= :q))[1]
+                    AS first_solve_time_ms
+            FROM run_training_items rp
+            LEFT JOIN training_attempts a ON a.run_training_item_id = rp.id
+            WHERE rp.run_id = :run_id
+            GROUP BY rp.id, rp.position
+            ORDER BY rp.position
+        """),
+        {"run_id": run_id, "q": total_queue},
+    ).all()
+    return [
+        RunItemStats(
+            id=row.id,
+            position=row.position,
+            has_queue_solved=row.has_queue_solved,
+            has_first_solved=row.has_first_solved,
+            queue_done=row.queue_done,
+            solved_at=row.solved_at,
+            last_terminal_at=row.last_terminal_at,
+            first_solve_time_ms=row.first_solve_time_ms,
+        )
+        for row in rows
+    ]
+
+
 def _compute_terminal_timestamps(run_puzzles: list[RunTrainingItem], total_queue: int) -> list[int]:
     result: list[int] = []
     for rp in run_puzzles:
@@ -375,6 +428,19 @@ def _compute_terminal_timestamps(run_puzzles: list[RunTrainingItem], total_queue
             last = queue_attempts[-1]
             if last.status == "failed" and last.completed_at is not None:
                 result.append(int(last.completed_at.timestamp() * 1000))
+    result.sort()
+    return result
+
+
+def _compute_terminal_timestamps_from_stats(
+    run_item_stats: list[RunItemStats], total_queue: int
+) -> list[int]:
+    result: list[int] = []
+    for s in run_item_stats:
+        if s.has_queue_solved and s.solved_at is not None:
+            result.append(int(s.solved_at.timestamp() * 1000))
+        elif s.queue_done >= total_queue and s.last_terminal_at is not None:
+            result.append(int(s.last_terminal_at.timestamp() * 1000))
     result.sort()
     return result
 
@@ -538,7 +604,8 @@ def _build_pace_summary(
 
 def _pace_chart_data(
     run: Run,
-    run_puzzles: list[RunTrainingItem],
+    total_puzzles: int,
+    terminal_timestamps: list[int],
     schedule_cfg: ScheduleConfig,
     tz_str: str = "UTC",
 ) -> dict[str, object] | None:
@@ -546,8 +613,6 @@ def _pace_chart_data(
         return None
 
     target_hours = float(schedule_cfg.runs[run.run_index].target_hours)
-    total_queue = schedule_cfg.total_queue
-    total_puzzles = len(run_puzzles)
     tz = _parse_tz(tz_str)
 
     start_ms = int(run.started_at.timestamp() * 1000)
@@ -570,7 +635,6 @@ def _pace_chart_data(
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     as_of_ms = completed_at_ms if completed_at_ms is not None else (aborted_at_ms if aborted_at_ms is not None else now_ms)
 
-    terminal_timestamps = _compute_terminal_timestamps(run_puzzles, total_queue)
     resolved_at_as_of = _resolved_count_at(terminal_timestamps, as_of_ms)
 
     schedule_rate = total_puzzles / (deadline_ms - start_ms) if deadline_ms > start_ms else 0.0
@@ -700,7 +764,13 @@ def run_dict(run: Run, tz: str = "UTC") -> dict[str, object]:
         "targetAccuracy": run.target_accuracy,
         "targetMinSolveSeconds": run.target_min_solve_seconds,
         "targetMaxSolveSeconds": run.target_max_solve_seconds,
-        "paceChart": _pace_chart_data(run, run_puzzles, config, tz),
+        "paceChart": _pace_chart_data(
+            run,
+            len(run_puzzles),
+            _compute_terminal_timestamps(run_puzzles, total_queue),
+            config,
+            tz,
+        ),
     }
 
 
@@ -1113,43 +1183,30 @@ def get_run_puzzle(run_id: int, run_puzzle_id: int, user_id: int) -> dict[str, o
 
 
 def _compute_overview_stats(
-    run_puzzles: list[RunTrainingItem],
+    run_item_stats: list[RunItemStats],
     total_queue: int,
     focus_run_puzzle_id: int,
+    focus_qualifying_attempt_id: int | None,
     selected_attempt_id: int | None,
 ) -> dict[str, object]:
-    def _stats_pass(
-        exclude_id: int | None,
-    ) -> tuple[int, int, int, list[int]]:
+    def _stats_pass(exclude_id: int | None) -> tuple[int, int, int, list[int]]:
         first_solved = 0
         all_solved = 0
         resolved = 0
         times: list[int] = []
 
-        for rp in run_puzzles:
-            if exclude_id is not None and rp.id == exclude_id:
+        for s in run_item_stats:
+            if exclude_id is not None and s.id == exclude_id:
                 continue
-
-            completed = sorted(
-                [a for a in rp.attempts if a.status != "in_progress"],
-                key=lambda a: a.try_number,
-            )
-            queue_completed = [a for a in completed if a.try_number <= total_queue]
-            has_solved = any(a.status == "solved" for a in queue_completed)
-            all_failed = not has_solved and len(queue_completed) >= total_queue
-
-            if not (has_solved or all_failed):
+            if not (s.has_queue_solved or s.queue_done >= total_queue):
                 continue
-
             resolved += 1
-
-            if has_solved:
+            if s.has_queue_solved:
                 all_solved += 1
-                if queue_completed and queue_completed[0].status == "solved" and queue_completed[0].try_number == 1:
+                if s.has_first_solved:
                     first_solved += 1
-                qualifying = next((a for a in queue_completed if a.status == "solved"), None)
-                if qualifying is not None and qualifying.time_spent_ms is not None:
-                    times.append(qualifying.time_spent_ms)
+                if s.first_solve_time_ms is not None:
+                    times.append(s.first_solve_time_ms)
 
         return first_solved, all_solved, resolved, times
 
@@ -1161,23 +1218,10 @@ def _compute_overview_stats(
     avg_after = (sum(times_after) / len(times_after)) if times_after else None
     avg_before = (sum(times_before) / len(times_before)) if times_before else None
 
-    focus_rp = next((rp for rp in run_puzzles if rp.id == focus_run_puzzle_id), None)
-    q_attempt_id: int | None = None
-    if focus_rp is not None:
-        queue = sorted(
-            [a for a in focus_rp.attempts if a.try_number <= total_queue and a.status != "in_progress"],
-            key=lambda a: a.try_number,
-        )
-        first_solved_a = next((a for a in queue if a.status == "solved"), None)
-        if first_solved_a is not None:
-            q_attempt_id = first_solved_a.id
-        elif len(queue) >= total_queue:
-            q_attempt_id = queue[-1].id
-
     is_qualifying = (
         selected_attempt_id is not None
-        and q_attempt_id is not None
-        and selected_attempt_id == q_attempt_id
+        and focus_qualifying_attempt_id is not None
+        and selected_attempt_id == focus_qualifying_attempt_id
     )
 
     acc_delta: float | None = (
@@ -1211,14 +1255,13 @@ def _compute_overview_stats(
 def _compute_attempt_impact(
     attempt: TrainingAttempt,
     qualifying_attempt_id: int | None,
-    run_puzzles: list[RunTrainingItem],
+    total_run_puzzles: int,
     total_queue: int,
     training_id: int,
 ) -> dict[str, object]:
     is_qualifying = attempt.id == qualifying_attempt_id
 
     run_progress_delta_pct: float | None = None
-    total_run_puzzles = len(run_puzzles)
     if is_qualifying and total_run_puzzles > 0:
         run_progress_delta_pct = round(1.0 / total_run_puzzles * 100, 2)
 
@@ -1255,14 +1298,14 @@ def _overview_attempt_view(
     qualifying_attempt_id: int | None,
     total_queue: int,
     contract: SolveContract,
-    run_puzzles: list[RunTrainingItem],
+    total_run_puzzles: int,
     training_id: int,
 ) -> dict[str, object]:
     sorted_for_type = sorted(run_puzzle.attempts, key=lambda a: a.try_number)
     type_data = attempt_type_fields(sorted_for_type, attempt.try_number, total_queue)
 
     impact = _compute_attempt_impact(
-        attempt, qualifying_attempt_id, run_puzzles, total_queue, training_id
+        attempt, qualifying_attempt_id, total_run_puzzles, total_queue, training_id
     )
 
     attempt_moves = attempt.moves if isinstance(attempt.moves, list) else []
@@ -1292,17 +1335,15 @@ def _overview_attempt_view(
 
 def _compute_progress_card(
     run: Run,
-    run_puzzles: list[RunTrainingItem],
+    run_item_stats: list[RunItemStats],
     total_queue: int,
     run_progress_delta_pct: float | None,
     training_id: int,
 ) -> dict[str, object]:
-    total_run = len(run_puzzles)
+    total_run = len(run_item_stats)
     resolved_run = sum(
-        1 for rp in run_puzzles
-        if derive_position_status(rp.attempts, total_queue) in (
-            "solved", "solved_with_retries", "failed"
-        )
+        1 for s in run_item_stats
+        if s.has_queue_solved or s.queue_done >= total_queue
     )
     run_pct = round(resolved_run / total_run * 100, 2) if total_run > 0 else 0.0
 
@@ -1338,24 +1379,17 @@ def _compute_progress_card(
 
     training_resolved: int = db.session.scalar(
         sa.text("""
-            SELECT COUNT(*)
-            FROM run_training_items rp
-            JOIN runs r ON r.id = rp.run_id
-            WHERE r.training_id = :training_id
-              AND (
-                EXISTS (
-                    SELECT 1 FROM training_attempts pa
-                    WHERE pa.run_training_item_id = rp.id
-                      AND pa.status = 'solved'
-                      AND pa.try_number <= :total_queue
-                )
-                OR (
-                    SELECT COUNT(*) FROM training_attempts pa
-                    WHERE pa.run_training_item_id = rp.id
-                      AND pa.status != 'in_progress'
-                      AND pa.try_number <= :total_queue
-                ) >= :total_queue
-              )
+            SELECT COUNT(*) FROM (
+                SELECT pa.run_training_item_id
+                FROM training_attempts pa
+                JOIN run_training_items rp ON rp.id = pa.run_training_item_id
+                JOIN runs r ON r.id = rp.run_id
+                WHERE r.training_id = :training_id
+                  AND pa.status != 'in_progress'
+                  AND pa.try_number <= :total_queue
+                GROUP BY pa.run_training_item_id
+                HAVING BOOL_OR(pa.status = 'solved') OR COUNT(*) >= :total_queue
+            ) terminal
         """),
         {"training_id": training_id, "total_queue": total_queue},
     ) or 0
@@ -1404,7 +1438,7 @@ def _compute_overview_actions(run: Run, metadata: SourceMetadata) -> dict[str, o
 
 def _compute_run_complete_overlay(
     run: Run,
-    run_puzzles: list[RunTrainingItem],
+    run_item_stats: list[RunItemStats],
     total_queue: int,
     run_just_completed: bool,
     completing_attempt_id: int | None,
@@ -1414,29 +1448,20 @@ def _compute_run_complete_overlay(
     if not run_just_completed or completing_attempt_id is None:
         return None
 
-    total = len(run_puzzles)
-    solved = sum(
-        1 for rp in run_puzzles
-        if derive_position_status(rp.attempts, total_queue) == "solved"
-    )
+    total = len(run_item_stats)
+    solved = sum(1 for s in run_item_stats if s.has_queue_solved and s.has_first_solved)
     solved_with_retries = sum(
-        1 for rp in run_puzzles
-        if derive_position_status(rp.attempts, total_queue) == "solved_with_retries"
+        1 for s in run_item_stats if s.has_queue_solved and not s.has_first_solved
     )
     failed = sum(
-        1 for rp in run_puzzles
-        if derive_position_status(rp.attempts, total_queue) == "failed"
+        1 for s in run_item_stats if not s.has_queue_solved and s.queue_done >= total_queue
     )
 
-    all_times: list[int] = []
-    for rp in run_puzzles:
-        queue_completed = sorted(
-            [a for a in rp.attempts if a.status != "in_progress" and a.try_number <= total_queue],
-            key=lambda a: a.try_number,
-        )
-        qualifying = next((a for a in queue_completed if a.status == "solved"), None)
-        if qualifying is not None and qualifying.time_spent_ms is not None:
-            all_times.append(qualifying.time_spent_ms)
+    all_times: list[int] = [
+        s.first_solve_time_ms
+        for s in run_item_stats
+        if s.has_queue_solved and s.first_solve_time_ms is not None
+    ]
 
     resolved = solved + solved_with_retries + failed
     acc_pct: float | None = (
@@ -1487,14 +1512,11 @@ def _build_run_puzzle_overview(
     break_hours = config.runs[run.run_index].break_after_hours if run.run_index < total_runs else 0
     break_duration = _format_break_duration(break_hours)
 
-    all_run_puzzles = list(
-        db.session.scalars(
-            sa.select(RunTrainingItem)
-            .options(selectinload(RunTrainingItem.attempts))
-            .where(RunTrainingItem.run_id == run.id)
-        ).all()
-    )
+    all_run_item_stats = _fetch_run_item_stats(run.id, total_queue)
+    total_run_puzzles = len(all_run_item_stats)
 
+    # Lazy-loads run_puzzle.attempts (one targeted query for this puzzle only).
+    # SQLAlchemy caches the collection for subsequent accesses within this request.
     sorted_attempts = sorted(
         [a for a in run_puzzle.attempts if a.status != "in_progress"],
         key=lambda a: a.try_number,
@@ -1509,7 +1531,7 @@ def _build_run_puzzle_overview(
     q_attempt_id = qualifying_attempt_id(sorted_attempts, total_queue)
 
     stats = _compute_overview_stats(
-        all_run_puzzles, total_queue, run_puzzle.id, resolved_selected_id
+        all_run_item_stats, total_queue, run_puzzle.id, q_attempt_id, resolved_selected_id
     )
 
     is_selected_qualifying = (
@@ -1524,7 +1546,7 @@ def _build_run_puzzle_overview(
     for a in sorted_attempts:
         view = _overview_attempt_view(
             a, run, run_puzzle, q_attempt_id, total_queue,
-            payload.contract, all_run_puzzles, training_id,
+            payload.contract, total_run_puzzles, training_id,
         )
         if a.id == q_attempt_id:
             impact = cast(dict[str, object], view["impact"])
@@ -1552,6 +1574,8 @@ def _build_run_puzzle_overview(
         run.target_max_solve_seconds * 10 if run.target_max_solve_seconds is not None else None
     )
 
+    terminal_timestamps = _compute_terminal_timestamps_from_stats(all_run_item_stats, total_queue)
+
     return {
         "runTrainingItem": {
             "id": run_puzzle.id,
@@ -1574,7 +1598,7 @@ def _build_run_puzzle_overview(
         "selectedAttemptId": resolved_selected_id,
         "attempts": attempt_views,
         "runPace": {
-            "chartData": _pace_chart_data(run, all_run_puzzles, config, tz),
+            "chartData": _pace_chart_data(run, total_run_puzzles, terminal_timestamps, config, tz),
         },
         "stats": {
             "runIndex": run.run_index,
@@ -1582,7 +1606,7 @@ def _build_run_puzzle_overview(
             "averageSolveTime": stats["averageSolveTime"],
         },
         "progress": _compute_progress_card(
-            run, all_run_puzzles, total_queue, run_progress_delta_pct, training_id
+            run, all_run_item_stats, total_queue, run_progress_delta_pct, training_id
         ),
         "actions": _compute_overview_actions(run, payload.metadata),
         "timer": {
@@ -1590,7 +1614,7 @@ def _build_run_puzzle_overview(
             "targetMaxSolveTenths": target_max_solve_tenths,
         },
         "runCompleteOverlay": _compute_run_complete_overlay(
-            run, all_run_puzzles, total_queue, run_just_completed, completing_attempt_id,
+            run, all_run_item_stats, total_queue, run_just_completed, completing_attempt_id,
             break_duration, is_training_complete,
         ),
     }
