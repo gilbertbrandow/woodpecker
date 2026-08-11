@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from functools import lru_cache
 from urllib.parse import quote
 
 import chess
@@ -102,11 +103,16 @@ def _register_handlers() -> None:
     _HANDLERS[TrainingItemSource.DECOY] = (_decoy_payload, _decoy_payload_batch)
 
 
-def get_content(training_item_id: int) -> TrainingItemPayload:
+@lru_cache(maxsize=50_000)
+def _load_payload(training_item_id: int) -> TrainingItemPayload:
     ti = db.session.get(TrainingItem, training_item_id)
     if ti is None:
         raise NotFoundError("Puzzle not found", "The requested puzzle could not be found.")
     return _dispatch(ti)
+
+
+def get_content(training_item_id: int) -> TrainingItemPayload:
+    return _load_payload(training_item_id)
 
 
 def get_content_batch(training_item_ids: list[int]) -> dict[int, TrainingItemPayload]:

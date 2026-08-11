@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.services.run import _pace_chart_data
+from app.services.run import _compute_terminal_timestamps, _pace_chart_data
 from app.services.schedule_config import RunDefinition, ScheduleConfig
 
 MS_PER_HOUR = 3_600_000
@@ -78,11 +78,12 @@ def _call(
         puzzles.append(SimpleNamespace(attempts=[]))
     now_ms = START_MS + now_offset_ms
     now_dt = datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc)
+    terminal_timestamps = _compute_terminal_timestamps(puzzles, schedule_cfg.total_queue)  # type: ignore[arg-type]
     with patch("app.services.run.datetime") as mock_dt:
         mock_dt.now.return_value = now_dt
         mock_dt.fromtimestamp = datetime.fromtimestamp
         mock_dt.side_effect = datetime  # allows datetime(...) constructor calls
-        result = _pace_chart_data(run, puzzles, schedule_cfg, tz)  # type: ignore[arg-type]
+        result = _pace_chart_data(run, total_puzzles, terminal_timestamps, schedule_cfg, tz)  # type: ignore[arg-type]
     return result
 
 
@@ -92,7 +93,7 @@ class TestReturnNone:
     def test_run_index_out_of_bounds(self) -> None:
         run = _make_run(run_index=5)
         schedule_cfg = _make_schedule_cfg(168, run_index=0)
-        assert _pace_chart_data(run, [], schedule_cfg) is None  # type: ignore[arg-type]
+        assert _pace_chart_data(run, 0, [], schedule_cfg) is None  # type: ignore[arg-type]
 
 
 # ── required fields ───────────────────────────────────────────────────────────
