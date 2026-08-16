@@ -254,8 +254,11 @@ resource "aws_iam_instance_profile" "ec2_backup" {
 # After `terraform apply`, confirm the subscription email AWS sends to that address.
 
 locals {
-  enable_alerts = var.alert_email != ""
+  enable_alerts       = var.alert_email != ""
+  enable_health_check = local.enable_alerts && var.domain_name != ""
 }
+
+# ── SNS — eu-west-1 (EC2 / CloudWatch alarms) ─────────────────────────────────
 
 resource "aws_sns_topic" "alerts" {
   count = local.enable_alerts ? 1 : 0
@@ -268,6 +271,109 @@ resource "aws_sns_topic_subscription" "email" {
   protocol  = "email"
   endpoint  = var.alert_email
 }
+
+# ── SNS — us-east-1 (Route 53 health check metrics only appear here) ──────────
+
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+}
+
+resource "aws_sns_topic" "alerts_us_east_1" {
+  count    = local.enable_health_check ? 1 : 0
+  provider = aws.us_east_1
+  name     = "${var.project}-alerts"
+}
+
+resource "aws_sns_topic_subscription" "email_us_east_1" {
+  count     = local.enable_health_check ? 1 : 0
+  provider  = aws.us_east_1
+  topic_arn = aws_sns_topic.alerts_us_east_1[0].arn
+  protocol  = "email"
+  endpoint  = var.alert_email
+}
+
+# ── Route 53 health check ──────────────────────────────────────────────────────
+# Probes https://<domain> every 30 s from multiple AWS regions.
+# After 3 consecutive failures the alarm fires — detection time ~90 seconds.
+
+resource "aws_route53_health_check" "site" {
+  count             = local.enable_health_check ? 1 : 0
+  fqdn              = var.domain_name
+  port              = 443
+  type              = "HTTPS"
+  resource_path     = "/"
+  failure_threshold = 3
+  request_interval  = 30
+
+  tags = {
+    Name = "${var.project}-site-health"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "site_down" {
+  count               = local.enable_health_check ? 1 : 0
+  provider            = aws.us_east_1
+  alarm_name          = "${var.project}-site-down"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "HealthCheckStatus"
+  namespace           = "AWS/Route53"
+  period              = 60
+  statistic           = "Minimum"
+  threshold           = 1
+  alarm_description   = "${var.domain_name} is not responding to HTTPS — site is down."
+  alarm_actions       = [aws_sns_topic.alerts_us_east_1[0].arn]
+  ok_actions          = [aws_sns_topic.alerts_us_east_1[0].arn]
+
+  dimensions = {
+    HealthCheckId = aws_route53_health_check.site[0].id
+  }
+}
+
+# ── EC2 status check alarms ────────────────────────────────────────────────────
+# instance: OS/network not responding (e.g. DHCP loss, kernel hang).
+# system:   AWS hardware failure — open a support case if this fires.
+
+resource "aws_cloudwatch_metric_alarm" "instance_status_failed" {
+  count               = local.enable_alerts ? 1 : 0
+  alarm_name          = "${var.project}-instance-status-failed"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "StatusCheckFailed_Instance"
+  namespace           = "AWS/EC2"
+  period              = 60
+  statistic           = "Maximum"
+  threshold           = 0
+  alarm_description   = "EC2 instance status check failing — OS or network not responding. Stop/start the instance."
+  alarm_actions       = [aws_sns_topic.alerts[0].arn]
+  ok_actions          = [aws_sns_topic.alerts[0].arn]
+
+  dimensions = {
+    InstanceId = aws_instance.woodpecker.id
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "system_status_failed" {
+  count               = local.enable_alerts ? 1 : 0
+  alarm_name          = "${var.project}-system-status-failed"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "StatusCheckFailed_System"
+  namespace           = "AWS/EC2"
+  period              = 60
+  statistic           = "Maximum"
+  threshold           = 0
+  alarm_description   = "EC2 system status check failing — likely an AWS hardware issue. Open an AWS support case."
+  alarm_actions       = [aws_sns_topic.alerts[0].arn]
+  ok_actions          = [aws_sns_topic.alerts[0].arn]
+
+  dimensions = {
+    InstanceId = aws_instance.woodpecker.id
+  }
+}
+
+# ── CPU credit alarm ───────────────────────────────────────────────────────────
 
 resource "aws_cloudwatch_metric_alarm" "cpu_credit_low" {
   count               = local.enable_alerts ? 1 : 0

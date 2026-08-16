@@ -194,13 +194,30 @@ Postgres data lives on a **dedicated 5 GB gp3 EBS volume** (`woodpecker-pgdata`)
 
 ### Fresh instance setup (disaster recovery)
 
-After `terraform apply` creates a new instance and attaches the pgdata EBS volume, a single command handles the rest — mounting the volume, obtaining the TLS certificate, and pushing the nginx config:
+After `terraform apply` creates a new instance and attaches the pgdata EBS volume, a single command handles the rest:
 
 ```bash
 make -C deploy instance-bootstrap
 ```
 
 Requires `DOMAIN_NAME` and `CERTBOT_EMAIL` in `~/.woodpecker-prod-env`. Once it completes, publish a GitHub release to deploy the application.
+
+The bootstrap script is the authoritative record of every configuration decision applied to the instance. It is idempotent and can be safely re-run. It covers:
+
+| Step | What it does |
+| ---- | ------------ |
+| Mount pgdata EBS | Binds `/dev/nvme1n1` → `/mnt/woodpecker-data` with `nofail` |
+| Swap (2 GB) | Safety buffer so memory spikes degrade gracefully instead of OOM-killing Postgres |
+| Docker log rotation | Caps container logs at 10 MB × 3 per container — prevents root volume fill |
+| DHCP keep-alive | `KeepConfiguration=dhcp` drop-in: retains IP if DHCP renewal times out rather than tearing down the interface |
+| Disable fwupd | Firmware updates inside a VM are meaningless; the service downloads ~2 MB every hour and processes it for ~20 minutes — enough to cause DHCP renewal collisions |
+| Mask fwupd daemon | Timer disabled above; daemon masked so it cannot be restarted by any other trigger (~14 MB freed) |
+| Disable motd-news / update-notifier | Desktop notification tools with no server value |
+| needrestart list-only | Prevents `unattended-upgrades` from auto-restarting Docker after package installs |
+| Mask multipathd | Manages redundant SAN/NAS paths — meaningless on EC2 EBS single-path volumes (~26 MB freed) |
+| Remove amazon-ssm-agent snap | IAM role lacks SSM permissions; agent is inactive and provides no value. SSH key access is the only access method (~14 MB freed) |
+| TLS certificate | `certbot --standalone` for apex and `www` |
+| nginx config | Pushes `deploy/nginx/https.conf` (rendered for the domain) |
 
 ## Monitoring
 
@@ -221,13 +238,22 @@ Errors and performance traces are sent to [woodpecker-n0.sentry.io](https://wood
 
 ### CloudWatch (infrastructure layer)
 
-The t3.micro has a burst CPU credit balance. When credits run out the CPU is hard-capped at 10% — requests slow down silently with no error. A CloudWatch alarm fires when `CPUCreditBalance < 20` for two consecutive 5-minute periods, giving roughly 10 minutes to act before throttling becomes severe.
+Four alarms are managed by Terraform (`deploy/terraform/main.tf`):
 
-The alarm and SNS email subscription are managed by Terraform (`deploy/terraform/main.tf`). To enable:
+| Alarm | Metric | Threshold | What it means |
+| ----- | ------ | --------- | ------------- |
+| `site-down` | Route 53 `HealthCheckStatus` | < 1 for 1 min | HTTPS probe failed 3× in a row — site is unreachable from outside. Detection time ~90 s. |
+| `instance-status-failed` | `StatusCheckFailed_Instance` | > 0 for 2 min | OS or network not responding (e.g. DHCP loss, kernel hang). Stop/start the instance. |
+| `system-status-failed` | `StatusCheckFailed_System` | > 0 for 2 min | AWS hardware issue. Open an AWS support case. |
+| `cpu-credit-low` | `CPUCreditBalance` | < 20 for 10 min | t3.micro burst credits nearly exhausted — CPU will throttle to 10%. Resize to t3.small. |
 
-1. Set `alert_email` in `deploy/terraform/terraform.tfvars`
+The `site-down` alarm uses a Route 53 health check whose CloudWatch metrics only appear in `us-east-1`. Terraform creates a second SNS topic there for this alarm — both require email confirmation.
+
+To enable all alarms:
+
+1. Set `alert_email` and `domain_name` in `deploy/terraform/terraform.tfvars`
 2. Run `cd deploy/terraform && terraform apply`
-3. Confirm the subscription email AWS sends to that address — alerts are inactive until confirmed
+3. Confirm **both** subscription emails AWS sends — one from `eu-west-1`, one from `us-east-1`
 
 To check credit status manually: AWS Console → EC2 → select instance → Monitoring tab → **CPUCreditBalance**.
 
