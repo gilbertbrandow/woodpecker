@@ -7,7 +7,7 @@ import { col, actionCol } from '../DataTable'
 import { api, type LeaderboardRun } from '../../lib/api'
 import { DATA_ICONS } from '../../lib/icons'
 import { UserAvatar } from '../UserAvatar'
-import { formatSolveTimeMs } from '../../lib/utils'
+import { formatSolveTimeMs, formatNumber } from '../../lib/utils'
 import { PositionBadge, getGlobalPosition } from '../leaderboard/PositionBadge'
 
 const PAGE_SIZE = 10
@@ -63,6 +63,18 @@ export function DashboardLeaderboard({ trainingId, runIndex, initialRows }: Prop
             {user?.id === row.original.userId && (
               <span className="text-xs text-muted-foreground font-normal">you</span>
             )}
+          </span>
+        ),
+      }),
+      col({
+        id: 'resolvedCount',
+        accessorFn: (r) => r.resolvedCount,
+        header: 'Solved',
+        meta: { icon: DATA_ICONS.puzzles },
+        enableSorting: true,
+        cell: ({ row }) => (
+          <span className="tabular-nums">
+            {formatNumber(row.original.resolvedCount)} / {formatNumber(row.original.totalPuzzles)}
           </span>
         ),
       }),
@@ -136,6 +148,7 @@ export function DashboardLeaderboard({ trainingId, runIndex, initialRows }: Prop
       columns={columns}
       fetchData={fetchData}
       initialData={initialData}
+      instanceKey={`${trainingId}-${runIndex}`}
       pageSize={PAGE_SIZE}
       initialSorting={[{ id: 'accuracyPct', desc: true }]}
       getRowClassName={(r) => (user?.id === r.userId ? 'bg-muted/50' : '')}

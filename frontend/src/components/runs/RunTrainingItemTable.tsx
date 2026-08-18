@@ -249,6 +249,7 @@ export function RunTrainingItemTable({ runId, runIdStr, isActive }: Props): Reac
     <ServerDataTable
       columns={actionColumns}
       fetchData={fetchData}
+      instanceKey={runId}
       pageSize={PAGE_SIZE}
       initialSorting={[]}
       filters={FILTERS}

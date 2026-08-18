@@ -249,6 +249,7 @@ export function SchedulesTable({
       columns={columns}
       pageSize={pickerMode ? 10 : PAGE_SIZE}
       refreshKey={refreshKey}
+      instanceKey={subsetId ?? 'all'}
       filters={[
         userFilterSpec,
         ...(subsetId === undefined && !pickerMode ? [subsetFilterSpec] : []),

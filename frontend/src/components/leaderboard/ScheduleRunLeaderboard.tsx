@@ -256,6 +256,7 @@ export function ScheduleRunLeaderboard({ scheduleId, currentUserId }: Props): Re
       columns={columns}
       filters={FILTERS}
       fetchData={fetchData}
+      instanceKey={scheduleId}
       pageSize={PAGE_SIZE}
       initialSorting={[{ id: 'accuracyPct', desc: true }]}
       onRowClick={(r) =>

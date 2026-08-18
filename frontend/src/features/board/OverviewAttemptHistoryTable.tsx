@@ -246,6 +246,7 @@ export function OverviewAttemptHistoryTable({
       filters={filters}
       pageSize={PAGE_SIZE}
       fetchData={fetchData}
+      instanceKey={trainingItemId}
       initialCustomValues={initialCustomValues}
       persistFilters={tableId ? `table-filters:${tableId}` : undefined}
       onRowClick={onRowClick}
