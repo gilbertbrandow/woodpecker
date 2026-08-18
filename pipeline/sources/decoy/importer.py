@@ -7,6 +7,7 @@ from urllib.parse import quote
 
 import chess
 import click
+import requests
 import sqlalchemy as sa
 from sqlalchemy import func, select, text as sa_text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -17,8 +18,25 @@ from app.models.game import Game
 from app.models.opening import Opening
 
 PROGRESS_INTERVAL = 500
+EXPECTED_SCHEMA_VERSION = 1
+_META_URL = "https://raw.githubusercontent.com/gilbertbrandow/decoys/main/meta.json"
 
 _REQUIRED_FIELDS = {"fen", "opponentMove", "acceptedMoves", "bestCp", "depth", "moveNumber"}
+
+
+def check_schema_version() -> None:
+    try:
+        meta = requests.get(_META_URL, timeout=10).json()
+    except Exception as exc:
+        click.echo(f"Warning: could not fetch decoys meta.json ({exc}). Skipping schema version check.")
+        return
+    remote = meta.get("schemaVersion")
+    if remote != EXPECTED_SCHEMA_VERSION:
+        raise SystemExit(
+            f"Decoy schema version mismatch: importer expects v{EXPECTED_SCHEMA_VERSION}, "
+            f"generator repo reports v{remote}. "
+            f"Check https://github.com/gilbertbrandow/decoys for breaking changes."
+        )
 
 
 @dataclass
@@ -205,6 +223,7 @@ def import_decoys(
     limit: int | None,
     batch_size: int,
 ) -> dict[str, Any]:
+    check_schema_version()
     opening_by_display_name, opening_by_eco = _load_opening_caches(session)
 
     start = time.monotonic()
