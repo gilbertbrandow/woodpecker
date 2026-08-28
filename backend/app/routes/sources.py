@@ -21,8 +21,7 @@ def list_sources() -> Response:
 def lichess_tactics_items() -> Response:
     q = TableQuery(request)
     return jsonify(svc.list_items(
-        page=q.page,
-        page_size=q.page_size,
+        paginator=q.paginator,
         rating=q.range_filter("rating"),
         theme=q.str_set_filter("theme"),
         opening=q.str_filter("opening"),
@@ -40,8 +39,7 @@ def lichess_tactics_source_run_metadata() -> Response:
 def scraped_positional_items() -> Response:
     q = TableQuery(request)
     return jsonify(pos_svc.list_items(
-        page=q.page,
-        page_size=q.page_size,
+        paginator=q.paginator,
         difficulty=q.int_filter("difficulty"),
         theme=q.str_set_filter("theme"),
         opening=q.str_filter("opening"),
@@ -59,8 +57,7 @@ def scraped_positional_source_run_metadata() -> Response:
 def decoy_items() -> Response:
     q = TableQuery(request)
     return jsonify(decoy_svc.list_items(
-        page=q.page,
-        page_size=q.page_size,
+        paginator=q.paginator,
         opening=q.str_filter("opening"),
     ))
 

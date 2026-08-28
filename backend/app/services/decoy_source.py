@@ -12,7 +12,7 @@ from app.models.source_import_run import (
     SourceImportStatus,
 )
 from app.services.training_item_content import _serialize_game
-from app.table_query import FilterList
+from app.table_query import FilterList, Paginator
 
 
 def _serialize_puzzle(dp: DecoyPuzzle) -> dict:
@@ -35,7 +35,7 @@ def _serialize_puzzle(dp: DecoyPuzzle) -> dict:
     }
 
 
-def list_items(page: int, page_size: int, opening: FilterList) -> dict:
+def list_items(paginator: Paginator, opening: FilterList) -> dict:
     conditions = []
 
     opening_name = opening.str_values[0] if opening.str_values else None
@@ -57,7 +57,7 @@ def list_items(page: int, page_size: int, opening: FilterList) -> dict:
         select(func.count()).select_from(base_q.subquery())
     ).scalar_one()
 
-    offset = (page - 1) * page_size
+    offset = (paginator.page - 1) * paginator.page_size
     puzzles = list(
         db.session.execute(
             base_q
@@ -65,17 +65,17 @@ def list_items(page: int, page_size: int, opening: FilterList) -> dict:
                 selectinload(DecoyPuzzle.game).selectinload(Game.opening),
             )
             .order_by(DecoyPuzzle.id)
-            .limit(page_size)
+            .limit(paginator.page_size)
             .offset(offset)
         ).scalars()
     )
 
-    total_pages = max(1, (total + page_size - 1) // page_size)
+    total_pages = max(1, (total + paginator.page_size - 1) // paginator.page_size)
 
     return {
         "puzzles": [_serialize_puzzle(p) for p in puzzles],
-        "page": page,
-        "pageSize": page_size,
+        "page": paginator.page,
+        "pageSize": paginator.page_size,
         "totalPages": total_pages,
         "total": total,
     }

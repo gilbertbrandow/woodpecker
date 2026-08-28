@@ -39,8 +39,7 @@ def list_all_trainings() -> Response:
         started_at=q.date_filter("startedAt"),
         completed_at=q.date_filter("completedAt"),
         search=q.q,
-        page=q.page,
-        page_size=q.page_size,
+        paginator=q.paginator,
         tz_str=tz_str,
     ))
 

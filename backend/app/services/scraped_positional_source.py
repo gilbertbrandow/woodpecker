@@ -16,7 +16,7 @@ from app.models.source_import_run import (
     SourceImportSource,
     SourceImportStatus,
 )
-from app.table_query import FilterList, SetFilter
+from app.table_query import FilterList, Paginator, SetFilter
 
 
 def _serialize_puzzle(p: ScrapedPositionalPuzzle) -> dict:
@@ -39,8 +39,7 @@ def _serialize_puzzle(p: ScrapedPositionalPuzzle) -> dict:
 
 
 def list_items(
-    page: int,
-    page_size: int,
+    paginator: Paginator,
     difficulty: FilterList,
     theme: SetFilter,
     opening: FilterList,
@@ -108,7 +107,7 @@ def list_items(
         select(func.count()).select_from(ScrapedPositionalPuzzle).where(*conditions)
     ).scalar_one()
 
-    offset = (page - 1) * page_size
+    offset = (paginator.page - 1) * paginator.page_size
     puzzles = list(
         db.session.execute(
             select(ScrapedPositionalPuzzle)
@@ -119,17 +118,17 @@ def list_items(
                 selectinload(ScrapedPositionalPuzzle.opening),
             )
             .order_by(ScrapedPositionalPuzzle.id)
-            .limit(page_size)
+            .limit(paginator.page_size)
             .offset(offset)
         ).scalars()
     )
 
-    total_pages = max(1, (total + page_size - 1) // page_size)
+    total_pages = max(1, (total + paginator.page_size - 1) // paginator.page_size)
 
     return {
         "items": [_serialize_puzzle(p) for p in puzzles],
-        "page": page,
-        "pageSize": page_size,
+        "page": paginator.page,
+        "pageSize": paginator.page_size,
         "totalPages": total_pages,
         "total": total,
     }

@@ -3,7 +3,14 @@ from __future__ import annotations
 import sqlalchemy as sa
 
 from app.extensions import db
-from app.table_query import DateFilter, FilterList, RangeFilter, SetFilter
+from app.table_query import (
+    DateFilter,
+    FilterList,
+    Paginator,
+    RangeFilter,
+    SetFilter,
+    SortParam,
+)
 
 _EMPTY_FILTER = FilterList(op='is')
 
@@ -11,6 +18,27 @@ _STATUS_SQL = {
     'active':    'r.completed_at IS NULL AND r.aborted_at IS NULL',
     'completed': 'r.completed_at IS NOT NULL AND r.aborted_at IS NULL',
     'aborted':   'r.aborted_at IS NOT NULL',
+}
+
+# Sort allowlists — exported so the route can call q.sort_param(ALLOWLIST)
+RUN_BOARD_SORT_ALLOWLIST: dict[str, str] = {
+    'accuracyPct':      'accuracy_pct',
+    'deltaAccuracyPct': 'delta_accuracy_pct',
+    'avgRating':        'rs.avg_rating',
+    'avgSolveTimeMs':   'rs.avg_solve_time_ms',
+    'avgTimeSolvedMs':  'rs.avg_time_solved_ms',
+    'avgTimeFailedMs':  'rs.avg_time_failed_ms',
+    'resolvedCount':    'COALESCE(rs.resolved_count, 0)',
+}
+
+WEEKLY_BOARD_SORT_ALLOWLIST: dict[str, str] = {
+    'puzzlesAttempted':    'COALESCE(ws.resolved_count, 0)',
+    'lichessTacticPct':    'lichess_tactic_pct',
+    'scrapedPositionalPct': 'scraped_positional_pct',
+    'decoyPct':            'decoy_pct',
+    'avgRating':           'ws.avg_rating',
+    'avgAccuracyPct':      'avg_accuracy_pct',
+    'avgSolveTimeMs':      'ws.avg_solve_time_ms',
 }
 
 
@@ -24,9 +52,11 @@ def get_run_board(
     run_index: int | None = None,
     exclude_aborted: bool = False,
     search: str | None = None,
-    page: int = 1,
-    page_size: int = 50,
+    paginator: Paginator | None = None,
+    sort: SortParam | None = None,
 ) -> tuple[list[dict[str, object]], int]:
+    if paginator is None:
+        paginator = Paginator(page=1, page_size=50)
     sch_f = schedule_filter or _EMPTY_FILTER
     usr_f = user_filter or _EMPTY_FILTER
     sta_f = status_filter or _EMPTY_FILTER
@@ -55,6 +85,13 @@ def get_run_board(
     sta_f.apply_status(conditions, _STATUS_SQL)
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+    if sort is not None:
+        order_by = f"{sort.order_by_clause()}, r.id ASC"
+    else:
+        order_by = "r.started_at DESC NULLS LAST, r.id ASC"
+
+    params.update(paginator.params)
 
     rows = db.session.execute(
         sa.text(f"""
@@ -141,6 +178,11 @@ def get_run_board(
                 rs.avg_time_failed_ms,
                 CASE
                     WHEN COALESCE(rs.resolved_count, 0) > 0
+                    THEN rs.first_solved_count::float / rs.resolved_count * 100
+                    ELSE NULL
+                END AS accuracy_pct,
+                CASE
+                    WHEN COALESCE(rs.resolved_count, 0) > 0
                      AND COALESCE(prev_rs.resolved_count, 0) > 0
                     THEN ROUND(
                         (
@@ -150,7 +192,8 @@ def get_run_board(
                         1
                     )::float
                     ELSE NULL
-                END AS delta_accuracy_pct
+                END AS delta_accuracy_pct,
+                COUNT(*) OVER() AS total_count
             FROM runs r
             JOIN trainings t ON t.id = r.training_id
             JOIN users u     ON u.id = t.user_id
@@ -162,51 +205,47 @@ def get_run_board(
                AND prev_r.aborted_at IS NULL
             LEFT JOIN run_stats prev_rs ON prev_rs.run_id = prev_r.id
             {where}
-            ORDER BY r.started_at DESC
+            ORDER BY {order_by}
+            LIMIT :page_limit OFFSET :page_offset
         """),
         params,
     ).all()
 
-    result: list[dict[str, object]] = []
-    for row in rows:
-        first_solved = int(row.first_solved_count)
-        resolved = int(row.resolved_count)
-        accuracy_pct: float | None = (
-            round(first_solved / resolved * 100, 1) if resolved > 0 else None
-        )
-        if row.aborted_at is not None:
+    def _mapper(row: object) -> dict[str, object]:
+        if row.aborted_at is not None:  # type: ignore[attr-defined]
             status = "aborted"
-        elif row.completed_at is not None:
+        elif row.completed_at is not None:  # type: ignore[attr-defined]
             status = "completed"
         else:
             status = "active"
-        result.append({
-            "runId": int(row.run_id),
-            "trainingId": int(row.training_id),
-            "runIndex": int(row.run_index),
-            "startedAt": row.started_at.isoformat(),
-            "completedAt": row.completed_at.isoformat() if row.completed_at else None,
-            "abortedAt": row.aborted_at.isoformat() if row.aborted_at else None,
+        accuracy_pct = float(row.accuracy_pct) if row.accuracy_pct is not None else None  # type: ignore[attr-defined]
+        if accuracy_pct is not None:
+            accuracy_pct = round(accuracy_pct, 1)
+        return {
+            "runId": int(row.run_id),  # type: ignore[attr-defined]
+            "trainingId": int(row.training_id),  # type: ignore[attr-defined]
+            "runIndex": int(row.run_index),  # type: ignore[attr-defined]
+            "startedAt": row.started_at.isoformat(),  # type: ignore[attr-defined]
+            "completedAt": row.completed_at.isoformat() if row.completed_at else None,  # type: ignore[attr-defined]
+            "abortedAt": row.aborted_at.isoformat() if row.aborted_at else None,  # type: ignore[attr-defined]
             "status": status,
-            "userId": int(row.user_id),
-            "displayName": row.display_name,
-            "avatarUrl": row.avatar_url,
-            "scheduleId": int(row.schedule_id),
-            "scheduleName": row.schedule_name,
-            "firstSolvedCount": first_solved,
-            "resolvedCount": resolved,
-            "totalPuzzles": int(row.total_puzzles),
+            "userId": int(row.user_id),  # type: ignore[attr-defined]
+            "displayName": row.display_name,  # type: ignore[attr-defined]
+            "avatarUrl": row.avatar_url,  # type: ignore[attr-defined]
+            "scheduleId": int(row.schedule_id),  # type: ignore[attr-defined]
+            "scheduleName": row.schedule_name,  # type: ignore[attr-defined]
+            "firstSolvedCount": int(row.first_solved_count),  # type: ignore[attr-defined]
+            "resolvedCount": int(row.resolved_count),  # type: ignore[attr-defined]
+            "totalPuzzles": int(row.total_puzzles),  # type: ignore[attr-defined]
             "accuracyPct": accuracy_pct,
-            "avgRating": float(row.avg_rating) if row.avg_rating is not None else None,
-            "avgSolveTimeMs": float(row.avg_solve_time_ms) if row.avg_solve_time_ms is not None else None,
-            "avgTimeSolvedMs": float(row.avg_time_solved_ms) if row.avg_time_solved_ms is not None else None,
-            "avgTimeFailedMs": float(row.avg_time_failed_ms) if row.avg_time_failed_ms is not None else None,
-            "deltaAccuracyPct": float(row.delta_accuracy_pct) if row.delta_accuracy_pct is not None else None,
-        })
+            "avgRating": float(row.avg_rating) if row.avg_rating is not None else None,  # type: ignore[attr-defined]
+            "avgSolveTimeMs": float(row.avg_solve_time_ms) if row.avg_solve_time_ms is not None else None,  # type: ignore[attr-defined]
+            "avgTimeSolvedMs": float(row.avg_time_solved_ms) if row.avg_time_solved_ms is not None else None,  # type: ignore[attr-defined]
+            "avgTimeFailedMs": float(row.avg_time_failed_ms) if row.avg_time_failed_ms is not None else None,  # type: ignore[attr-defined]
+            "deltaAccuracyPct": float(row.delta_accuracy_pct) if row.delta_accuracy_pct is not None else None,  # type: ignore[attr-defined]
+        }
 
-    total = len(result)
-    offset = (page - 1) * page_size
-    return result[offset:offset + page_size], total
+    return paginator.paginate(rows, _mapper)
 
 
 def get_weekly_board(
@@ -215,9 +254,11 @@ def get_weekly_board(
     avg_rating_filter: RangeFilter | None = None,
     schedules_filter: SetFilter | None = None,
     search: str | None = None,
-    page: int = 1,
-    page_size: int = 50,
+    paginator: Paginator | None = None,
+    sort: SortParam | None = None,
 ) -> tuple[list[dict[str, object]], int]:
+    if paginator is None:
+        paginator = Paginator(page=1, page_size=50)
     usr_f = user_filter or _EMPTY_FILTER
 
     outer_conditions: list[str] = []
@@ -233,6 +274,13 @@ def get_weekly_board(
     if schedules_filter:
         schedules_filter.apply(outer_conditions, params, "ws.schedule_ids", prefix="schedules")
     outer_where = ("WHERE " + " AND ".join(outer_conditions)) if outer_conditions else ""
+
+    if sort is not None:
+        order_by = f"{sort.order_by_clause()}, u.display_name ASC NULLS LAST"
+    else:
+        order_by = "COALESCE(ws.resolved_count, 0) DESC NULLS LAST, u.display_name ASC NULLS LAST"
+
+    params.update(paginator.params)
 
     rows = db.session.execute(
         sa.text(f"""
@@ -290,46 +338,35 @@ def get_weekly_board(
                 COALESCE(ws.decoy_count, 0)                  AS decoy_count,
                 ws.avg_rating,
                 ws.avg_solve_time_ms,
-                COALESCE(ws.schedule_names, ARRAY[]::text[]) AS schedule_names
+                COALESCE(ws.schedule_names, ARRAY[]::text[]) AS schedule_names,
+                CASE WHEN COALESCE(ws.resolved_count, 0) > 0 THEN ROUND((ws.puzzles_solved::float / ws.resolved_count * 100)::numeric, 1)::float ELSE NULL END AS avg_accuracy_pct,
+                CASE WHEN COALESCE(ws.resolved_count, 0) > 0 THEN ROUND((ws.lichess_tactic_count::float / ws.resolved_count * 100)::numeric, 1)::float ELSE NULL END AS lichess_tactic_pct,
+                CASE WHEN COALESCE(ws.resolved_count, 0) > 0 THEN ROUND((ws.scraped_positional_count::float / ws.resolved_count * 100)::numeric, 1)::float ELSE NULL END AS scraped_positional_pct,
+                CASE WHEN COALESCE(ws.resolved_count, 0) > 0 THEN ROUND((ws.decoy_count::float / ws.resolved_count * 100)::numeric, 1)::float ELSE NULL END AS decoy_pct,
+                COUNT(*) OVER() AS total_count
             FROM active_users au
             JOIN users u ON u.id = au.user_id
             LEFT JOIN weekly_stats ws ON ws.user_id = au.user_id
             {outer_where}
-            ORDER BY COALESCE(ws.resolved_count, 0) DESC, u.display_name
+            ORDER BY {order_by}
+            LIMIT :page_limit OFFSET :page_offset
         """),
         params,
     ).all()
 
-    result: list[dict[str, object]] = []
-    for row in rows:
-        puzzles_solved = int(row.puzzles_solved)
-        resolved = int(row.resolved_count)
-        accuracy_pct: float | None = (
-            round(puzzles_solved / resolved * 100, 1) if resolved > 0 else None
-        )
-        lichess_tactic_pct: float | None = (
-            round(int(row.lichess_tactic_count) / resolved * 100, 1) if resolved > 0 else None
-        )
-        scraped_positional_pct: float | None = (
-            round(int(row.scraped_positional_count) / resolved * 100, 1) if resolved > 0 else None
-        )
-        decoy_pct: float | None = (
-            round(int(row.decoy_count) / resolved * 100, 1) if resolved > 0 else None
-        )
-        result.append({
-            "userId": int(row.user_id),
-            "displayName": row.display_name,
-            "avatarUrl": row.avatar_url,
-            "puzzlesAttempted": resolved,
-            "lichessTacticPct": lichess_tactic_pct,
-            "scrapedPositionalPct": scraped_positional_pct,
-            "decoyPct": decoy_pct,
-            "avgRating": float(row.avg_rating) if row.avg_rating is not None else None,
-            "avgAccuracyPct": accuracy_pct,
-            "avgSolveTimeMs": float(row.avg_solve_time_ms) if row.avg_solve_time_ms is not None else None,
-            "scheduleNames": list(row.schedule_names) if row.schedule_names else [],
-        })
+    def _mapper(row: object) -> dict[str, object]:
+        return {
+            "userId": int(row.user_id),  # type: ignore[attr-defined]
+            "displayName": row.display_name,  # type: ignore[attr-defined]
+            "avatarUrl": row.avatar_url,  # type: ignore[attr-defined]
+            "puzzlesAttempted": int(row.resolved_count),  # type: ignore[attr-defined]
+            "lichessTacticPct": float(row.lichess_tactic_pct) if row.lichess_tactic_pct is not None else None,  # type: ignore[attr-defined]
+            "scrapedPositionalPct": float(row.scraped_positional_pct) if row.scraped_positional_pct is not None else None,  # type: ignore[attr-defined]
+            "decoyPct": float(row.decoy_pct) if row.decoy_pct is not None else None,  # type: ignore[attr-defined]
+            "avgRating": float(row.avg_rating) if row.avg_rating is not None else None,  # type: ignore[attr-defined]
+            "avgAccuracyPct": float(row.avg_accuracy_pct) if row.avg_accuracy_pct is not None else None,  # type: ignore[attr-defined]
+            "avgSolveTimeMs": float(row.avg_solve_time_ms) if row.avg_solve_time_ms is not None else None,  # type: ignore[attr-defined]
+            "scheduleNames": list(row.schedule_names) if row.schedule_names else [],  # type: ignore[attr-defined]
+        }
 
-    total = len(result)
-    offset = (page - 1) * page_size
-    return result[offset:offset + page_size], total
+    return paginator.paginate(rows, _mapper)

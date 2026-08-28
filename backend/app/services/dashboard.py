@@ -13,7 +13,7 @@ from app.services import leaderboard as leaderboard_svc
 from app.services.schedule_config import ScheduleConfig
 from app.services.training import get_training_progress
 from app.services.training_state import end_of_today_utc
-from app.table_query import FilterList
+from app.table_query import FilterList, Paginator
 
 # ---------------------------------------------------------------------------
 # SQL helper: compute per-run stats in one query for a list of run_ids
@@ -476,7 +476,7 @@ def get_dashboard(
         schedule_filter=FilterList(op='is', int_values=[resolved["scheduleId"]]),
         run_index=run_index,
         exclude_aborted=True,
-        page_size=100,
+        paginator=Paginator(page=1, page_size=100),
     )
 
     return {

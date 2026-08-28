@@ -12,7 +12,7 @@ from app.models.training import Training
 from app.models.user import User
 from app.services.schedule_config import RunDefinition, ScheduleConfig
 from app.services.training_state import compute_training_state
-from app.table_query import DateFilter, FilterList
+from app.table_query import DateFilter, FilterList, Paginator
 
 
 def _get_training(training_id: int) -> Training:
@@ -368,10 +368,11 @@ def list_all_trainings(
     started_at: DateFilter | None = None,
     completed_at: DateFilter | None = None,
     search: str | None = None,
-    page: int = 1,
-    page_size: int = 20,
+    paginator: Paginator | None = None,
     tz_str: str = "UTC",
 ) -> dict[str, object]:
+    if paginator is None:
+        paginator = Paginator(page=1, page_size=20)
     conditions: list[str] = []
     params: dict[str, object] = {}
 
@@ -460,9 +461,10 @@ def list_all_trainings(
         rows = db.session.execute(sa.text(select_sql), params).all()
         total = 0  # computed after Python filter below
     else:
-        params["limit"] = page_size
-        params["offset"] = (page - 1) * page_size
-        rows = db.session.execute(sa.text(select_sql + " LIMIT :limit OFFSET :offset"), params).all()
+        params.update(paginator.params)
+        rows = db.session.execute(
+            sa.text(select_sql + " LIMIT :page_limit OFFSET :page_offset"), params
+        ).all()
         total = db.session.scalar(
             sa.text(f"""
                 SELECT COUNT(*)
@@ -471,7 +473,7 @@ def list_all_trainings(
                 JOIN users u ON u.id = t.user_id
                 {where}
             """),
-            {k: v for k, v in params.items() if k not in ("limit", "offset")},
+            {k: v for k, v in params.items() if k not in ("page_limit", "page_offset")},
         ) or 0
 
     now = datetime.now(timezone.utc)
@@ -589,8 +591,8 @@ def list_all_trainings(
         else:
             items = [i for i in items if i["trainingState"]["state"] in requested_states]  # type: ignore[index]
         total = len(items)
-        start = (page - 1) * page_size
-        items = items[start : start + page_size]
+        start = (paginator.page - 1) * paginator.page_size
+        items = items[start : start + paginator.page_size]
 
     return {"items": items, "total": total}
 

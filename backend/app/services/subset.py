@@ -10,7 +10,7 @@ from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.subset import Subset, SubsetTrainingItem
 from app.models.user import User
-from app.table_query import DateFilter, FilterList, RangeFilter
+from app.table_query import DateFilter, FilterList, Paginator, RangeFilter
 
 DEFAULT_RATING_MIN = 0
 DEFAULT_RATING_MAX = 9999
@@ -1161,12 +1161,13 @@ def list_subsets(
     locked_only: bool = False,
     status: FilterList | None = None,
     search: str | None = None,
-    page: int = 1,
-    page_size: int = 20,
+    paginator: Paginator | None = None,
     user_ids: FilterList | None = None,
     date: DateFilter | None = None,
     puzzle_count: RangeFilter | None = None,
 ) -> dict[str, object]:
+    if paginator is None:
+        paginator = Paginator(page=1, page_size=20)
     if locked_only:
         access_clause = "sub.locked_at IS NOT NULL"
     else:
@@ -1199,8 +1200,8 @@ def list_subsets(
         limit_clause = ""
     else:
         total = int(db.session.execute(sa.text(f"SELECT COUNT(*) {base_sql}"), params).scalar_one())
-        offset = (page - 1) * page_size
-        limit_clause = f"LIMIT {page_size} OFFSET {offset}"
+        params.update(paginator.params)
+        limit_clause = "LIMIT :page_limit OFFSET :page_offset"
 
     has_trained_col = ""
     if locked_only:
