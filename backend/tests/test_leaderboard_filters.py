@@ -289,3 +289,173 @@ class TestLeaderboardWeeklyFilters:
         items = resp.get_json()["items"]
         assert len(items) == 1
         assert isinstance(items[0]["scheduleNames"], list)
+
+    def test_sort_by_puzzles_desc(self, client: FlaskClient, db_session) -> None:
+        from app.models.run import Run, RunTrainingItem, TrainingAttempt
+        from app.models.training import Training
+        from app.models.training_item import TrainingItem, TrainingItemSource
+
+        alice = _make_user(db_session, "lbw_sort_alice", "Alice Sort")
+        bob = _make_user(db_session, "lbw_sort_bob", "Bob Sort")
+        _login(client, alice.id)
+        sched_a = _make_schedule(db_session, alice)
+        sched_b = _make_schedule(db_session, bob)
+
+        now = datetime.now(timezone.utc)
+
+        # Create a training item for both
+        ti = TrainingItem(source_type=TrainingItemSource.LICHESS_TACTIC)
+        db_session.add(ti)
+        db_session.flush()
+
+        # Alice: 3 attempts
+        training_a = Training(user_id=alice.id, schedule_id=sched_a.id, started_at=now)
+        db_session.add(training_a)
+        db_session.flush()
+        run_a = Run(training_id=training_a.id, run_index=0, started_at=now)
+        db_session.add(run_a)
+        db_session.flush()
+        for i in range(3):
+            rp = RunTrainingItem(run_id=run_a.id, position=i, training_item_id=ti.id)
+            db_session.add(rp)
+            db_session.flush()
+            attempt = TrainingAttempt(
+                run_training_item_id=rp.id,
+                try_number=1,
+                status='solved',
+                started_at=now,
+                completed_at=now,
+                time_spent_ms=1000,
+                moves=[],
+            )
+            db_session.add(attempt)
+        db_session.flush()
+
+        # Bob: 1 attempt
+        training_b = Training(user_id=bob.id, schedule_id=sched_b.id, started_at=now)
+        db_session.add(training_b)
+        db_session.flush()
+        run_b = Run(training_id=training_b.id, run_index=0, started_at=now)
+        db_session.add(run_b)
+        db_session.flush()
+        rp_b = RunTrainingItem(run_id=run_b.id, position=0, training_item_id=ti.id)
+        db_session.add(rp_b)
+        db_session.flush()
+        attempt_b = TrainingAttempt(
+            run_training_item_id=rp_b.id,
+            try_number=1,
+            status='solved',
+            started_at=now,
+            completed_at=now,
+            time_spent_ms=1000,
+            moves=[],
+        )
+        db_session.add(attempt_b)
+        db_session.flush()
+
+        resp = client.get(
+            f"/leaderboard/weekly?sort=puzzlesAttempted:desc"
+            f"&userId=is&userId={alice.id}&userId={bob.id}"
+        )
+
+        assert resp.status_code == 200
+        items = resp.get_json()["items"]
+        user_ids = [i["userId"] for i in items]
+        assert user_ids.index(alice.id) < user_ids.index(bob.id)
+
+
+# ── /leaderboard sort + pagination ───────────────────────────────────────────
+
+
+def _make_attempt(session, run, training_item_id: int, *, solved: bool = True):  # type: ignore[misc]
+    """Create a RunTrainingItem + TrainingAttempt so accuracy can differ between runs."""
+    from app.models.run import RunTrainingItem, TrainingAttempt
+    now = datetime.now(timezone.utc)
+    rp = RunTrainingItem(run_id=run.id, position=0, training_item_id=training_item_id)
+    session.add(rp)
+    session.flush()
+    attempt = TrainingAttempt(
+        run_training_item_id=rp.id,
+        try_number=1,
+        status='solved' if solved else 'failed',
+        started_at=now,
+        completed_at=now,
+        time_spent_ms=1000,
+        moves=[],
+    )
+    session.add(attempt)
+    session.flush()
+    return rp
+
+
+def _make_training_item(session):  # type: ignore[misc]
+    from app.models.training_item import TrainingItem, TrainingItemSource
+    ti = TrainingItem(source_type=TrainingItemSource.LICHESS_TACTIC)
+    session.add(ti)
+    session.flush()
+    return ti
+
+
+@pytest.mark.integration
+class TestLeaderboardRunSort:
+
+    def test_sort_by_accuracy_desc(self, client: FlaskClient, db_session) -> None:
+        alice = _make_user(db_session, "lb_sort_acc_alice", "Alice Acc")
+        bob = _make_user(db_session, "lb_sort_acc_bob", "Bob Acc")
+        _login(client, alice.id)
+        sched = _make_schedule(db_session, alice)
+
+        ti = _make_training_item(db_session)
+
+        # Alice: solved on first try (100% accuracy)
+        run_a = _make_run(db_session, alice, sched)
+        _make_attempt(db_session, run_a, ti.id, solved=True)
+
+        # Bob: failed on first try (0% accuracy)
+        run_b = _make_run(db_session, bob, _make_schedule(db_session, bob))
+        _make_attempt(db_session, run_b, ti.id, solved=False)
+
+        resp = client.get(
+            f"/leaderboard?sort=accuracyPct:desc"
+            f"&userId=is&userId={alice.id}&userId={bob.id}"
+        )
+
+        assert resp.status_code == 200
+        items = resp.get_json()["items"]
+        user_ids = [i["userId"] for i in items]
+        assert alice.id in user_ids
+        assert bob.id in user_ids
+        assert user_ids.index(alice.id) < user_ids.index(bob.id)
+
+    def test_sort_unknown_column_ignored(self, client: FlaskClient, db_session) -> None:
+        user = _make_user(db_session, "lb_sort_unk")
+        _login(client, user.id)
+
+        resp = client.get("/leaderboard?sort=nonexistent:desc")
+
+        assert resp.status_code == 200
+
+    def test_pagination_with_sort_no_overlap(self, client: FlaskClient, db_session) -> None:
+        user = _make_user(db_session, "lb_sort_pg")
+        _login(client, user.id)
+        sched = _make_schedule(db_session, user)
+
+        ti = _make_training_item(db_session)
+
+        for i in range(3):
+            run = _make_run(db_session, user, sched, run_index=i)
+            _make_attempt(db_session, run, ti.id, solved=(i % 2 == 0))
+
+        resp1 = client.get(f"/leaderboard?pageSize=2&page=1&sort=accuracyPct:desc&userId=is&userId={user.id}")
+        resp2 = client.get(f"/leaderboard?pageSize=2&page=2&sort=accuracyPct:desc&userId=is&userId={user.id}")
+
+        assert resp1.status_code == 200
+        assert resp2.status_code == 200
+        data1 = resp1.get_json()
+        data2 = resp2.get_json()
+        assert data1["total"] >= 3
+        assert len(data1["items"]) == 2
+        assert len(data2["items"]) >= 1
+        ids1 = {i["runId"] for i in data1["items"]}
+        ids2 = {i["runId"] for i in data2["items"]}
+        assert ids1.isdisjoint(ids2)

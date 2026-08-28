@@ -14,7 +14,7 @@ from app.services.attempt_state import attempt_type_fields
 from app.services.chess_board import compute_attempt_board, compute_attempt_pgn
 from app.services.schedule_config import ScheduleConfig
 from app.services.training_item_content import get_content
-from app.table_query import FilterList, RangeFilter
+from app.table_query import FilterList, Paginator, RangeFilter
 
 
 def _range_matches(f: RangeFilter, value: float | None) -> bool:
@@ -68,8 +68,7 @@ def _require_own_attempt(training_item_id: int, user_id: int) -> None:
 def get_attempt_history(
     training_item_id: int,
     user_id: int,
-    page: int = 1,
-    page_size: int = 20,
+    paginator: Paginator | None = None,
     user_ids: FilterList | None = None,
     result: FilterList | None = None,
     schedule_ids: FilterList | None = None,
@@ -78,6 +77,8 @@ def get_attempt_history(
     try_number: RangeFilter | None = None,
     time_spent_ms: RangeFilter | None = None,
 ) -> dict[str, object]:
+    if paginator is None:
+        paginator = Paginator(page=1, page_size=20)
     _require_own_attempt(training_item_id, user_id)
 
     # Single join query — replaces N×4 individual session.get() calls.
@@ -163,8 +164,8 @@ def get_attempt_history(
 
     rows.sort(key=lambda r: cast(datetime, r["_started_at"]), reverse=True)
     total = len(rows)
-    start = (page - 1) * page_size
-    page_rows = rows[start : start + page_size]
+    start = (paginator.page - 1) * paginator.page_size
+    page_rows = rows[start : start + paginator.page_size]
     for r in page_rows:
         r["startedAt"] = cast(datetime, r.pop("_started_at")).isoformat()
     return {"attempts": page_rows, "total": total}

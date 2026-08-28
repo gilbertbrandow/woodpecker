@@ -14,8 +14,7 @@ def get_attempt_history(training_item_id: int) -> tuple[Response, int] | Respons
     result = training_items_svc.get_attempt_history(
         training_item_id,
         session["user_id"],
-        page=q.page,
-        page_size=q.page_size,
+        paginator=q.paginator,
         user_ids=q.int_filter("userId"),
         result=q.str_filter("result"),
         schedule_ids=q.int_filter("scheduleId"),

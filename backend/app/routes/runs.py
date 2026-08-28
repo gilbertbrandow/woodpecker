@@ -35,8 +35,7 @@ def list_run_training_items(run_id: int) -> tuple[Response, int] | Response:
     q = TableQuery(request)
     result = run_svc.list_run_puzzles(
         run_id,
-        page=q.page,
-        page_size=q.page_size,
+        paginator=q.paginator,
         source_type=q.str_filter('sourceType'),
         position_status=q.str_filter('positionStatus'),
         time_ms=q.range_filter('timeMs'),

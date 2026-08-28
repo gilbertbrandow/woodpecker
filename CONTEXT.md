@@ -227,7 +227,21 @@ Every paginated list in the app uses two paired components:
 
 **TableQuery** (`backend/app/table_query.py`) — the Flask-side counterpart. Parses the wire format emitted by ServerDataTable from `request.args`: `page`, `pageSize`, `q` (search), and typed filter methods (`str_filter`, `int_filter`, `date_filter`, `range_filter`, `set_filter`). Calling a filter method on the instance IS the declaration that the endpoint supports that filter — no registration step. All new list endpoints must use `TableQuery`.
 
-Wire format: repeated query params with an op-prefix token (`userId=is&userId=1&userId=2`). The frontend emits this automatically; the backend parses it via the filter methods.
+Wire format: repeated query params with an op-prefix token (`userId=is&userId=1&userId=2`). The frontend emits this automatically; the backend parses it via the filter methods. Sort is a single param: `sort=colId:asc` or `sort=colId:desc`.
+
+**Paginator** — a dataclass (`backend/app/table_query.py`) that replaces the `page: int, page_size: int` pair in every service signature. Exposes `paginator.params` (a dict with `:page_limit` and `:page_offset` named params ready to merge into a query's params dict) and `paginator.paginate(rows, mapper)` (extracts `total` from the `total_count` window column and maps rows to dicts). All raw-SQL services must use it; ORM-based services use `paginator.page_size` and `paginator.page` in ORM calls and return directly. Routes obtain it via `q.paginator`.
+
+**SortParam** — a dataclass (`backend/app/table_query.py`) returned by `q.sort_param(allowlist)`. The `allowlist` maps frontend column IDs to safe server-side SQL expressions (injection prevention — the column name from the request is never interpolated directly). `sort.order_by_clause()` emits a single `expr DIR NULLS LAST` fragment. Services append their own stable tiebreaker after it. Returns `None` when no sort param is present; callers fall back to their default ORDER BY.
+
+SQL pagination standard for raw-SQL services:
+
+```sql
+SELECT ..., COUNT(*) OVER() AS total_count
+FROM ...
+WHERE ...
+ORDER BY {order_by}, {tiebreaker}
+LIMIT :page_limit OFFSET :page_offset
+```
 
 Key non-obvious constraints:
 
@@ -235,3 +249,5 @@ Key non-obvious constraints:
 - Filter specs passed to `ServerDataTable` are frozen at mount and must be stable references.
 - `instanceKey` forces a re-fetch when a parent prop (e.g. `scheduleId`) changes without the component unmounting.
 - Search is always the `q` param — never `search`. Rename when migrating existing endpoints.
+- `ServerDataTable` owns sort state (initialized from URL `?sort=` param, falling back to `initialSorting`). It passes `serverSorting={{ sorting, onSortingChange }}` to `DataTable`, which sets `manualSorting: true` and defers sort state to the caller. Sort changes trigger re-fetches via the fetch effect dependency.
+- `COUNT(*) OVER()` in PostgreSQL is computed before `LIMIT`/`OFFSET`, so the window total is always the full matching count regardless of the page slice.

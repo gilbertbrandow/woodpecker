@@ -1,5 +1,15 @@
 """Unit tests for table_query filter types — no DB or Flask context needed."""
-from app.table_query import DateFilter, FilterList, RangeFilter, SetFilter
+from unittest.mock import MagicMock
+
+from app.table_query import (
+    DateFilter,
+    FilterList,
+    Paginator,
+    RangeFilter,
+    SetFilter,
+    SortParam,
+    TableQuery,
+)
 
 # ---------------------------------------------------------------------------
 # FilterList.apply_status
@@ -254,3 +264,100 @@ def test_set_filter_apply_noop_when_empty() -> None:
     f.apply(conditions, params, "t.tag_ids", prefix="tags")
     assert conditions == []
     assert params == {}
+
+
+# ---------------------------------------------------------------------------
+# Paginator
+# ---------------------------------------------------------------------------
+
+def test_paginator_params_page1() -> None:
+    p = Paginator(page=1, page_size=20)
+    assert p.params == {'page_limit': 20, 'page_offset': 0}
+
+
+def test_paginator_params_page2() -> None:
+    p = Paginator(page=2, page_size=20)
+    assert p.params == {'page_limit': 20, 'page_offset': 20}
+
+
+def test_paginator_paginate_empty() -> None:
+    p = Paginator(page=1, page_size=20)
+    items, total = p.paginate([], lambda r: r)
+    assert items == []
+    assert total == 0
+
+
+def test_paginator_paginate_maps_rows() -> None:
+    p = Paginator(page=1, page_size=20)
+
+    row1 = MagicMock()
+    row1.total_count = 5
+    row1.value = 'a'
+    row2 = MagicMock()
+    row2.total_count = 5
+    row2.value = 'b'
+
+    items, total = p.paginate([row1, row2], lambda r: r.value)
+    assert total == 5
+    assert items == ['a', 'b']
+
+
+# ---------------------------------------------------------------------------
+# SortParam / TableQuery.sort_param
+# ---------------------------------------------------------------------------
+
+_SORT_ALLOWLIST: dict[str, str] = {
+    'accuracyPct': 'accuracy_pct',
+    'avgRating': 'rs.avg_rating',
+}
+
+
+def _make_table_query(args: dict) -> TableQuery:
+    req = MagicMock()
+    req.args = MagicMock()
+    req.args.get = lambda k, d=None: args.get(k, d)
+    req.args.getlist = lambda k: ([args[k]] if k in args and not isinstance(args[k], list) else args.get(k, []))
+    return TableQuery(req)
+
+
+def test_sort_param_none_when_missing() -> None:
+    q = _make_table_query({})
+    assert q.sort_param(_SORT_ALLOWLIST) is None
+
+
+def test_sort_param_none_when_unknown_column() -> None:
+    q = _make_table_query({'sort': 'unknown:desc'})
+    assert q.sort_param(_SORT_ALLOWLIST) is None
+
+
+def test_sort_param_none_when_invalid_dir() -> None:
+    q = _make_table_query({'sort': 'accuracyPct:sideways'})
+    assert q.sort_param(_SORT_ALLOWLIST) is None
+
+
+def test_sort_param_valid_desc() -> None:
+    q = _make_table_query({'sort': 'accuracyPct:desc'})
+    sp = q.sort_param(_SORT_ALLOWLIST)
+    assert sp is not None
+    assert sp.key == 'accuracyPct'
+    assert sp.dir == 'desc'
+    assert sp.sql_expr == 'accuracy_pct'
+
+
+def test_sort_param_valid_asc() -> None:
+    q = _make_table_query({'sort': 'avgRating:asc'})
+    sp = q.sort_param(_SORT_ALLOWLIST)
+    assert sp is not None
+    assert sp.key == 'avgRating'
+    assert sp.dir == 'asc'
+    assert sp.sql_expr == 'rs.avg_rating'
+
+
+def test_sort_order_by_desc() -> None:
+    sp = SortParam(key='accuracyPct', dir='desc', sql_expr='rs.avg_rating')
+    assert sp.order_by_clause() == 'rs.avg_rating DESC NULLS LAST'
+
+
+def test_sort_order_by_asc() -> None:
+    sp = SortParam(key='avgRating', dir='asc', sql_expr='rs.avg_rating')
+    assert sp.order_by_clause() == 'rs.avg_rating ASC NULLS LAST'

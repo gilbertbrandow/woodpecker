@@ -1,12 +1,40 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Literal, cast
+from typing import Any, Literal, TypeVar, cast
 
 import sqlalchemy as sa
 from flask import Request
 
 from app.utils import FilterOp, parse_multi_filter
+
+T = TypeVar('T')
+
+
+@dataclass
+class Paginator:
+    page: int
+    page_size: int
+
+    @property
+    def params(self) -> dict[str, int]:
+        return {'page_limit': self.page_size, 'page_offset': (self.page - 1) * self.page_size}
+
+    def paginate(self, rows: Sequence[Any], mapper: Callable[[Any], T]) -> tuple[list[T], int]:
+        total = int(rows[0].total_count) if rows else 0
+        return [mapper(r) for r in rows], total
+
+
+@dataclass
+class SortParam:
+    key: str
+    dir: Literal['asc', 'desc']
+    sql_expr: str
+
+    def order_by_clause(self) -> str:
+        direction = 'DESC' if self.dir == 'desc' else 'ASC'
+        return f"{self.sql_expr} {direction} NULLS LAST"
 
 # ---------------------------------------------------------------------------
 # Shared SQL-building helpers (bare conditions — callers join with AND)
@@ -281,6 +309,26 @@ class TableQuery:
         except ValueError:
             self.page_size = 20
         self.q = self._args.get('q') or None
+
+    @property
+    def paginator(self) -> Paginator:
+        return Paginator(page=self.page, page_size=self.page_size)
+
+    def sort_param(self, allowlist: dict[str, str]) -> SortParam | None:
+        raw = self._args.get('sort')
+        if not raw:
+            return None
+        colonIdx = raw.rfind(':')
+        if colonIdx <= 0:
+            return None
+        col_id = raw[:colonIdx]
+        direction = raw[colonIdx + 1:]
+        if direction not in ('asc', 'desc'):
+            return None
+        sql_expr = allowlist.get(col_id)
+        if not sql_expr:
+            return None
+        return SortParam(key=col_id, dir=cast(Literal['asc', 'desc'], direction), sql_expr=sql_expr)
 
     def flag(self, key: str) -> bool:
         return self._args.get(key) == 'true'

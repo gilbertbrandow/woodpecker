@@ -125,6 +125,10 @@ type DataTableProps<T extends RowData> = {
   emptyMessage?: React.ReactNode
   loading?: boolean
   serverPagination?: ServerPagination
+  serverSorting?: {
+    sorting: SortingState
+    onSortingChange: (s: SortingState) => void
+  }
   tableId?: string | false
   footerRow?: React.ReactNode
   onFooterRowClick?: () => void
@@ -145,6 +149,7 @@ export function DataTable<T extends RowData>({
   emptyMessage = <span className="text-muted-foreground">No results.</span>,
   loading = false,
   serverPagination,
+  serverSorting,
   tableId,
   footerRow,
   onFooterRowClick,
@@ -152,10 +157,13 @@ export function DataTable<T extends RowData>({
   const { getParam, getMultiParam, setParams } = useTableUrlSync(tableId)
   const theadRef = React.useRef<HTMLTableSectionElement>(null)
 
-  const [sorting, setSorting] = useState<SortingState>(() => {
+  const [internalSorting, setInternalSorting] = useState<SortingState>(() => {
+    if (serverSorting) return initialSorting
     const fromUrl = parseSortParam(getParam('sort'))
     return fromUrl.length > 0 ? fromUrl : initialSorting
   })
+
+  const sorting = serverSorting ? serverSorting.sorting : internalSorting
 
   const [globalFilter, setGlobalFilter] = useState<string>(() => getParam('q') ?? '')
 
@@ -191,8 +199,12 @@ export function DataTable<T extends RowData>({
     onColumnVisibilityChange: setColumnVisibility,
     onSortingChange: (updater) => {
       const next = typeof updater === 'function' ? updater(sorting) : updater
-      setSorting(next)
-      table.setPageIndex(0)
+      if (serverSorting) {
+        serverSorting.onSortingChange(next)
+      } else {
+        setInternalSorting(next)
+        table.setPageIndex(0)
+      }
       setParams({ sort: encodeSortParam(next), page: null })
     },
     onGlobalFilterChange: (value: string) => {
@@ -200,6 +212,7 @@ export function DataTable<T extends RowData>({
       table.setPageIndex(0)
     },
     globalFilterFn: filterFn_includesString,
+    manualSorting: !!serverSorting,
     manualPagination: !!serverPagination,
     initialState: {
       pagination: { pageIndex: serverPagination ? 0 : urlPageIndex, pageSize },

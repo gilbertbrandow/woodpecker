@@ -31,7 +31,7 @@ from app.services.training_item_content import (
     get_content,
     get_content_batch,
 )
-from app.table_query import DateFilter, FilterList, RangeFilter
+from app.table_query import DateFilter, FilterList, Paginator, RangeFilter
 
 
 def _get_run(run_id: int) -> Run:
@@ -885,12 +885,13 @@ _RUN_STATUS_SQL: dict[str, str] = {
 
 def list_runs_paged(
     training_id: int,
-    page: int = 1,
-    page_size: int = 20,
+    paginator: Paginator | None = None,
     status: FilterList | None = None,
     started_at: DateFilter | None = None,
     completed_at: DateFilter | None = None,
 ) -> dict[str, object]:
+    if paginator is None:
+        paginator = Paginator(page=1, page_size=20)
     training = db.session.get(Training, training_id)
     if training is None:
         raise NotFoundError("Training not found", "The requested training does not exist.")
@@ -915,25 +916,20 @@ def list_runs_paged(
 
     where = "WHERE " + " AND ".join(conditions)
 
-    select_sql = f"""
-        SELECT r.id
-        FROM runs r
-        {where}
-        ORDER BY r.run_index ASC
-    """
+    params.update(paginator.params)
+    id_rows = db.session.execute(
+        sa.text(f"""
+            SELECT r.id, COUNT(*) OVER() AS total_count
+            FROM runs r
+            {where}
+            ORDER BY r.run_index ASC
+            LIMIT :page_limit OFFSET :page_offset
+        """),
+        params,
+    ).all()
 
-    params["limit"] = page_size
-    params["offset"] = (page - 1) * page_size
-    run_ids: list[int] = [
-        row[0]
-        for row in db.session.execute(
-            sa.text(select_sql + " LIMIT :limit OFFSET :offset"), params
-        ).all()
-    ]
-    total: int = db.session.scalar(
-        sa.text(f"SELECT COUNT(*) FROM runs r {where}"),
-        {k: v for k, v in params.items() if k not in ("limit", "offset")},
-    ) or 0
+    total = int(id_rows[0].total_count) if id_rows else 0
+    run_ids: list[int] = [row.id for row in id_rows]
 
     runs_by_id: dict[int, Run] = {}
     if run_ids:
@@ -1060,13 +1056,14 @@ def continue_run(run_id: int, user_id: int) -> dict[str, object]:
 
 def list_run_puzzles(
     run_id: int,
-    page: int = 1,
-    page_size: int = 25,
+    paginator: Paginator | None = None,
     source_type: FilterList | None = None,
     position_status: FilterList | None = None,
     time_ms: RangeFilter | None = None,
     rating: RangeFilter | None = None,
 ) -> dict[str, object]:
+    if paginator is None:
+        paginator = Paginator(page=1, page_size=25)
     run = _get_run(run_id)
     _, config = _get_schedule_config(run)
     total_queue = config.total_queue
@@ -1136,15 +1133,12 @@ def list_run_puzzles(
 
     where_sql = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
-    total: int = db.session.scalar(
-        sa.text(f"{cte_sql} SELECT COUNT(*) FROM base {where_sql}"),
-        params,
-    ) or 0
-
     rows = db.session.execute(
-        sa.text(f"{cte_sql} SELECT * FROM base {where_sql} ORDER BY position LIMIT :limit OFFSET :offset"),
-        {**params, "limit": page_size, "offset": (page - 1) * page_size},
+        sa.text(f"{cte_sql} SELECT *, COUNT(*) OVER() AS total_count FROM base {where_sql} ORDER BY position LIMIT :page_limit OFFSET :page_offset"),
+        {**params, **paginator.params},
     ).all()
+
+    total = int(rows[0].total_count) if rows else 0
 
     rp_ids = [row.run_training_item_id for row in rows]
     training_item_ids = [row.training_item_id for row in rows]

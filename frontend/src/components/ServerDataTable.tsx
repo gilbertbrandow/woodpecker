@@ -11,6 +11,16 @@ import { getHandler } from './filters'
 import type { FilterValues } from './filters'
 import { getStored, setStored } from '../lib/storage'
 
+function parseSort(sortParam: string | null | undefined): SortingState {
+  if (!sortParam) return []
+  const colonIdx = sortParam.lastIndexOf(':')
+  if (colonIdx <= 0) return []
+  const col = sortParam.slice(0, colonIdx)
+  const dir = sortParam.slice(colonIdx + 1)
+  if (!col || (dir !== 'asc' && dir !== 'desc')) return []
+  return [{ id: col, desc: dir === 'desc' }]
+}
+
 // ---------------------------------------------------------------------------
 // Public types — defined in ./filters, re-exported here for backward compat
 // ---------------------------------------------------------------------------
@@ -38,7 +48,6 @@ export type FetchParams = {
   filters: Record<string, string[]>
   page: number
   pageSize: number
-  // Reserved for future server-side sorting support — always undefined for now.
   sort?: { key: string; dir: 'asc' | 'desc' }
 }
 
@@ -236,6 +245,12 @@ export function ServerDataTable<T extends RowData>({
   const [total, setTotal] = useState(() => initialData?.total ?? 0)
   const [loading, setLoading] = useState(() => !initialData)
 
+  // Server-side sort state — initialised from URL if present
+  const [sorting, setSorting] = useState<SortingState>(() => {
+    const fromUrl = parseSort(getParam('sort'))
+    return fromUrl.length > 0 ? fromUrl : initialSorting
+  })
+
   // ---------------------------------------------------------------------------
   // Async hydration for custom filters whose URL IDs weren't in memory
   // ---------------------------------------------------------------------------
@@ -307,10 +322,14 @@ export function ServerDataTable<T extends RowData>({
     [filterValues], // specs and pendingFetchParamsRef are stable refs
   )
 
+  const sortSerialized = sorting[0]
+    ? `${sorting[0].id}:${sorting[0].desc ? 'desc' : 'asc'}`
+    : ''
+
   // When initialData is provided we skip the first fetch — the data is already loaded.
   const initialFetchParamsRef = useRef<string | null>(
     initialData !== undefined
-      ? `${debouncedSearchSerialized}|${nonSearchSerialized}|${page}|${pageSize}|${refreshKey ?? ''}|${instanceKey ?? ''}`
+      ? `${debouncedSearchSerialized}|${nonSearchSerialized}|${page}|${pageSize}|${refreshKey ?? ''}|${instanceKey ?? ''}|${sortSerialized}`
       : null,
   )
 
@@ -345,13 +364,13 @@ export function ServerDataTable<T extends RowData>({
   }, [debouncedSearchSerialized, nonSearchSerialized, page, pageSize]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------------------
-  // Fetch: called when settled filter params, page, or refreshKey change.
+  // Fetch: called when settled filter params, page, sort, or refreshKey change.
   // Runs immediately on mount — pending fetch params supply correct IDs for any keys
   // still being hydrated, so hydration and fetch happen in parallel.
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (initialFetchParamsRef.current !== null) {
-      const sig = `${debouncedSearchSerialized}|${nonSearchSerialized}|${page}|${pageSize}|${refreshKey ?? ''}|${instanceKey ?? ''}`
+      const sig = `${debouncedSearchSerialized}|${nonSearchSerialized}|${page}|${pageSize}|${refreshKey ?? ''}|${instanceKey ?? ''}|${sortSerialized}`
       if (sig === initialFetchParamsRef.current) return
       initialFetchParamsRef.current = null
     }
@@ -367,9 +386,13 @@ export function ServerDataTable<T extends RowData>({
       if (effectiveParams.length > 0) filters[spec.key] = effectiveParams
     }
 
+    const sortParam = sorting[0]
+      ? { key: sorting[0].id, dir: sorting[0].desc ? 'desc' as const : 'asc' as const }
+      : undefined
+
     let cancelled = false
     setLoading(true)
-    fetchDataRef.current({ filters, page, pageSize })
+    fetchDataRef.current({ filters, page, pageSize, sort: sortParam })
       .then(({ items, total: t }) => {
         if (cancelled) return
         setData(items)
@@ -380,11 +403,16 @@ export function ServerDataTable<T extends RowData>({
       .finally(() => { if (!cancelled) setLoading(false) })
 
     return () => { cancelled = true }
-  }, [debouncedSearchSerialized, nonSearchSerialized, page, pageSize, refreshKey, instanceKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [debouncedSearchSerialized, nonSearchSerialized, page, pageSize, refreshKey, instanceKey, sortSerialized]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------------------
   // Filter change handlers
   // ---------------------------------------------------------------------------
+  const handleSortChange = useCallback((newSorting: SortingState) => {
+    setSorting(newSorting)
+    setPage(1)
+  }, [])
+
   const handleFilterChange = useCallback((key: string, value: unknown) => {
     // Clear pending for this key so the user's new selection isn't overridden by stale
     // hydration tokens if hydration hasn't completed yet.
@@ -459,6 +487,7 @@ export function ServerDataTable<T extends RowData>({
       searchSlot={searchSlot}
       filtersSlot={filtersSlot}
       serverPagination={{ totalRows: total, page, pageSize, onPageChange: setPage, onPageSizeChange: (s) => { setPageSize(s); setPage(1) } }}
+      serverSorting={{ sorting, onSortingChange: handleSortChange }}
       pageSize={pageSize}
       onRowClick={onRowClick}
       getRowClassName={getRowClassName}

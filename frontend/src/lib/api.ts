@@ -16,15 +16,16 @@ export { ApiError } from './request'
 //
 // Filter key names must match the backend param names exactly. Search is
 // always keyed 'q' on both sides.
-export type TableParams = { filters: Record<string, string[]>; page: number; pageSize: number }
+export type TableParams = { filters: Record<string, string[]>; page: number; pageSize: number; sort?: { key: string; dir: 'asc' | 'desc' } }
 
 // Serialises TableParams to URLSearchParams. Exported so callers can build
 // custom requests (e.g. with extra fixed params) without going through an
 // api method.
-export function tableParamsToUrl({ filters, page, pageSize }: TableParams): URLSearchParams {
+export function tableParamsToUrl({ filters, page, pageSize, sort }: TableParams): URLSearchParams {
   const p = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
   for (const [key, values] of Object.entries(filters))
     for (const v of values) p.append(key, v)
+  if (sort) p.set('sort', `${sort.key}:${sort.dir}`)
   return p
 }
 

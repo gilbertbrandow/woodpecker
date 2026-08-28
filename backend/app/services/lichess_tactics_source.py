@@ -15,7 +15,7 @@ from app.models.source_import_run import (
     SourceImportSource,
     SourceImportStatus,
 )
-from app.table_query import FilterList, RangeFilter, SetFilter
+from app.table_query import FilterList, Paginator, RangeFilter, SetFilter
 
 TOP_THEMES_LIMIT = 25
 
@@ -33,8 +33,7 @@ def _serialize_tactic(t: LichessTactic) -> dict:
 
 
 def list_items(
-    page: int,
-    page_size: int,
+    paginator: Paginator,
     rating: RangeFilter,
     theme: SetFilter,
     opening: FilterList,
@@ -116,7 +115,7 @@ def list_items(
         select(func.count()).select_from(LichessTactic).where(*conditions)
     ).scalar_one()
 
-    offset = (page - 1) * page_size
+    offset = (paginator.page - 1) * paginator.page_size
     tactics = list(
         db.session.execute(
             select(LichessTactic)
@@ -126,17 +125,17 @@ def list_items(
                 selectinload(LichessTactic.openings),
             )
             .order_by(LichessTactic.rating)
-            .limit(page_size)
+            .limit(paginator.page_size)
             .offset(offset)
         ).scalars()
     )
 
-    total_pages = max(1, (total + page_size - 1) // page_size)
+    total_pages = max(1, (total + paginator.page_size - 1) // paginator.page_size)
 
     return {
         "puzzles": [_serialize_tactic(t) for t in tactics],
-        "page": page,
-        "pageSize": page_size,
+        "page": paginator.page,
+        "pageSize": paginator.page_size,
         "totalPages": total_pages,
         "total": total,
     }

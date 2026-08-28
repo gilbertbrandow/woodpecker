@@ -5,6 +5,10 @@ from app.exceptions import ForbiddenError, NotFoundError
 from app.extensions import db
 from app.models.training import Training
 from app.services import leaderboard as leaderboard_svc
+from app.services.leaderboard import (
+    RUN_BOARD_SORT_ALLOWLIST,
+    WEEKLY_BOARD_SORT_ALLOWLIST,
+)
 from app.table_query import FilterList, TableQuery
 
 leaderboard_bp = Blueprint("leaderboard", __name__, url_prefix="/leaderboard")
@@ -49,8 +53,8 @@ def get_leaderboard() -> Response | tuple[Response, int]:
         run_index=run_index,
         exclude_aborted=exclude_aborted,
         search=q.q,
-        page=q.page,
-        page_size=q.page_size,
+        paginator=q.paginator,
+        sort=q.sort_param(RUN_BOARD_SORT_ALLOWLIST),
     )
     return jsonify({"items": items, "total": total})
 
@@ -65,7 +69,7 @@ def get_weekly_leaderboard() -> Response | tuple[Response, int]:
         avg_rating_filter=q.range_filter("avgRating"),
         schedules_filter=q.set_filter("scheduleIds"),
         search=q.q,
-        page=q.page,
-        page_size=q.page_size,
+        paginator=q.paginator,
+        sort=q.sort_param(WEEKLY_BOARD_SORT_ALLOWLIST),
     )
     return jsonify({"items": items, "total": total})
