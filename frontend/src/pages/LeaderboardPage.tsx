@@ -150,12 +150,7 @@ export function LeaderboardPage(): React.ReactElement | null {
       enableSorting: false,
       cell: ({ row }) => (
         <span className="flex items-center gap-2">
-          <UserAvatar
-            displayName={row.original.user.displayName}
-            avatarUrl={row.original.user.avatarUrl}
-            isPresent={row.original.user.isPresent}
-            countryCode={row.original.user.countryCode}
-          />
+          <UserAvatar user={row.original.user} />
           <span className="font-medium">{row.original.user.displayName}</span>
           {user?.id === row.original.user.id && (
             <span className="text-xs text-muted-foreground font-normal">you</span>
@@ -316,12 +311,7 @@ export function LeaderboardPage(): React.ReactElement | null {
       enableSorting: false,
       cell: ({ row }) => (
         <span className="flex items-center gap-2">
-          <UserAvatar
-            displayName={row.original.user.displayName}
-            avatarUrl={row.original.user.avatarUrl}
-            isPresent={row.original.user.isPresent}
-            countryCode={row.original.user.countryCode}
-          />
+          <UserAvatar user={row.original.user} />
           <span className="font-medium">{row.original.user.displayName}</span>
           {user?.id === row.original.user.id && (
             <span className="text-xs text-muted-foreground font-normal">you</span>

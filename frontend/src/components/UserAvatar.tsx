@@ -1,24 +1,20 @@
 import * as React from 'react'
+import type { UserRef } from '../lib/api'
 import { parseAvatarValue } from '../lib/avatar'
 import { DefaultAvatar } from './DefaultAvatar'
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar'
 import { HoverCard, HoverCardTrigger, HoverCardContent } from './ui/hover-card'
 
 type UserAvatarProps = {
-  displayName: string
-  avatarUrl: string | null
-  isPresent?: boolean
-  countryCode?: string | null
+  user: Pick<UserRef, 'displayName' | 'avatarUrl' | 'isPresent' | 'countryCode'>
   className?: string
 }
 
 export function UserAvatar({
-  displayName,
-  avatarUrl,
-  isPresent,
-  countryCode,
+  user,
   className = 'h-6 w-6',
 }: UserAvatarProps): React.ReactElement {
+  const { displayName, avatarUrl, isPresent, countryCode } = user
   const av = parseAvatarValue(avatarUrl)
   const avatarEl =
     av.type === 'custom' ? (
@@ -62,21 +58,19 @@ export function UserAvatar({
                 className="h-3 w-auto"
               />
             )}
-            {isPresent !== undefined && (
-              <div className="flex items-center gap-1">
-                {isPresent ? (
-                  <>
-                    <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
-                    <span className="text-xs text-muted-foreground">Online</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="h-2 w-2 rounded-full border border-muted-foreground shrink-0" />
-                    <span className="text-xs text-muted-foreground">Offline</span>
-                  </>
-                )}
-              </div>
-            )}
+            <div className="flex items-center gap-1">
+              {isPresent ? (
+                <>
+                  <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
+                  <span className="text-xs text-muted-foreground">Online</span>
+                </>
+              ) : (
+                <>
+                  <span className="h-2 w-2 rounded-full border border-muted-foreground shrink-0" />
+                  <span className="text-xs text-muted-foreground">Offline</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </HoverCardContent>

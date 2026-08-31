@@ -52,10 +52,10 @@ export function UserSelectorContent({
         label: u.displayName,
         chipFlush: true,
         chipIcon: (
-          <UserAvatar displayName={u.displayName} avatarUrl={u.avatarUrl} className="h-5 w-5 shrink-0" />
+          <UserAvatar user={u} className="h-5 w-5 shrink-0" />
         ),
         resultIcon: (
-          <UserAvatar displayName={u.displayName} avatarUrl={u.avatarUrl} className="mr-2 h-5 w-5" />
+          <UserAvatar user={u} className="mr-2 h-5 w-5" />
         ),
         suggestionExtra:
           me && u.id === me.id ? (
@@ -99,12 +99,7 @@ export function UserSelector({
               </span>
               <AvatarGroup>
                 {visibleAvatars.map((u) => (
-                  <UserAvatar
-                    key={u.id}
-                    displayName={u.displayName}
-                    avatarUrl={u.avatarUrl}
-                    className="h-5 w-5"
-                  />
+                  <UserAvatar key={u.id} user={u} className="h-5 w-5" />
                 ))}
                 {overflowCount > 0 && (
                   <AvatarGroupCount className="h-5 w-5 text-[10px]">

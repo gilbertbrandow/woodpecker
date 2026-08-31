@@ -48,7 +48,7 @@ export function useUserFilterSpec(urlKey: string, label = 'User'): EntityFilterS
         return (
           <AvatarGroup>
             {visible.map((u) => (
-              <UserAvatar key={u.id} displayName={u.displayName} avatarUrl={u.avatarUrl} className="h-4 w-4" />
+              <UserAvatar key={u.id} user={u} className="h-4 w-4" />
             ))}
             {Array.from({ length: skeletonCount }).map((_, i) => (
               <span key={`p${i}`} className="inline-block h-4 w-4 animate-pulse rounded-full bg-muted" />

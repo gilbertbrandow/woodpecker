@@ -20,12 +20,7 @@ const COLUMNS: ColumnDef<StockFeatures, AdminUser>[] = [
     meta: { icon: DATA_ICONS.user },
     cell: ({ row }) => (
       <div className="flex items-center gap-2">
-        <UserAvatar
-          displayName={row.original.displayName}
-          avatarUrl={row.original.avatarUrl}
-          isPresent={row.original.isPresent}
-          countryCode={row.original.countryCode}
-        />
+        <UserAvatar user={row.original} />
         <span className="font-medium">{row.original.displayName}</span>
       </div>
     ),

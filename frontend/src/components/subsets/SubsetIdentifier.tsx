@@ -35,13 +35,7 @@ export function SubsetIdentifier({
 
   return (
     <div className={cn("flex min-w-0 items-center gap-2", className)}>
-      <UserAvatar
-        displayName={subset.ownedBy.displayName}
-        avatarUrl={subset.ownedBy.avatarUrl}
-        isPresent={subset.ownedBy.isPresent}
-        countryCode={subset.ownedBy.countryCode}
-        className={compact ? "h-4 w-4 shrink-0" : "h-5 w-5 shrink-0"}
-      />
+      <UserAvatar user={subset.ownedBy} className={compact ? "h-4 w-4 shrink-0" : "h-5 w-5 shrink-0"} />
       <div className="flex min-w-0 items-baseline gap-1.5">
         <span className={`shrink-0 font-medium ${compact ? "text-xs" : "text-sm"}`}>
           {displayName}

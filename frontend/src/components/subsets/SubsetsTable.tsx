@@ -98,12 +98,7 @@ export function SubsetsTable({ selectedId, onSelect, onCountChange }: SubsetsTab
       meta: { icon: DATA_ICONS.user },
       enableSorting: false,
       cell: ({ row }) => (
-        <UserAvatar
-          displayName={row.original.ownedBy.displayName}
-          avatarUrl={row.original.ownedBy.avatarUrl}
-          isPresent={row.original.ownedBy.isPresent}
-          countryCode={row.original.ownedBy.countryCode}
-        />
+        <UserAvatar user={row.original.ownedBy} />
       ),
     }))
 

@@ -359,11 +359,7 @@ function SubsetRefBadge({
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-zinc-300/60 bg-zinc-100 px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-zinc-700 dark:border-zinc-600/40 dark:bg-zinc-800 dark:text-zinc-300">
       {ownedBy && (
-        <UserAvatar
-          displayName={ownedBy.displayName}
-          avatarUrl={ownedBy.avatarUrl}
-          className="h-3.5 w-3.5"
-        />
+        <UserAvatar user={ownedBy} className="h-3.5 w-3.5" />
       )}
       {display}
     </span>
@@ -470,12 +466,7 @@ function ExcludedSubsetsTable({
         meta: { icon: DATA_ICONS.user },
         enableSorting: false,
         cell: ({ row }) => (
-          <UserAvatar
-            displayName={row.original.ownedBy.displayName}
-            avatarUrl={row.original.ownedBy.avatarUrl}
-            isPresent={row.original.ownedBy.isPresent}
-            countryCode={row.original.ownedBy.countryCode}
-          />
+          <UserAvatar user={row.original.ownedBy} />
         ),
       },
       {

@@ -361,7 +361,7 @@ export function TrainingPage(): React.ReactElement | null {
             <StatusBadge status={trainingStateToStatusValue(detailStatus?.state ?? training.status)} />
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
-            <UserAvatar displayName={training.owner.displayName} avatarUrl={training.owner.avatarUrl} isPresent={training.owner.isPresent} countryCode={training.owner.countryCode} className="h-4 w-4" />
+            <UserAvatar user={training.owner} className="h-4 w-4" />
             <span>{training.owner.displayName}</span>
             <span className="text-muted-foreground/40">·</span>
             <span>Started {formatStartedAt(training.startedAt)}</span>
