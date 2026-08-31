@@ -38,6 +38,8 @@ export function SubsetIdentifier({
       <UserAvatar
         displayName={subset.ownedBy.displayName}
         avatarUrl={subset.ownedBy.avatarUrl}
+        isPresent={subset.ownedBy.isPresent}
+        countryCode={subset.ownedBy.countryCode}
         className={compact ? "h-4 w-4 shrink-0" : "h-5 w-5 shrink-0"}
       />
       <div className="flex min-w-0 items-baseline gap-1.5">

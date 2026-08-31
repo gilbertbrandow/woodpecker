@@ -473,6 +473,8 @@ function ExcludedSubsetsTable({
           <UserAvatar
             displayName={row.original.ownedBy.displayName}
             avatarUrl={row.original.ownedBy.avatarUrl}
+            isPresent={row.original.ownedBy.isPresent}
+            countryCode={row.original.ownedBy.countryCode}
           />
         ),
       },

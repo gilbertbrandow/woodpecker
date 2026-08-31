@@ -15,7 +15,7 @@ export function useUserFilterSpec(urlKey: string, label = 'User'): EntityFilterS
 
   return useMemo<EntityFilterSpec<SelectableUser>>(() => {
     const currentUser: SelectableUser | null = user
-      ? { id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl }
+      ? { id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl, isPresent: false, countryCode: user.countryCode }
       : null
 
     return {

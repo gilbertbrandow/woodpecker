@@ -101,6 +101,8 @@ export function SubsetsTable({ selectedId, onSelect, onCountChange }: SubsetsTab
         <UserAvatar
           displayName={row.original.ownedBy.displayName}
           avatarUrl={row.original.ownedBy.avatarUrl}
+          isPresent={row.original.ownedBy.isPresent}
+          countryCode={row.original.ownedBy.countryCode}
         />
       ),
     }))

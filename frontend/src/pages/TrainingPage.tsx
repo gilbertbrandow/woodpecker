@@ -217,7 +217,7 @@ export function TrainingPage(): React.ReactElement | null {
   const solveTimeCompletedCount = solveTimeData.filter((d) => d.completed).length
 
   const runColumns = useMemo<ColumnDef<StockFeatures, RunSlot>[]>(() => {
-    const canManage = !!training && !!user && training.ownerId === user.id && (training.status === 'not_started' || training.status === 'in_progress')
+    const canManage = !!training && !!user && training.owner.id === user.id && (training.status === 'not_started' || training.status === 'in_progress')
     const completedCount = runs.filter((r) => r.status === 'completed').length
     const hasActive = runs.some((r) => r.status === 'active')
     const startableIndex = canManage && !hasActive && completedCount < (training?.schedule.runCount ?? 0) ? completedCount : null
@@ -348,7 +348,7 @@ export function TrainingPage(): React.ReactElement | null {
   }
 
   const { schedule } = training
-  const isOwner = training.ownerId === user.id
+  const isOwner = training.owner.id === user.id
   const completedRunCount = runs.filter((r) => r.status === 'completed').length
 
   return (
@@ -361,8 +361,8 @@ export function TrainingPage(): React.ReactElement | null {
             <StatusBadge status={trainingStateToStatusValue(detailStatus?.state ?? training.status)} />
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
-            <UserAvatar displayName={training.ownerDisplayName} avatarUrl={training.ownerAvatarUrl} className="h-4 w-4" />
-            <span>{training.ownerDisplayName}</span>
+            <UserAvatar displayName={training.owner.displayName} avatarUrl={training.owner.avatarUrl} isPresent={training.owner.isPresent} countryCode={training.owner.countryCode} className="h-4 w-4" />
+            <span>{training.owner.displayName}</span>
             <span className="text-muted-foreground/40">·</span>
             <span>Started {formatStartedAt(training.startedAt)}</span>
           </div>

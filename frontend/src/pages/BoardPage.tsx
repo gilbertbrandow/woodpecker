@@ -512,7 +512,7 @@ export function BoardPage(): React.ReactElement | null {
           <OverviewAttemptHistoryTable
             key={overviewData.runTrainingItem.trainingItemId}
             trainingItemId={overviewData.runTrainingItem.trainingItemId}
-            currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl }}
+            currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl, isPresent: false, countryCode: user.countryCode }}
             selectedAttemptId={spectateState?.view.attemptId ?? selectedAttemptId}
             onRowClick={handleRowClick}
             onUserFilterChange={handleUserFilterChange}
@@ -615,7 +615,7 @@ export function BoardPage(): React.ReactElement | null {
           nextPuzzleDisabledReason={overviewData.actions.nextTrainingItem.disabledReason}
           analyzeUrl={overviewData.actions.analyze.url}
           trainingItemId={overviewData.runTrainingItem.trainingItemId}
-          currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl }}
+          currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl, isPresent: false, countryCode: user.countryCode }}
           topSlot={
             sourceForMetaCard !== null ? (
               <TrainingItemMetaCard

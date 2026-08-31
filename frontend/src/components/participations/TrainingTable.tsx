@@ -66,6 +66,8 @@ export function TrainingTable({
           <UserAvatar
             displayName={row.original.user.displayName}
             avatarUrl={row.original.user.avatarUrl}
+            isPresent={row.original.user.isPresent}
+            countryCode={row.original.user.countryCode}
           />
         ),
       }),

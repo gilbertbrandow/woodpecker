@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { flushSync } from 'react-dom'
 import * as Sentry from '@sentry/react'
 import { api, type AuthUser, type OnboardingState, type WaitlistedState } from '../lib/api'
+import { usePresencePing } from '../hooks/usePresencePing'
 
 export type AuthContextValue = {
   user: AuthUser | null
@@ -14,6 +15,11 @@ export type AuthContextValue = {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
+
+function PresencePing(): null {
+  usePresencePing()
+  return null
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -65,6 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ user, onboarding, waitlisted, loading, logout, updateUser, setWaitlisted: handleSetWaitlisted }}>
+      {user && <PresencePing />}
       {children}
     </AuthContext.Provider>
   )

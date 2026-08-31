@@ -106,15 +106,20 @@ export function ScheduleRunLeaderboard({ scheduleId, currentUserId }: Props): Re
       }),
       col({
         id: 'user',
-        accessorFn: (r) => r.displayName,
+        accessorFn: (r) => r.user.displayName,
         header: 'User',
         meta: { icon: DATA_ICONS.user },
         enableSorting: false,
         cell: ({ row }) => (
           <span className="flex items-center gap-2">
-            <UserAvatar displayName={row.original.displayName} avatarUrl={row.original.avatarUrl} />
-            <span className="font-medium">{row.original.displayName}</span>
-            {currentUserId === row.original.userId && (
+            <UserAvatar
+              displayName={row.original.user.displayName}
+              avatarUrl={row.original.user.avatarUrl}
+              isPresent={row.original.user.isPresent}
+              countryCode={row.original.user.countryCode}
+            />
+            <span className="font-medium">{row.original.user.displayName}</span>
+            {currentUserId === row.original.user.id && (
               <span className="text-xs text-muted-foreground font-normal">you</span>
             )}
           </span>
@@ -265,7 +270,7 @@ export function ScheduleRunLeaderboard({ scheduleId, currentUserId }: Props): Re
           params: { trainingId: String(r.trainingId) },
         })
       }
-      getRowClassName={(r) => (currentUserId === r.userId ? 'bg-muted/50' : '')}
+      getRowClassName={(r) => (currentUserId === r.user.id ? 'bg-muted/50' : '')}
       emptyMessage="No runs found."
     />
   )

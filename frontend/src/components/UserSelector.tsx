@@ -31,7 +31,7 @@ export function UserSelectorContent({
   const { user: authUser } = useAuth()
   const me: SelectableUser | null =
     authUser?.status === 'active'
-      ? { id: authUser.id, displayName: authUser.displayName, avatarUrl: authUser.avatarUrl }
+      ? { id: authUser.id, displayName: authUser.displayName, avatarUrl: authUser.avatarUrl, isPresent: false, countryCode: authUser.countryCode }
       : null
 
   return (
@@ -78,7 +78,7 @@ export function UserSelector({
   const { user: authUser } = useAuth()
   const me: SelectableUser | null =
     authUser?.status === 'active'
-      ? { id: authUser.id, displayName: authUser.displayName, avatarUrl: authUser.avatarUrl }
+      ? { id: authUser.id, displayName: authUser.displayName, avatarUrl: authUser.avatarUrl, isPresent: false, countryCode: authUser.countryCode }
       : null
 
   const [open, setOpen] = useState(false)
