@@ -3,10 +3,18 @@ import sqlalchemy as sa
 from app.extensions import db
 from app.models.user import User
 from app.selectable import UserSelectorOut
+from app.services.user_ref import user_ref
 
 
 def _to_selectable(u: User) -> UserSelectorOut:
-    return {"id": u.id, "displayName": u.display_name, "avatarUrl": u.avatar_url}
+    ref = user_ref(u)
+    return {
+        "id": ref["id"],  # type: ignore[typeddict-item]
+        "displayName": ref["displayName"],  # type: ignore[typeddict-item]
+        "avatarUrl": ref["avatarUrl"],  # type: ignore[typeddict-item]
+        "isPresent": ref["isPresent"],  # type: ignore[typeddict-item]
+        "countryCode": ref["countryCode"],  # type: ignore[typeddict-item]
+    }
 
 
 def get_users_by_ids(ids: list[int]) -> list[UserSelectorOut]:

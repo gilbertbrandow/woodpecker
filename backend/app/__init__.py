@@ -81,7 +81,7 @@ def create_app() -> Flask:
                     User.id == user_id,
                     sa.or_(
                         User.last_seen_at.is_(None),
-                        User.last_seen_at < datetime.now(timezone.utc) - timedelta(minutes=5),
+                        User.last_seen_at < datetime.now(timezone.utc) - timedelta(minutes=1),
                     ),
                 )
                 .values(last_seen_at=datetime.now(timezone.utc))

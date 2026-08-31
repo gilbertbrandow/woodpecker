@@ -9,6 +9,7 @@ from app.decorators import admin_required
 from app.exceptions import ConflictError, NotFoundError
 from app.extensions import db
 from app.models.user import User, WaitlistEntry, WhitelistEntry
+from app.services.user_ref import user_ref
 from app.table_query import TableQuery
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -73,13 +74,11 @@ def list_users() -> Response:
     return jsonify({
         "items": [
             {
-                "id": u.id,
+                **user_ref(u),
                 "lichessUsername": u.lichess_username,
-                "displayName": u.display_name,
                 "createdAt": u.created_at.isoformat(),
-                "avatarUrl": u.avatar_url,
-                "lastLoginAt": u.last_login_at.isoformat() if u.last_login_at else None,
-                "lastSeenAt": u.last_seen_at.isoformat() if u.last_seen_at else None,
+                "lastLoginAt": (u.last_login_at or u.created_at).isoformat(),
+                "lastSeenAt": (u.last_seen_at or u.created_at).isoformat(),
                 "isSuperAdmin": u.is_superadmin,
             }
             for u in users

@@ -12,6 +12,7 @@ from app.models.training import Training
 from app.models.user import User
 from app.services.schedule_config import RunDefinition, ScheduleConfig
 from app.services.training_state import compute_training_state
+from app.services.user_ref import user_ref
 from app.table_query import DateFilter, FilterList, Paginator
 
 
@@ -86,9 +87,7 @@ def training_full_dict(training: Training) -> dict[str, object]:
         "startedAt": training.started_at.isoformat(),
         "completedAt": training.completed_at.isoformat() if training.completed_at else None,
         "abortedAt": training.aborted_at.isoformat() if training.aborted_at else None,
-        "ownerId": owner.id,
-        "ownerDisplayName": owner.display_name,
-        "ownerAvatarUrl": owner.avatar_url,
+        "owner": user_ref(owner),
         "runTargets": run_targets,
         "schedule": {
             "id": schedule.id,
@@ -99,10 +98,7 @@ def training_full_dict(training: Training) -> dict[str, object]:
             "runCount": run_count,
             "runs": [{"target_hours": r.target_hours, "break_after_hours": r.break_after_hours} for r in schedule_cfg.runs],
             "puzzleOrder": puzzle_order,
-            "createdBy": {
-                "displayName": creator.display_name,
-                "avatarUrl": creator.avatar_url,
-            },
+            "createdBy": user_ref(creator),
             "subset": {
                 "id": subset.id,
                 "name": subset.name,

@@ -10,6 +10,7 @@ from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.subset import Subset, SubsetTrainingItem
 from app.models.user import User
+from app.services.user_ref import user_ref
 from app.table_query import DateFilter, FilterList, Paginator, RangeFilter
 
 DEFAULT_RATING_MIN = 0
@@ -44,11 +45,7 @@ def subset_to_dict(subset: Subset, owner: User | None = None) -> dict[str, objec
         "lockedAt": subset.locked_at.isoformat() if subset.locked_at else None,
     }
     if owner is not None:
-        d["ownedBy"] = {
-            "id": owner.id,
-            "displayName": owner.display_name,
-            "avatarUrl": owner.avatar_url,
-        }
+        d["ownedBy"] = user_ref(owner)
     return d
 
 

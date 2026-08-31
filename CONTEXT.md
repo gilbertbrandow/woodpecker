@@ -119,6 +119,10 @@ _Avoid_: source data, puzzle metadata, display metadata
 > **Dev:** "Can a Run span multiple Subsets?"
 > **Domain expert:** "No. A Run belongs to a Training, which belongs to a Schedule, which is tied to exactly one Subset. To train across multiple puzzle sets, the user composes a Subset from multiple Sources."
 
+**UserRef**:
+The canonical lightweight user shape returned by the API whenever a user is referenced from another resource (leaderboard row, subset owner, training owner, schedule creator, etc.). Always contains `{ id, displayName, avatarUrl, isPresent, countryCode }`. Distinct from `AuthUser`, which is the full shape of the currently logged-in user returned by `/auth/me`. All API responses that previously embedded user fields as flat root fields (e.g. `ownerDisplayName`, `ownerAvatarUrl`) or inconsistent nested objects must migrate to `UserRef`.
+_Avoid_: UserStub, PublicUser, user object (too generic)
+
 **Display Name**:
 The sole public identity of an active user. Required (non-null) for all active users. Chosen during onboarding, prefilled with the user's Lichess username. Validated on all writes: 2–32 characters, letters/numbers/spaces/underscores/hyphens only. Lichess username is never shown publicly; Display Name is used everywhere another user is represented.
 _Avoid_: nickname (prior code term, renamed), username (when referring to public display)
@@ -212,6 +216,14 @@ _Avoid_: admin dashboard, management panel
 **Last Login**:
 The timestamp of a User's most recent completed Lichess OAuth callback as an existing (already-active) user. Stored as `last_login_at` (nullable) on the User record. `null` for users who have never logged back in after initial account creation. Not updated on first onboarding — only on subsequent logins.
 _Avoid_: last active, last seen (both conflate login with training activity)
+
+**Presence**:
+A derived boolean indicating whether a User has made an authenticated request within the last 5 minutes. Computed from `last_seen_at` at query time — never stored. Exposed in API responses as `isPresent`. UI copy uses "online" (green dot indicator); "presence" is the domain term only.
+_Avoid_: online status, active status, last seen (as a synonym — last_seen_at is the raw timestamp; Presence is the derived boolean)
+
+**Last Seen**:
+The timestamp of a User's most recent authenticated request, updated at most once per minute per user (debounced server-side). Stored as `last_seen_at` (nullable) on the User record. When null, falls back to `created_at` for display purposes. The raw input from which Presence is derived.
+_Avoid_: last active (conflates with training activity), last login (conflates with OAuth)
 
 ## Flagged ambiguities
 

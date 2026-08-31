@@ -145,6 +145,11 @@ def onboarding() -> tuple[Response, int] | Response:
     return jsonify(user_to_dict(user))
 
 
+@auth_bp.get("/ping")
+def ping() -> tuple[str, int]:
+    return "", 204
+
+
 @auth_bp.patch("/waitlist/email")
 def update_email() -> tuple[Response, int] | Response:
     state = auth_session.read()

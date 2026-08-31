@@ -9,6 +9,7 @@ def user_to_dict(user: User) -> dict[str, object]:
         "username": user.lichess_username,
         "displayName": user.display_name,
         "avatarUrl": user.avatar_url,
+        "countryCode": user.country_code,
         "boardTheme": user.board_theme,
         "pieceTheme": user.piece_theme,
         "showTimerTenths": user.show_timer_tenths,
