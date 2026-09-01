@@ -2,9 +2,11 @@ services:
   db:
     command: >
       postgres
-      -c shared_buffers=64MB
+      -c shared_buffers=192MB
       -c max_connections=25
       -c maintenance_work_mem=32MB
+      -c effective_cache_size=768MB
+      -c jit=off
     volumes:
       - /mnt/woodpecker-data/pgdata:/var/lib/postgresql/data
 

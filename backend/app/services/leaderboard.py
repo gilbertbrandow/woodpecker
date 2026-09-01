@@ -92,11 +92,26 @@ def get_run_board(
     else:
         order_by = "r.started_at DESC NULLS LAST, r.id ASC"
 
+    # Scope run_stats to relevant runs only — prevents the CTE from scanning all
+    # run_training_items regardless of the outer schedule/run_index filters.
+    target_conds: list[str] = []
+    sch_f.apply(target_conds, params, "t.schedule_id", prefix="sched")
+    if run_index is not None:
+        target_conds.append("r.run_index BETWEEN :run_index_prev AND :run_index")
+        params["run_index_prev"] = run_index - 1
+    target_where = ("WHERE " + " AND ".join(target_conds)) if target_conds else ""
+
     params.update(paginator.params)
 
     rows = db.session.execute(
         sa.text(f"""
-            WITH run_stats AS (
+            WITH target_run_ids AS (
+                SELECT r.id
+                FROM runs r
+                JOIN trainings t ON t.id = r.training_id
+                {target_where}
+            ),
+            run_stats AS (
                 SELECT
                     rp.run_id,
                     COUNT(*)                                              AS total_puzzles,
@@ -156,6 +171,7 @@ def get_run_board(
                     ORDER BY pa.try_number DESC
                     LIMIT 1
                 ) last_failed ON true
+                WHERE rp.run_id IN (SELECT id FROM target_run_ids)
                 GROUP BY rp.run_id
             )
             SELECT
