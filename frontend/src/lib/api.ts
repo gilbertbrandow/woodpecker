@@ -43,6 +43,7 @@ export type AuthUser = {
   username: string
   displayName: string
   avatarUrl: string | null
+  isPresent: boolean
   countryCode: string | null
   boardTheme: string
   pieceTheme: string
@@ -106,6 +107,7 @@ export type AuthState = AuthUser | OnboardingState | WaitlistedState
 export type SettingsPayload = {
   displayName?: string
   avatarUrl?: string
+  countryCode?: string | null
   boardTheme?: string
   pieceTheme?: string
   showTimerTenths?: boolean
@@ -1131,6 +1133,8 @@ export const api = {
   settings: {
     update: (payload: SettingsPayload): Promise<AuthUser> =>
       request<AuthUser>('/settings', { method: 'PATCH', body: JSON.stringify(payload) }),
+    refreshCountry: (): Promise<AuthUser> =>
+      request<AuthUser>('/settings/refresh-country', { method: 'POST' }),
   },
   subsets: {
     list: (params: TableParams): Promise<{ items: Subset[]; total: number }> =>

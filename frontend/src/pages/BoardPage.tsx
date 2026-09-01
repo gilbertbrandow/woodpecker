@@ -512,7 +512,7 @@ export function BoardPage(): React.ReactElement | null {
           <OverviewAttemptHistoryTable
             key={overviewData.runTrainingItem.trainingItemId}
             trainingItemId={overviewData.runTrainingItem.trainingItemId}
-            currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl, isPresent: false, countryCode: user.countryCode }}
+            currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl, isPresent: user.isPresent, countryCode: user.countryCode }}
             selectedAttemptId={spectateState?.view.attemptId ?? selectedAttemptId}
             onRowClick={handleRowClick}
             onUserFilterChange={handleUserFilterChange}
@@ -615,7 +615,7 @@ export function BoardPage(): React.ReactElement | null {
           nextPuzzleDisabledReason={overviewData.actions.nextTrainingItem.disabledReason}
           analyzeUrl={overviewData.actions.analyze.url}
           trainingItemId={overviewData.runTrainingItem.trainingItemId}
-          currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl, isPresent: false, countryCode: user.countryCode }}
+          currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl, isPresent: user.isPresent, countryCode: user.countryCode }}
           topSlot={
             sourceForMetaCard !== null ? (
               <TrainingItemMetaCard
@@ -639,7 +639,7 @@ export function BoardPage(): React.ReactElement | null {
         <div className="flex items-center gap-1.5 px-3 py-1">
           <span>Inspecting</span>
           <UserAvatar
-            user={spectateState.kind === 'other' ? spectateState.user : { displayName: user?.displayName ?? '', avatarUrl: user?.avatarUrl ?? null, isPresent: false, countryCode: user?.countryCode ?? null }}
+            user={spectateState.kind === 'other' ? spectateState.user : { displayName: user?.displayName ?? '', avatarUrl: user?.avatarUrl ?? null, isPresent: user?.isPresent ?? false, countryCode: user?.countryCode ?? null }}
             className="h-4 w-4"
           />
           <span>{spectateState.kind === 'other' ? spectateState.user.displayName : (user?.displayName ?? '')}</span>

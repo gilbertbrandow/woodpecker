@@ -4,6 +4,8 @@ import { parseAvatarValue } from '../lib/avatar'
 import { DefaultAvatar } from './DefaultAvatar'
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar'
 import { HoverCard, HoverCardTrigger, HoverCardContent } from './ui/hover-card'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip'
+import { COUNTRIES, FLAG_URL } from '../lib/countries'
 
 type UserAvatarProps = {
   user: Pick<UserRef, 'displayName' | 'avatarUrl' | 'isPresent' | 'countryCode'>
@@ -49,28 +51,33 @@ export function UserAvatar({
       </HoverCardTrigger>
       <HoverCardContent className="w-auto p-3" side="top" align="center">
         <div className="flex flex-col gap-1.5 min-w-[120px]">
-          <span className="text-sm font-medium leading-none">{displayName}</span>
-          <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-medium leading-none">{displayName}</span>
             {countryCode && (
-              <img
-                src={`https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`}
-                alt={countryCode}
-                className="h-3 w-auto"
-              />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <img
+                    src={FLAG_URL(countryCode)}
+                    alt={countryCode}
+                    className="h-3 w-auto cursor-default"
+                  />
+                </TooltipTrigger>
+                <TooltipContent>{COUNTRIES.find(c => c.code === countryCode)?.name ?? countryCode}</TooltipContent>
+              </Tooltip>
             )}
-            <div className="flex items-center gap-1">
-              {isPresent ? (
-                <>
-                  <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
-                  <span className="text-xs text-muted-foreground">Online</span>
-                </>
-              ) : (
-                <>
-                  <span className="h-2 w-2 rounded-full border border-muted-foreground shrink-0" />
-                  <span className="text-xs text-muted-foreground">Offline</span>
-                </>
-              )}
-            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            {isPresent ? (
+              <>
+                <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
+                <span className="text-xs text-muted-foreground">Online</span>
+              </>
+            ) : (
+              <>
+                <span className="h-2 w-2 rounded-full border border-muted-foreground shrink-0" />
+                <span className="text-xs text-muted-foreground">Offline</span>
+              </>
+            )}
           </div>
         </div>
       </HoverCardContent>

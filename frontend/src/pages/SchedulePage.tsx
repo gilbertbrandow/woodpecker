@@ -485,7 +485,7 @@ export function SchedulePage(): React.ReactElement | null {
                 })
               }
             >
-              <UserAvatar user={{ displayName: user.displayName, avatarUrl: user.avatarUrl, isPresent: false, countryCode: user.countryCode }} className="h-7 w-7" />
+              <UserAvatar user={{ displayName: user.displayName, avatarUrl: user.avatarUrl, isPresent: user.isPresent, countryCode: user.countryCode }} className="h-7 w-7" />
               <ProgressBar
                 value={myTraining.totalPuzzles > 0 ? Math.round((myTraining.completedPuzzles / myTraining.totalPuzzles) * 100) : 0}
                 tooltipLabel={`${myTraining.completedPuzzles} / ${myTraining.totalPuzzles} puzzles`}
