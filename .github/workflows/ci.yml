@@ -142,7 +142,7 @@ jobs:
         run: docker build --target prod -t woodpecker-backend:ci backend/
 
       - name: Scan with Trivy
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: woodpecker-backend:ci
           format: sarif
@@ -175,7 +175,7 @@ jobs:
         run: docker build --target build -t woodpecker-frontend:ci frontend/
 
       - name: Scan with Trivy
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: woodpecker-frontend:ci
           format: sarif
@@ -205,7 +205,7 @@ jobs:
         run: docker build -t woodpecker-backup:ci deploy/backup/
 
       - name: Scan with Trivy
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: woodpecker-backup:ci
           format: sarif
@@ -235,7 +235,7 @@ jobs:
         run: docker build -f pipeline/base.Dockerfile -t woodpecker-pipeline-base .
 
       - name: Scan base image with Trivy
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: woodpecker-pipeline-base
           format: sarif
@@ -256,7 +256,7 @@ jobs:
         run: docker build -f pipeline/openings/Dockerfile -t woodpecker-pipeline-openings .
 
       - name: Scan openings image with Trivy
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: woodpecker-pipeline-openings
           format: sarif
@@ -277,7 +277,7 @@ jobs:
         run: docker build -f pipeline/sources/lichess_tactics/Dockerfile -t woodpecker-pipeline-lichess-tactics .
 
       - name: Scan lichess-tactics image with Trivy
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: woodpecker-pipeline-lichess-tactics
           format: sarif
