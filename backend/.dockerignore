@@ -1,6 +1,9 @@
 # Virtual environment — dependencies are installed fresh via pip in the image
 .venv/
 
+# JavaScript tooling — not part of the Python backend image
+node_modules/
+
 # Python cache — regenerated automatically at runtime
 __pycache__/
 *.pyc

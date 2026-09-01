@@ -1,0 +1,11 @@
+# pip 26.x vendors msgpack 1.1.2 internally for its own inter-process
+# communication. This is pip's private dependency — it is never exposed to
+# user-controlled input in our application. Fix requires a pip release that
+# upgrades its vendored copy; not actionable on our end.
+GHSA-6v7p-g79w-8964
+
+# The python:3.x-slim base image embeds an OCI SBOM that lists setuptools
+# 70.3.0. Our Dockerfiles explicitly upgrade setuptools to >=78.1.1 (installed
+# version: 84.0.0), but Trivy surfaces the stale SBOM entry alongside the
+# real installation. The installed version is clean.
+CVE-2025-47273

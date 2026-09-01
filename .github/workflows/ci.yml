@@ -172,7 +172,7 @@ jobs:
         run: bash frontend/scripts/check-node-version.sh
 
       - name: Build
-        run: docker build --target build -t woodpecker-frontend:ci frontend/
+        run: docker build --target prod -t woodpecker-frontend:ci frontend/
 
       - name: Scan with Trivy
         uses: aquasecurity/trivy-action@v0.36.0
