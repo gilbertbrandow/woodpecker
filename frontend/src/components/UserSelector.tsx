@@ -31,7 +31,7 @@ export function UserSelectorContent({
   const { user: authUser } = useAuth()
   const me: SelectableUser | null =
     authUser?.status === 'active'
-      ? { id: authUser.id, displayName: authUser.displayName, avatarUrl: authUser.avatarUrl }
+      ? { id: authUser.id, displayName: authUser.displayName, avatarUrl: authUser.avatarUrl, isPresent: authUser.isPresent, countryCode: authUser.countryCode }
       : null
 
   return (
@@ -52,10 +52,10 @@ export function UserSelectorContent({
         label: u.displayName,
         chipFlush: true,
         chipIcon: (
-          <UserAvatar displayName={u.displayName} avatarUrl={u.avatarUrl} className="h-5 w-5 shrink-0" />
+          <UserAvatar user={u} className="h-5 w-5 shrink-0" />
         ),
         resultIcon: (
-          <UserAvatar displayName={u.displayName} avatarUrl={u.avatarUrl} className="mr-2 h-5 w-5" />
+          <UserAvatar user={u} className="mr-2 h-5 w-5" />
         ),
         suggestionExtra:
           me && u.id === me.id ? (
@@ -78,7 +78,7 @@ export function UserSelector({
   const { user: authUser } = useAuth()
   const me: SelectableUser | null =
     authUser?.status === 'active'
-      ? { id: authUser.id, displayName: authUser.displayName, avatarUrl: authUser.avatarUrl }
+      ? { id: authUser.id, displayName: authUser.displayName, avatarUrl: authUser.avatarUrl, isPresent: authUser.isPresent, countryCode: authUser.countryCode }
       : null
 
   const [open, setOpen] = useState(false)
@@ -99,12 +99,7 @@ export function UserSelector({
               </span>
               <AvatarGroup>
                 {visibleAvatars.map((u) => (
-                  <UserAvatar
-                    key={u.id}
-                    displayName={u.displayName}
-                    avatarUrl={u.avatarUrl}
-                    className="h-5 w-5"
-                  />
+                  <UserAvatar key={u.id} user={u} className="h-5 w-5" />
                 ))}
                 {overflowCount > 0 && (
                   <AvatarGroupCount className="h-5 w-5 text-[10px]">

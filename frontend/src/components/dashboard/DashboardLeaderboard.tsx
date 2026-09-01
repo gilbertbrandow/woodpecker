@@ -52,15 +52,15 @@ export function DashboardLeaderboard({ trainingId, runIndex, initialRows }: Prop
       }),
       col({
         id: 'user',
-        accessorFn: (r) => r.displayName,
+        accessorFn: (r) => r.user.displayName,
         header: 'User',
         meta: { icon: DATA_ICONS.user },
         enableSorting: false,
         cell: ({ row }) => (
           <span className="flex items-center gap-2">
-            <UserAvatar displayName={row.original.displayName} avatarUrl={row.original.avatarUrl} />
-            <span className="font-medium">{row.original.displayName}</span>
-            {user?.id === row.original.userId && (
+            <UserAvatar user={row.original.user} />
+            <span className="font-medium">{row.original.user.displayName}</span>
+            {user?.id === row.original.user.id && (
               <span className="text-xs text-muted-foreground font-normal">you</span>
             )}
           </span>
@@ -151,7 +151,7 @@ export function DashboardLeaderboard({ trainingId, runIndex, initialRows }: Prop
       instanceKey={`${trainingId}-${runIndex}`}
       pageSize={PAGE_SIZE}
       initialSorting={[{ id: 'accuracyPct', desc: true }]}
-      getRowClassName={(r) => (user?.id === r.userId ? 'bg-muted/50' : '')}
+      getRowClassName={(r) => (user?.id === r.user.id ? 'bg-muted/50' : '')}
       emptyMessage="No runs yet."
       compact
     />

@@ -106,10 +106,7 @@ export function SchedulesTable({
       meta: { icon: DATA_ICONS.user },
       enableSorting: false,
       cell: ({ row }) => (
-        <UserAvatar
-          displayName={row.original.createdBy.displayName}
-          avatarUrl={row.original.createdBy.avatarUrl}
-        />
+        <UserAvatar user={row.original.createdBy} />
       ),
     }))
 

@@ -12,6 +12,8 @@ type FlowStep = {
 type Flow = {
   displayName: string
   avatarUrl: string
+  isPresent: boolean
+  countryCode: string | null
   context: string
   steps: FlowStep[]
 }
@@ -20,6 +22,8 @@ const FLOWS: Flow[] = [
   {
     displayName: 'Alice',
     avatarUrl: 'default:bq:crimson:alpha',
+    isPresent: false,
+    countryCode: null,
     context: 'Creates her own Subset with exactly the puzzles she wants and sets up a Schedule that works for her.',
     steps: [
       { icon: CONCEPT_ICONS.Subset, label: 'Creates "Alice\'s Subset"', detail: '250 puzzles: 70% Lichess Tactics (rating 1800–2200), 20% Scraped Positional (medium difficulty), 10% Decoys. Locks it.' },
@@ -31,6 +35,8 @@ const FLOWS: Flow[] = [
   {
     displayName: 'Bob',
     avatarUrl: 'default:bk:navy:merida',
+    isPresent: false,
+    countryCode: null,
     context: 'Uses Alice\'s Subset and Schedule by simply starting a Training from Alice\'s existing Schedule.',
     steps: [
       { icon: CONCEPT_ICONS.Training, label: 'Starts new training', detail: 'Using "Alice\'s Schedule"' },
@@ -40,6 +46,8 @@ const FLOWS: Flow[] = [
   {
     displayName: 'Carol',
     avatarUrl: 'default:bb:amber:anarcandy',
+    isPresent: false,
+    countryCode: null,
     context: 'Wants to train on Alice\'s Subset but prefers her own Schedule with different run lengths and ordering.',
     steps: [
       { icon: CONCEPT_ICONS.Schedule, label: 'Creates "Carol\'s Schedule"', detail: 'Uses "Alice\'s Subset". 5 runs with tightening time limits: 2 weeks, 1 week, 4 days, 2 days, 1 day. 1 day break between each run. Puzzles ordered by rating each run.' },
@@ -123,7 +131,7 @@ export function GuidePage(): React.ReactElement {
             <div key={flow.displayName} className="flex flex-col gap-4 rounded-md border border-border p-4">
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
-                  <UserAvatar displayName={flow.displayName} avatarUrl={flow.avatarUrl} className="h-5 w-5" />
+                  <UserAvatar user={flow} className="h-5 w-5" />
                   <span className="text-sm font-medium">{flow.displayName}</span>
                 </div>
                 <p className="text-xs leading-relaxed text-muted-foreground">{flow.context}</p>

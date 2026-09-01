@@ -14,6 +14,7 @@ from app.services.attempt_state import attempt_type_fields
 from app.services.chess_board import compute_attempt_board, compute_attempt_pgn
 from app.services.schedule_config import ScheduleConfig
 from app.services.training_item_content import get_content
+from app.services.user_ref import user_ref
 from app.table_query import FilterList, Paginator, RangeFilter
 
 
@@ -119,7 +120,7 @@ def get_attempt_history(
 
     rows: list[dict[str, object]] = []
     for ctx in context_rows:
-        rp, run, training, user, schedule, subset = (
+        rp, run, _, user, schedule, subset = (
             ctx.RunTrainingItem, ctx.Run, ctx.Training, ctx.User, ctx.Schedule, ctx.Subset
         )
         if not isinstance(schedule.config, dict):
@@ -147,9 +148,7 @@ def get_attempt_history(
                 "attemptId": a.id,
                 "runId": rp.run_id,
                 "runTrainingItemId": rp.id,
-                "userId": training.user_id,
-                "displayName": user.display_name,
-                "avatarUrl": user.avatar_url,
+                "user": user_ref(user),
                 "runIndex": run.run_index,
                 "tryNumber": a.try_number,
                 "countsTowardsTraining": type_data["countsTowardsTraining"],

@@ -1,3 +1,5 @@
+import time
+
 import click
 from flask import Flask
 
@@ -32,3 +34,43 @@ def register_commands(app: Flask) -> None:
         user.is_superadmin = True
         db.session.commit()
         click.echo(f"Granted superadmin to {normalized}.")
+
+    @app.cli.command("backfill-country")
+    def backfill_country() -> None:
+        """Fetch country_code from Lichess public API for users missing it."""
+        import requests as http
+        import sqlalchemy as sa
+
+        from app.extensions import db
+        from app.models.user import User
+        from app.services.flags import is_valid_flag
+
+        users = db.session.scalars(
+            sa.select(User).where(User.country_code.is_(None))
+        ).all()
+
+        if not users:
+            click.echo("All users already have a country_code.")
+            return
+
+        click.echo(f"Backfilling country for {len(users)} users...")
+        updated = 0
+        for user in users:
+            try:
+                resp = http.get(
+                    f"https://lichess.org/api/user/{user.lichess_username}",
+                    timeout=5,
+                )
+                if resp.ok:
+                    data = resp.json()
+                    profile = data.get("profile") or {}
+                    raw = profile.get("flag") or profile.get("country")
+                    if raw and isinstance(raw, str) and is_valid_flag(raw):
+                        user.country_code = raw
+                        updated += 1
+            except http.exceptions.RequestException:
+                click.echo(f"  Warning: failed to fetch {user.lichess_username}")
+            time.sleep(0.1)  # ~10 req/s, well under Lichess rate limit
+
+        db.session.commit()
+        click.echo(f"Done. Updated {updated}/{len(users)} users.")

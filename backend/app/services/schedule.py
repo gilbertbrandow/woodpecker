@@ -9,6 +9,7 @@ from app.models.schedule import Schedule
 from app.models.subset import Subset
 from app.models.user import User
 from app.services.schedule_config import ScheduleConfig
+from app.services.user_ref import user_ref, user_ref_from_row
 from app.table_query import DateFilter, FilterList, Paginator, RangeFilter
 
 DEFAULT_CONFIG: dict[str, object] = {
@@ -36,7 +37,7 @@ def schedule_to_dict(schedule: Schedule, creator: User) -> dict[str, object]:
         "status": schedule.status,
         "config": schedule.config,
         "totalHours": total_hours,
-        "createdBy": {"id": creator.id, "displayName": creator.display_name, "avatarUrl": creator.avatar_url},
+        "createdBy": user_ref(creator),
         "createdAt": schedule.created_at.isoformat(),
         "lockedAt": schedule.locked_at.isoformat() if schedule.locked_at else None,
     }
@@ -250,7 +251,7 @@ def list_schedules(
         sa.text(f"""
             SELECT s.id, s.name, s.description, s.config,
                    s.created_at, s.locked_at, s.subset_id,
-                   u.id AS user_id, u.display_name, u.avatar_url,
+                   u.id AS user_id, u.display_name, u.avatar_url, u.last_seen_at, u.country_code,
                    sub.name AS subset_name,
                    COALESCE(sub.locked_puzzle_count, sub.puzzle_count) AS subset_puzzle_count
             {base_sql}
@@ -276,7 +277,7 @@ def list_schedules(
             "name": row.name,
             "description": row.description,
             "status": "locked" if row.locked_at is not None else "draft",
-            "createdBy": {"id": int(row.user_id), "displayName": row.display_name, "avatarUrl": row.avatar_url},
+            "createdBy": user_ref_from_row(int(row.user_id), row.display_name, row.avatar_url, row.last_seen_at, row.country_code),
             "subsetId": row.subset_id,
             "subsetName": row.subset_name,
             "subsetPuzzleCount": int(row.subset_puzzle_count) if row.subset_puzzle_count is not None else 0,

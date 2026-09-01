@@ -64,6 +64,17 @@ def decide_access(active_count: int, max_users: int, in_whitelist: bool) -> str:
     return "waitlisted"
 
 
+def _extract_country_code(account: berserk.types.AccountInformation) -> str | None:
+    from app.services.flags import is_valid_flag
+    profile = account.get("profile")
+    if not isinstance(profile, dict):
+        return None
+    raw = profile.get("flag") or profile.get("country")
+    if not raw or not isinstance(raw, str):
+        return None
+    return raw if is_valid_flag(raw) else None
+
+
 def get_or_create_user(access_token: str) -> dict[str, object]:
     lichess_session = berserk.TokenSession(access_token)
     client = berserk.Client(session=lichess_session)
@@ -71,6 +82,7 @@ def get_or_create_user(access_token: str) -> dict[str, object]:
     lichess_username: str = account["username"]
     raw_avatar = account.get("avatar")
     avatar_url: str | None = str(raw_avatar) if raw_avatar is not None else None
+    country_code = _extract_country_code(account)
 
     existing = db.session.execute(
         db.select(User).filter_by(lichess_username=lichess_username)
@@ -78,6 +90,8 @@ def get_or_create_user(access_token: str) -> dict[str, object]:
 
     if existing:
         existing.last_login_at = datetime.now(timezone.utc)
+        if country_code is not None:
+            existing.country_code = country_code
         db.session.commit()
         return {"status": "active", "user_id": existing.id}
 

@@ -99,7 +99,7 @@ class TestLeaderboardRunFilters:
 
         assert resp.status_code == 200
         items = resp.get_json()["items"]
-        user_ids = {i["userId"] for i in items}
+        user_ids = {i["user"]["id"] for i in items}
         assert alice.id in user_ids
         assert bob.id not in user_ids
 
@@ -116,7 +116,7 @@ class TestLeaderboardRunFilters:
 
         assert resp.status_code == 200
         items = resp.get_json()["items"]
-        user_ids = {i["userId"] for i in items}
+        user_ids = {i["user"]["id"] for i in items}
         assert alice.id not in user_ids
         assert bob.id in user_ids
 
@@ -179,7 +179,7 @@ class TestLeaderboardRunFilters:
 
         assert resp.status_code == 200
         items = resp.get_json()["items"]
-        user_ids = {i["userId"] for i in items}
+        user_ids = {i["user"]["id"] for i in items}
         assert alice.id in user_ids
         assert bob.id not in user_ids
 
@@ -253,7 +253,7 @@ class TestLeaderboardWeeklyFilters:
 
         assert resp.status_code == 200
         items = resp.get_json()["items"]
-        user_ids = {i["userId"] for i in items}
+        user_ids = {i["user"]["id"] for i in items}
         assert alice.id in user_ids
         assert bob.id not in user_ids
 
@@ -270,7 +270,7 @@ class TestLeaderboardWeeklyFilters:
 
         assert resp.status_code == 200
         items = resp.get_json()["items"]
-        user_ids = {i["userId"] for i in items}
+        user_ids = {i["user"]["id"] for i in items}
         assert alice.id in user_ids
         assert bob.id not in user_ids
 
@@ -360,7 +360,7 @@ class TestLeaderboardWeeklyFilters:
 
         assert resp.status_code == 200
         items = resp.get_json()["items"]
-        user_ids = [i["userId"] for i in items]
+        user_ids = [i["user"]["id"] for i in items]
         assert user_ids.index(alice.id) < user_ids.index(bob.id)
 
 
@@ -422,7 +422,7 @@ class TestLeaderboardRunSort:
 
         assert resp.status_code == 200
         items = resp.get_json()["items"]
-        user_ids = [i["userId"] for i in items]
+        user_ids = [i["user"]["id"] for i in items]
         assert alice.id in user_ids
         assert bob.id in user_ids
         assert user_ids.index(alice.id) < user_ids.index(bob.id)

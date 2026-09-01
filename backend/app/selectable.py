@@ -31,3 +31,5 @@ class UserSelectorOut(TypedDict):
     id: int
     displayName: str
     avatarUrl: str | None
+    isPresent: bool
+    countryCode: str | None

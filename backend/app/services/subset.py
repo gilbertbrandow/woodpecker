@@ -10,6 +10,7 @@ from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.subset import Subset, SubsetTrainingItem
 from app.models.user import User
+from app.services.user_ref import user_ref, user_ref_from_row
 from app.table_query import DateFilter, FilterList, Paginator, RangeFilter
 
 DEFAULT_RATING_MIN = 0
@@ -44,11 +45,7 @@ def subset_to_dict(subset: Subset, owner: User | None = None) -> dict[str, objec
         "lockedAt": subset.locked_at.isoformat() if subset.locked_at else None,
     }
     if owner is not None:
-        d["ownedBy"] = {
-            "id": owner.id,
-            "displayName": owner.display_name,
-            "avatarUrl": owner.avatar_url,
-        }
+        d["ownedBy"] = user_ref(owner)
     return d
 
 
@@ -1220,7 +1217,7 @@ def list_subsets(
             SELECT sub.id, sub.name, sub.config,
                    COALESCE(sub.locked_puzzle_count, sub.puzzle_count) AS puzzle_count,
                    sub.created_at, sub.locked_at,
-                   u.id AS owner_id, u.display_name, u.avatar_url,
+                   u.id AS owner_id, u.display_name, u.avatar_url, u.last_seen_at, u.country_code,
                    CASE
                        WHEN sub.locked_at IS NOT NULL THEN 'locked'
                        WHEN EXISTS (
@@ -1246,11 +1243,7 @@ def list_subsets(
             "config": row.config,
             "createdAt": row.created_at.isoformat(),
             "lockedAt": row.locked_at.isoformat() if row.locked_at else None,
-            "ownedBy": {
-                "id": row.owner_id,
-                "displayName": row.display_name,
-                "avatarUrl": row.avatar_url,
-            },
+            "ownedBy": user_ref_from_row(int(row.owner_id), row.display_name, row.avatar_url, row.last_seen_at, row.country_code),
         }
         if locked_only:
             item["hasTrained"] = bool(row.has_trained)

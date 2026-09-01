@@ -11,12 +11,17 @@ import {
   type AvatarPiece, type AvatarColor, type AvatarStyle,
 } from '../lib/avatar'
 import { resolvePieceSet } from '../lib/themes'
-import { Undo2 } from 'lucide-react'
+import { Undo2, RefreshCw } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar'
 import { DefaultAvatar } from '../components/DefaultAvatar'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover'
+import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from '../components/ui/command'
+import { ChevronsUpDown, Check, X } from 'lucide-react'
+import { Tooltip, TooltipTrigger, TooltipContent } from '../components/ui/tooltip'
+import { COUNTRIES, FLAG_URL } from '../lib/countries'
 
 const PIECE_CHESS_NOTATION: Record<string, string> = {
   bk: 'K',
@@ -38,6 +43,9 @@ export function ProfilePage(): React.ReactElement | null {
   const [customUrl, setCustomUrl] = useState('')
   const [urlError, setUrlError] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [refreshingCountry, setRefreshingCountry] = useState(false)
+  const [selectedCountryCode, setSelectedCountryCode] = useState<string | null>(null)
+  const [countryOpen, setCountryOpen] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -48,6 +56,7 @@ export function ProfilePage(): React.ReactElement | null {
   useEffect(() => {
     if (!user) return
     setDisplayName(user.displayName)
+    setSelectedCountryCode(user.countryCode ?? null)
     const avatarVal = parseAvatarValue(user.avatarUrl)
     const defaults = resolveAvatarDefaults(user.username)
     if (avatarVal.type === 'custom') {
@@ -76,6 +85,20 @@ export function ProfilePage(): React.ReactElement | null {
     setCustomUrl('')
   }
 
+  const handleRefreshCountry = async (): Promise<void> => {
+    setRefreshingCountry(true)
+    try {
+      const updated = await api.settings.refreshCountry()
+      updateUser(updated)
+      setSelectedCountryCode(updated.countryCode ?? null)
+      toast.success('Country updated', { description: updated.countryCode ? `Set to ${updated.countryCode}.` : 'No country found on your Lichess profile.' })
+    } catch {
+      // request.ts already shows the error toast
+    } finally {
+      setRefreshingCountry(false)
+    }
+  }
+
   const handleSave = async (): Promise<void> => {
     if (mode === 'custom' && !customUrl.trim()) {
       setUrlError(true)
@@ -87,7 +110,7 @@ export function ProfilePage(): React.ReactElement | null {
         mode === 'custom'
           ? customUrl.trim()
           : `default:${selectedPiece}:${selectedColor}:${selectedStyle}`
-      const updated = await api.settings.update({ displayName, avatarUrl: avatarUrlValue })
+      const updated = await api.settings.update({ displayName, avatarUrl: avatarUrlValue, countryCode: selectedCountryCode })
       updateUser(updated)
       toast.success('Profile updated', { description: 'Your profile has been saved.' })
     } catch {
@@ -146,6 +169,64 @@ export function ProfilePage(): React.ReactElement | null {
               className="h-9"
             />
             <p className="text-xs text-muted-foreground">2–32 characters. Shown to other users.</p>
+          </div>
+        </div>
+
+        {/* Country */}
+        <div className="mb-8">
+          <h3 className="text-sm font-semibold mb-3">Country</h3>
+          <div className="flex flex-col gap-2 max-w-sm">
+            <div className="flex items-center gap-2">
+              <Popover open={countryOpen} onOpenChange={setCountryOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={countryOpen} className="flex-1 justify-between font-normal">
+                    {selectedCountryCode ? (
+                      <span className="flex items-center gap-2">
+                        <img src={FLAG_URL(selectedCountryCode)} alt={selectedCountryCode} className="h-3.5 w-auto" />
+                        {COUNTRIES.find(c => c.code === selectedCountryCode)?.name ?? selectedCountryCode}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Select country…</span>
+                    )}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search country…" />
+                    <CommandList>
+                      <CommandEmpty>No country found.</CommandEmpty>
+                      {selectedCountryCode && (
+                        <CommandItem value="__clear__" onSelect={() => { setSelectedCountryCode(null); setCountryOpen(false) }}>
+                          <X className="mr-2 h-3.5 w-3.5" />
+                          Clear
+                        </CommandItem>
+                      )}
+                      {COUNTRIES.map((c) => (
+                        <CommandItem
+                          key={c.code}
+                          value={c.name}
+                          onSelect={() => { setSelectedCountryCode(c.code); setCountryOpen(false) }}
+                        >
+                          <img src={FLAG_URL(c.code)} alt={c.code} className="mr-2 h-3.5 w-auto" />
+                          {c.name}
+                          {selectedCountryCode === c.code && <Check className="ml-auto h-4 w-4" />}
+                        </CommandItem>
+                      ))}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={() => void handleRefreshCountry()} disabled={refreshingCountry}>
+                    <RefreshCw className={`h-4 w-4${refreshingCountry ? ' animate-spin' : ''}`} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Fetch country from Lichess profile</TooltipContent>
+              </Tooltip>
+            </div>
+            <p className="text-xs text-muted-foreground">Shown as a flag on your avatar. Use the sync button to import from your Lichess profile.</p>
           </div>
         </div>
 

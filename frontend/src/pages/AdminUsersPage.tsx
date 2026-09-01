@@ -20,7 +20,7 @@ const COLUMNS: ColumnDef<StockFeatures, AdminUser>[] = [
     meta: { icon: DATA_ICONS.user },
     cell: ({ row }) => (
       <div className="flex items-center gap-2">
-        <UserAvatar displayName={row.original.displayName} avatarUrl={row.original.avatarUrl} />
+        <UserAvatar user={row.original} />
         <span className="font-medium">{row.original.displayName}</span>
       </div>
     ),
@@ -32,6 +32,24 @@ const COLUMNS: ColumnDef<StockFeatures, AdminUser>[] = [
     cell: ({ row }) => (
       <span className="text-muted-foreground">{row.original.lichessUsername}</span>
     ),
+  }),
+  col({
+    accessorKey: 'countryCode',
+    header: 'Country',
+    meta: { icon: DATA_ICONS.user },
+    cell: ({ row }) =>
+      row.original.countryCode ? (
+        <div className="flex items-center gap-1.5">
+          <img
+            src={`https://flagcdn.com/w20/${row.original.countryCode.toLowerCase()}.png`}
+            alt={row.original.countryCode}
+            className="h-3 w-auto"
+          />
+          <span className="text-muted-foreground text-sm">{row.original.countryCode}</span>
+        </div>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      ),
   }),
   col({
     accessorKey: 'createdAt',
@@ -49,7 +67,7 @@ const COLUMNS: ColumnDef<StockFeatures, AdminUser>[] = [
     meta: { icon: DATA_ICONS.lastLogin },
     cell: ({ row }) => (
       <span className="tabular-nums text-muted-foreground">
-        {row.original.lastLoginAt ? formatDate(row.original.lastLoginAt) : '—'}
+        {formatDate(row.original.lastLoginAt)}
       </span>
     ),
   }),
@@ -59,7 +77,7 @@ const COLUMNS: ColumnDef<StockFeatures, AdminUser>[] = [
     meta: { icon: DATA_ICONS.lastSeen },
     cell: ({ row }) => (
       <span className="tabular-nums text-muted-foreground">
-        {row.original.lastSeenAt ? formatDate(row.original.lastSeenAt) : '—'}
+        {formatDate(row.original.lastSeenAt)}
       </span>
     ),
   }),

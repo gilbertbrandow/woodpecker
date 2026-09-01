@@ -1,22 +1,24 @@
 import * as React from 'react'
+import type { UserRef } from '../lib/api'
 import { parseAvatarValue } from '../lib/avatar'
 import { DefaultAvatar } from './DefaultAvatar'
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar'
+import { HoverCard, HoverCardTrigger, HoverCardContent } from './ui/hover-card'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip'
+import { COUNTRIES, FLAG_URL } from '../lib/countries'
 
 type UserAvatarProps = {
-  displayName: string
-  avatarUrl: string | null
+  user: Pick<UserRef, 'displayName' | 'avatarUrl' | 'isPresent' | 'countryCode'>
   className?: string
 }
 
 export function UserAvatar({
-  displayName,
-  avatarUrl,
+  user,
   className = 'h-6 w-6',
 }: UserAvatarProps): React.ReactElement {
+  const { displayName, avatarUrl, isPresent, countryCode } = user
   const av = parseAvatarValue(avatarUrl)
-  const avatar =
+  const avatarEl =
     av.type === 'custom' ? (
       <Avatar className={`${className} shrink-0`}>
         <AvatarImage src={av.url} alt={displayName} />
@@ -35,16 +37,50 @@ export function UserAvatar({
     )
 
   return (
-    <Tooltip delayDuration={100}>
-      <TooltipTrigger asChild>
+    <HoverCard openDelay={200} closeDelay={100}>
+      <HoverCardTrigger asChild>
         <span
-          className={`inline-flex shrink-0 cursor-default ${className}`}
+          className={`relative inline-flex shrink-0 cursor-default ${className}`}
           onClick={(e) => e.stopPropagation()}
         >
-          {avatar}
+          {avatarEl}
+          {isPresent === true && (
+            <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-green-500 ring-1 ring-background" />
+          )}
         </span>
-      </TooltipTrigger>
-      <TooltipContent>{displayName}</TooltipContent>
-    </Tooltip>
+      </HoverCardTrigger>
+      <HoverCardContent className="w-auto p-3" side="top" align="center">
+        <div className="flex flex-col gap-1.5 min-w-[120px]">
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-medium leading-none">{displayName}</span>
+            {countryCode && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <img
+                    src={FLAG_URL(countryCode)}
+                    alt={countryCode}
+                    className="h-3 w-auto cursor-default"
+                  />
+                </TooltipTrigger>
+                <TooltipContent>{COUNTRIES.find(c => c.code === countryCode)?.name ?? countryCode}</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            {isPresent ? (
+              <>
+                <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
+                <span className="text-xs text-muted-foreground">Online</span>
+              </>
+            ) : (
+              <>
+                <span className="h-2 w-2 rounded-full border border-muted-foreground shrink-0" />
+                <span className="text-xs text-muted-foreground">Offline</span>
+              </>
+            )}
+          </div>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
   )
 }

@@ -13,7 +13,7 @@ import { useUserFilterSpec } from '../../hooks/useUserFilterSpec'
 import { useScheduleFilterSpec } from '../../hooks/useScheduleFilterSpec'
 import { useSubsetFilterSpec } from '../../hooks/useSubsetFilterSpec'
 import { UserSelector } from '../../components/UserSelector'
-import type { SelectableUser } from '../../lib/api'
+import type { SelectableUser, UserRef } from '../../lib/api'
 
 export type OverviewAttemptHistoryRow = {
   attemptId: number
@@ -26,9 +26,7 @@ export type OverviewAttemptHistoryRow = {
   result: 'solved' | 'failed'
   timeSpentMs: number | null
   startedAt?: string | null
-  userId?: number
-  displayName?: string
-  avatarUrl?: string | null
+  user?: UserRef
   scheduleId?: number
   scheduleName?: string
   subsetId?: number
@@ -49,9 +47,9 @@ const columns: ColumnDef<StockFeatures, OverviewAttemptHistoryRow>[] = [
     meta: { className: 'px-2 py-1 text-xs', icon: DATA_ICONS.user, iconOnly: true },
     enableSorting: false,
     cell: ({ row }) => {
-      const { displayName, avatarUrl } = row.original
-      return displayName ? (
-        <UserAvatar displayName={displayName} avatarUrl={avatarUrl ?? null} className="h-4 w-4" />
+      const { user } = row.original
+      return user ? (
+        <UserAvatar user={user} className="h-4 w-4" />
       ) : (
         <span className="inline-block h-4 w-4 rounded-full bg-muted" />
       )
@@ -219,9 +217,7 @@ export function OverviewAttemptHistoryTable({
           result: a.result,
           timeSpentMs: a.timeSpentMs,
           startedAt: a.startedAt,
-          userId: a.userId,
-          displayName: a.displayName,
-          avatarUrl: a.avatarUrl,
+          user: a.user,
           scheduleId: a.scheduleId,
           scheduleName: a.scheduleName,
           subsetId: a.subsetId,

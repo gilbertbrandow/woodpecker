@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 
 from app.extensions import db
+from app.services.user_ref import user_ref_from_row
 from app.table_query import (
     DateFilter,
     FilterList,
@@ -167,6 +168,8 @@ def get_run_board(
                 u.id          AS user_id,
                 u.display_name,
                 u.avatar_url,
+                u.last_seen_at,
+                u.country_code,
                 s.id          AS schedule_id,
                 s.name        AS schedule_name,
                 COALESCE(rs.first_solved_count, 0)  AS first_solved_count,
@@ -229,9 +232,7 @@ def get_run_board(
             "completedAt": row.completed_at.isoformat() if row.completed_at else None,  # type: ignore[attr-defined]
             "abortedAt": row.aborted_at.isoformat() if row.aborted_at else None,  # type: ignore[attr-defined]
             "status": status,
-            "userId": int(row.user_id),  # type: ignore[attr-defined]
-            "displayName": row.display_name,  # type: ignore[attr-defined]
-            "avatarUrl": row.avatar_url,  # type: ignore[attr-defined]
+            "user": user_ref_from_row(int(row.user_id), row.display_name, row.avatar_url, row.last_seen_at, row.country_code),  # type: ignore[attr-defined]
             "scheduleId": int(row.schedule_id),  # type: ignore[attr-defined]
             "scheduleName": row.schedule_name,  # type: ignore[attr-defined]
             "firstSolvedCount": int(row.first_solved_count),  # type: ignore[attr-defined]
@@ -331,6 +332,8 @@ def get_weekly_board(
                 u.id                                     AS user_id,
                 u.display_name,
                 u.avatar_url,
+                u.last_seen_at,
+                u.country_code,
                 COALESCE(ws.puzzles_solved, 0)                AS puzzles_solved,
                 COALESCE(ws.resolved_count, 0)               AS resolved_count,
                 COALESCE(ws.lichess_tactic_count, 0)         AS lichess_tactic_count,
@@ -356,9 +359,7 @@ def get_weekly_board(
 
     def _mapper(row: object) -> dict[str, object]:
         return {
-            "userId": int(row.user_id),  # type: ignore[attr-defined]
-            "displayName": row.display_name,  # type: ignore[attr-defined]
-            "avatarUrl": row.avatar_url,  # type: ignore[attr-defined]
+            "user": user_ref_from_row(int(row.user_id), row.display_name, row.avatar_url, row.last_seen_at, row.country_code),  # type: ignore[attr-defined]
             "puzzlesAttempted": int(row.resolved_count),  # type: ignore[attr-defined]
             "lichessTacticPct": float(row.lichess_tactic_pct) if row.lichess_tactic_pct is not None else None,  # type: ignore[attr-defined]
             "scrapedPositionalPct": float(row.scraped_positional_pct) if row.scraped_positional_pct is not None else None,  # type: ignore[attr-defined]

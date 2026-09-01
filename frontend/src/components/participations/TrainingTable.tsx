@@ -63,10 +63,7 @@ export function TrainingTable({
         meta: { icon: DATA_ICONS.user },
         enableSorting: false,
         cell: ({ row }) => (
-          <UserAvatar
-            displayName={row.original.user.displayName}
-            avatarUrl={row.original.user.avatarUrl}
-          />
+          <UserAvatar user={row.original.user} />
         ),
       }),
       col({

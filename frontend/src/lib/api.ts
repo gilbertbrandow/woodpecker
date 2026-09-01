@@ -29,12 +29,22 @@ export function tableParamsToUrl({ filters, page, pageSize, sort }: TableParams)
   return p
 }
 
+export type UserRef = {
+  id: number
+  displayName: string
+  avatarUrl: string | null
+  isPresent: boolean
+  countryCode: string | null
+}
+
 export type AuthUser = {
   status: 'active'
   id: number
   username: string
   displayName: string
   avatarUrl: string | null
+  isPresent: boolean
+  countryCode: string | null
   boardTheme: string
   pieceTheme: string
   showTimerTenths: boolean
@@ -50,9 +60,11 @@ export type AdminUser = {
   lichessUsername: string
   displayName: string
   avatarUrl: string | null
+  isPresent: boolean
+  countryCode: string | null
   createdAt: string
-  lastLoginAt: string | null
-  lastSeenAt: string | null
+  lastLoginAt: string
+  lastSeenAt: string
   isSuperAdmin: boolean
 }
 
@@ -95,6 +107,7 @@ export type AuthState = AuthUser | OnboardingState | WaitlistedState
 export type SettingsPayload = {
   displayName?: string
   avatarUrl?: string
+  countryCode?: string | null
   boardTheme?: string
   pieceTheme?: string
   showTimerTenths?: boolean
@@ -112,7 +125,7 @@ export type Subset = {
   config: SubsetConfig | null
   createdAt: string
   lockedAt: string | null
-  ownedBy: { id: number; displayName: string; avatarUrl: string | null }
+  ownedBy: UserRef
   hasTrained?: boolean
 }
 
@@ -373,7 +386,7 @@ export type ScheduleSummary = {
   name: string
   description: string | null
   status: 'draft' | 'locked'
-  createdBy: { id: number; displayName: string; avatarUrl: string | null }
+  createdBy: UserRef
   subsetId: number
   subsetName: string
   subsetPuzzleCount: number
@@ -462,7 +475,7 @@ export type TrainingScheduleSummary = {
   runCount: number
   runs: { target_hours: number; break_after_hours: number }[]
   puzzleOrder: PuzzleOrder | null
-  createdBy: { displayName: string; avatarUrl: string | null }
+  createdBy: UserRef
   subset: { id: number; name: string; puzzleCount: number }
 }
 
@@ -473,9 +486,7 @@ export type Training = {
   startedAt: string
   completedAt: string | null
   abortedAt: string | null
-  ownerId: number
-  ownerDisplayName: string
-  ownerAvatarUrl: string | null
+  owner: UserRef
   runTargets: RunTarget[]
   schedule: TrainingScheduleSummary
 }
@@ -505,7 +516,7 @@ export type MyTrainingSummary = {
 }
 
 export type AllTrainingSummary = MyTrainingSummary & {
-  user: { id: number; displayName: string; avatarUrl: string | null }
+  user: UserRef
   subsetName: string
 }
 
@@ -514,11 +525,7 @@ export type TrainingPage = {
   total: number
 }
 
-export type SelectableUser = {
-  id: number
-  displayName: string
-  avatarUrl: string | null
-}
+export type SelectableUser = UserRef
 
 export type SelectableSchedule = {
   id: number
@@ -532,10 +539,7 @@ export type SelectableSubset = {
   status: 'draft' | 'filled' | 'locked'
 }
 
-export type ParticipantInfo = {
-  id: number
-  displayName: string
-  avatarUrl: string | null
+export type ParticipantInfo = UserRef & {
   startedAt: string
 }
 
@@ -566,9 +570,7 @@ export type LeaderboardRun = {
   completedAt: string | null
   abortedAt: string | null
   status: RunStatus
-  userId: number
-  displayName: string
-  avatarUrl: string | null
+  user: UserRef
   scheduleId: number
   scheduleName: string
   firstSolvedCount: number
@@ -583,9 +585,7 @@ export type LeaderboardRun = {
 }
 
 export type WeeklyLeaderboardRow = {
-  userId: number
-  displayName: string
-  avatarUrl: string | null
+  user: UserRef
   puzzlesAttempted: number
   lichessTacticPct: number | null
   scrapedPositionalPct: number | null
@@ -754,7 +754,7 @@ export type Schedule = {
   status: 'draft' | 'locked'
   config: ScheduleConfig | null
   totalHours: number
-  createdBy: { id: number; displayName: string; avatarUrl: string | null }
+  createdBy: UserRef
   createdAt: string
   lockedAt: string | null
 }
@@ -813,9 +813,7 @@ export type AttemptHistoryRow = {
   attemptId: number
   runId: number
   runTrainingItemId: number
-  userId: number
-  displayName: string
-  avatarUrl: string | null
+  user: UserRef
   runIndex: number
   tryNumber: number
   countsTowardsTraining: boolean
@@ -1122,6 +1120,7 @@ export type LichessTacticsSourceRunMetadata = {
 export const api = {
   auth: {
     me: (): Promise<AuthState> => request('/auth/me'),
+    ping: (): Promise<void> => request('/auth/ping'),
     logout: (): Promise<void> => request('/auth/logout', { method: 'POST' }),
     completeOnboarding: (displayName: string): Promise<AuthUser> =>
       request('/auth/onboarding', { method: 'POST', body: JSON.stringify({ displayName }) }),
@@ -1134,6 +1133,8 @@ export const api = {
   settings: {
     update: (payload: SettingsPayload): Promise<AuthUser> =>
       request<AuthUser>('/settings', { method: 'PATCH', body: JSON.stringify(payload) }),
+    refreshCountry: (): Promise<AuthUser> =>
+      request<AuthUser>('/settings/refresh-country', { method: 'POST' }),
   },
   subsets: {
     list: (params: TableParams): Promise<{ items: Subset[]; total: number }> =>

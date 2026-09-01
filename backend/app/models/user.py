@@ -22,6 +22,7 @@ class User(Base):
     opponent_move_delay_ms: Mapped[int] = mapped_column(nullable=False, default=300, server_default="300")
     animation_duration_ms: Mapped[int] = mapped_column(nullable=False, default=150, server_default="150")
     is_superadmin: Mapped[bool] = mapped_column(nullable=False, default=False, server_default=sa.false())
+    country_code: Mapped[str | None] = mapped_column(String(32), nullable=True, default=None)
     last_login_at: Mapped[datetime | None] = mapped_column(nullable=True, default=None)
     last_seen_at: Mapped[datetime | None] = mapped_column(nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(

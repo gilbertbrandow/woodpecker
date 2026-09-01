@@ -26,7 +26,7 @@ import { usePgnNavigation } from '../features/board/usePgnNavigation'
 import { resolveDisplayBoard, formatTimer, formatTargetSolveTime } from '../features/board/boardPage.helpers'
 import type { BoardState } from '../features/board/useBoardPageController'
 import { api } from '../lib/api'
-import type { AttemptSpectateView, SelectableUser, TrainingItemMetaPgnDisplay } from '../lib/api'
+import type { AttemptSpectateView, SelectableUser, TrainingItemMetaPgnDisplay, UserRef } from '../lib/api'
 import { useBoardSounds, sanToSoundEvents } from '../features/board/useBoardSounds'
 import { BoardPageSkeleton } from '../features/board/BoardPageSkeleton'
 import { useIsDesktop } from '../hooks/use-mobile'
@@ -112,7 +112,7 @@ export function BoardPage(): React.ReactElement | null {
     })
 
   type SpectateState =
-    | { kind: 'other'; displayName: string; avatarUrl: string | null; view: AttemptSpectateView }
+    | { kind: 'other'; user: UserRef; view: AttemptSpectateView }
     | { kind: 'self'; runId: number; runTrainingItemId: number; view: AttemptSpectateView }
 
   const [spectateState, setSpectateState] = React.useState<SpectateState | null>(null)
@@ -122,8 +122,8 @@ export function BoardPage(): React.ReactElement | null {
   }, [runTrainingItemId])
 
   const handleSpectateOther = React.useCallback(
-    (view: AttemptSpectateView, otherUser: { displayName: string; avatarUrl: string | null }): void => {
-      setSpectateState({ kind: 'other', view, displayName: otherUser.displayName, avatarUrl: otherUser.avatarUrl })
+    (view: AttemptSpectateView, otherUser: UserRef): void => {
+      setSpectateState({ kind: 'other', view, user: otherUser })
     },
     [],
   )
@@ -157,10 +157,10 @@ export function BoardPage(): React.ReactElement | null {
     (row: OverviewAttemptHistoryRow): void => {
       if (user === null) return
       if (trainingItemId === null) return
-      if (row.userId !== undefined && row.userId !== user.id) {
+      if (row.user !== undefined && row.user.id !== user.id) {
         void api.trainingItems
           .getSpectateView(trainingItemId, row.attemptId)
-          .then((view) => handleSpectateOther(view, { displayName: row.displayName ?? '', avatarUrl: row.avatarUrl ?? null }))
+          .then((view) => handleSpectateOther(view, row.user!))
           .catch(() => {})
         return
       }
@@ -512,7 +512,7 @@ export function BoardPage(): React.ReactElement | null {
           <OverviewAttemptHistoryTable
             key={overviewData.runTrainingItem.trainingItemId}
             trainingItemId={overviewData.runTrainingItem.trainingItemId}
-            currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl }}
+            currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl, isPresent: user.isPresent, countryCode: user.countryCode }}
             selectedAttemptId={spectateState?.view.attemptId ?? selectedAttemptId}
             onRowClick={handleRowClick}
             onUserFilterChange={handleUserFilterChange}
@@ -615,7 +615,7 @@ export function BoardPage(): React.ReactElement | null {
           nextPuzzleDisabledReason={overviewData.actions.nextTrainingItem.disabledReason}
           analyzeUrl={overviewData.actions.analyze.url}
           trainingItemId={overviewData.runTrainingItem.trainingItemId}
-          currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl }}
+          currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl, isPresent: user.isPresent, countryCode: user.countryCode }}
           topSlot={
             sourceForMetaCard !== null ? (
               <TrainingItemMetaCard
@@ -639,11 +639,10 @@ export function BoardPage(): React.ReactElement | null {
         <div className="flex items-center gap-1.5 px-3 py-1">
           <span>Inspecting</span>
           <UserAvatar
-            displayName={spectateState.kind === 'other' ? spectateState.displayName : (user?.displayName ?? '')}
-            avatarUrl={spectateState.kind === 'other' ? spectateState.avatarUrl : (user?.avatarUrl ?? null)}
+            user={spectateState.kind === 'other' ? spectateState.user : { displayName: user?.displayName ?? '', avatarUrl: user?.avatarUrl ?? null, isPresent: user?.isPresent ?? false, countryCode: user?.countryCode ?? null }}
             className="h-4 w-4"
           />
-          <span>{spectateState.kind === 'other' ? spectateState.displayName : (user?.displayName ?? '')}</span>
+          <span>{spectateState.kind === 'other' ? spectateState.user.displayName : (user?.displayName ?? '')}</span>
         </div>
         {spectateState.kind === 'self' && (
           <>
