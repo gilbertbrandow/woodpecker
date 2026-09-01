@@ -77,8 +77,8 @@ def list_users() -> Response:
                 **user_ref(u),
                 "lichessUsername": u.lichess_username,
                 "createdAt": u.created_at.isoformat(),
-                "lastLoginAt": (u.last_login_at or u.created_at).isoformat(),
-                "lastSeenAt": (u.last_seen_at or u.created_at).isoformat(),
+                "lastLoginAt": u.last_login_at.isoformat() if u.last_login_at else None,
+                "lastSeenAt": u.last_seen_at.isoformat() if u.last_seen_at else None,
                 "isSuperAdmin": u.is_superadmin,
             }
             for u in users

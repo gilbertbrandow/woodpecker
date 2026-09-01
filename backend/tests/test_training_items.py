@@ -158,7 +158,7 @@ class TestAttemptHistory:
         assert len(body["attempts"]) == 1
         row = body["attempts"][0]
         assert row["attemptId"] == world["attempt_a_id"]
-        assert row["userId"] == world["user_a_id"]
+        assert row["user"]["id"] == world["user_a_id"]
         assert row["result"] == "solved"
         assert row["countsTowardsTraining"] is True
 
@@ -481,7 +481,7 @@ class TestAttemptHistoryFilters:
         assert resp.status_code == 200
         body = resp.get_json()
         assert body["total"] == 1
-        assert body["attempts"][0]["userId"] == world["user_a_id"]
+        assert body["attempts"][0]["user"]["id"] == world["user_a_id"]
 
         # Filter to other user — user_a can see it because they have own attempt
         resp2 = client.get(
@@ -491,7 +491,7 @@ class TestAttemptHistoryFilters:
         assert resp2.status_code == 200
         body2 = resp2.get_json()
         assert body2["total"] == 1
-        assert body2["attempts"][0]["userId"] == extra["user_id"]
+        assert body2["attempts"][0]["user"]["id"] == extra["user_id"]
 
     def test_all_users_returned_without_user_id_filter(
         self, client: FlaskClient, db_session
