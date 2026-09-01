@@ -9,3 +9,4 @@ GHSA-6v7p-g79w-8964
 # version: 84.0.0), but Trivy surfaces the stale SBOM entry alongside the
 # real installation. The installed version is clean.
 CVE-2025-47273
+CVE-2026-59890
