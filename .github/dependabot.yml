@@ -58,6 +58,31 @@ updates:
         patterns:
           - "*"
 
+  - package-ecosystem: pip
+    directory: /deploy/backup
+    schedule:
+      interval: daily
+    labels:
+      - dependencies
+      - backend
+    groups:
+      backup-pip:
+        patterns:
+          - "*"
+
+  - package-ecosystem: docker
+    directory: /deploy/backup
+    schedule:
+      interval: daily
+    labels:
+      - dependencies
+      - docker
+      - backend
+    groups:
+      backup-docker:
+        patterns:
+          - "*"
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
