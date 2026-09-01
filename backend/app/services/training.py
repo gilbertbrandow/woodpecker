@@ -12,7 +12,7 @@ from app.models.training import Training
 from app.models.user import User
 from app.services.schedule_config import RunDefinition, ScheduleConfig
 from app.services.training_state import compute_training_state
-from app.services.user_ref import user_ref
+from app.services.user_ref import user_ref, user_ref_from_row
 from app.table_query import DateFilter, FilterList, Paginator
 
 
@@ -418,7 +418,7 @@ def list_all_trainings(
                t.started_at, t.completed_at, t.aborted_at,
                s.name AS schedule_name, s.subset_id, s.config,
                sub.name AS subset_name,
-               u.display_name, u.avatar_url,
+               u.display_name, u.avatar_url, u.last_seen_at, u.country_code,
                CASE
                  WHEN t.aborted_at IS NOT NULL THEN 'aborted'
                  WHEN t.completed_at IS NOT NULL THEN 'completed'
@@ -573,11 +573,7 @@ def list_all_trainings(
             "completedAt": row.completed_at.isoformat() if row.completed_at else None,
             "abortedAt": row.aborted_at.isoformat() if row.aborted_at else None,
             "trainingState": training_state,
-            "user": {
-                "id": row.user_id,
-                "displayName": row.display_name,
-                "avatarUrl": row.avatar_url,
-            },
+            "user": user_ref_from_row(int(row.user_id), row.display_name, row.avatar_url, row.last_seen_at, row.country_code),
         })
 
     if needs_python_pagination and status is not None:
@@ -624,7 +620,7 @@ def get_schedule_participants(
 
     rows = db.session.execute(
         sa.text("""
-            SELECT t.id, t.started_at, u.display_name, u.avatar_url
+            SELECT t.id, t.user_id, t.started_at, u.display_name, u.avatar_url, u.last_seen_at, u.country_code
             FROM trainings t
             JOIN users u ON u.id = t.user_id
             WHERE t.schedule_id = :sid
@@ -635,9 +631,8 @@ def get_schedule_participants(
 
     participants: list[dict[str, object]] = [
         {
+            **user_ref_from_row(int(row.user_id), row.display_name, row.avatar_url, row.last_seen_at, row.country_code),
             "id": row.id,
-            "displayName": row.display_name,
-            "avatarUrl": row.avatar_url,
             "startedAt": row.started_at.isoformat(),
         }
         for row in rows

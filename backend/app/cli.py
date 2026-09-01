@@ -43,6 +43,7 @@ def register_commands(app: Flask) -> None:
 
         from app.extensions import db
         from app.models.user import User
+        from app.services.flags import is_valid_flag
 
         users = db.session.scalars(
             sa.select(User).where(User.country_code.is_(None))
@@ -63,9 +64,9 @@ def register_commands(app: Flask) -> None:
                 if resp.ok:
                     data = resp.json()
                     profile = data.get("profile") or {}
-                    raw = profile.get("country")
-                    if raw:
-                        user.country_code = str(raw)[:2].upper()
+                    raw = profile.get("flag") or profile.get("country")
+                    if raw and isinstance(raw, str) and is_valid_flag(raw):
+                        user.country_code = raw
                         updated += 1
             except http.exceptions.RequestException:
                 click.echo(f"  Warning: failed to fetch {user.lichess_username}")

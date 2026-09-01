@@ -65,11 +65,14 @@ def decide_access(active_count: int, max_users: int, in_whitelist: bool) -> str:
 
 
 def _extract_country_code(account: berserk.types.AccountInformation) -> str | None:
+    from app.services.flags import is_valid_flag
     profile = account.get("profile")
     if not isinstance(profile, dict):
         return None
-    raw = profile.get("country")
-    return str(raw)[:2].upper() if raw else None
+    raw = profile.get("flag") or profile.get("country")
+    if not raw or not isinstance(raw, str):
+        return None
+    return raw if is_valid_flag(raw) else None
 
 
 def get_or_create_user(access_token: str) -> dict[str, object]:
