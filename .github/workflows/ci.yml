@@ -132,15 +132,39 @@ jobs:
   build-backend:
     name: Build backend image
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@v7
 
       - name: Build
-        run: docker build --target prod backend/
+        run: docker build --target prod -t woodpecker-backend:ci backend/
+
+      - name: Scan with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: woodpecker-backend:ci
+          format: sarif
+          output: trivy.sarif
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          cache: "true"
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy.sarif
+          category: backend
 
   build-frontend:
     name: Build frontend image
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@v7
 
@@ -148,19 +172,124 @@ jobs:
         run: bash frontend/scripts/check-node-version.sh
 
       - name: Build
-        run: docker build --target build frontend/
+        run: docker build --target prod -t woodpecker-frontend:ci frontend/
+
+      - name: Scan with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: woodpecker-frontend:ci
+          format: sarif
+          output: trivy.sarif
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          cache: "true"
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy.sarif
+          category: frontend
+
+  build-backup:
+    name: Build backup image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build
+        run: docker build -t woodpecker-backup:ci deploy/backup/
+
+      - name: Scan with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: woodpecker-backup:ci
+          format: sarif
+          output: trivy.sarif
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          cache: "true"
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy.sarif
+          category: backup
 
   build-pipeline:
     name: Build pipeline images
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@v7
 
       - name: Build base image
         run: docker build -f pipeline/base.Dockerfile -t woodpecker-pipeline-base .
 
+      - name: Scan base image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: woodpecker-pipeline-base
+          format: sarif
+          output: trivy-base.sarif
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          cache: "true"
+
+      - name: Upload base image Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-base.sarif
+          category: pipeline-base
+
       - name: Build openings image
         run: docker build -f pipeline/openings/Dockerfile -t woodpecker-pipeline-openings .
 
+      - name: Scan openings image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: woodpecker-pipeline-openings
+          format: sarif
+          output: trivy-openings.sarif
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          cache: "true"
+
+      - name: Upload openings image Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-openings.sarif
+          category: pipeline-openings
+
       - name: Build lichess-tactics image
         run: docker build -f pipeline/sources/lichess_tactics/Dockerfile -t woodpecker-pipeline-lichess-tactics .
+
+      - name: Scan lichess-tactics image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: woodpecker-pipeline-lichess-tactics
+          format: sarif
+          output: trivy-lichess-tactics.sarif
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          cache: "true"
+
+      - name: Upload lichess-tactics image Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-lichess-tactics.sarif
+          category: pipeline-lichess-tactics
