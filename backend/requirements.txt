@@ -1,5 +1,5 @@
 berserk==0.14.0
-msgpack>=1.2.1
+msgpack>=1.2.2
 setuptools>=78.1.1
 sentry-sdk[flask]==2.68.1
 pytest==9.1.1
