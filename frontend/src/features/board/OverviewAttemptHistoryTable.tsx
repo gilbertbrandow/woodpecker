@@ -250,6 +250,7 @@ export function OverviewAttemptHistoryTable({
       initialSorting={[{ id: 'startedAt', desc: true }]}
       emptyMessage="No attempts recorded."
       compact
+      title="Attempts"
     />
   )
 }
