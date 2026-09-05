@@ -148,9 +148,14 @@ export function ProfilePage(): React.ReactElement | null {
           <div className="flex items-center gap-4">
             {previewAvatar}
             <div className="min-w-0">
-              <p className="text-base font-semibold truncate">
-                {displayName || <span className="text-muted-foreground italic font-normal text-sm">No display name</span>}
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-base font-semibold truncate">
+                  {displayName || <span className="text-muted-foreground italic font-normal text-sm">No display name</span>}
+                </p>
+                {selectedCountryCode && (
+                  <img src={FLAG_URL(selectedCountryCode)} alt={selectedCountryCode} className="h-3.5 w-auto shrink-0" />
+                )}
+              </div>
               <p className="text-xs text-muted-foreground mt-0.5">{user.username}</p>
             </div>
           </div>

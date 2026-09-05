@@ -10,6 +10,7 @@ import { Badge } from '../components/ui/badge'
 import { api, type AdminUser } from '../lib/api'
 import { formatDate } from '../lib/utils'
 import { DATA_ICONS } from '../lib/icons'
+import { FLAG_URL } from '../lib/countries'
 
 const PAGE_SIZE = 20
 
@@ -41,7 +42,7 @@ const COLUMNS: ColumnDef<StockFeatures, AdminUser>[] = [
       row.original.countryCode ? (
         <div className="flex items-center gap-1.5">
           <img
-            src={`https://flagcdn.com/w20/${row.original.countryCode.toLowerCase()}.png`}
+            src={FLAG_URL(row.original.countryCode)}
             alt={row.original.countryCode}
             className="h-3 w-auto"
           />

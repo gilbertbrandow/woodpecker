@@ -491,10 +491,10 @@ export function DataTable<T extends RowData>({
                 ))}
               </SelectContent>
             </Select>
-            <span>/ Page</span>
+            <span className="hidden sm:inline">/ Page</span>
           </div>
           {!compact && (
-            <span className="tabular-nums">
+            <span className="hidden sm:inline tabular-nums">
               {serverPagination.totalRows === 0
                 ? 'No results'
                 : `Showing ${(serverPagination.page - 1) * serverPagination.pageSize + 1}–${Math.min(serverPagination.page * serverPagination.pageSize, serverPagination.totalRows)} of ${serverPagination.totalRows}`}
@@ -544,9 +544,9 @@ export function DataTable<T extends RowData>({
                 ))}
               </SelectContent>
             </Select>
-            <span>/ Page</span>
+            <span className="hidden sm:inline">/ Page</span>
           </div>
-          <span className="tabular-nums">
+          <span className="hidden sm:inline tabular-nums">
             {totalFiltered === 0
               ? 'No results'
               : `Showing ${start}–${end} of ${totalFiltered}`}

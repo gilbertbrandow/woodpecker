@@ -113,6 +113,42 @@ def test_decoy_metadata_to_api_dict_has_correct_shape() -> None:
     assert api["opening"] is None
 
 
+def test_decoy_payload_sorts_accepted_moves_descending_for_white_player() -> None:
+    # FEN has 'b' to move → opponent is black → player is white → sort descending (highest cp first).
+    fen_black_to_move = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"
+    decoy = _stub_decoy(
+        fen=fen_black_to_move,
+        accepted_moves=[
+            {"uci": "g8f6", "cp": 5, "line": "g8f6"},
+            {"uci": "e7e5", "cp": 12, "line": "e7e5"},
+            {"uci": "c7c5", "cp": 8, "line": "c7c5"},
+        ],
+    )
+    with patch("app.services.training_item_content.db") as mock_db:
+        mock_db.session.execute.return_value.scalar_one.return_value = decoy
+        payload = _decoy_payload(10)
+    accepted = list(payload.contract.plies[1])
+    assert accepted == ["e7e5", "c7c5", "g8f6"]  # descending by cp: 12, 8, 5
+
+
+def test_decoy_payload_sorts_accepted_moves_ascending_for_black_player() -> None:
+    # FEN has 'w' to move → opponent is white → player is black → sort ascending (lowest cp first).
+    fen_white_to_move = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    decoy = _stub_decoy(
+        fen=fen_white_to_move,
+        accepted_moves=[
+            {"uci": "e2e4", "cp": 20, "line": "e2e4"},
+            {"uci": "d2d4", "cp": -5, "line": "d2d4"},
+            {"uci": "c2c4", "cp": 10, "line": "c2c4"},
+        ],
+    )
+    with patch("app.services.training_item_content.db") as mock_db:
+        mock_db.session.execute.return_value.scalar_one.return_value = decoy
+        payload = _decoy_payload(10)
+    accepted = list(payload.contract.plies[1])
+    assert accepted == ["d2d4", "c2c4", "e2e4"]  # ascending by cp: -5, 10, 20
+
+
 def test_get_content_batch_with_empty_list_returns_empty_dict() -> None:
     result = get_content_batch([])
     assert result == {}

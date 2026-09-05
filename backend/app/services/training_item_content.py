@@ -279,7 +279,14 @@ def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
             f"DecoyPuzzle {decoy.id}: accepted_moves is {type(decoy.accepted_moves).__name__}, "
             "expected list — run migration p9q0r1s2t3u4 to fix corrupt rows"
         )
-    accepted_ucis = [m["uci"] for m in decoy.accepted_moves if isinstance(m, dict) and "uci" in m]
+    valid_moves = [m for m in decoy.accepted_moves if isinstance(m, dict) and "uci" in m]
+    # FEN turn is the opponent's color; after their move it's the player's turn.
+    # Player is white when FEN shows black to move → sort descending (higher cp = better for white).
+    # Player is black when FEN shows white to move → sort ascending (lower cp = better for black).
+    fen_parts = decoy.fen.split()
+    player_is_white = len(fen_parts) > 1 and fen_parts[1] == 'b'
+    valid_moves.sort(key=lambda m: m.get("cp", 0), reverse=player_is_white)
+    accepted_ucis = [m["uci"] for m in valid_moves]
     decoy_lines = {
         m["uci"]: m["line"]
         for m in decoy.accepted_moves
@@ -306,7 +313,7 @@ def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
             is_decoy=True,
         ),
         metadata=DecoyMetadata(
-            accepted_moves=list(decoy.accepted_moves),
+            accepted_moves=valid_moves,
             best_cp=decoy.best_cp,
             move_number=decoy.move_number,
             depth=decoy.depth,

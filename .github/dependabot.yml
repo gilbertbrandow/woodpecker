@@ -38,7 +38,6 @@ updates:
       interval: daily
     labels:
       - dependencies
-      - docker
       - backend
     groups:
       backend-docker:
@@ -51,8 +50,6 @@ updates:
       interval: daily
     labels:
       - dependencies
-      - docker
-      - frontend
     groups:
       frontend-docker:
         patterns:
@@ -76,7 +73,6 @@ updates:
       interval: daily
     labels:
       - dependencies
-      - docker
       - backend
     groups:
       backup-docker:
