@@ -3,6 +3,8 @@ import { AppLogo } from './AppLogo'
 import { ThemeToggle } from './ThemeToggle'
 import { UserMenu } from './UserMenu'
 import { useSidebar } from './ui/sidebar'
+import { cn } from '../lib/utils'
+import { buttonVariants } from './ui/button'
 import { Menu } from 'lucide-react'
 
 export function SolveHeader(): React.ReactElement {
@@ -22,6 +24,15 @@ export function SolveHeader(): React.ReactElement {
         </button>
       </div>
       <div className="hidden items-center gap-1 sm:flex">
+        <a
+          href="https://github.com/gilbertbrandow/woodpecker"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }))}
+          aria-label="GitHub"
+        >
+          <img src="/github.svg" alt="GitHub" className="h-4 w-4 dark:invert" />
+        </a>
         <ThemeToggle />
         <UserMenu />
       </div>
