@@ -3,6 +3,7 @@ import { type Table, type StockFeatures, type RowData } from '@tanstack/react-ta
 import cupGold from '../../assets/medals/cup-gold.svg'
 import cupSilver from '../../assets/medals/cup-silver.svg'
 import cupBronze from '../../assets/medals/cup-bronze.svg'
+import { Tooltip, TooltipTrigger, TooltipContent } from '../ui/tooltip'
 
 const cupIcons: Record<1 | 2 | 3, string> = {
   1: cupGold,
@@ -13,9 +14,14 @@ const cupIcons: Record<1 | 2 | 3, string> = {
 export function PositionBadge({ position }: { position: number }): React.ReactElement {
   if (position === 1 || position === 2 || position === 3) {
     return (
-      <span className="inline-flex h-7 w-7 items-center justify-center">
-        <img src={cupIcons[position]} alt={`${position}`} className="h-7 w-7" />
-      </span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex h-7 w-7 items-center justify-center cursor-default">
+            <img src={cupIcons[position]} alt={`No. ${position}`} className="h-7 w-7" />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>No. {position}</TooltipContent>
+      </Tooltip>
     )
   }
   return (

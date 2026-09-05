@@ -422,7 +422,7 @@ export function DashboardPage(): React.ReactElement {
       {/* Header row: title + selectors */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-base font-semibold">Dashboard</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <span className="text-xs text-muted-foreground hidden sm:block">Viewing</span>
           <TrainingRunPicker
             trainings={trainings}

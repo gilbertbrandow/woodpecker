@@ -21,6 +21,7 @@ import { api } from '../lib/api'
 import type { LeaderboardRun, WeeklyLeaderboardRow } from '../lib/api'
 
 const PAGE_SIZE = 50
+const WEEKLY_PAGE_SIZE = 10
 
 const RUN_STARTED_FILTER: DateFilterSpec = {
   type: 'date',
@@ -109,7 +110,7 @@ export function LeaderboardPage(): React.ReactElement | null {
   // ServerDataTable sets pageIndex=0 in the tanstack table, so getGlobalPosition()
   // returns a 1-based local index. We add the server-page offset to get global rank.
   const runPageRef = useRef({ page: 1, pageSize: PAGE_SIZE })
-  const weeklyPageRef = useRef({ page: 1, pageSize: PAGE_SIZE })
+  const weeklyPageRef = useRef({ page: 1, pageSize: WEEKLY_PAGE_SIZE })
 
   const runFilters = useMemo<FilterSpec[]>(
     () => [{ type: 'search', key: 'q' }, userFilterSpec, RUN_STATUS_FILTER, scheduleFilterSpec, RUN_STARTED_FILTER, RUN_AVG_RATING_FILTER, RUN_RESOLVED_FILTER],
@@ -444,7 +445,7 @@ export function LeaderboardPage(): React.ReactElement | null {
           tableId="weekly"
           columns={weeklyColumns}
           filters={weeklyFilters}
-          pageSize={PAGE_SIZE}
+          pageSize={WEEKLY_PAGE_SIZE}
           fetchData={fetchWeeklyData}
           initialSorting={[{ id: 'puzzlesAttempted', desc: true }]}
           getRowClassName={(r) => user.id === r.user.id ? 'bg-muted/50' : ''}
