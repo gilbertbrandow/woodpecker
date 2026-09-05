@@ -2,7 +2,7 @@ export type Country = { code: string; name: string }
 
 export const FLAG_URL = (code: string): string =>
   /^[A-Z]{2}$/.test(code)
-    ? `https://flagcdn.com/w40/${code.toLowerCase()}.png`
+    ? `https://flagcdn.com/w80/${code.toLowerCase()}.png`
     : `https://lichess1.org/assets/flags/${code}.webp`
 
 // Mirrors lila's Flags.scala exactly — same codes, same names, same order (sorted by name).
