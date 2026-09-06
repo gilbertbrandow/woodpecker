@@ -91,6 +91,7 @@ export type ServerDataTableProps<T extends RowData> = {
   compact?: boolean
   footerRow?: React.ReactNode
   onFooterRowClick?: () => void
+  title?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -116,6 +117,7 @@ export function ServerDataTable<T extends RowData>({
   footerRow,
   onFooterRowClick,
   persistFilters,
+  title,
 }: ServerDataTableProps<T>): React.ReactElement {
   const { getParam, getMultiParam, setParams } = useTableUrlSync(tableId)
 
@@ -450,8 +452,9 @@ export function ServerDataTable<T extends RowData>({
     [filterValues], // specs, chipSpecs, and pendingFetchParamsRef are stable refs
   )
 
-  const searchSlot = searchSpecs.length > 0 ? (
+  const searchSlot = (title || searchSpecs.length > 0) ? (
     <>
+      {title && <span className="shrink-0 font-medium">{title}</span>}
       {searchSpecs.map((spec) => (
         <div key={spec.key} className="relative shrink-0">
           <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -496,6 +499,7 @@ export function ServerDataTable<T extends RowData>({
       compact={compact}
       footerRow={footerRow}
       onFooterRowClick={onFooterRowClick}
+      filtersRight={!!title}
     />
   )
 }

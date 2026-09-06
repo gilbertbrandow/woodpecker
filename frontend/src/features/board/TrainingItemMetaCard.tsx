@@ -1,10 +1,10 @@
 import * as React from 'react'
 import { ChevronDown } from 'lucide-react'
-import { Badge } from '../../components/ui/badge'
 import { cn } from '../../lib/utils'
 import type { DecoySourceMetadata, LichessTacticSourceMetadata, ScrapedPositionalSourceMetadata, SourceMetadata } from '../../lib/api'
 import type { PlySelection } from './boardPage.helpers'
 import { TrainingItemTypeBadge } from '../../components/TrainingItemTypeBadge'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 
 type DisplayMoveMin = {
   san: string
@@ -111,30 +111,6 @@ function MoveSequence({
   return <span>{items}</span>
 }
 
-function SubvariationsBlock({
-  subvariations,
-  selectedPly,
-  onPlyClick,
-}: {
-  subvariations: DisplayMoveMin[][]
-  selectedPly: PlySelection | null | undefined
-  onPlyClick: ((ply: PlySelection) => void) | undefined
-}): React.ReactElement | null {
-  if (subvariations.length === 0) return null
-  return (
-    <>
-      <span className="text-muted-foreground"> (</span>
-      <div className="text-[10px] text-muted-foreground space-y-1 my-1.5">
-        {subvariations.map((sv, si) => (
-          <div key={si}>
-            <MoveSequence moves={sv} line="subvariation" subIndex={si} selectedPly={selectedPly} onPlyClick={onPlyClick} />
-          </div>
-        ))}
-      </div>
-      <span className="text-muted-foreground">)</span>
-    </>
-  )
-}
 
 function formatEval(pvs: Array<{ cp?: number; mate?: number }>): string {
   const pv = pvs[0]
@@ -190,7 +166,7 @@ function DecoyEvalSection({
   }, [selectedPly, pgnDisplay, cpByUci, minCp, maxCp, source.bestCp])
 
   return (
-    <div className="flex items-center gap-2 border-t border-border pt-3 pb-1">
+    <div className="flex items-center gap-2 border-t border-border px-3 py-1.5 leading-[1.75em]">
       <span className="shrink-0 text-xs text-muted-foreground">Eval</span>
       {resolvedCp != null ? (
         <>
@@ -247,87 +223,132 @@ function computePrevPly(
   return selected.index > 0 ? { line: 'main', index: selected.index - 1 } : null
 }
 
-function LichessTacticSection({
-  source,
-  trainingItemId,
+type OpeningInfo = { eco: string; displayName: string }
+
+function TacticMeta({
   focusMode,
   runPosition,
+  badge,
+  ratingLabel,
+  opening,
+  themes,
+  trainingItemId,
 }: {
-  source: LichessTacticSourceMetadata
-  trainingItemId: number | undefined
   focusMode: boolean
   runPosition: number | undefined
+  badge: 'LICHESS_TACTIC' | 'SCRAPED_POSITIONAL'
+  ratingLabel: React.ReactNode
+  opening: OpeningInfo | null
+  themes: Array<{ name: string; displayName: string | null; description?: string | null }>
+  trainingItemId?: number
 }): React.ReactElement {
+  if (focusMode) {
+    return (
+      <span className="font-mono text-sm">
+        <span className="text-xs text-muted-foreground">Puzzle </span>
+        #{runPosition !== undefined ? runPosition + 1 : '—'}
+      </span>
+    )
+  }
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-3">
-        <div>
-          <span className="text-xs text-muted-foreground">Puzzle </span>
-          <span className="text-sm font-mono">
-            #{focusMode && runPosition !== undefined ? runPosition + 1 : (trainingItemId ?? source.displayId)}
-          </span>
-        </div>
-        {!focusMode && <TrainingItemTypeBadge source="LICHESS_TACTIC" />}
-        {!focusMode && (
-          <span className="tabular-nums text-sm">
-            <span className="text-xs text-muted-foreground">Rating </span>
-            {source.rating}
-          </span>
-        )}
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2">
+        <span className="shrink-0 font-mono text-sm">#{trainingItemId ?? '—'}</span>
+        <TrainingItemTypeBadge source={badge} />
+        <span className="tabular-nums text-sm">
+          <span className="text-xs text-muted-foreground">Rating </span>
+          {ratingLabel}
+        </span>
       </div>
-      {!focusMode && source.themes.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {source.themes.map((t) => (
-            <Badge key={t.name} variant="outline" className="text-xs font-normal">
-              {t.displayName}
-            </Badge>
-          ))}
+      {themes.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-1.5">
+          {themes.map((t) => {
+            const label = t.displayName ?? t.name
+            if (!t.description) {
+              return (
+                <span key={t.name} className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                  {label}
+                </span>
+              )
+            }
+            return (
+              <Tooltip key={t.name} delayDuration={200}>
+                <TooltipTrigger asChild>
+                  <span className="cursor-default rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground transition-colors">
+                    {label}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[220px] text-center text-xs">
+                  {t.description}
+                </TooltipContent>
+              </Tooltip>
+            )
+          })}
+        </div>
+      )}
+      {opening !== null && (
+        <div className="flex items-center gap-1.5 overflow-hidden mt-1">
+          <span className="shrink-0 font-mono text-xs font-semibold">{opening.eco}</span>
+          <span className="truncate text-xs text-muted-foreground">{opening.displayName}</span>
         </div>
       )}
     </div>
   )
 }
 
-function ScrapedPositionalSection({
+function LichessTacticSection({
   source,
-  trainingItemId,
   focusMode,
   runPosition,
+  opening,
+  trainingItemId,
 }: {
-  source: ScrapedPositionalSourceMetadata
-  trainingItemId: number | undefined
+  source: LichessTacticSourceMetadata
   focusMode: boolean
   runPosition: number | undefined
+  opening: OpeningInfo | null
+  trainingItemId?: number
 }): React.ReactElement {
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-3">
-        <div>
-          <span className="text-xs text-muted-foreground">Puzzle </span>
-          <span className="text-sm font-mono">
-            #{focusMode && runPosition !== undefined ? runPosition + 1 : (trainingItemId ?? source.internalId)}
-          </span>
-        </div>
-        {!focusMode && <TrainingItemTypeBadge source="SCRAPED_POSITIONAL" />}
-        {!focusMode && (
-          <span className="tabular-nums text-sm">
-            <span className="text-xs text-muted-foreground">Rating </span>
-            {source.difficulty.minRating != null && source.difficulty.maxRating != null
-              ? `${source.difficulty.minRating}–${source.difficulty.maxRating}`
-              : source.difficulty.label}
-          </span>
-        )}
-      </div>
-      {!focusMode && source.themes.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {source.themes.map((t) => (
-            <Badge key={t.name} variant="outline" className="text-xs font-normal">
-              {t.displayName}
-            </Badge>
-          ))}
-        </div>
-      )}
-    </div>
+    <TacticMeta
+      focusMode={focusMode}
+      runPosition={runPosition}
+      badge="LICHESS_TACTIC"
+      ratingLabel={source.rating}
+      opening={opening}
+      themes={source.themes}
+      trainingItemId={trainingItemId}
+    />
+  )
+}
+
+function ScrapedPositionalSection({
+  source,
+  focusMode,
+  runPosition,
+  opening,
+  trainingItemId,
+}: {
+  source: ScrapedPositionalSourceMetadata
+  focusMode: boolean
+  runPosition: number | undefined
+  opening: OpeningInfo | null
+  trainingItemId?: number
+}): React.ReactElement {
+  const ratingLabel =
+    source.difficulty.minRating != null && source.difficulty.maxRating != null
+      ? `${source.difficulty.minRating}–${source.difficulty.maxRating}`
+      : source.difficulty.label
+  return (
+    <TacticMeta
+      focusMode={focusMode}
+      runPosition={runPosition}
+      badge="SCRAPED_POSITIONAL"
+      ratingLabel={ratingLabel}
+      opening={opening}
+      themes={source.themes}
+      trainingItemId={trainingItemId}
+    />
   )
 }
 
@@ -360,18 +381,203 @@ function DecoyGameInfo({ g }: { g: NonNullable<DecoySourceMetadata['game']> }): 
           <PlayerLabel name={g.black} title={g.blackTitle} elo={g.blackElo} />
         </div>
       </div>
-      {g.event !== null && (
-        <div className="flex items-center gap-2">
-          <span className="w-9 shrink-0 text-xs text-muted-foreground">Event</span>
-          <span className="truncate py-1 text-xs">{g.event}</span>
+      {(g.date !== null || g.event !== null) && (
+        <div className="flex items-center gap-2 overflow-hidden">
+          {g.date !== null && (
+            <>
+              <span className="shrink-0 text-xs text-muted-foreground">Date</span>
+              <span className="shrink-0 font-mono text-xs">{g.date}</span>
+            </>
+          )}
+          {g.event !== null && (
+            <>
+              <span className="shrink-0 text-xs text-muted-foreground">Event</span>
+              <span className="truncate text-xs">{g.event}</span>
+            </>
+          )}
         </div>
       )}
-      {g.date !== null && (
-        <div className="flex items-center gap-2">
-          <span className="w-9 shrink-0 text-xs text-muted-foreground">Date</span>
-          <span className="py-1 font-mono text-xs">{g.date}</span>
-        </div>
+    </div>
+  )
+}
+
+type RowEntry = { move: DisplayMoveMin; idx: number }
+type MoveRow = { moveNumber: number; white: RowEntry | null; black: RowEntry | null }
+
+function ColumnMoveCell({
+  entry,
+  selectedPly,
+  onPlyClick,
+  rightBorder = true,
+  bottomBorder = true,
+  showPlaceholder = false,
+}: {
+  entry: RowEntry | null
+  selectedPly: PlySelection | null | undefined
+  onPlyClick: ((ply: PlySelection) => void) | undefined
+  rightBorder?: boolean
+  bottomBorder?: boolean
+  showPlaceholder?: boolean
+}): React.ReactElement {
+  const isSelected = !!entry && selectedPly?.line === 'main' && selectedPly.index === entry.idx
+
+  const content = entry ? (
+    <>
+      <span className="font-chess">{entry.move.san}</span>
+      {entry.move.moveStatus === 'wrong' && (
+        <span className="text-red-600 dark:text-red-400">??</span>
       )}
+    </>
+  ) : showPlaceholder ? (
+    <span className="block text-center">...</span>
+  ) : null
+
+  const cls = cn(
+    'flex-[0_0_43.5%] border-border px-2 py-0.5 text-sm leading-[1.75em]',
+    bottomBorder && 'border-b',
+    rightBorder && 'border-r',
+    entry && !isSelected && onPlyClick ? 'cursor-pointer hover:bg-muted' : '',
+    isSelected ? 'font-bold bg-foreground/10' : '',
+  )
+
+  if (!entry || !onPlyClick) {
+    return <div className={cls}>{content}</div>
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onPlyClick({ line: 'main', index: entry.idx })}
+      className={cls}
+    >
+      {content}
+    </button>
+  )
+}
+
+function VariationLines({
+  pgnDisplay,
+  selectedPly,
+  onPlyClick,
+  isLast = false,
+}: {
+  pgnDisplay: TrainingItemMetaPgnDisplayMin
+  selectedPly: PlySelection | null | undefined
+  onPlyClick: ((ply: PlySelection) => void) | undefined
+  isLast?: boolean
+}): React.ReactElement | null {
+  const lines: Array<{ moves: DisplayMoveMin[]; line: 'variation' | 'subvariation'; si: number }> =
+    React.useMemo(() => {
+      if (pgnDisplay.subvariations !== null) {
+        return pgnDisplay.subvariations.map((sv, i) => ({ moves: sv, line: 'subvariation' as const, si: i }))
+      }
+      if (pgnDisplay.variation !== null) {
+        return [{ moves: pgnDisplay.variation, line: 'variation' as const, si: 0 }]
+      }
+      return []
+    }, [pgnDisplay])
+
+  if (lines.length === 0) return null
+
+  const multi = lines.length > 1
+
+  return (
+    <div className={cn('flex-[0_0_100%] bg-muted/30 pl-2 text-xs', isLast && 'border-t border-border', !isLast && 'border-b border-border')}>
+      <div className={cn('py-2 pr-2', multi ? 'pl-[18px]' : 'pl-2')}>
+        {lines.map(({ moves, line, si }, i) => (
+          <div key={si} className={cn('relative', i > 0 && 'mt-2')}>
+            {multi && (
+              <span
+                aria-hidden
+                className={cn(
+                  'pointer-events-none absolute left-[-16px] w-[8px] border-l-2 border-border',
+                  i === 0 ? '-top-2' : 'top-0',
+                  i === lines.length - 1
+                    ? 'h-[0.85em]'
+                    : i === 0
+                      ? 'h-[calc(100%+1rem)]'
+                      : 'h-[calc(100%+0.5rem)]',
+                )}
+              >
+                <span className={cn(
+                  'absolute left-0 block h-0 w-[8px] -translate-y-0.5 border-t-2 border-border',
+                  i === 0 ? 'top-[calc(0.85em+0.5rem)]' : 'top-[0.85em]',
+                )} />
+              </span>
+            )}
+            <MoveSequence
+              moves={moves}
+              line={line}
+              subIndex={line === 'subvariation' ? si : undefined}
+              selectedPly={selectedPly}
+              onPlyClick={onPlyClick}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PgnColumnView({
+  pgnDisplay,
+  selectedPly,
+  onPlyClick,
+}: {
+  pgnDisplay: TrainingItemMetaPgnDisplayMin
+  selectedPly: PlySelection | null | undefined
+  onPlyClick: ((ply: PlySelection) => void) | undefined
+}): React.ReactElement {
+  const rows: MoveRow[] = React.useMemo(() => {
+    const result: MoveRow[] = []
+    let current: MoveRow | null = null
+    for (let i = 0; i < pgnDisplay.mainline.length; i++) {
+      const move = pgnDisplay.mainline[i]
+      if (move.isWhite) {
+        current = { moveNumber: move.moveNumber, white: { move, idx: i }, black: null }
+        result.push(current)
+      } else if (current && current.moveNumber === move.moveNumber) {
+        current.black = { move, idx: i }
+      } else {
+        current = { moveNumber: move.moveNumber, white: null, black: { move, idx: i } }
+        result.push(current)
+      }
+    }
+    return result
+  }, [pgnDisplay.mainline])
+
+  const interruptAfterRow = React.useMemo(() => {
+    if (pgnDisplay.subvariations === null && pgnDisplay.variation === null) return -1
+    if (pgnDisplay.mainline.length <= 1) return -1
+    // Find where the variation branches by matching the first variation move to the mainline
+    const firstVarMove = pgnDisplay.subvariations?.[0]?.[0] ?? pgnDisplay.variation?.[0]
+    const branchIdx = firstVarMove
+      ? pgnDisplay.mainline.findIndex(m => m.moveNumber === firstVarMove.moveNumber && m.isWhite === firstVarMove.isWhite)
+      : 1
+    const targetIdx = branchIdx > 0 ? branchIdx : 1
+    for (let r = 0; r < rows.length; r++) {
+      if (rows[r].white?.idx === targetIdx || rows[r].black?.idx === targetIdx) return r
+    }
+    return rows.length - 1
+  }, [pgnDisplay, rows])
+
+  return (
+    <div className="flex flex-wrap leading-normal">
+      {rows.map((row, r) => {
+        const isLast = r === rows.length - 1
+        return (
+          <React.Fragment key={row.moveNumber}>
+            <div className={cn('flex-[0_0_13%] flex select-none items-center justify-center border-r border-border bg-muted py-0.5 text-[11px] leading-[1.75em] text-muted-foreground/60', !isLast && 'border-b')}>
+              {row.moveNumber}
+            </div>
+            <ColumnMoveCell entry={row.white} selectedPly={selectedPly} onPlyClick={onPlyClick} bottomBorder={!isLast} showPlaceholder={row.white === null} />
+            <ColumnMoveCell entry={row.black} selectedPly={selectedPly} onPlyClick={onPlyClick} rightBorder={false} bottomBorder={!isLast} />
+            {r === interruptAfterRow && (
+              <VariationLines pgnDisplay={pgnDisplay} selectedPly={selectedPly} onPlyClick={onPlyClick} isLast={interruptAfterRow === rows.length - 1} />
+            )}
+          </React.Fragment>
+        )
+      })}
     </div>
   )
 }
@@ -385,77 +591,68 @@ function PgnDisplayBlock({
   selectedPly: PlySelection | null | undefined
   onPlyClick: ((ply: PlySelection) => void) | undefined
 }): React.ReactElement {
-  if (pgnDisplay.subvariations !== null) {
-    return (
-      <>
-        <MoveSequence moves={pgnDisplay.mainline.slice(0, 2)} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />
-        <SubvariationsBlock subvariations={pgnDisplay.subvariations} selectedPly={selectedPly} onPlyClick={onPlyClick} />
-        {pgnDisplay.mainline.length > 2 && (
-          <>{' '}<MoveSequence moves={pgnDisplay.mainline.slice(2)} line="main" startIndex={2} selectedPly={selectedPly} onPlyClick={onPlyClick} /></>
-        )}
-      </>
-    )
-  }
-  return (
-    <>
-      <MoveSequence moves={pgnDisplay.mainline} line="main" selectedPly={selectedPly} onPlyClick={onPlyClick} />
-      {pgnDisplay.variation !== null && (
-        <span className="text-xs">
-          {' '}(<MoveSequence moves={pgnDisplay.variation} line="variation" selectedPly={selectedPly} onPlyClick={onPlyClick} />)
-        </span>
-      )}
-    </>
-  )
+  return <PgnColumnView pgnDisplay={pgnDisplay} selectedPly={selectedPly} onPlyClick={onPlyClick} />
 }
 
 function DecoySection({
   source,
-  trainingItemId,
   focusMode,
   runPosition,
+  opening,
+  trainingItemId,
 }: {
   source: DecoySourceMetadata
-  trainingItemId: number | undefined
   focusMode: boolean
   runPosition: number | undefined
+  opening: OpeningInfo | null
+  trainingItemId?: number
 }): React.ReactElement {
-  const puzzleId = trainingItemId ?? '—'
-  const g = source.game
+  if (focusMode) {
+    return (
+      <span className="font-mono text-sm">
+        <span className="text-xs text-muted-foreground">Puzzle </span>
+        #{runPosition !== undefined ? runPosition + 1 : '—'}
+      </span>
+    )
+  }
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-3">
-        <div>
-          <span className="text-xs text-muted-foreground">Puzzle </span>
-          <span className="text-sm font-mono">
-            #{focusMode && runPosition !== undefined ? runPosition + 1 : puzzleId}
-          </span>
-        </div>
-        {!focusMode && <TrainingItemTypeBadge source="DECOY" />}
+      <div className="flex items-center gap-2">
+        <span className="shrink-0 font-mono text-sm">#{trainingItemId ?? '—'}</span>
+        <TrainingItemTypeBadge source="DECOY" />
       </div>
-      {!focusMode && g !== null && <DecoyGameInfo g={g} />}
+      {source.game !== null && <DecoyGameInfo g={source.game} />}
+      {opening !== null && (
+        <div className="flex items-center gap-1.5 overflow-hidden">
+          <span className="shrink-0 font-mono text-xs font-semibold">{opening.eco}</span>
+          <span className="truncate text-xs text-muted-foreground">{opening.displayName}</span>
+        </div>
+      )}
     </div>
   )
 }
 
 function SourceSection({
   source,
-  trainingItemId,
   focusMode,
   runPosition,
+  opening,
+  trainingItemId,
 }: {
   source: SourceMetadata
-  trainingItemId: number | undefined
   focusMode: boolean
   runPosition: number | undefined
+  opening: OpeningInfo | null
+  trainingItemId?: number
 }): React.ReactElement | null {
   if (source.sourceType === 'LICHESS_TACTIC') {
-    return <LichessTacticSection source={source} trainingItemId={trainingItemId} focusMode={focusMode} runPosition={runPosition} />
+    return <LichessTacticSection source={source} focusMode={focusMode} runPosition={runPosition} opening={opening} trainingItemId={trainingItemId} />
   }
   if (source.sourceType === 'SCRAPED_POSITIONAL') {
-    return <ScrapedPositionalSection source={source} trainingItemId={trainingItemId} focusMode={focusMode} runPosition={runPosition} />
+    return <ScrapedPositionalSection source={source} focusMode={focusMode} runPosition={runPosition} opening={opening} trainingItemId={trainingItemId} />
   }
   if (source.sourceType === 'DECOY') {
-    return <DecoySection source={source} trainingItemId={trainingItemId} focusMode={focusMode} runPosition={runPosition} />
+    return <DecoySection source={source} focusMode={focusMode} runPosition={runPosition} opening={opening} trainingItemId={trainingItemId} />
   }
   return null
 }
@@ -520,7 +717,7 @@ export function MobileOverviewMetaBar({
   const [isOpen, setIsOpen] = React.useState(false)
 
   const opening = source.opening
-  const themes: Array<{ name: string; displayName: string | null }> =
+  const themes: Array<{ name: string; displayName: string | null; description?: string | null }> =
     source.sourceType !== 'DECOY' ? source.themes : []
   const decoyGame = source.sourceType === 'DECOY' ? source.game : null
   const hasDetails =
@@ -539,10 +736,12 @@ export function MobileOverviewMetaBar({
         <div className="flex min-w-0 items-center gap-2">
           <span className="shrink-0 font-mono text-sm">#{puzzleId}</span>
           {sourceType !== null && <TrainingItemTypeBadge source={sourceType} />}
-          <span className="shrink-0 text-sm tabular-nums">
-            <span className="text-xs text-muted-foreground">{source.sourceType === 'DECOY' ? 'Move: ' : 'Rating: '}</span>
-            {ratingDisplay}
-          </span>
+          {source.sourceType !== 'DECOY' && (
+            <span className="shrink-0 text-sm tabular-nums">
+              <span className="text-xs text-muted-foreground">Rating: </span>
+              {ratingDisplay}
+            </span>
+          )}
         </div>
         {hasDetails && (
           <ChevronDown
@@ -563,16 +762,33 @@ export function MobileOverviewMetaBar({
             </div>
           )}
           {themes.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {themes.map((t) => (
-                <Badge key={t.name} variant="outline" className="text-xs font-normal">
-                  {t.displayName ?? t.name}
-                </Badge>
-              ))}
+            <div className="flex flex-wrap gap-1">
+              {themes.map((t) => {
+                const label = t.displayName ?? t.name
+                if (!('description' in t) || !t.description) {
+                  return (
+                    <span key={t.name} className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                      {label}
+                    </span>
+                  )
+                }
+                return (
+                  <Tooltip key={t.name} delayDuration={200}>
+                    <TooltipTrigger asChild>
+                      <span className="cursor-default rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground transition-colors">
+                        {label}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-[220px] text-center text-xs">
+                      {t.description}
+                    </TooltipContent>
+                  </Tooltip>
+                )
+              })}
             </div>
           )}
           {pgnDisplay !== null && pgnDisplay.mainline.length > 0 && (
-            <div className="border-t border-border pt-2 text-sm leading-relaxed">
+            <div className="-mx-3 border-t border-border">
               <PgnDisplayBlock pgnDisplay={pgnDisplay} selectedPly={selectedPly} onPlyClick={onPlyClick} />
             </div>
           )}
@@ -611,24 +827,19 @@ export function TrainingItemMetaCard({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onPlyClick, selectedPly, pgnDisplay])
 
-  const opening = source.opening
-
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-border px-3 py-3">
-      <SourceSection source={source} trainingItemId={trainingItemId} focusMode={focusMode} runPosition={runPosition} />
-      {!focusMode && opening !== null && (
-        <div className="flex items-center gap-1.5 border-t border-border pt-3 pb-1 overflow-hidden">
-          <span className="font-mono text-xs font-semibold shrink-0">{opening.eco}</span>
-          <span className="text-xs text-muted-foreground truncate">{opening.displayName}</span>
-        </div>
-      )}
+    <div className={cn(
+      'flex flex-col gap-3 overflow-hidden rounded-md border border-border px-3 pt-3',
+      pgnDisplay !== null && pgnDisplay.mainline.length > 0 ? 'pb-0' : 'pb-3',
+    )}>
+      <SourceSection source={source} focusMode={focusMode} runPosition={runPosition} opening={source.opening} trainingItemId={trainingItemId} />
       {pgnDisplay !== null && pgnDisplay.mainline.length > 0 && (
-        <div className={cn('text-sm leading-relaxed', 'border-t border-border pt-2')}>
+        <div className="-mx-3 border-t border-border">
           <PgnDisplayBlock pgnDisplay={pgnDisplay} selectedPly={selectedPly} onPlyClick={onPlyClick} />
+          {!focusMode && source.sourceType === 'DECOY' && (
+            <DecoyEvalSection source={source} selectedPly={selectedPly} pgnDisplay={pgnDisplay} />
+          )}
         </div>
-      )}
-      {!focusMode && source.sourceType === 'DECOY' && (
-        <DecoyEvalSection source={source} selectedPly={selectedPly} pgnDisplay={pgnDisplay} />
       )}
     </div>
   )

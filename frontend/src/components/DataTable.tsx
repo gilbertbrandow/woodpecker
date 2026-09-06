@@ -132,6 +132,7 @@ type DataTableProps<T extends RowData> = {
   tableId?: string | false
   footerRow?: React.ReactNode
   onFooterRowClick?: () => void
+  filtersRight?: boolean
 }
 
 export function DataTable<T extends RowData>({
@@ -153,6 +154,7 @@ export function DataTable<T extends RowData>({
   tableId,
   footerRow,
   onFooterRowClick,
+  filtersRight = false,
 }: DataTableProps<T>): React.ReactElement {
   const { getParam, getMultiParam, setParams } = useTableUrlSync(tableId)
   const theadRef = React.useRef<HTMLTableSectionElement>(null)
@@ -254,7 +256,7 @@ export function DataTable<T extends RowData>({
             </div>
           )}
           {searchSlot}
-          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
+          <div className={`flex min-w-0 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0 ${filtersRight ? 'ml-auto' : 'flex-1'}`}>
           {filtersSlot}
           {(() => {
             const hideableCols = table.getAllColumns().filter((c) => {

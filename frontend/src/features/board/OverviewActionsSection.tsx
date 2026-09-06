@@ -13,6 +13,14 @@ type OverviewActionsSectionProps = {
 }
 
 export function OverviewActionsSection({ nextPuzzleDisabledReason, isLoadingNextPuzzle, gameUrl, onNextPuzzle, onRetake }: OverviewActionsSectionProps): React.ReactElement {
+  const nextButtonRef = React.useRef<HTMLButtonElement>(null)
+
+  React.useEffect(() => {
+    if (nextPuzzleDisabledReason === null && !isLoadingNextPuzzle) {
+      nextButtonRef.current?.focus()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // focus once on mount only
 
   return (
     <div className="mt-auto flex flex-col gap-3">
@@ -42,6 +50,7 @@ export function OverviewActionsSection({ nextPuzzleDisabledReason, isLoadingNext
         <TooltipTrigger asChild>
           <span className="w-full">
             <Button
+              ref={nextButtonRef}
               className="w-full bg-foreground text-background hover:bg-foreground/90"
               disabled={nextPuzzleDisabledReason !== null || isLoadingNextPuzzle}
               onClick={onNextPuzzle}

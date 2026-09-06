@@ -493,6 +493,19 @@ def _short_label(t_ms: int, kind: str, domain_len_ms: int, tz: ZoneInfo) -> str:
     return dt.strftime("%b")
 
 
+_MAX_PACE_INTRA_SAMPLES = 60
+
+
+def _sample_pace_timestamps(timestamps: list[int], max_n: int) -> list[int]:
+    total = len(timestamps)
+    if total <= max_n:
+        return list(timestamps)
+    step = total / max_n
+    sampled = [timestamps[min(round(i * step), total - 1)] for i in range(max_n - 1)]
+    sampled.append(timestamps[-1])
+    return sampled
+
+
 def _generate_label_ticks(
     domain_start_ms: int,
     domain_end_ms: int,
@@ -544,7 +557,8 @@ def _generate_series(
     is_active: bool,
     resolved_at_as_of: int,
 ) -> list[dict[str, object]]:
-    all_times = sorted(label_tick_times | set(special_times.keys()))
+    sampled_terminals = _sample_pace_timestamps(terminal_timestamps, _MAX_PACE_INTRA_SAMPLES)
+    all_times = sorted(label_tick_times | set(special_times.keys()) | set(sampled_terminals))
     series: list[dict[str, object]] = []
     for t in all_times:
         actual: object = _resolved_count_at(terminal_timestamps, t) if t <= as_of_ms else None

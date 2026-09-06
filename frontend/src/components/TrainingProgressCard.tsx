@@ -51,6 +51,12 @@ export function TrainingProgressCard({
       </div>
       <ChartContainer config={PROGRESS_CONFIG} className={grow ? 'flex-1 min-h-0 min-w-0 w-full' : 'h-64 min-w-0 w-full'}>
         <ComposedChart data={points} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="trainingActualGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="var(--color-actual)" stopOpacity={0.8} />
+              <stop offset="95%" stopColor="var(--color-actual)" stopOpacity={0.1} />
+            </linearGradient>
+          </defs>
           <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeOpacity={1} />
           <XAxis
             dataKey="timeMs"
@@ -103,8 +109,8 @@ export function TrainingProgressCard({
             dataKey="actual"
             stroke="var(--color-actual)"
             strokeWidth={2}
-            fill="var(--color-actual)"
-            fillOpacity={0.15}
+            fill="url(#trainingActualGradient)"
+            fillOpacity={1}
             dot={false}
             connectNulls={false}
             isAnimationActive={false}

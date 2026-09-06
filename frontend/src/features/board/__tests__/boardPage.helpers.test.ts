@@ -46,16 +46,18 @@ describe('buildPgnDisplay', () => {
     expect(qxd5).not.toBeNull()
   })
 
-  it('in_progress with no moves shows empty mainline', () => {
+  it('in_progress with no moves pre-shows the opponent first move', () => {
     const result = buildPgnDisplay(FEN, [], SOLUTION, 'in_progress')
-    expect(result.mainline).toHaveLength(0)
+    expect(result.mainline).toHaveLength(1)
+    expect(result.mainline[0].moveStatus).toBe('opponent')
+    expect(result.mainline[0].uci).toBe(FIRST_PLY)
     expect(result.variation).toBeNull()
   })
 
-  it('in_progress with one ply applied shows that move with null status', () => {
+  it('in_progress with first ply in allPliesPlayed still shows exactly one opponent move', () => {
     const result = buildPgnDisplay(FEN, [FIRST_PLY], SOLUTION, 'in_progress')
     expect(result.mainline).toHaveLength(1)
-    expect(result.mainline[0].moveStatus).toBeNull()
+    expect(result.mainline[0].moveStatus).toBe('opponent')
     expect(result.mainline[0].uci).toBe(FIRST_PLY)
     expect(result.variation).toBeNull()
   })

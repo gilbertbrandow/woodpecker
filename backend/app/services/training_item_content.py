@@ -151,7 +151,7 @@ def _lichess_tactic_payload(training_item_id: int) -> TrainingItemPayload:
             display_id=tactic.puzzle_id,
             rating=tactic.rating,
             game_url=tactic.game_url,
-            themes=[{"name": t.name, "displayName": t.display_name} for t in tactic.themes],
+            themes=[{"name": t.name, "displayName": t.display_name, "description": t.description} for t in tactic.themes],
             opening=_opening_dict(tactic.openings[-1]) if tactic.openings else None,
         ),
     )
@@ -175,7 +175,7 @@ def _lichess_tactic_payload_batch(
                 display_id=t.puzzle_id,
                 rating=t.rating,
                 game_url=t.game_url,
-                themes=[{"name": th.name, "displayName": th.display_name} for th in t.themes],
+                themes=[{"name": th.name, "displayName": th.display_name, "description": th.description} for th in t.themes],
                 opening=_opening_dict(t.openings[-1]) if t.openings else None,
             ),
         )
@@ -227,7 +227,7 @@ def _build_positional_payload(puzzle: ScrapedPositionalPuzzle) -> TrainingItemPa
                 "minRating": d.min_rating,
                 "maxRating": d.max_rating,
             },
-            themes=[{"name": t.name, "displayName": t.display_name} for t in puzzle.themes],
+            themes=[{"name": t.name, "displayName": t.display_name, "description": t.description} for t in puzzle.themes],
             opening=_opening_dict(puzzle.opening) if puzzle.opening else None,
         ),
     )

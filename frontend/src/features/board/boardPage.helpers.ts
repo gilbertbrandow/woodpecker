@@ -31,7 +31,7 @@ export type BoardState = {
 }
 
 export const HEADER_H = 56
-export const FOOTER_H = 49
+export const FOOTER_H = 0
 export const BOARD_GAP = 24
 export const H_PAD_MD = 48
 export const H_PAD_SM = 32
@@ -228,7 +228,11 @@ export function buildPgnDisplay(
   if (attemptStatus === 'in_progress') {
     const chess = new Chess(baseFen)
     const mainline: DisplayMove[] = []
-    for (const uci of attemptMoves) {
+    const firstOpponent = applyUciDisplay(chess, solutionMoves[0], 'opponent')
+    if (!firstOpponent) return { mainline, variation: null, subvariations: null }
+    mainline.push(firstOpponent)
+    // allPliesPlayed[0] is the same opponent move; skip it to avoid duplication
+    for (const uci of attemptMoves.slice(1)) {
       const move = applyUciDisplay(chess, uci, null)
       if (!move) break
       mainline.push(move)

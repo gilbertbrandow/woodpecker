@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useAuth } from '../context/auth'
-import { Clock, CheckCircle2, XCircle, ClockArrowUp, ClockArrowDown, ExternalLink, Lightbulb, Eye } from 'lucide-react'
+import { Clock, CheckCircle2, XCircle, ClockArrowUp, ClockArrowDown, ExternalLink, Lightbulb, Eye, Loader2 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
 import { Button } from '../components/ui/button'
 import { UserAvatar } from '../components/UserAvatar'
@@ -26,7 +26,7 @@ import { usePgnNavigation } from '../features/board/usePgnNavigation'
 import { resolveDisplayBoard, formatTimer, formatTargetSolveTime } from '../features/board/boardPage.helpers'
 import type { BoardState } from '../features/board/useBoardPageController'
 import { api } from '../lib/api'
-import type { AttemptSpectateView, SelectableUser, TrainingItemMetaPgnDisplay, UserRef } from '../lib/api'
+import type { AttemptSpectateView, RunTrainingItemOverview, SelectableUser, TrainingItemMetaPgnDisplay, UserRef } from '../lib/api'
 import { useBoardSounds, sanToSoundEvents } from '../features/board/useBoardSounds'
 import { BoardPageSkeleton } from '../features/board/BoardPageSkeleton'
 import { useIsDesktop } from '../hooks/use-mobile'
@@ -247,6 +247,7 @@ export function BoardPage(): React.ReactElement | null {
   const lastOverviewTimerTextRef = React.useRef(ZERO_TIMER)
   const lastOverviewMetTargetTimeRef = React.useRef<'fast' | 'in_window' | 'missed' | null>(null)
   const lastSelectedAttemptRef = React.useRef<(typeof allAttempts)[number] | null>(null)
+  const lastSettledOverviewRef = React.useRef<RunTrainingItemOverview | null>(null)
 
   React.useEffect(() => {
     lastOverviewTimerTextRef.current = ZERO_TIMER
@@ -259,6 +260,11 @@ export function BoardPage(): React.ReactElement | null {
   }
 
   const overviewData = ctrl.overview.data
+
+  const overviewMatchesRoute = overviewData !== null && overviewData.runTrainingItem.id === runTrainingItemId
+  if (overviewMatchesRoute) lastSettledOverviewRef.current = overviewData
+  const displayedOverviewData = overviewMatchesRoute ? overviewData : lastSettledOverviewRef.current
+  const isOverviewTransitioning = ctrl.mode === 'overview' && !overviewMatchesRoute && displayedOverviewData !== null
 
   const spectateTimeMs = spectateState?.view.timeSpentMs ?? null
   const frozenTimerTenths = spectateState !== null
@@ -391,13 +397,13 @@ export function BoardPage(): React.ReactElement | null {
     )
 
   const sourceForMetaCard =
-    ctrl.mode === 'overview' && overviewData !== null
-      ? overviewData.trainingItem.source
+    ctrl.mode === 'overview' && displayedOverviewData !== null
+      ? displayedOverviewData.trainingItem.source
       : (ctrl.solvingView?.trainingItem.source ?? null)
 
   const trainingItemIdForMetaCard =
-    ctrl.mode === 'overview' && overviewData !== null
-      ? overviewData.runTrainingItem.trainingItemId
+    ctrl.mode === 'overview' && displayedOverviewData !== null
+      ? displayedOverviewData.runTrainingItem.trainingItemId
       : ctrl.solvingView?.runTrainingItem.trainingItemId
 
   const timerBar =
@@ -602,7 +608,7 @@ export function BoardPage(): React.ReactElement | null {
           />
         </div>
       )}
-      {ctrl.mode === 'overview' && overviewData !== null && overviewData.runTrainingItem.id === runTrainingItemId && user !== null && (
+      {ctrl.mode === 'overview' && displayedOverviewData !== null && user !== null && (
         <OverviewSidebarRight
           key={runTrainingItemId}
           showTable={isDesktop}
@@ -612,20 +618,29 @@ export function BoardPage(): React.ReactElement | null {
           isLoadingNextPuzzle={ctrl.isLoadingNextPuzzle}
           onNextPuzzle={() => void ctrl.actions.handleNextPuzzle()}
           onRetake={() => { handleClearSpectate(); void ctrl.actions.handleRetake() }}
-          nextPuzzleDisabledReason={overviewData.actions.nextTrainingItem.disabledReason}
-          analyzeUrl={overviewData.actions.analyze.url}
-          trainingItemId={overviewData.runTrainingItem.trainingItemId}
+          nextPuzzleDisabledReason={overviewData?.actions.nextTrainingItem.disabledReason ?? null}
+          analyzeUrl={overviewData?.actions.analyze.url ?? null}
+          trainingItemId={displayedOverviewData.runTrainingItem.trainingItemId}
           currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl, isPresent: user.isPresent, countryCode: user.countryCode }}
           topSlot={
             sourceForMetaCard !== null ? (
-              <TrainingItemMetaCard
-                source={sourceForMetaCard}
-                pgnDisplay={pgnDisplay}
-                trainingItemId={trainingItemIdForMetaCard}
-                focusMode={false}
-                selectedPly={selectedPly}
-                onPlyClick={handlePlyClick}
-              />
+              <div className="relative">
+                <div className={isOverviewTransitioning ? 'pointer-events-none opacity-40 blur-sm' : undefined}>
+                  <TrainingItemMetaCard
+                    source={sourceForMetaCard}
+                    pgnDisplay={pgnDisplay}
+                    trainingItemId={trainingItemIdForMetaCard}
+                    focusMode={false}
+                    selectedPly={selectedPly}
+                    onPlyClick={handlePlyClick}
+                  />
+                </div>
+                {isOverviewTransitioning && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+              </div>
             ) : undefined
           }
         />
