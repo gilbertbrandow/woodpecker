@@ -163,7 +163,7 @@ export type SubsetConfig = {
   excludeSubsets?: number[]
 }
 
-export type LichessTacticTheme = { name: string; displayName: string | null }
+export type LichessTacticTheme = { name: string; displayName: string | null; description: string | null }
 export type LichessTacticOpening = { name: string; displayName: string; eco: string }
 export type TrainingItemOpening = { name: string; displayName: string; eco: string }
 
@@ -181,7 +181,7 @@ export type ScrapedPositionalSourceMetadata = {
   internalId: number
   lichessUrl: string
   difficulty: ScrapedPositionalDifficulty
-  themes: { name: string; displayName: string }[]
+  themes: { name: string; displayName: string; description: string | null }[]
   opening: TrainingItemOpening | null
 }
 
