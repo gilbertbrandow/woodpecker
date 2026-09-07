@@ -751,7 +751,7 @@ export function MobileOverviewMetaBar({
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-[-1px] right-[-1px] z-50 flex flex-col gap-3 rounded-b-md border border-t-0 border-border bg-background px-3 pb-3 pt-3 shadow-md">
+        <div className="absolute top-full left-[-1px] right-[-1px] z-50 flex flex-col gap-3 rounded-b-md border border-t-0 border-border bg-background px-3 pt-3 shadow-md">
           {decoyGame !== null && (
             <DecoyGameInfo g={decoyGame} />
           )}
