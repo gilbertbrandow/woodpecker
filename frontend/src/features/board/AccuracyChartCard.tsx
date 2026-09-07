@@ -360,23 +360,24 @@ function ComparisonPickerDialog({
                 Click a run to overlay it on the chart. Up to {MAX_COMPETITORS} at a time.
               </DialogPrimitive.Description>
             </div>
-            <div className="flex items-center gap-3">
-              {selectedRunIds.length > 0 && (
-                <button
-                  type="button"
-                  onClick={onClearAll}
-                  className="flex h-6 items-center gap-1.5 rounded-md bg-destructive px-2 text-xs text-destructive-foreground transition-colors hover:bg-destructive/90"
-                >
-                  <Trash2 className="h-3 w-3" />
-                  Clear all ({selectedRunIds.length})
-                </button>
-              )}
-              <DialogPrimitive.Close className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ml-1">
-                <X className="h-4 w-4" />
-                <span className="sr-only">Close</span>
-              </DialogPrimitive.Close>
-            </div>
+            <DialogPrimitive.Close className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ml-4">
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </DialogPrimitive.Close>
           </div>
+          {selectedRunIds.length > 0 && (
+            <div className="flex items-center justify-between border-b px-4 py-2">
+              <span className="text-xs text-muted-foreground tabular-nums">{selectedRunIds.length} selected</span>
+              <button
+                type="button"
+                onClick={onClearAll}
+                className="flex h-6 items-center gap-1.5 rounded-md bg-destructive px-2 text-xs text-destructive-foreground transition-colors hover:bg-destructive/90"
+              >
+                <Trash2 className="h-3 w-3" />
+                Clear all
+              </button>
+            </div>
+          )}
           <div className="px-4 py-3">
             <SubsetRunPickerTable
               subsetId={subsetId}
@@ -580,9 +581,10 @@ export function AccuracyChartCard({
       </div>
 
       {!mounted ? (
-        <div className="flex-1 min-h-0 w-full animate-pulse rounded-md bg-muted" />
+        <div className="flex-1 min-h-[200px] w-full animate-pulse rounded-md bg-muted" />
       ) : (
-        <ChartContainer config={CHART_CONFIG} className="flex-1 min-h-0 min-w-0 w-full">
+        <div className="relative flex-1 min-h-[200px] w-full">
+          <ChartContainer config={CHART_CONFIG} className="absolute inset-0 min-w-0">
           <ComposedChart data={sharedData} margin={{ top: 16, right: 16, left: 0, bottom: 0 }}>
             <XAxis
               dataKey="x"
@@ -702,7 +704,8 @@ export function AccuracyChartCard({
 
             <Customized component={avatarLayer} />
           </ComposedChart>
-        </ChartContainer>
+          </ChartContainer>
+        </div>
       )}
 
       {targetAccuracy !== null && accuracy.resolvedCount > 0 && accuracy.valuePct !== null && (
