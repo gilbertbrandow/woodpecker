@@ -189,6 +189,22 @@ function MiniAvatar({ user, borderColor }: { user: Pick<UserRef, 'avatarUrl' | '
 }
 
 // ---------------------------------------------------------------------------
+// Series localStorage cache
+// ---------------------------------------------------------------------------
+
+const SERIES_CACHE_PREFIX = 'run-series:'
+
+function readCachedSeries(runId: number): RunAccuracySeries | null {
+  return getStored<RunAccuracySeries>(`${SERIES_CACHE_PREFIX}${runId}`)
+}
+
+function writeCachedSeries(series: RunAccuracySeries): void {
+  if (series.isCompleted) {
+    setStored(`${SERIES_CACHE_PREFIX}${series.runId}`, series)
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Picker table
 // ---------------------------------------------------------------------------
 
@@ -398,7 +414,15 @@ export function AccuracyChartCard({
     getStored<number[]>(storageKey) ?? []
   )
 
-  const [overlayCache, setOverlayCache] = React.useState<Map<number, RunAccuracySeries>>(new Map())
+  const [overlayCache, setOverlayCache] = React.useState<Map<number, RunAccuracySeries>>(() => {
+    const cache = new Map<number, RunAccuracySeries>()
+    const saved = getStored<number[]>(`accuracy-overlays:${runId}`) ?? []
+    for (const id of saved) {
+      const cached = readCachedSeries(id)
+      if (cached !== null) cache.set(id, cached)
+    }
+    return cache
+  })
 
   React.useEffect(() => { setMounted(true) }, [])
 
@@ -409,11 +433,18 @@ export function AccuracyChartCard({
   React.useEffect(() => {
     const toFetch = selectedRunIds.filter(id => !overlayCache.has(id))
     if (toFetch.length === 0) return
-    for (const id of toFetch) {
-      api.runs.getAccuracySeries(id)
-        .then(series => setOverlayCache(prev => new Map(prev).set(id, series)))
-        .catch(() => {})
-    }
+    api.runs.getAccuracySeriesBatch(toFetch)
+      .then(results => {
+        setOverlayCache(prev => {
+          const next = new Map(prev)
+          for (const series of results) {
+            next.set(series.runId, series)
+            writeCachedSeries(series)
+          }
+          return next
+        })
+      })
+      .catch(() => {})
   // overlayCache intentionally omitted — cache only grows, no need to re-run when it changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRunIds])

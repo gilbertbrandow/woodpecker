@@ -698,6 +698,7 @@ export type RunAccuracySeries = {
   runIndex: number
   scheduleId: number
   scheduleName: string
+  isCompleted: boolean
   points: number[]
 }
 
@@ -1339,6 +1340,8 @@ export const api = {
       request(`/runs/${runId}/continue`, { method: 'POST' }),
     getAccuracySeries: (runId: number): Promise<RunAccuracySeries> =>
       request(`/runs/${runId}/accuracy-series`),
+    getAccuracySeriesBatch: (runIds: number[]): Promise<RunAccuracySeries[]> =>
+      request(`/runs/accuracy-series?ids=${runIds.join(',')}`),
   },
   trainingItems: {
     getAttemptHistory: (
