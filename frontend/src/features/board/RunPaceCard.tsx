@@ -1,12 +1,18 @@
 import * as React from 'react'
 import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, ReferenceDot } from 'recharts'
 import type { DotProps } from 'recharts'
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, Flag, CalendarDays } from 'lucide-react'
 import { ChartContainer, ChartTooltip, type ChartConfig } from '../../components/ui/chart'
-import type { PaceChartData, PaceChartTickKind } from '../../lib/api'
+import { ProgressBar } from '../../components/ProgressBar'
+import { DeltaBadge } from './DeltaBadge'
+import type { PaceChartData, PaceChartTickKind, RunTrainingItemOverview } from '../../lib/api'
+
+type ProgressRowData = Omit<RunTrainingItemOverview['progress']['runProgress'], never>
 
 type RunPaceCardProps = {
   chartData: PaceChartData | null
+  runProgress?: ProgressRowData
+  trainingProgress?: ProgressRowData | null
   stretch?: boolean
 }
 
@@ -145,7 +151,24 @@ function FooterContent({ data }: { data: PaceChartData }): React.ReactElement | 
   )
 }
 
-export function RunPaceCard({ chartData, stretch = false }: RunPaceCardProps): React.ReactElement {
+function ProgressRow({
+  label, value, tooltipLabel, delta, icon: Icon,
+}: { label: string; value: number; tooltipLabel: string; delta: number | null; icon: React.ElementType }): React.ReactElement {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex h-6 items-center gap-2">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <Icon className="h-3.5 w-3.5 shrink-0" />
+          <span>{label}</span>
+        </div>
+        <DeltaBadge delta={delta} goodWhenPositive={true} format={(n) => `${n.toFixed(2)}%`} />
+      </div>
+      <ProgressBar value={value} tooltipLabel={tooltipLabel} className="w-full" />
+    </div>
+  )
+}
+
+export function RunPaceCard({ chartData, runProgress, trainingProgress = null, stretch = false }: RunPaceCardProps): React.ReactElement {
   const [mounted, setMounted] = React.useState(false)
   React.useEffect(() => { setMounted(true) }, [])
 
@@ -278,6 +301,15 @@ export function RunPaceCard({ chartData, stretch = false }: RunPaceCardProps): R
       )}
 
       {chartData !== null && <FooterContent data={chartData} />}
+
+      {runProgress !== undefined && (
+        <div className="flex flex-col gap-3 border-t pt-3">
+          <ProgressRow {...runProgress} icon={Flag} />
+          {trainingProgress !== null && trainingProgress !== undefined && (
+            <ProgressRow {...trainingProgress} icon={CalendarDays} />
+          )}
+        </div>
+      )}
     </div>
   )
 }

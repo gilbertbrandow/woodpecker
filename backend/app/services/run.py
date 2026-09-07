@@ -14,6 +14,7 @@ from app.models.run import Run, RunTrainingItem, TrainingAttempt
 from app.models.schedule import Schedule
 from app.models.subset import Subset, SubsetTrainingItem
 from app.models.training import Training
+from app.models.user import User
 from app.services.attempt_state import (
     attempt_type_fields,
     derive_attempt_outcome,
@@ -31,6 +32,7 @@ from app.services.training_item_content import (
     get_content,
     get_content_batch,
 )
+from app.services.user_ref import user_ref
 from app.table_query import DateFilter, FilterList, Paginator, RangeFilter
 
 
@@ -411,6 +413,30 @@ def _fetch_run_item_stats(run_id: int, total_queue: int) -> list[RunItemStats]:
         )
         for row in rows
     ]
+
+
+def _compute_accuracy_chart_data(
+    run_item_stats: list[RunItemStats],
+    total_queue: int,
+    target_accuracy: float | None,
+) -> dict[str, object]:
+    resolved: list[tuple[datetime, bool]] = []
+    for s in run_item_stats:
+        if s.has_queue_solved and s.solved_at is not None:
+            resolved.append((s.solved_at, s.has_first_solved))
+        elif s.queue_done >= total_queue and s.last_terminal_at is not None:
+            resolved.append((s.last_terminal_at, False))
+
+    resolved.sort(key=lambda x: x[0])
+
+    points: list[float] = []
+    cumulative_first = 0
+    for i, (_, first_solved) in enumerate(resolved):
+        if first_solved:
+            cumulative_first += 1
+        points.append(round(cumulative_first / (i + 1) * 100, 2))
+
+    return {"points": points, "totalItems": len(run_item_stats), "targetAccuracy": target_accuracy}
 
 
 def _compute_terminal_timestamps(run_puzzles: list[RunTrainingItem], total_queue: int) -> list[int]:
@@ -1597,6 +1623,8 @@ def _build_run_puzzle_overview(
             "qualifyingAttemptId": q_attempt_id,
             "trainingId": training_id,
             "scheduleName": schedule_name,
+            "scheduleId": schedule.id if schedule is not None else None,
+            "subsetId": schedule.subset_id if schedule is not None else None,
         },
         "trainingItem": {
             "fen": payload.contract.fen,
@@ -1608,6 +1636,7 @@ def _build_run_puzzle_overview(
         "runPace": {
             "chartData": _pace_chart_data(run, total_run_puzzles, terminal_timestamps, config, tz),
         },
+        "accuracyChart": _compute_accuracy_chart_data(all_run_item_stats, total_queue, run.target_accuracy),
         "stats": {
             "runIndex": run.run_index,
             "accuracy": stats["accuracy"],
@@ -1779,6 +1808,38 @@ def get_training_item_history(run_id: int, training_item_id: int, user_id: int) 
         "maxTriesPerItem": total_queue,
         "positions": positions,
     }
+
+
+def get_run_accuracy_series(run_id: int) -> dict[str, object]:
+    run = db.session.get(Run, run_id)
+    if run is None:
+        raise NotFoundError("Run not found", "The requested run does not exist.")
+
+    schedule, config = _get_schedule_config(run)
+    total_queue = config.total_queue
+
+    training = db.session.get(Training, run.training_id)
+    if training is None:
+        raise NotFoundError("Training not found", "The requested training does not exist.")
+
+    owner = db.session.get(User, training.user_id)
+
+    stats = _fetch_run_item_stats(run_id, total_queue)
+    chart = _compute_accuracy_chart_data(stats, total_queue, None)
+
+    return {
+        "runId": run_id,
+        "user": user_ref(owner) if owner is not None else {
+            "id": training.user_id, "displayName": "Unknown",
+            "avatarUrl": None, "isPresent": False, "countryCode": None,
+        },
+        "runIndex": run.run_index,
+        "scheduleId": schedule.id,
+        "scheduleName": schedule.name,
+        "isCompleted": run.completed_at is not None,
+        "points": chart["points"],
+    }
+
 
 
 def get_attempt(

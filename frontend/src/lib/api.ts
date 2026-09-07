@@ -686,6 +686,36 @@ export type PaceChartData = {
   summary: PaceChartSummary
 }
 
+export type AccuracyChartData = {
+  points: number[]
+  totalItems: number
+  targetAccuracy: number | null
+}
+
+export type RunAccuracySeries = {
+  runId: number
+  user: UserRef
+  runIndex: number
+  scheduleId: number
+  scheduleName: string
+  isCompleted: boolean
+  points: number[]
+}
+
+export type SubsetRunRow = {
+  runId: number
+  runIndex: number
+  user: UserRef
+  scheduleId: number
+  scheduleName: string
+  status: 'active' | 'completed'
+  totalItems: number
+  firstSolvedCount: number
+  resolvedCount: number
+  accuracyPct: number | null
+  startedAt: string
+}
+
 export type ActiveRun = {
   runId: number
   scheduleName: string
@@ -854,6 +884,8 @@ export type RunTrainingItemOverview = {
     qualifyingAttemptId: number | null
     trainingId: number | null
     scheduleName: string | null
+    scheduleId: number | null
+    subsetId: number | null
   }
   trainingItem: {
     fen: string
@@ -865,6 +897,7 @@ export type RunTrainingItemOverview = {
   runPace: {
     chartData: PaceChartData | null
   }
+  accuracyChart: AccuracyChartData
   stats: {
     runIndex: number
     accuracy: {
@@ -1161,6 +1194,8 @@ export const api = {
       request(`/subsets/${id}/refill`, { method: 'POST' }),
     delete: (id: number): Promise<void> => request(`/subsets/${id}`, { method: 'DELETE' }),
     lock: (id: number): Promise<Subset> => request(`/subsets/${id}/lock`, { method: 'POST' }),
+    listRuns: (subsetId: number, params: TableParams): Promise<{ items: SubsetRunRow[]; total: number }> =>
+      request(`/subsets/${subsetId}/runs?${tableParamsToUrl(params)}`),
     getTrainingItems: (
       id: number,
       page?: number,
@@ -1303,6 +1338,10 @@ export const api = {
       request(`/runs/${runId}/training-items/${runTrainingItemId}/attempts`, { method: 'POST' }),
     continue: (runId: number): Promise<ContinueRunResult> =>
       request(`/runs/${runId}/continue`, { method: 'POST' }),
+    getAccuracySeries: (runId: number): Promise<RunAccuracySeries> =>
+      request(`/runs/${runId}/accuracy-series`),
+    getAccuracySeriesBatch: (runIds: number[]): Promise<RunAccuracySeries[]> =>
+      request(`/runs/accuracy-series?ids=${runIds.join(',')}`),
   },
   trainingItems: {
     getAttemptHistory: (

@@ -14,8 +14,7 @@ import { MoveStatusCard } from '../features/board/MoveStatusCard'
 import { AttemptTypeCard } from '../features/board/AttemptTypeCard'
 import { OverviewSidebarLeft } from '../features/board/OverviewSidebarLeft'
 import { OverviewSidebarRight } from '../features/board/OverviewSidebarRight'
-import { OverviewStatsSection } from '../features/board/OverviewStatsSection'
-import { ProgressCard } from '../features/board/ProgressCard'
+import { AccuracyChartCard } from '../features/board/AccuracyChartCard'
 import { RunPaceCard } from '../features/board/RunPaceCard'
 import { RunCompleteOverlay } from '../features/board/RunCompleteOverlay'
 import { OverviewAttemptHistoryTable } from '../features/board/OverviewAttemptHistoryTable'
@@ -116,7 +115,6 @@ export function BoardPage(): React.ReactElement | null {
     | { kind: 'self'; runId: number; runTrainingItemId: number; view: AttemptSpectateView }
 
   const [spectateState, setSpectateState] = React.useState<SpectateState | null>(null)
-
   React.useEffect(() => {
     setSpectateState(null)
   }, [runTrainingItemId])
@@ -499,20 +497,24 @@ export function BoardPage(): React.ReactElement | null {
   const mobileDrawerContent =
     ctrl.mode === 'overview' && overviewData !== null ? (
       <div className="flex flex-col gap-5">
-        <OverviewStatsSection
-          accuracy={{ ...overviewData.stats.accuracy, deltaPct: selectedAccuracyDelta }}
-          averageSolveTime={{ ...overviewData.stats.averageSolveTime, deltaMs: selectedSolveTimeDelta }}
-        />
-        {overviewData.runPace.chartData !== null && (
-          <RunPaceCard chartData={overviewData.runPace.chartData} />
-        )}
-        <ProgressCard
+        <RunPaceCard
+          chartData={overviewData.runPace.chartData}
           runProgress={{ ...overviewData.progress.runProgress, delta: selectedRunProgressDelta }}
           trainingProgress={
             overviewData.progress.trainingProgress !== null
               ? { ...overviewData.progress.trainingProgress, delta: selectedTrainingProgressDelta }
               : null
           }
+        />
+        <AccuracyChartCard
+          runId={overviewData.runTrainingItem.runId}
+          subsetId={overviewData.runTrainingItem.subsetId}
+          scheduleId={overviewData.runTrainingItem.scheduleId}
+          scheduleName={overviewData.runTrainingItem.scheduleName}
+          accuracyChart={overviewData.accuracyChart}
+          accuracy={{ ...overviewData.stats.accuracy, deltaPct: selectedAccuracyDelta }}
+          averageSolveTime={{ ...overviewData.stats.averageSolveTime, deltaMs: selectedSolveTimeDelta }}
+          currentUser={{ avatarUrl: user?.avatarUrl ?? null, displayName: user?.displayName ?? '' }}
         />
         {user !== null && !isDesktop && overviewData.runTrainingItem.id === runTrainingItemId && (
           <OverviewAttemptHistoryTable
@@ -531,6 +533,7 @@ export function BoardPage(): React.ReactElement | null {
     ctrl.mode === 'overview' && overviewData !== null ? (
       <OverviewSidebarLeft
         paceChart={overviewData.runPace.chartData}
+        accuracyChart={overviewData.accuracyChart}
         accuracy={{ ...overviewData.stats.accuracy, deltaPct: selectedAccuracyDelta }}
         averageSolveTime={{ ...overviewData.stats.averageSolveTime, deltaMs: selectedSolveTimeDelta }}
         runProgress={{ ...overviewData.progress.runProgress, delta: selectedRunProgressDelta }}
@@ -539,6 +542,11 @@ export function BoardPage(): React.ReactElement | null {
             ? { ...overviewData.progress.trainingProgress, delta: selectedTrainingProgressDelta }
             : null
         }
+        runId={overviewData.runTrainingItem.runId}
+        subsetId={overviewData.runTrainingItem.subsetId}
+        scheduleId={overviewData.runTrainingItem.scheduleId}
+        scheduleName={overviewData.runTrainingItem.scheduleName}
+        currentUser={{ avatarUrl: user?.avatarUrl ?? null, displayName: user?.displayName ?? '' }}
       />
     ) : ctrl.solvingView !== null ? (
       <AttemptTypeCard
