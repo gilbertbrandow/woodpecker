@@ -111,3 +111,10 @@ def get_attempt(
 def get_training_item_history(run_id: int, training_item_id: int) -> tuple[Response, int] | Response:
     result = run_svc.get_training_item_history(run_id, training_item_id, session["user_id"])
     return jsonify(result)
+
+
+@runs_bp.get("/<int:run_id>/accuracy-series")
+@login_required
+def get_accuracy_series(run_id: int) -> tuple[Response, int] | Response:
+    result = run_svc.get_run_accuracy_series(run_id)
+    return jsonify(result)

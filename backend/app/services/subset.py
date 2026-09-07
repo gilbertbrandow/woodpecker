@@ -11,7 +11,7 @@ from app.models.schedule import Schedule
 from app.models.subset import Subset, SubsetTrainingItem
 from app.models.user import User
 from app.services.user_ref import user_ref, user_ref_from_row
-from app.table_query import DateFilter, FilterList, Paginator, RangeFilter
+from app.table_query import DateFilter, FilterList, Paginator, RangeFilter, SortParam
 
 DEFAULT_RATING_MIN = 0
 DEFAULT_RATING_MAX = 9999
@@ -1250,6 +1250,120 @@ def list_subsets(
         items.append(item)
 
     return {"items": items, "total": total if total is not None else len(items)}
+
+
+def list_subset_runs(
+    subset_id: int,
+    paginator: Paginator,
+    user_ids: FilterList | None = None,
+    schedule_ids: FilterList | None = None,
+    search: str | None = None,
+    sort: SortParam | None = None,
+) -> dict[str, object]:
+    params: dict[str, object] = {"subset_id": subset_id}
+    conditions: list[str] = ["s.subset_id = :subset_id", "r.aborted_at IS NULL"]
+
+    if search:
+        conditions.append("(u.display_name ILIKE :search OR s.name ILIKE :search)")
+        params["search"] = f"%{search}%"
+    if user_ids is not None:
+        user_ids.apply(conditions, params, "t.user_id", prefix="uid")
+    if schedule_ids is not None:
+        schedule_ids.apply(conditions, params, "t.schedule_id", prefix="sid")
+
+    where_sql = "WHERE " + " AND ".join(conditions)
+    order_by = sort.order_by_clause() if sort else "r.started_at DESC NULLS LAST"
+
+    count_sql = f"""
+        SELECT COUNT(*)
+        FROM runs r
+        JOIN trainings t ON r.training_id = t.id
+        JOIN users u ON t.user_id = u.id
+        JOIN schedules s ON t.schedule_id = s.id
+        {where_sql}
+    """
+    total = int(db.session.execute(sa.text(count_sql), params).scalar_one())
+
+    params.update(paginator.params)
+
+    rows = db.session.execute(
+        sa.text(f"""
+            WITH run_stats AS (
+                SELECT
+                    rp.run_id,
+                    COUNT(*) AS total_items,
+                    SUM(CASE WHEN EXISTS (
+                        SELECT 1 FROM training_attempts a
+                        WHERE a.run_training_item_id = rp.id
+                          AND a.status = 'solved' AND a.try_number = 1
+                    ) THEN 1 ELSE 0 END) AS first_solved_count,
+                    SUM(CASE WHEN EXISTS (
+                        SELECT 1 FROM training_attempts a2
+                        WHERE a2.run_training_item_id = rp.id
+                          AND a2.status != 'in_progress'
+                    ) THEN 1 ELSE 0 END) AS resolved_count
+                FROM run_training_items rp
+                WHERE rp.run_id IN (
+                    SELECT r2.id FROM runs r2
+                    JOIN trainings t2 ON r2.training_id = t2.id
+                    JOIN schedules s2 ON t2.schedule_id = s2.id
+                    WHERE s2.subset_id = :subset_id AND r2.aborted_at IS NULL
+                )
+                GROUP BY rp.run_id
+            )
+            SELECT
+                r.id AS run_id,
+                r.run_index,
+                r.started_at,
+                r.completed_at,
+                t.user_id,
+                u.display_name,
+                u.avatar_url,
+                u.last_seen_at,
+                u.country_code,
+                t.schedule_id,
+                s.name AS schedule_name,
+                COALESCE(rs.total_items, 0) AS total_items,
+                COALESCE(rs.first_solved_count, 0) AS first_solved_count,
+                COALESCE(rs.resolved_count, 0) AS resolved_count
+            FROM runs r
+            JOIN trainings t ON r.training_id = t.id
+            JOIN users u ON t.user_id = u.id
+            JOIN schedules s ON t.schedule_id = s.id
+            LEFT JOIN run_stats rs ON rs.run_id = r.id
+            {where_sql}
+            ORDER BY {order_by}
+            LIMIT :page_limit OFFSET :page_offset
+        """),
+        params,
+    ).all()
+
+    items: list[dict[str, object]] = []
+    for row in rows:
+        status = "completed" if row.completed_at is not None else "active"
+        resolved = int(row.resolved_count)
+        first_solved = int(row.first_solved_count)
+        accuracy_pct: float | None = (
+            round(first_solved / resolved * 100, 1) if resolved > 0 else None
+        )
+        items.append({
+            "runId": int(row.run_id),
+            "runIndex": int(row.run_index),
+            "user": user_ref_from_row(
+                int(row.user_id), row.display_name, row.avatar_url,
+                row.last_seen_at, row.country_code,
+            ),
+            "scheduleId": int(row.schedule_id),
+            "scheduleName": row.schedule_name,
+            "status": status,
+            "totalItems": int(row.total_items),
+            "firstSolvedCount": first_solved,
+            "resolvedCount": resolved,
+            "accuracyPct": accuracy_pct,
+            "startedAt": row.started_at.isoformat(),
+        })
+
+    return {"items": items, "total": total}
 
 
 def get_subset(subset_id: int, user_id: int) -> tuple[Subset, User]:

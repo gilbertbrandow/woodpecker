@@ -136,6 +136,22 @@ def discard_puzzle(subset_id: int, training_item_id: int) -> tuple[Response, int
     return jsonify(), 204
 
 
+@subsets_bp.get("/<int:subset_id>/runs")
+@login_required
+def list_subset_runs(subset_id: int) -> tuple[Response, int] | Response:
+    q = TableQuery(request)
+    sort = q.sort_param({"startedAt": "r.started_at"})
+    result = subset_svc.list_subset_runs(
+        subset_id,
+        paginator=q.paginator,
+        user_ids=q.int_filter("userId"),
+        schedule_ids=q.int_filter("scheduleId"),
+        search=q.q,
+        sort=sort,
+    )
+    return jsonify(result)
+
+
 @subsets_bp.get("/<int:subset_id>/stats")
 @login_required
 def get_stats(subset_id: int) -> tuple[Response, int] | Response:
