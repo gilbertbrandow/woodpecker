@@ -1836,6 +1836,7 @@ def get_run_accuracy_series(run_id: int) -> dict[str, object]:
         "runIndex": run.run_index,
         "scheduleId": schedule.id,
         "scheduleName": schedule.name,
+        "isCompleted": run.completed_at is not None,
         "points": chart["points"],
     }
 
