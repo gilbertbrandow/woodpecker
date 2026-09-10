@@ -35,7 +35,7 @@ class TestSolveHappyPath:
         assert attempt_row is not None
         assert attempt_row.status == "solved"
         assert attempt_row.time_spent_ms == 3000
-        assert attempt_row.moves == [player_move]
+        assert attempt_row.moves == [[player_move]]
 
         overview = body["overview"]
         assert "trainingItem" in overview
@@ -51,11 +51,7 @@ class TestSolveHappyPath:
 
         assert "nextTrainingItem" in overview["actions"]
 
-        pgn = None
-        for attempt_view in overview["attempts"]:
-            if attempt_view["id"] == attempt_id:
-                pgn = attempt_view.get("pgnDisplay")
-                break
+        pgn = overview.get("pgn")
         assert pgn is not None
         mainline = pgn["mainline"]
         assert len(mainline) >= 2
@@ -98,26 +94,17 @@ class TestCheckmateAlternative:
         from app.models.run import TrainingAttempt
         attempt_row = db_session.get(TrainingAttempt, attempt_id)
         assert attempt_row is not None
-        assert attempt_row.moves == [alt_move]
+        assert attempt_row.moves == [[alt_move]]
 
         overview = body["overview"]
-        pgn = None
-        for attempt_view in overview["attempts"]:
-            if attempt_view["id"] == attempt_id:
-                pgn = attempt_view.get("pgnDisplay")
-                break
-
-        assert pgn is not None, "pgnDisplay missing from overview attempt"
+        pgn = overview.get("pgn")
+        assert pgn is not None, "pgn missing from overview"
         mainline = pgn["mainline"]
-
-        player_plies = [m for m in mainline if m["moveStatus"] != "opponent"]
-        assert len(player_plies) >= 1
-
-        actual_uci = player_plies[0]["uci"]
-        assert actual_uci == alt_move, (
-            f"pgnDisplay shows {actual_uci!r} but player played {alt_move!r}. "
-            f"The solution move {solution_move!r} must not appear as the player ply."
-        )
+        assert len(mainline) >= 2
+        assert mainline[0]["moveStatus"] == "opponent"
+        # Mainline always shows the contract solution; alt_move may appear as a subvariation.
+        assert mainline[1]["moveStatus"] == "correct"
+        assert mainline[1]["uci"] == solution_move
 
 
 @pytest.mark.integration

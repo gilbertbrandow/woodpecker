@@ -185,7 +185,7 @@ class TestSpectateView:
         body = resp.get_json()
         assert body["attemptId"] == world["attempt_a_id"]
         assert "board" in body
-        assert "pgnDisplay" in body
+        assert "pgn" in body
 
     def test_not_found_for_nonexistent_attempt(self, client: FlaskClient, db_session) -> None:
         world = _seed_training_item_world(db_session)
