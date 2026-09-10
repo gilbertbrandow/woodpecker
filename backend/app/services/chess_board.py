@@ -10,10 +10,13 @@ def _resolve(ply: str | list[str]) -> str:
 def compute_attempt_board(
     contract: SolveContract,
     status: str,
-    moves: list[str],
+    moves: list[list[str]],
 ) -> dict[str, object] | None:
     if status == "in_progress":
         return None
+
+    # Use the first variation for the terminal board position.
+    flat = moves[0] if moves else []
 
     plies = contract.plies
     board = chess.Board(contract.fen)
@@ -21,15 +24,15 @@ def compute_attempt_board(
     if status == "solved":
         try:
             board.push_uci(_resolve(plies[0]))
-            for player_idx, uci in enumerate(moves):
+            for player_idx, uci in enumerate(flat):
                 board.push_uci(uci)
-                is_last_user = player_idx + 1 >= len(moves)
+                is_last_user = player_idx + 1 >= len(flat)
                 opponent_idx = player_idx * 2 + 2
                 if not is_last_user and opponent_idx < len(plies):
                     board.push_uci(_resolve(plies[opponent_idx]))
         except ValueError:
             pass
-        last_uci = moves[-1] if moves else None
+        last_uci = flat[-1] if flat else None
         last_move: list[str] | None = [last_uci[:2], last_uci[2:4]] if last_uci else None
         return {
             "terminalFen": board.fen(),
@@ -40,7 +43,7 @@ def compute_attempt_board(
     try:
         board.push_uci(_resolve(plies[0]))
         player_positions = list(range(1, len(plies), 2))
-        for i, uci in enumerate(moves):
+        for i, uci in enumerate(flat):
             if i >= len(player_positions):
                 break
             expected = plies[player_positions[i]]
@@ -55,7 +58,7 @@ def compute_attempt_board(
                     "lastMove": last_move,
                     "result": "wrong",
                 }
-            if i + 1 < len(moves) and player_positions[i] + 1 < len(plies):
+            if i + 1 < len(flat) and player_positions[i] + 1 < len(plies):
                 board.push_uci(_resolve(plies[player_positions[i] + 1]))
     except ValueError:
         pass
@@ -63,14 +66,25 @@ def compute_attempt_board(
     return {"terminalFen": None, "lastMove": None, "result": None}
 
 
-def compute_attempt_pgn(
+def build_pgn(
     contract: SolveContract,
-    status: str,
-    moves: list[str],
-) -> dict[str, object] | None:
-    if status == "in_progress":
-        return None
+    moves: list[list[str]],
+) -> dict[str, object]:
+    """Build the display representation for one TrainingAttempt.
 
+    Returns a structured dict with:
+      - mainline: list of display moves (the correct solution)
+      - subvariations: wrong-move entries and Decoy alternatives
+
+    Mainline: the correct solution from the SolveContract (for Decoy: the
+    accepted move the user actually solved with, falling back to plies[1][0]).
+    Subvariations: one entry per failed Variation (single wrong move with ??).
+    For Decoy puzzles, other accepted moves also appear as correct subvariations.
+
+    Extensibility note: future callers may pass additional keyword arguments
+    such as a game_prefix (moves before the training position) to produce a
+    full-game display that embeds the training excerpt in context.
+    """
     plies = contract.plies
     is_decoy = contract.is_decoy
 
@@ -98,12 +112,105 @@ def compute_attempt_pgn(
         except ValueError:
             return None
 
-    def _decoy_subvariations(player_uci: str | None) -> list[list[dict[str, object]]] | None:
+    # ── Determine the canonical player move for the mainline ──────────────────
+
+    # For Decoy: find the accepted move the user played when they solved.
+    solved_player_uci: str | None = None
+    if is_decoy:
         accepted: list[str] = plies[1]  # type: ignore[assignment]
+        for variation in moves:
+            if variation:
+                candidate = variation[0]
+                if candidate in accepted:
+                    solved_player_uci = candidate
+                    break
+
+    # ── Build the mainline ────────────────────────────────────────────────────
+
+    mainline: list[dict[str, object]] = []
+    board = chess.Board(contract.fen)
+
+    try:
+        opp_move = _make_display_move(board, _resolve(plies[0]), "opponent")
+        if opp_move:
+            mainline.append(opp_move)
+    except ValueError:
+        return {"mainline": mainline, "subvariations": None}
+
+    if is_decoy:
+        canonical_uci = solved_player_uci or _resolve(plies[1])
+        player_dm = _make_display_move(board, canonical_uci, "correct")
+        if player_dm:
+            mainline.append(player_dm)
+        # Append decoy continuation line after the accepted move.
         lines = contract.decoy_lines or {}
-        result: list[list[dict[str, object]]] = []
+        for cont_uci in lines.get(canonical_uci, "").split()[1:]:
+            cont_dm = _make_display_move(board, cont_uci, None)
+            if not cont_dm:
+                break
+            mainline.append(cont_dm)
+    else:
+        player_positions = list(range(1, len(plies), 2))
+        for i, ply in enumerate(player_positions):
+            player_dm = _make_display_move(board, _resolve(plies[ply]), "correct")
+            if not player_dm:
+                break
+            mainline.append(player_dm)
+            opp_idx = ply + 1
+            if opp_idx < len(plies):
+                opp_dm = _make_display_move(board, _resolve(plies[opp_idx]), "opponent")
+                if not opp_dm:
+                    break
+                mainline.append(opp_dm)
+
+    # ── Build subvariations ───────────────────────────────────────────────────
+
+    subvariations: list[list[dict[str, object]]] = []
+
+    # Wrong-move subvariations (one per failed Variation).
+    player_positions = list(range(1, len(plies), 2))
+    for variation in moves:
+        if not variation:
+            continue
+        # Walk through the variation to find the first wrong player move.
+        var_board = chess.Board(contract.fen)
+        try:
+            var_board.push_uci(_resolve(plies[0]))
+        except ValueError:
+            continue
+
+        for i, uci in enumerate(variation):
+            if i >= len(player_positions):
+                break
+            expected = plies[player_positions[i]]
+            is_correct = (
+                uci in expected if isinstance(expected, list) else uci == expected
+            )
+            if not is_correct:
+                # This is the wrong move — emit it as a ?? subvariation.
+                sv_dm = _make_display_move(var_board, uci, "wrong")
+                if sv_dm:
+                    subvariations.append([sv_dm])
+                break
+            # Correct so far — advance the board and continue.
+            try:
+                var_board.push_uci(uci)
+            except ValueError:
+                break
+            opp_idx = player_positions[i] + 1
+            if opp_idx < len(plies) and i + 1 < len(variation):
+                try:
+                    var_board.push_uci(_resolve(plies[opp_idx]))
+                except ValueError:
+                    break
+
+    # For Decoy: append other accepted moves as correct subvariations.
+    if is_decoy:
+        accepted = plies[1]  # type: ignore[assignment]
+        lines = contract.decoy_lines or {}
+        mainline_uci = solved_player_uci or _resolve(plies[1])
         for acc_uci in accepted:
-            if acc_uci == player_uci:
+            if acc_uci == mainline_uci:
                 continue
             sub_board = chess.Board(contract.fen)
             try:
@@ -119,84 +226,9 @@ def compute_attempt_pgn(
                     break
                 sv_moves.append(dm)
             if sv_moves:
-                result.append(sv_moves)
-        return result if result else None
+                subvariations.append(sv_moves)
 
-    mainline: list[dict[str, object]] = []
-    variation: list[dict[str, object]] | None = None
-    subvariations: list[list[dict[str, object]]] | None = None
-
-    board = chess.Board(contract.fen)
-    try:
-        opp_move = _make_display_move(board, _resolve(plies[0]), "opponent")
-        if opp_move:
-            mainline.append(opp_move)
-    except ValueError:
-        return {"mainline": mainline, "variation": None, "subvariations": None}
-
-    player_positions = list(range(1, len(plies), 2))
-
-    if status == "solved":
-        for i, uci in enumerate(moves):
-            is_last = i == len(moves) - 1
-            dm = _make_display_move(board, uci, "correct")
-            if not dm:
-                break
-            mainline.append(dm)
-            if not is_last:
-                opp_idx = player_positions[i] + 1 if i < len(player_positions) else None
-                if opp_idx is not None and opp_idx < len(plies):
-                    opp = _make_display_move(board, _resolve(plies[opp_idx]), "opponent")
-                    if opp:
-                        mainline.append(opp)
-        if is_decoy:
-            player_uci = moves[0] if moves else None
-            if player_uci and contract.decoy_lines:
-                for cont_uci in contract.decoy_lines.get(player_uci, "").split()[1:]:
-                    cont_dm = _make_display_move(board, cont_uci, None)
-                    if not cont_dm:
-                        break
-                    mainline.append(cont_dm)
-            subvariations = _decoy_subvariations(player_uci)
-        return {"mainline": mainline, "variation": None, "subvariations": subvariations}
-
-    for i, uci in enumerate(moves):
-        if i >= len(player_positions):
-            break
-        expected = plies[player_positions[i]]
-        is_wrong = (uci not in expected) if isinstance(expected, list) else (uci != expected)
-        dm = _make_display_move(board, uci, "wrong" if is_wrong else "correct")
-        if not dm:
-            break
-        mainline.append(dm)
-        if is_wrong and not board.is_checkmate():
-            if is_decoy:
-                subvariations = _decoy_subvariations(uci)
-            else:
-                var_board = chess.Board(contract.fen)
-                try:
-                    var_board.push_uci(_resolve(plies[0]))
-                    for j in range(i):
-                        var_board.push_uci(moves[j])
-                        if player_positions[j] + 1 < len(plies):
-                            var_board.push_uci(_resolve(plies[player_positions[j] + 1]))
-                except ValueError:
-                    break
-                variation = []
-                var_idx = player_positions[i]
-                for k in range(var_idx, len(plies)):
-                    vdm = _make_display_move(
-                        var_board,
-                        _resolve(plies[k]),
-                        "correct" if k % 2 == 1 else "opponent",
-                    )
-                    if not vdm:
-                        break
-                    variation.append(vdm)
-            break
-        if i + 1 < len(moves) and player_positions[i] + 1 < len(plies):
-            opp = _make_display_move(board, _resolve(plies[player_positions[i] + 1]), "opponent")
-            if opp:
-                mainline.append(opp)
-
-    return {"mainline": mainline, "variation": variation, "subvariations": subvariations}
+    return {
+        "mainline": mainline,
+        "subvariations": subvariations if subvariations else None,
+    }

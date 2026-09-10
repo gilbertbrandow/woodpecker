@@ -11,7 +11,7 @@ from app.models.subset import Subset
 from app.models.training import Training
 from app.models.user import User
 from app.services.attempt_state import attempt_type_fields
-from app.services.chess_board import compute_attempt_board, compute_attempt_pgn
+from app.services.chess_board import build_pgn, compute_attempt_board
 from app.services.schedule_config import ScheduleConfig
 from app.services.training_item_content import get_content
 from app.services.user_ref import user_ref
@@ -188,11 +188,14 @@ def get_spectate_view(training_item_id: int, attempt_id: int, user_id: int) -> d
         raise NotFoundError("Attempt not found", "The requested attempt is still in progress.")
 
     payload = get_content(training_item_id)
-    attempt_moves = attempt.moves if isinstance(attempt.moves, list) else []
+    raw = attempt.moves if isinstance(attempt.moves, list) else []
+    attempt_moves: list[list[str]] = (
+        raw if (raw and isinstance(raw[0], list)) else ([raw] if raw else [])
+    )
 
     return {
         "attemptId": attempt.id,
         "timeSpentMs": attempt.time_spent_ms,
         "board": compute_attempt_board(payload.contract, attempt.status, attempt_moves),
-        "pgnDisplay": compute_attempt_pgn(payload.contract, attempt.status, attempt_moves),
+        "pgn": build_pgn(payload.contract, attempt_moves),
     }
