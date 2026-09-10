@@ -1,20 +1,21 @@
 import { useState, useMemo, useEffect } from 'react'
-import type { RunTrainingItemAttemptView, TrainingItemMetaPgnDisplay, OverviewAttemptView } from '../../lib/api'
-import { buildPgnDisplay } from './boardPage.helpers'
-import type { Mode, PlySelection } from './boardPage.helpers'
+import type { RunTrainingItemAttemptView, RunTrainingItemOverview, TrainingItemMetaPgnDisplay } from '../../lib/api'
+import { buildFocusPgnDisplay, buildLiveSolvingPgnDisplay } from './boardPage.helpers'
+import type { Mode, PlySelection, FailedModeWrongMove } from './boardPage.helpers'
 
 type UsePgnNavigationParams = {
   mode: Mode
   solvingView: RunTrainingItemAttemptView | null
   session: {
-    movesPlayed: string[]
     allPliesPlayed: string[]
+    movesPlayed: string[]
     failedRetryPlies: string[]
+    failedModeWrongMoves: FailedModeWrongMove[]
     liveFocusStatus: 'in_progress' | 'solved' | 'failed'
   }
-  selectedAttempt: OverviewAttemptView | null
+  overview: RunTrainingItemOverview | null
   boardKey: number
-  // When spectating another user's attempt, pass their pgnDisplay here so that
+  // When spectating another user's attempt, pass their pgn here so that
   // selectedPly auto-selection and navigation operate on the correct PGN.
   overviewPgnDisplayOverride?: TrainingItemMetaPgnDisplay | null
 }
@@ -30,7 +31,7 @@ export function usePgnNavigation({
   mode,
   solvingView,
   session,
-  selectedAttempt,
+  overview,
   boardKey,
   overviewPgnDisplayOverride,
 }: UsePgnNavigationParams): PgnNavigationResult {
@@ -41,28 +42,52 @@ export function usePgnNavigation({
   }, [boardKey])
 
   const focusPgnDisplay = useMemo((): TrainingItemMetaPgnDisplay | null => {
-    if (mode !== 'focus' && mode !== 'failed') return null
+    if (mode !== 'focus') return null
     if (!solvingView) return null
-    const moves =
-      mode === 'focus' && session.liveFocusStatus === 'in_progress'
-        ? session.allPliesPlayed
-        : session.movesPlayed
-    return buildPgnDisplay(
+    // While in_progress: plain correct-moves display.
+    // Once liveFocusStatus is 'failed' (wrong move played, board reverting):
+    // show the wrong move immediately as a provisional mainline entry with ??.
+    if (session.liveFocusStatus !== 'failed') {
+      return buildFocusPgnDisplay(solvingView.trainingItem.fen, session.allPliesPlayed)
+    }
+    const firstWrongMove = session.movesPlayed[session.movesPlayed.length - 1]
+    if (!firstWrongMove) return buildFocusPgnDisplay(solvingView.trainingItem.fen, session.allPliesPlayed)
+    return buildLiveSolvingPgnDisplay(
       solvingView.trainingItem.fen,
-      moves,
-      solvingView.trainingItem.solution,
-      mode === 'failed' ? 'failed' : session.liveFocusStatus,
-      mode === 'failed' ? session.failedRetryPlies : undefined,
-      false,
+      session.allPliesPlayed,
+      firstWrongMove,
+      [],
+      [],
+    )
+  }, [mode, solvingView, session])
+
+  // In failed (retry) mode, build a live PGN from the retry session.
+  // W1 (session.movesPlayed[session.movesPlayed.length - 1]) holds the provisional mainline slot until
+  // the correct move is played; subsequent wrong moves become subvariations.
+  const failedFocusPgnDisplay = useMemo((): TrainingItemMetaPgnDisplay | null => {
+    if (mode !== 'failed') return null
+    if (!solvingView) return null
+    const firstWrongMove = session.movesPlayed[session.movesPlayed.length - 1]
+    if (!firstWrongMove) return null
+    return buildLiveSolvingPgnDisplay(
+      solvingView.trainingItem.fen,
+      session.allPliesPlayed,
+      firstWrongMove,
+      session.failedRetryPlies,
+      session.failedModeWrongMoves,
     )
   }, [mode, solvingView, session])
 
   const overviewPgnDisplay: TrainingItemMetaPgnDisplay | null =
     overviewPgnDisplayOverride !== undefined
       ? overviewPgnDisplayOverride
-      : (selectedAttempt?.pgnDisplay ?? null)
+      : (overview?.pgn ?? null)
 
-  const pgnDisplay = mode === 'overview' ? overviewPgnDisplay : focusPgnDisplay
+  const pgnDisplay = mode === 'overview'
+    ? overviewPgnDisplay
+    : mode === 'failed'
+      ? failedFocusPgnDisplay
+      : focusPgnDisplay
 
   useEffect(() => {
     if (mode !== 'overview') return
@@ -70,29 +95,12 @@ export function usePgnNavigation({
       setSelectedPly(null)
       return
     }
-    const lastMove = overviewPgnDisplay.mainline[overviewPgnDisplay.mainline.length - 1]
-    if (lastMove.moveStatus === 'wrong') {
-      if (overviewPgnDisplay.variation && overviewPgnDisplay.variation.length > 0) {
-        setSelectedPly({ line: 'variation', index: overviewPgnDisplay.variation.length - 1 })
-      } else if (overviewPgnDisplay.subvariations && overviewPgnDisplay.subvariations.length > 0) {
-        // Decoy failed: subvariations hold each accepted move's line.
-        // Prefer the one matching the retry move the user actually played; fall back to the first.
-        const retryUci = session.failedRetryPlies[0] ?? null
-        const matchIdx = retryUci !== null
-          ? overviewPgnDisplay.subvariations.findIndex(sv => sv.length > 0 && sv[0].uci === retryUci)
-          : -1
-        setSelectedPly({ line: 'subvariation', subIndex: matchIdx >= 0 ? matchIdx : 0, index: 0 })
-      } else {
-        setSelectedPly(null)
-      }
-      return
-    }
     let targetIndex = overviewPgnDisplay.mainline.length - 1
     while (targetIndex > 0 && overviewPgnDisplay.mainline[targetIndex].moveStatus === null) {
       targetIndex--
     }
     setSelectedPly({ line: 'main', index: targetIndex })
-  }, [overviewPgnDisplay, mode, session.failedRetryPlies])
+  }, [overviewPgnDisplay, mode, overview])
 
   const isAtHead =
     selectedPly === null ||

@@ -182,7 +182,7 @@ export function formatTimeRemaining(ms: number): string {
 }
 
 export type PlySelection =
-  | { line: 'main' | 'variation'; index: number }
+  | { line: 'main'; index: number }
   | { line: 'subvariation'; subIndex: number; index: number }
 
 function applyUciDisplay(
@@ -214,110 +214,93 @@ function applyUciDisplay(
   }
 }
 
-export function buildPgnDisplay(
+// Builds a minimal PGN display for focus mode from the interleaved plies
+// played so far (opponent move at index 0, then player and opponent alternating).
+// The backend owns the full aggregate PGN; this is only for live focus display.
+export function buildFocusPgnDisplay(
   baseFen: string,
-  attemptMoves: string[],
-  plies: (string | string[])[],
-  attemptStatus: 'solved' | 'failed' | 'in_progress',
-  retryPlies: string[] = [],
-  autoVariation: boolean = true,
+  plies: string[],
 ): TrainingItemMetaPgnDisplay {
-  const solutionMoves = plies.map(resolveStep)
-  if (solutionMoves.length === 0) return { mainline: [], variation: null, subvariations: null }
-
-  if (attemptStatus === 'in_progress') {
-    const chess = new Chess(baseFen)
-    const mainline: DisplayMove[] = []
-    const firstOpponent = applyUciDisplay(chess, solutionMoves[0], 'opponent')
-    if (!firstOpponent) return { mainline, variation: null, subvariations: null }
-    mainline.push(firstOpponent)
-    // allPliesPlayed[0] is the same opponent move; skip it to avoid duplication
-    for (const uci of attemptMoves.slice(1)) {
-      const move = applyUciDisplay(chess, uci, null)
-      if (!move) break
-      mainline.push(move)
-    }
-    return { mainline, variation: null, subvariations: null }
-  }
-
-  if (attemptStatus === 'solved') {
-    const chess = new Chess(baseFen)
-    const mainline: DisplayMove[] = []
-    const firstOpponent = applyUciDisplay(chess, solutionMoves[0], 'opponent')
-    if (!firstOpponent) return { mainline, variation: null, subvariations: null }
-    mainline.push(firstOpponent)
-    for (let i = 0; i < attemptMoves.length; i++) {
-      const isLast = i === attemptMoves.length - 1
-      const userMove = applyUciDisplay(chess, attemptMoves[i], 'correct')
-      if (!userMove) break
-      mainline.push(userMove)
-      if (!isLast) {
-        const nextOpponentIndex = 2 * (i + 1)
-        if (nextOpponentIndex < solutionMoves.length) {
-          const oppMove = applyUciDisplay(chess, solutionMoves[nextOpponentIndex], 'opponent')
-          if (!oppMove) break
-          mainline.push(oppMove)
-        }
-      }
-    }
-    return { mainline, variation: null, subvariations: null }
-  }
-
   const chess = new Chess(baseFen)
   const mainline: DisplayMove[] = []
+  for (let i = 0; i < plies.length; i++) {
+    const moveStatus: DisplayMove['moveStatus'] = i === 0 ? 'opponent' : null
+    const move = applyUciDisplay(chess, plies[i], moveStatus)
+    if (!move) break
+    mainline.push(move)
+  }
+  return { mainline, subvariations: null }
+}
 
-  const opponentFirst = applyUciDisplay(chess, solutionMoves[0], 'opponent')
-  if (!opponentFirst) return { mainline: [], variation: null, subvariations: null }
-  mainline.push(opponentFirst)
+export type FailedModeWrongMove = {
+  uci: string
+  // Snapshot of failedRetryPlies at the time this wrong move was played.
+  // Empty = wrong move at the same position as W1; non-empty = later position.
+  retryPliesAtWrongMove: string[]
+}
 
-  if (attemptMoves.length === 0) {
-    return { mainline, variation: null, subvariations: null }
+// Builds the live PGN during active solving after the first wrong move (W1).
+//
+// W1 occupies the mainline slot until the correct move is played at that position.
+// Subsequent wrong moves at the same position (W2, W3…) appear as subvariations
+// immediately. Once the correct move is found, W1 is demoted to the first
+// subvariation and the correct move becomes mainline. Wrong moves at later
+// positions always go directly to subvariation.
+export function buildLiveSolvingPgnDisplay(
+  baseFen: string,
+  allPliesPlayed: string[],          // correct focus prefix (opp + player), does not include W1
+  firstWrongMove: string,             // W1: the first wrong move of the entire attempt
+  failedRetryPlies: string[],         // correct retry plies; non-empty means W1 is resolved
+  failedModeWrongMoves: FailedModeWrongMove[], // W2, W3, … played in failed mode
+): TrainingItemMetaPgnDisplay {
+  const w1Resolved = failedRetryPlies.length > 0
+
+  const mainlinePlies = w1Resolved
+    ? [...allPliesPlayed, ...failedRetryPlies]
+    : [...allPliesPlayed, firstWrongMove]
+
+  const mainlineChess = new Chess(baseFen)
+  const mainline: DisplayMove[] = []
+  for (let i = 0; i < mainlinePlies.length; i++) {
+    const moveStatus: DisplayMove['moveStatus'] =
+      i === 0 ? 'opponent'
+      : !w1Resolved && i === mainlinePlies.length - 1 ? 'wrong'
+      : null
+    const move = applyUciDisplay(mainlineChess, mainlinePlies[i], moveStatus)
+    if (!move) break
+    mainline.push(move)
   }
 
-  let branchFen = chess.fen()
-  let actualFailedIdx = 0
-
-  for (let i = 0; i < attemptMoves.length; i++) {
-    actualFailedIdx = i
-    const isLastUserMove = i === attemptMoves.length - 1
-    const userStatus: DisplayMove['moveStatus'] = isLastUserMove ? 'wrong' : 'correct'
-
-    if (isLastUserMove) {
-      branchFen = chess.fen()
+  // Build a DisplayMove for a wrong move branching from a given ply prefix.
+  const makeWrongDisplay = (uci: string, prefix: string[]): DisplayMove | null => {
+    const chess = new Chess(baseFen)
+    for (const ply of prefix) {
+      try { applyUci(chess, ply) } catch { return null }
     }
-
-    const userMove = applyUciDisplay(chess, attemptMoves[i], userStatus)
-    if (!userMove) break
-    mainline.push(userMove)
-
-    const opponentIdx = 2 + i * 2
-    if (!isLastUserMove && opponentIdx < solutionMoves.length) {
-      const oppMove = applyUciDisplay(chess, solutionMoves[opponentIdx], 'opponent')
-      if (!oppMove) break
-      mainline.push(oppMove)
-    }
+    return applyUciDisplay(chess, uci, 'wrong')
   }
 
-  const variationChess = new Chess(branchFen)
-  const variation: DisplayMove[] = []
+  const subvariations: DisplayMove[][] = []
 
-  if (retryPlies.length > 0) {
-    for (const uci of retryPlies) {
-      const move = applyUciDisplay(variationChess, uci, null)
-      if (!move) break
-      variation.push(move)
-    }
-  } else if (autoVariation) {
-    const correctStartIdx = actualFailedIdx * 2 + 1
-    for (let i = correctStartIdx; i < solutionMoves.length; i++) {
-      const status: DisplayMove['moveStatus'] = i % 2 === 0 ? 'opponent' : 'correct'
-      const move = applyUciDisplay(variationChess, solutionMoves[i], status)
-      if (!move) break
-      variation.push(move)
-    }
+  // Wrong moves at W1's position. Once W1 is resolved it joins this group first.
+  if (w1Resolved) {
+    const d = makeWrongDisplay(firstWrongMove, allPliesPlayed)
+    if (d) subvariations.push([d])
+  }
+  for (const { uci, retryPliesAtWrongMove } of failedModeWrongMoves) {
+    if (retryPliesAtWrongMove.length > 0) continue
+    const d = makeWrongDisplay(uci, allPliesPlayed)
+    if (d) subvariations.push([d])
   }
 
-  return { mainline, variation: variation.length > 0 ? variation : null, subvariations: null }
+  // Wrong moves at later positions (P2+).
+  for (const { uci, retryPliesAtWrongMove } of failedModeWrongMoves) {
+    if (retryPliesAtWrongMove.length === 0) continue
+    const d = makeWrongDisplay(uci, [...allPliesPlayed, ...retryPliesAtWrongMove])
+    if (d) subvariations.push([d])
+  }
+
+  return { mainline, subvariations: subvariations.length > 0 ? subvariations : null }
 }
 
 export function resolveDisplayBoard(
@@ -335,11 +318,7 @@ export function resolveDisplayBoard(
       if (selectedPly.line === 'subvariation') {
         ply = overviewPgnDisplay.subvariations?.[selectedPly.subIndex]?.[selectedPly.index]
       } else {
-        const plyList =
-          selectedPly.line === 'main'
-            ? overviewPgnDisplay.mainline
-            : (overviewPgnDisplay.variation ?? [])
-        ply = plyList[selectedPly.index]
+        ply = overviewPgnDisplay.mainline[selectedPly.index]
       }
       if (ply) {
         const feedbackResult: MoveFeedbackResult | null =
@@ -375,9 +354,7 @@ export function resolveDisplayBoard(
   const isAtHeadPly =
     selectedPly.line === 'main' && selectedPly.index === focusPgnDisplay.mainline.length - 1
   if (isAtHeadPly) return board
-  const plyList =
-    selectedPly.line === 'main' ? focusPgnDisplay.mainline : (focusPgnDisplay.variation ?? [])
-  const ply = plyList[selectedPly.index]
+  const ply = focusPgnDisplay.mainline[selectedPly.index]
   if (!ply) return board
   const feedbackResult: MoveFeedbackResult | null =
     ply.moveStatus === 'correct' ? 'correct' : ply.moveStatus === 'wrong' ? 'wrong' : null

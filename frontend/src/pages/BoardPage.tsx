@@ -187,9 +187,9 @@ export function BoardPage(): React.ReactElement | null {
     mode: ctrl.mode,
     solvingView: ctrl.solvingView,
     session: ctrl.session,
-    selectedAttempt,
+    overview: ctrl.overview.data,
     boardKey: ctrl.board.boardKey,
-    overviewPgnDisplayOverride: spectateState?.view.pgnDisplay,
+    overviewPgnDisplayOverride: spectateState?.view.pgn,
   })
 
   const pgnDisplayRef = React.useRef<TrainingItemMetaPgnDisplay | null>(null)
@@ -204,8 +204,7 @@ export function BoardPage(): React.ReactElement | null {
     if (ply.line === 'subvariation') {
       san = pgn.subvariations?.[ply.subIndex]?.[ply.index]?.san
     } else {
-      const list = ply.line === 'main' ? pgn.mainline : (pgn.variation ?? [])
-      san = list[ply.index]?.san
+      san = pgn.mainline[ply.index]?.san
     }
     if (!san) return
     for (const event of sanToSoundEvents(san)) {
@@ -213,8 +212,8 @@ export function BoardPage(): React.ReactElement | null {
     }
   }, [setSelectedPly, playSound])
 
-  const overviewPgnDisplay = ctrl.mode === 'overview'
-    ? (spectateState?.view.pgnDisplay ?? selectedAttempt?.pgnDisplay ?? null)
+  const overviewPgnDisplay = (ctrl.mode === 'overview' || ctrl.mode === 'failed')
+    ? (spectateState?.view.pgn ?? ctrl.overview.data?.pgn ?? null)
     : null
 
   const baseDisplayBoard = React.useMemo(
@@ -223,7 +222,7 @@ export function BoardPage(): React.ReactElement | null {
         ctrl.board,
         ctrl.mode,
         selectedPly,
-        ctrl.mode !== 'overview' ? pgnDisplay : null,
+        ctrl.mode === 'focus' ? pgnDisplay : null,
         selectedAttempt,
         overviewPgnDisplay,
       ),

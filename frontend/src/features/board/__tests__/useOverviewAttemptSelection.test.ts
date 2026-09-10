@@ -10,7 +10,7 @@ function makeAttempt(id: number, runId: number, runTrainingItemId: number, statu
     moves: [], attemptType: 'scored', isQualifying: false,
     countsTowardsTraining: true, countsTowardsProgress: true,
     countsTowardsAccuracy: true, countsTowardsAverageTime: true,
-    board: null, pgnDisplay: null,
+    board: null,
     impact: { runProgressDeltaPct: null, trainingProgressDeltaPct: null, accuracyDeltaPct: null, averageSolveTimeDeltaMs: null },
   }
 }
@@ -24,6 +24,7 @@ function makeOverviewData(attempts: OverviewAttemptView[], selectedAttemptId: nu
     },
     trainingItem: { fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', solution: ['e2e4'], source: { sourceType: 'SCRAPED_POSITIONAL', internalId: 1, lichessUrl: 'https://lichess.org/training/1', difficulty: { value: 1, label: 'Easy', minRating: null, maxRating: null }, themes: [], opening: null } },
     selectedAttemptId,
+    pgn: null,
     attempts,
     runPace: { chartData: null, isRunActive: true },
     accuracyChart: { points: [], totalItems: 0, targetAccuracy: null },
