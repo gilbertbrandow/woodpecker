@@ -1,3 +1,5 @@
+from typing import NamedTuple
+
 import chess
 
 from app.services.solve_contract import SolveContract
@@ -5,6 +7,66 @@ from app.services.solve_contract import SolveContract
 
 def _resolve(ply: str | list[str]) -> str:
     return ply if isinstance(ply, str) else ply[0]
+
+
+class _ContractStep(NamedTuple):
+    fen_before: str
+    uci: str
+    fen_after: str
+    is_player: bool
+    correct: bool  # always True for opponent steps; True/False for player steps
+
+
+def _walk_contract(
+    contract: SolveContract,
+    player_moves: list[str],
+) -> list[_ContractStep]:
+    """Walk a SolveContract interleaved with player moves.
+
+    Returns one _ContractStep per ply pushed: the opponent's first move, then
+    alternating player and opponent moves. Stops at (and includes) the first
+    wrong player move. Opponent steps always have correct=True.
+    A checkmate move is always treated as correct regardless of the expected ply.
+    """
+    plies = contract.plies
+    player_positions = list(range(1, len(plies), 2))
+    board = chess.Board(contract.fen)
+    result: list[_ContractStep] = []
+
+    opp_uci = _resolve(plies[0])
+    fen_before = board.fen()
+    try:
+        board.push_uci(opp_uci)
+    except ValueError:
+        return result
+    result.append(_ContractStep(fen_before, opp_uci, board.fen(), is_player=False, correct=True))
+
+    for i, uci in enumerate(player_moves):
+        if i >= len(player_positions):
+            break
+        expected = plies[player_positions[i]]
+        is_correct_move = uci in expected if isinstance(expected, list) else uci == expected
+        fen_before = board.fen()
+        try:
+            board.push_uci(uci)
+        except ValueError:
+            break
+        is_correct = is_correct_move or board.is_checkmate()
+        result.append(_ContractStep(fen_before, uci, board.fen(), is_player=True, correct=is_correct))
+        if not is_correct:
+            break
+
+        opp_idx = player_positions[i] + 1
+        if opp_idx < len(plies) and i + 1 < len(player_moves):
+            opp_uci = _resolve(plies[opp_idx])
+            fen_before = board.fen()
+            try:
+                board.push_uci(opp_uci)
+            except ValueError:
+                break
+            result.append(_ContractStep(fen_before, opp_uci, board.fen(), is_player=False, correct=True))
+
+    return result
 
 
 def compute_attempt_board(
@@ -15,55 +77,33 @@ def compute_attempt_board(
     if status == "in_progress":
         return None
 
-    # Use the first variation for the terminal board position.
     flat = moves[0] if moves else []
-
-    plies = contract.plies
-    board = chess.Board(contract.fen)
+    steps = _walk_contract(contract, flat)
 
     if status == "solved":
-        try:
-            board.push_uci(_resolve(plies[0]))
-            for player_idx, uci in enumerate(flat):
-                board.push_uci(uci)
-                is_last_user = player_idx + 1 >= len(flat)
-                opponent_idx = player_idx * 2 + 2
-                if not is_last_user and opponent_idx < len(plies):
-                    board.push_uci(_resolve(plies[opponent_idx]))
-        except ValueError:
-            pass
-        last_uci = flat[-1] if flat else None
-        last_move: list[str] | None = [last_uci[:2], last_uci[2:4]] if last_uci else None
+        last_player = next((s for s in reversed(steps) if s.is_player), None)
+        if last_player:
+            return {
+                "terminalFen": last_player.fen_after,
+                "lastMove": [last_player.uci[:2], last_player.uci[2:4]],
+                "result": "correct",
+            }
+        last = steps[-1] if steps else None
         return {
-            "terminalFen": board.fen(),
-            "lastMove": last_move,
+            "terminalFen": last.fen_after if last else None,
+            "lastMove": None,
             "result": "correct",
         }
 
-    try:
-        board.push_uci(_resolve(plies[0]))
-        player_positions = list(range(1, len(plies), 2))
-        for i, uci in enumerate(flat):
-            if i >= len(player_positions):
-                break
-            expected = plies[player_positions[i]]
-            board.push_uci(uci)
-            is_correct = (
-                uci in expected if isinstance(expected, list) else uci == expected
-            )
-            if not is_correct and not board.is_checkmate():
-                last_move = [uci[:2], uci[2:4]]
-                return {
-                    "terminalFen": board.fen(),
-                    "lastMove": last_move,
-                    "result": "wrong",
-                }
-            if i + 1 < len(flat) and player_positions[i] + 1 < len(plies):
-                board.push_uci(_resolve(plies[player_positions[i] + 1]))
-    except ValueError:
-        pass
-
-    return {"terminalFen": None, "lastMove": None, "result": None}
+    # status == "failed"
+    wrong = next((s for s in steps if s.is_player and not s.correct), None)
+    if wrong is None:
+        return {"terminalFen": None, "lastMove": None, "result": None}
+    return {
+        "terminalFen": wrong.fen_after,
+        "lastMove": [wrong.uci[:2], wrong.uci[2:4]],
+        "result": "wrong",
+    }
 
 
 def build_pgn(
@@ -80,10 +120,6 @@ def build_pgn(
     accepted move the user actually solved with, falling back to plies[1][0]).
     Subvariations: one entry per failed Variation (single wrong move with ??).
     For Decoy puzzles, other accepted moves also appear as correct subvariations.
-
-    Extensibility note: future callers may pass additional keyword arguments
-    such as a game_prefix (moves before the training position) to produce a
-    full-game display that embeds the training excerpt in context.
     """
     plies = contract.plies
     is_decoy = contract.is_decoy
@@ -114,7 +150,6 @@ def build_pgn(
 
     # ── Determine the canonical player move for the mainline ──────────────────
 
-    # For Decoy: find the accepted move the user played when they solved.
     solved_player_uci: str | None = None
     if is_decoy:
         accepted: list[str] = plies[1]  # type: ignore[assignment]
@@ -142,7 +177,6 @@ def build_pgn(
         player_dm = _make_display_move(board, canonical_uci, "correct")
         if player_dm:
             mainline.append(player_dm)
-        # Append decoy continuation line after the accepted move.
         lines = contract.decoy_lines or {}
         for cont_uci in lines.get(canonical_uci, "").split()[1:]:
             cont_dm = _make_display_move(board, cont_uci, None)
@@ -163,46 +197,21 @@ def build_pgn(
                     break
                 mainline.append(opp_dm)
 
-    # ── Build subvariations ───────────────────────────────────────────────────
+    # ── Build subvariations (wrong-move entries) ──────────────────────────────
 
     subvariations: list[list[dict[str, object]]] = []
 
-    # Wrong-move subvariations (one per failed Variation).
-    player_positions = list(range(1, len(plies), 2))
     for variation in moves:
         if not variation:
             continue
-        # Walk through the variation to find the first wrong player move.
-        var_board = chess.Board(contract.fen)
-        try:
-            var_board.push_uci(_resolve(plies[0]))
-        except ValueError:
+        steps = _walk_contract(contract, variation)
+        wrong = next((s for s in steps if s.is_player and not s.correct), None)
+        if wrong is None:
             continue
-
-        for i, uci in enumerate(variation):
-            if i >= len(player_positions):
-                break
-            expected = plies[player_positions[i]]
-            is_correct = (
-                uci in expected if isinstance(expected, list) else uci == expected
-            )
-            if not is_correct:
-                # This is the wrong move — emit it as a ?? subvariation.
-                sv_dm = _make_display_move(var_board, uci, "wrong")
-                if sv_dm:
-                    subvariations.append([sv_dm])
-                break
-            # Correct so far — advance the board and continue.
-            try:
-                var_board.push_uci(uci)
-            except ValueError:
-                break
-            opp_idx = player_positions[i] + 1
-            if opp_idx < len(plies) and i + 1 < len(variation):
-                try:
-                    var_board.push_uci(_resolve(plies[opp_idx]))
-                except ValueError:
-                    break
+        wrong_board = chess.Board(wrong.fen_before)
+        sv_dm = _make_display_move(wrong_board, wrong.uci, "wrong")
+        if sv_dm:
+            subvariations.append([sv_dm])
 
     # For Decoy: append other accepted moves as correct subvariations.
     if is_decoy:

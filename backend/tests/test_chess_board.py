@@ -76,7 +76,8 @@ def test_pgn_multi_move_solution_solved() -> None:
 
 
 def test_pgn_multiple_failed_variations() -> None:
-    result = build_pgn(FOUR_PLY, [["d7d6"], ["d7d5", "d8d4"]])
+    # Second variation: correct first move then wrong second move (Qd7 instead of Qxd5).
+    result = build_pgn(FOUR_PLY, [["d7d6"], ["d7d5", "d8d7"]])
     assert result is not None
     subvariations = result["subvariations"]
     assert isinstance(subvariations, list)
