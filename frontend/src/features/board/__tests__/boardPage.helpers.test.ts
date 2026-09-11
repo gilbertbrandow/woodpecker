@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { Chess } from 'chess.js'
-import { buildFocusPgnDisplay, computeFinalFen, resolveOverviewBoardPosition, resolveStep, resultsInCheckmate } from '../boardPage.helpers'
+import { buildLivePgnDisplay, computeFinalFen, resolveOverviewBoardPosition, resolveStep, resultsInCheckmate } from '../boardPage.helpers'
 
 describe('resultsInCheckmate', () => {
   it('returns true when the move results in checkmate', () => {
@@ -20,16 +20,16 @@ describe('resultsInCheckmate', () => {
   })
 })
 
-describe('buildFocusPgnDisplay', () => {
-  // 4-ply puzzle on standard starting position:
-  //   opponent (white): e2e4
-  //   player  (black): d7d5
-  //   opponent (white): e4xd5
-  //   player  (black): Qxd5
-  const FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-  const FIRST_PLY = 'e2e4'
-  const PLAYER_MOVE_1 = 'd7d5'
+// 4-ply puzzle: opponent (white) e2e4, player (black) d7d5, opponent e4xd5, player Qxd5.
+const FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+const OPP_MOVE = 'e2e4'
+const PLAYER_MOVE_1 = 'd7d5'
+const OPP_MOVE_2 = 'e4d5'
 
+const WRONG_MOVE_1 = 'd7d6'   // wrong at position 1 (same square as PLAYER_MOVE_1)
+const WRONG_MOVE_2 = 'd8d7'   // wrong at position 2 (after correct PLAYER_MOVE_1 + OPP_MOVE_2)
+
+describe('buildLivePgnDisplay — focus mode (no wrong move)', () => {
   beforeAll(() => {
     const chess = new Chess(FEN)
     const e4 = chess.move({ from: 'e2', to: 'e4' })
@@ -39,21 +39,21 @@ describe('buildFocusPgnDisplay', () => {
   })
 
   it('returns empty mainline when no plies have been played', () => {
-    const result = buildFocusPgnDisplay(FEN, [])
+    const result = buildLivePgnDisplay(FEN, [])
     expect(result.mainline).toHaveLength(0)
     expect(result.subvariations).toBeNull()
   })
 
   it('shows opponent move when only the first ply has been played', () => {
-    const result = buildFocusPgnDisplay(FEN, [FIRST_PLY])
+    const result = buildLivePgnDisplay(FEN, [OPP_MOVE])
     expect(result.mainline).toHaveLength(1)
     expect(result.mainline[0].moveStatus).toBe('opponent')
-    expect(result.mainline[0].uci).toBe(FIRST_PLY)
+    expect(result.mainline[0].uci).toBe(OPP_MOVE)
     expect(result.subvariations).toBeNull()
   })
 
   it('shows opponent then player move with null status for player move', () => {
-    const result = buildFocusPgnDisplay(FEN, [FIRST_PLY, PLAYER_MOVE_1])
+    const result = buildLivePgnDisplay(FEN, [OPP_MOVE, PLAYER_MOVE_1])
     expect(result.mainline).toHaveLength(2)
     expect(result.mainline[0].moveStatus).toBe('opponent')
     expect(result.mainline[1].moveStatus).toBeNull()
@@ -62,7 +62,67 @@ describe('buildFocusPgnDisplay', () => {
   })
 })
 
-// Reuse the same 4-ply position from the buildPgnDisplay suite above.
+describe('buildLivePgnDisplay — W1 unresolved (wrong move in mainline)', () => {
+  it('places W1 as the last mainline move with wrong status', () => {
+    const result = buildLivePgnDisplay(FEN, [OPP_MOVE], WRONG_MOVE_1)
+    expect(result.mainline).toHaveLength(2)
+    expect(result.mainline[0].moveStatus).toBe('opponent')
+    expect(result.mainline[1].uci).toBe(WRONG_MOVE_1)
+    expect(result.mainline[1].moveStatus).toBe('wrong')
+    expect(result.subvariations).toBeNull()
+  })
+})
+
+describe('buildLivePgnDisplay — W1 resolved (correct move found after W1)', () => {
+  it('demotes W1 to first subvariation and puts correct move in mainline', () => {
+    const result = buildLivePgnDisplay(FEN, [OPP_MOVE], WRONG_MOVE_1, [PLAYER_MOVE_1])
+    // Mainline: opp e4, then correct d5 (null status, not yet marked correct by backend)
+    expect(result.mainline).toHaveLength(2)
+    expect(result.mainline[0].moveStatus).toBe('opponent')
+    expect(result.mainline[1].uci).toBe(PLAYER_MOVE_1)
+    expect(result.mainline[1].moveStatus).toBeNull()
+    // W1 demoted to first subvariation
+    expect(result.subvariations).toHaveLength(1)
+    expect(result.subvariations![0][0].uci).toBe(WRONG_MOVE_1)
+    expect(result.subvariations![0][0].moveStatus).toBe('wrong')
+  })
+
+  it('W2 at the same position as W1 also goes to subvariations', () => {
+    const WRONG_MOVE_1B = 'c7c5'
+    const result = buildLivePgnDisplay(
+      FEN,
+      [OPP_MOVE],
+      WRONG_MOVE_1,
+      [PLAYER_MOVE_1],
+      [{ uci: WRONG_MOVE_1B, retryPliesAtWrongMove: [] }],
+    )
+    expect(result.subvariations).toHaveLength(2)
+    expect(result.subvariations![0][0].uci).toBe(WRONG_MOVE_1)
+    expect(result.subvariations![1][0].uci).toBe(WRONG_MOVE_1B)
+  })
+})
+
+describe('buildLivePgnDisplay — wrong move at a later position (P2)', () => {
+  it('puts a wrong move at P2 directly into subvariations', () => {
+    // Player got P1 right (d7d5), opponent responded (e4xd5), now wrong at P2.
+    const retryPlies = [PLAYER_MOVE_1, OPP_MOVE_2]
+    const result = buildLivePgnDisplay(
+      FEN,
+      [OPP_MOVE],
+      WRONG_MOVE_1,
+      retryPlies,
+      [{ uci: WRONG_MOVE_2, retryPliesAtWrongMove: [PLAYER_MOVE_1, OPP_MOVE_2] }],
+    )
+    // Mainline: opp e4, d5 (W1 resolved), opp exd5, Qd7 (the wrong P2 move is in subs)
+    expect(result.mainline.length).toBeGreaterThanOrEqual(2)
+    // W1 in first subvariation
+    expect(result.subvariations).not.toBeNull()
+    const wrongAtP2 = result.subvariations!.find(sv => sv[0].uci === WRONG_MOVE_2)
+    expect(wrongAtP2).toBeDefined()
+    expect(wrongAtP2![0].moveStatus).toBe('wrong')
+  })
+})
+
 const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 const SOLUTION_MOVES: (string | string[])[] = ['e2e4', 'd7d5', 'e4d5', 'd8d5']
 
@@ -73,7 +133,6 @@ describe('computeFinalFen', () => {
 
   it('returns the correct terminal FEN after applying all solution moves', () => {
     const terminal = computeFinalFen(INITIAL_FEN, SOLUTION_MOVES)
-    // Verify by replaying manually with chess.js
     const chess = new Chess(INITIAL_FEN)
     chess.move({ from: 'e2', to: 'e4' })
     chess.move({ from: 'd7', to: 'd5' })

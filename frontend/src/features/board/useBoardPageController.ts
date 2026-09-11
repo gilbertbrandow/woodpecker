@@ -609,7 +609,13 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
         const failedAttemptId = latestResolvedAttemptIdRef.current
         const rtiId = currentRunTrainingItemIdRef.current
         if (failedAttemptId !== null) {
-          appendVariationPromise = api.attempts.appendVariation(runId, rtiId, failedAttemptId, failedUserMovesRef.current).catch(() => {})
+          appendVariationPromise = api.attempts.appendVariation(runId, rtiId, failedAttemptId, failedUserMovesRef.current)
+            .then(() => api.runs.getOverview(runId, rtiId, failedAttemptId))
+            .then(({ overview: refreshed }) => {
+              setOverview(refreshed)
+              cachedOverviewPuzzleRef.current = refreshed
+            })
+            .catch(() => {})
         }
       }
       scheduleTimeout(() => {
