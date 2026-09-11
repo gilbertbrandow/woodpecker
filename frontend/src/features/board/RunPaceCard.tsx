@@ -186,8 +186,8 @@ export function RunPaceCard({ chartData, runProgress, trainingProgress = null, s
   return (
     <div className={`flex flex-col gap-2 rounded-lg border bg-card p-4${stretch ? ' flex-1 min-h-0' : ''}`}>
       <div>
-        <span className="font-medium">Run pace</span>
-        <p className="text-xs text-muted-foreground">Actual vs required pace</p>
+        <span className="font-medium">Pace</span>
+        <p className="text-xs text-muted-foreground">Actual & scheduled progress</p>
       </div>
 
       {!mounted || chartData === null ? (

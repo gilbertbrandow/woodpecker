@@ -106,6 +106,22 @@ def get_attempt(
     return jsonify(result)
 
 
+@runs_bp.post("/<int:run_id>/training-items/<int:run_training_item_id>/attempts/<int:attempt_id>/variations")
+@login_required
+def append_variation(
+    run_id: int, run_training_item_id: int, attempt_id: int
+) -> tuple[Response, int] | Response:
+    data: dict[str, object] = request.get_json(silent=True) or {}
+    uci_moves_raw = data.get("uciMoves")
+
+    if not isinstance(uci_moves_raw, list) or not all(isinstance(m, str) for m in uci_moves_raw):
+        return jsonify({"error": "uciMoves must be an array of strings"}), 400
+
+    uci_moves: list[str] = [str(m) for m in uci_moves_raw]
+    run_svc.append_variation(attempt_id, session["user_id"], run_id, run_training_item_id, uci_moves)
+    return jsonify({}), 200
+
+
 @runs_bp.get("/<int:run_id>/training-items/<int:training_item_id>/history")
 @login_required
 def get_training_item_history(run_id: int, training_item_id: int) -> tuple[Response, int] | Response:

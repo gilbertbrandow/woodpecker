@@ -21,7 +21,7 @@ from app.services.attempt_state import (
     derive_position_status,
     qualifying_attempt_id,
 )
-from app.services.chess_board import compute_attempt_board, compute_attempt_pgn
+from app.services.chess_board import build_pgn, compute_attempt_board
 from app.services.schedule_config import ScheduleConfig
 from app.services.solve_contract import SolveContract
 from app.services.training_item_content import (
@@ -1342,7 +1342,10 @@ def _overview_attempt_view(
         attempt, qualifying_attempt_id, total_run_puzzles, total_queue, training_id
     )
 
-    attempt_moves = attempt.moves if isinstance(attempt.moves, list) else []
+    raw = attempt.moves if isinstance(attempt.moves, list) else []
+    attempt_moves: list[list[str]] = (
+        raw if (raw and isinstance(raw[0], list)) else ([raw] if raw else [])
+    )
     return {
         "id": attempt.id,
         "runId": run.id,
@@ -1361,7 +1364,6 @@ def _overview_attempt_view(
         "countsTowardsAccuracy": type_data["countsTowardsAccuracy"],
         "countsTowardsAverageTime": type_data["countsTowardsAverageTime"],
         "board": compute_attempt_board(contract, attempt.status, attempt_moves),
-        "pgnDisplay": compute_attempt_pgn(contract, attempt.status, attempt_moves),
         "impact": impact,
     }
 
@@ -1596,6 +1598,15 @@ def _build_run_puzzle_overview(
                 run_progress_delta_pct = cast(float | None, impact.get("runProgressDeltaPct"))
                 break
 
+    selected_attempt = next(
+        (a for a in sorted_attempts if a.id == resolved_selected_id), None
+    )
+    raw_selected = selected_attempt.moves if selected_attempt is not None and isinstance(selected_attempt.moves, list) else []
+    selected_moves: list[list[str]] = (
+        raw_selected if (raw_selected and isinstance(raw_selected[0], list)) else ([raw_selected] if raw_selected else [])
+    )
+    pgn_display = build_pgn(payload.contract, selected_moves)
+
     position_status = derive_position_status(run_puzzle.attempts, total_queue)
     position_resolved = position_status in ("solved", "solved_with_retries", "failed")
     tries_in_window = sum(1 for a in sorted_attempts if a.try_number <= total_queue)
@@ -1632,6 +1643,7 @@ def _build_run_puzzle_overview(
             "source": payload.metadata.to_api_dict(),
         },
         "selectedAttemptId": resolved_selected_id,
+        "pgn": pgn_display,
         "attempts": attempt_views,
         "runPace": {
             "chartData": _pace_chart_data(run, total_run_puzzles, terminal_timestamps, config, tz),
@@ -1730,7 +1742,7 @@ def complete_attempt(
         attempt.time_spent_ms = client_time_spent_ms
     else:
         attempt.time_spent_ms = int((now - attempt.started_at).total_seconds() * 1000)
-    attempt.moves = uci_moves
+    attempt.moves = [uci_moves]
 
     position_status = derive_position_status(run_puzzle.attempts, total_queue)
     position_resolved = position_status in ("solved", "solved_with_retries", "failed")
@@ -1766,6 +1778,28 @@ def complete_attempt(
         "runCompletedByThisAttempt": run_just_completed,
         "overview": overview,
     }
+
+
+def append_variation(
+    attempt_id: int,
+    user_id: int,
+    run_id: int,
+    run_puzzle_id: int,
+    uci_moves: list[str],
+) -> None:
+    attempt, run_puzzle, run = _get_owned_attempt(attempt_id, user_id)
+
+    if run.id != run_id or run_puzzle.id != run_puzzle_id:
+        raise NotFoundError("Attempt not found", "The requested attempt does not exist.")
+
+    if attempt.status not in ("failed", "solved"):
+        raise ConflictError("Attempt not completed", "Variations can only be appended to a completed attempt.")
+
+    existing = attempt.moves if isinstance(attempt.moves, list) else []
+    if uci_moves in existing:
+        return
+    attempt.moves = existing + [uci_moves]
+    db.session.commit()
 
 
 def get_training_item_history(run_id: int, training_item_id: int, user_id: int) -> dict[str, object]:

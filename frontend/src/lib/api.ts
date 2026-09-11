@@ -802,7 +802,6 @@ export type DisplayMove = {
 
 export type TrainingItemMetaPgnDisplay = {
   mainline: DisplayMove[]
-  variation: DisplayMove[] | null
   subvariations: DisplayMove[][] | null
 }
 
@@ -822,7 +821,7 @@ export type OverviewAttemptView = {
   startedAt: string
   completedAt: string | null
   timeSpentMs: number | null
-  moves: string[]
+  moves: string[][]
   attemptType: 'scored' | 'practice'
   isQualifying: boolean
   countsTowardsTraining: boolean
@@ -830,7 +829,6 @@ export type OverviewAttemptView = {
   countsTowardsAccuracy: boolean
   countsTowardsAverageTime: boolean
   board: OverviewAttemptBoardView | null
-  pgnDisplay: TrainingItemMetaPgnDisplay | null
   impact: {
     runProgressDeltaPct: number | null
     trainingProgressDeltaPct: number | null
@@ -860,7 +858,7 @@ export type AttemptSpectateView = {
   attemptId: number
   timeSpentMs: number | null
   board: OverviewAttemptBoardView | null
-  pgnDisplay: TrainingItemMetaPgnDisplay | null
+  pgn: TrainingItemMetaPgnDisplay | null
 }
 
 
@@ -893,6 +891,7 @@ export type RunTrainingItemOverview = {
     source: SourceMetadata
   }
   selectedAttemptId: number | null
+  pgn: TrainingItemMetaPgnDisplay | null
   attempts: OverviewAttemptView[]
   runPace: {
     chartData: PaceChartData | null
@@ -1428,6 +1427,16 @@ export const api = {
         { method: 'POST', body: JSON.stringify({ uciMoves, clientTimeSpentMs }) },
       )
     },
+    appendVariation: (
+      runId: number,
+      runTrainingItemId: number,
+      attemptId: number,
+      uciMoves: string[],
+    ): Promise<void> =>
+      request(
+        `/runs/${runId}/training-items/${runTrainingItemId}/attempts/${attemptId}/variations`,
+        { method: 'POST', body: JSON.stringify({ uciMoves }) },
+      ),
   },
   admin: {
     users: (params: TableParams): Promise<{ items: AdminUser[]; total: number }> =>

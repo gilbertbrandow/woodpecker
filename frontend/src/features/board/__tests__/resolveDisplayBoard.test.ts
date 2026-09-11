@@ -26,7 +26,6 @@ const PGN_2_MOVES: TrainingItemMetaPgnDisplay = {
     { san: 'e4', uci: 'e2e4', fen: PLY_1_FEN, from: 'e2', to: 'e4', moveNumber: 1, isWhite: true, moveStatus: 'opponent' },
     { san: 'd5', uci: 'd7d5', fen: PLY_2_FEN, from: 'd7', to: 'd5', moveNumber: 1, isWhite: false, moveStatus: 'correct' },
   ],
-  variation: null,
   subvariations: null,
 }
 
@@ -34,9 +33,6 @@ const PGN_WITH_WRONG: TrainingItemMetaPgnDisplay = {
   mainline: [
     { san: 'e4', uci: 'e2e4', fen: PLY_1_FEN, from: 'e2', to: 'e4', moveNumber: 1, isWhite: true, moveStatus: 'opponent' },
     { san: 'd6', uci: 'd7d6', fen: PLY_2_FEN, from: 'd7', to: 'd6', moveNumber: 1, isWhite: false, moveStatus: 'wrong' },
-  ],
-  variation: [
-    { san: 'd5', uci: 'd7d5', fen: PLY_2_FEN, from: 'd7', to: 'd5', moveNumber: 1, isWhite: false, moveStatus: 'correct' },
   ],
   subvariations: null,
 }
@@ -48,7 +44,6 @@ const SOLVED_ATTEMPT: OverviewAttemptView = {
   countsTowardsTraining: true, countsTowardsProgress: true,
   countsTowardsAccuracy: true, countsTowardsAverageTime: true,
   board: { terminalFen: PLY_2_FEN, lastMove: ['d7', 'd5'], result: 'correct' },
-  pgnDisplay: null,
   impact: { runProgressDeltaPct: null, trainingProgressDeltaPct: null, accuracyDeltaPct: null, averageSolveTimeDeltaMs: null },
 }
 
@@ -86,11 +81,10 @@ describe('resolveDisplayBoard — focus mode', () => {
     expect(result.moveFeedback.result).toBe(null) // opponent move has null feedback in focus
   })
 
-  it('resolves variation ply when selected', () => {
-    const ply: PlySelection = { line: 'variation', index: 0 }
+  it('returns board unchanged when selected ply is out of mainline range', () => {
+    const ply: PlySelection = { line: 'main', index: 99 }
     const result = resolveDisplayBoard(BASE_BOARD, 'focus', ply, PGN_WITH_WRONG, null, null)
-    expect(result.fen).toBe(PLY_2_FEN)
-    expect(result.moveFeedback.result).toBe('correct')
+    expect(result).toBe(BASE_BOARD)
   })
 })
 

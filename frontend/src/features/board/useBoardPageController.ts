@@ -32,9 +32,9 @@ import {
   TIMER_UPDATE_MS,
   INITIAL_OPPONENT_MOVE_DELAY_MS,
 } from './boardPage.helpers'
-import type { Mode, Orientation, PendingPromotion, MoveFeedbackResult, MoveFeedbackState, BoardState } from './boardPage.helpers'
+import type { Mode, Orientation, PendingPromotion, MoveFeedbackResult, MoveFeedbackState, BoardState, FailedModeWrongMove } from './boardPage.helpers'
 
-export type { Mode, Orientation, PendingPromotion, MoveFeedbackResult, BoardState }
+export type { Mode, Orientation, PendingPromotion, MoveFeedbackResult, BoardState, FailedModeWrongMove }
 
 export type TimerState = {
   elapsedTenths: number
@@ -67,6 +67,7 @@ export type BoardPageControllerResult = {
     movesPlayed: string[]
     allPliesPlayed: string[]
     failedRetryPlies: string[]
+    failedModeWrongMoves: FailedModeWrongMove[]
     liveFocusStatus: 'in_progress' | 'solved' | 'failed'
   }
   overview: OverviewState
@@ -121,6 +122,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     lastMoveSquare: null,
     isShowingMoveFeedback: false,
   })
+  const failedUserMovesRef = useRef<string[]>([])
+  const failedModeWrongMovesRef = useRef<FailedModeWrongMove[]>([])
   const concludeFnRef = useRef<() => Promise<void>>(async () => {})
   const concludingRef = useRef(false)
   const concludePromiseRef = useRef<Promise<void> | null>(null)
@@ -131,6 +134,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const latestResolvedAttemptIdRef = useRef<number | null>(null)
   const primeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
+  const revertPendingRef = useRef(false)
 
   const [mode, setMode] = useState<Mode>('loading')
   const [solvingView, setSolvingView] = useState<RunTrainingItemAttemptView | null>(null)
@@ -153,6 +157,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const [movesPlayed, setMovesPlayed] = useState<string[]>([])
   const [allPliesPlayed, setAllPliesPlayed] = useState<string[]>([])
   const [failedRetryPlies, setFailedRetryPlies] = useState<string[]>([])
+  const [failedModeWrongMoves, setFailedModeWrongMoves] = useState<FailedModeWrongMove[]>([])
   const [liveFocusStatus, setLiveFocusStatus] = useState<'in_progress' | 'solved' | 'failed'>('in_progress')
   const [isAttemptReady, setIsAttemptReady] = useState(false)
   const [lastMoveResult, setLastMoveResult] = useState<MoveFeedbackResult | null>(null)
@@ -224,6 +229,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       clearTimeout(timeoutId)
     }
     pendingTimeoutsRef.current.clear()
+    revertPendingRef.current = false
   }, [])
 
   const scheduleTimeout = useCallback((callback: () => void, delayMs: number): ReturnType<typeof setTimeout> => {
@@ -263,12 +269,16 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     solutionMovesRef.current = solutionMoves
     moveIndexRef.current = 0
     inputBlockedRef.current = true
+    revertPendingRef.current = false
     movesPlayedRef.current = []
     allPliesRef.current = []
     failedRetryPliesRef.current = []
+    failedUserMovesRef.current = []
+    failedModeWrongMovesRef.current = []
     setMovesPlayed([])
     setAllPliesPlayed([])
     setFailedRetryPlies([])
+    setFailedModeWrongMoves([])
     setLiveFocusStatus('in_progress')
     currentAttemptIdRef.current = data.attempt.id
     currentRunTrainingItemIdRef.current = data.runTrainingItem.id
@@ -487,6 +497,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     setMode('failed')
     setHintSquare(null)
     failedRetryPliesRef.current = []
+    failedUserMovesRef.current = movesPlayedRef.current.slice(0, -1)
     setFailedRetryPlies([])
   }, [])
 
@@ -571,6 +582,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       allPliesRef.current = [...allPliesRef.current, uci]
       setAllPliesPlayed(allPliesRef.current)
     } else if (modeRef.current === 'failed') {
+      failedUserMovesRef.current = [...failedUserMovesRef.current, uci]
       failedRetryPliesRef.current = [...failedRetryPliesRef.current, uci]
       setFailedRetryPlies(failedRetryPliesRef.current)
     }
@@ -588,6 +600,24 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
     if (isLastMove) {
       if (modeRef.current === 'focus') setLiveFocusStatus('solved')
+      // For multi-accept (Decoy) puzzles solved in failed mode: fire appendVariation
+      // immediately so the network request overlaps with the existing animation delay
+      // rather than adding extra latency before the overview transition.
+      const justPlayedWasMultiAccept = Array.isArray(solutionMoves[moveIndexRef.current - 1])
+      let appendVariationPromise: Promise<void> | null = null
+      if (modeRef.current === 'failed' && justPlayedWasMultiAccept) {
+        const failedAttemptId = latestResolvedAttemptIdRef.current
+        const rtiId = currentRunTrainingItemIdRef.current
+        if (failedAttemptId !== null) {
+          appendVariationPromise = api.attempts.appendVariation(runId, rtiId, failedAttemptId, failedUserMovesRef.current)
+            .then(() => api.runs.getOverview(runId, rtiId, failedAttemptId))
+            .then(({ overview: refreshed }) => {
+              setOverview(refreshed)
+              cachedOverviewPuzzleRef.current = refreshed
+            })
+            .catch(() => {})
+        }
+      }
       scheduleTimeout(() => {
         if (modeRef.current === 'focus') {
           void concludeFnRef.current()
@@ -597,6 +627,9 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
               if (concludePromiseRef.current !== null) {
                 await concludePromiseRef.current
                 concludePromiseRef.current = null
+              }
+              if (appendVariationPromise !== null) {
+                await appendVariationPromise
               }
               skipNextLoadRef.current = true
               navigateToOverview(latestResolvedAttemptIdRef.current, false)
@@ -624,6 +657,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
 
     const prevFen = displayFenRef.current
     inputBlockedRef.current = true
+    revertPendingRef.current = true
     setInputBlocked(true)
     setMoveFeedback('wrong', dest, true)
 
@@ -632,6 +666,39 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       movesPlayedRef.current = [...movesPlayedRef.current, uci]
       setMovesPlayed(movesPlayedRef.current)
       setLiveFocusStatus('failed')
+      // Fire conclude immediately — board revert is a concurrent visual delay
+      concludePromiseRef.current = concludeFnRef.current()
+    } else {
+      // Failed mode: record the wrong move for the live PGN, fire appendVariation,
+      // then refresh the Aggregate PGN for the eventual overview transition.
+      // Skip if the same move at the same position was already recorded — including
+      // W1 itself, which is tracked separately (not in failedModeWrongMoves).
+      const currentRetryPlies = failedRetryPliesRef.current
+      const posKey = currentRetryPlies.join(',')
+      const w1 = movesPlayedRef.current[movesPlayedRef.current.length - 1]
+      const w1PositionKey = allPliesRef.current.slice(1).join(',')
+      const isDuplicate =
+        (uci === w1 && posKey === w1PositionKey) ||
+        failedModeWrongMovesRef.current.some(
+          w => w.uci === uci && w.retryPliesAtWrongMove.join(',') === posKey,
+        )
+      if (!isDuplicate) {
+        const wrongRecord: FailedModeWrongMove = {
+          uci,
+          retryPliesAtWrongMove: [...currentRetryPlies],
+        }
+        failedModeWrongMovesRef.current = [...failedModeWrongMovesRef.current, wrongRecord]
+        setFailedModeWrongMoves(failedModeWrongMovesRef.current)
+
+        const failedAttemptId = latestResolvedAttemptIdRef.current
+        const rtiId = currentRunTrainingItemIdRef.current
+        if (failedAttemptId !== null) {
+          void api.attempts.appendVariation(runId, rtiId, failedAttemptId, [...failedUserMovesRef.current, uci])
+            .then(() => api.runs.getOverview(runId, rtiId, failedAttemptId))
+            .then(({ overview: updatedOverview }) => { setOverview(updatedOverview) })
+            .catch(() => {})
+        }
+      }
     }
 
     const applied = chess.move({ from: orig, to: dest, promotion: promotionPiece ?? 'q' })
@@ -647,21 +714,19 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       setLastMove(committedLastMoveRef.current)
       hideMoveFeedbackBadge()
       setHintSquare(null)
+      revertPendingRef.current = false
       if (modeRef.current === 'focus') {
-        inputBlockedRef.current = false
-        setInputBlocked(false)
-        concludePromiseRef.current = concludeFnRef.current()
+        // conclude() may not have resolved yet — enter failed now
         enterFailed()
-      } else {
-        // 'failed' retry mode: no conclude, unblock immediately
-        inputBlockedRef.current = false
-        setInputBlocked(false)
       }
+      inputBlockedRef.current = false
+      setInputBlocked(false)
     }, WRONG_REVERT_MS)
   }, [setFen, setMoveFeedback, hideMoveFeedbackBadge, scheduleTimeout, enterFailed])
 
   const handleUserMove = useCallback((orig: string, dest: string): void => {
     if (inputBlockedRef.current) return
+    if (revertPendingRef.current) return
     if (concludingRef.current && modeRef.current === 'focus') return
     const chess = chessRef.current
     if (!chess) return
@@ -869,7 +934,7 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       targetMinSolveTenths,
       targetMaxSolveTenths,
     },
-    session: { attemptHistory, movesPlayed, allPliesPlayed, failedRetryPlies, liveFocusStatus },
+    session: { attemptHistory, movesPlayed, allPliesPlayed, failedRetryPlies, failedModeWrongMoves, liveFocusStatus },
     overview: { data: overview },
     isLoadingNextPuzzle,
     runJustCompleted,

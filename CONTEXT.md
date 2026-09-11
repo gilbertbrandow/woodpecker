@@ -182,8 +182,28 @@ _Avoid_: status banner, current status (ambiguous with TrainingDetailStatus)
 ## Overview
 
 **Attempt Spectate**:
-A mode within the TrainingItem overview panel where the board, PGN display, and solve time are replaced with those of a completed TrainingAttempt that is not the user's current-run attempt. Covers two variants: (1) another user's attempt — entered by clicking that user's row when the filter is set to "all users"; badge reads "Inspecting [avatar] [DisplayName]". (2) the current user's own attempt from a different Run — entered by clicking their own row from a different run; badge reads "Inspecting your attempt from other run, go to run" where "go to run" is a link to the full overview for that run. In both variants the current user's run context (attempt history table, Next Puzzle / Retake actions) remains intact — spectating does not interrupt the current Training. Exited by clicking the user's own current-run row, or switching the filter back to "me". Access-gated: the requesting user must have at least one completed TrainingAttempt on the same TrainingItem.
+A mode within the TrainingItem overview panel where the board and Aggregate PGN are replaced with those of a completed TrainingAttempt that is not the user's current-run attempt. Covers two variants: (1) another user's attempt — entered by clicking that user's row when the filter is set to "all users"; badge reads "Inspecting [avatar] [DisplayName]". (2) the current user's own attempt from a different Run — entered by clicking their own row from a different run; badge reads "Inspecting your attempt from other run, go to run" where "go to run" is a link to the full overview for that run. In both variants the current user's run context (attempt history table, Next Puzzle / Retake actions) remains intact — spectating does not interrupt the current Training. Exited by clicking the user's own current-run row, or switching the filter back to "me". Access-gated: the requesting user must have at least one completed TrainingAttempt on the same TrainingItem.
 _Avoid_: replay mode, watch mode, other-user view, self-spectate (internal variant — not a separate term)
+
+**Variation** (in solving context):
+A single play-through of a TrainingItem by a user. Begins from the puzzle's starting position and terminates either when all correct moves have been played (solved) or on the user's first wrong move (failed). A user may play multiple Variations within one TrainingAttempt: the first is always played in focus mode; subsequent ones are played in failed mode as the user retries. A failed Variation ends on the wrong move; a solved Variation ends on the last correct move.
+_Avoid_: attempt moves, move list (as a synonym for the play-through)
+
+**Focus Mode**:
+The initial solving state for a new TrainingAttempt. The clock runs from the moment the first opponent move plays. The user plays from the puzzle's starting position. A wrong move immediately and durably concludes the attempt as `failed` — the failure is persisted before the visual board revert — then transitions to Failed Mode. A checkmate move is always treated as correct regardless of the expected move. Solving the final correct move concludes the attempt as `solved` and transitions to Overview Mode.
+_Avoid_: active mode, playing mode
+
+**Failed Mode**:
+The retry state entered after the first wrong move in Focus Mode. The TrainingAttempt is already concluded as `failed`; Failed Mode is pure retry practice within the same attempt. The board sits at the exact position where the user last went wrong (the opponent's last committed move), not at the puzzle start. The user plays forward from that position. A wrong move is recorded immediately as a new failed Variation appended to the attempt, the board reverts to the point of failure, and the Aggregate PGN refreshes to show the new subvariation. Solving the final correct move transitions to Overview Mode without recording a Variation (the solved path matches the mainline). Show Hint and Show Solution are both available. There is no "Next Puzzle" action in Failed Mode; navigating away and returning redirects to Overview Mode.
+_Avoid_: retry mode, practice mode
+
+**Overview Mode**:
+The read-only state reached after an attempt concludes (solved or failed) or when navigating directly to a completed attempt. Shows the Aggregate PGN, board, stats, and run progress for the selected attempt. The board and PGN auto-select the last move played by the user — the final correct player ply in the mainline for non-Decoy puzzles; the accepted move (before any continuation line) for Decoy puzzles. Available actions: Retake (creates a new TrainingAttempt), Next Puzzle (advances to the next RunTrainingItem), Show on Lichess, Attempt Spectate.
+_Avoid_: review mode, solution mode
+
+**Aggregate PGN**:
+The single PGN display for a RunTrainingItem, representing the full picture of everything the user tried. The correct solution is always the mainline — for non-Decoy puzzles this is the solution from the SolveContract; for Decoy puzzles this is the accepted move the user actually solved with (falling back to the first accepted move if they never solved). Each failed Variation contributes exactly one subvariation: the single wrong move where it diverged from the mainline, annotated `??`. The correct prefix shared with the mainline is not repeated in the subvariation. For Decoy puzzles, other accepted moves not used as the mainline also appear as subvariations with a `correct` annotation, coexisting with the `??` entries in the same array. The Aggregate PGN is displayed continuously from the moment the user first fails — through failed mode and into the overview — with no change on transition. In Attempt Spectate it shows the full picture of all Variations the spectated user played.
+_Avoid_: per-attempt PGN, attempt PGN
 
 ## Leaderboards
 

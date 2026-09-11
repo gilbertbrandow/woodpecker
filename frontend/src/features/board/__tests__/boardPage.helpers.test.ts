@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { Chess } from 'chess.js'
-import { buildPgnDisplay, computeFinalFen, resolveOverviewBoardPosition, resolveStep, resultsInCheckmate } from '../boardPage.helpers'
+import { buildLivePgnDisplay, computeFinalFen, resolveOverviewBoardPosition, resolveStep, resultsInCheckmate } from '../boardPage.helpers'
 
 describe('resultsInCheckmate', () => {
   it('returns true when the move results in checkmate', () => {
@@ -20,78 +20,152 @@ describe('resultsInCheckmate', () => {
   })
 })
 
-describe('buildPgnDisplay', () => {
-  // 4-ply puzzle on standard starting position:
-  //   opponent (white): e2e4
-  //   player  (black): d7d5
-  //   opponent (white): e4xd5
-  //   player  (black): Qxd5
-  const FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-  const SOLUTION: (string | string[])[] = ['e2e4', 'd7d5', 'e4d5', 'd8d5']
-  const FIRST_PLY = 'e2e4'
-  const PLAYER_MOVE_1 = 'd7d5'
-  const PLAYER_MOVE_2 = 'd8d5'
-  const WRONG_MOVE = 'd7d6'
-  const CORRECT_RETRY_MOVE = 'd7d5'
+// 4-ply puzzle: opponent (white) e2e4, player (black) d7d5, opponent e4xd5, player Qxd5.
+const FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+const OPP_MOVE = 'e2e4'
+const PLAYER_MOVE_1 = 'd7d5'
+const OPP_MOVE_2 = 'e4d5'
 
+const WRONG_MOVE_1 = 'd7d6'   // wrong at position 1 (same square as PLAYER_MOVE_1)
+const WRONG_MOVE_2 = 'd8d7'   // wrong at position 2 (after correct PLAYER_MOVE_1 + OPP_MOVE_2)
+
+describe('buildLivePgnDisplay — focus mode (no wrong move)', () => {
   beforeAll(() => {
     const chess = new Chess(FEN)
     const e4 = chess.move({ from: 'e2', to: 'e4' })
     const d5 = chess.move({ from: 'd7', to: 'd5' })
-    const exd5 = chess.move({ from: 'e4', to: 'd5' })
-    const qxd5 = chess.move({ from: 'd8', to: 'd5' })
     expect(e4).not.toBeNull()
     expect(d5).not.toBeNull()
-    expect(exd5).not.toBeNull()
-    expect(qxd5).not.toBeNull()
   })
 
-  it('in_progress with no moves pre-shows the opponent first move', () => {
-    const result = buildPgnDisplay(FEN, [], SOLUTION, 'in_progress')
+  it('returns empty mainline when no plies have been played', () => {
+    const result = buildLivePgnDisplay(FEN, [])
+    expect(result.mainline).toHaveLength(0)
+    expect(result.subvariations).toBeNull()
+  })
+
+  it('shows opponent move when only the first ply has been played', () => {
+    const result = buildLivePgnDisplay(FEN, [OPP_MOVE])
     expect(result.mainline).toHaveLength(1)
     expect(result.mainline[0].moveStatus).toBe('opponent')
-    expect(result.mainline[0].uci).toBe(FIRST_PLY)
-    expect(result.variation).toBeNull()
+    expect(result.mainline[0].uci).toBe(OPP_MOVE)
+    expect(result.subvariations).toBeNull()
   })
 
-  it('in_progress with first ply in allPliesPlayed still shows exactly one opponent move', () => {
-    const result = buildPgnDisplay(FEN, [FIRST_PLY], SOLUTION, 'in_progress')
-    expect(result.mainline).toHaveLength(1)
+  it('shows opponent then player move with null status for player move', () => {
+    const result = buildLivePgnDisplay(FEN, [OPP_MOVE, PLAYER_MOVE_1])
+    expect(result.mainline).toHaveLength(2)
     expect(result.mainline[0].moveStatus).toBe('opponent')
-    expect(result.mainline[0].uci).toBe(FIRST_PLY)
-    expect(result.variation).toBeNull()
-  })
-
-  it('solved shows opponent first then player correct moves with no variation', () => {
-    const result = buildPgnDisplay(FEN, [PLAYER_MOVE_1, PLAYER_MOVE_2], SOLUTION, 'solved')
-    expect(result.mainline.length).toBeGreaterThanOrEqual(2)
-    expect(result.mainline[0].moveStatus).toBe('opponent')
-    expect(result.mainline[0].uci).toBe('e2e4')
-    expect(result.mainline[1].moveStatus).toBe('correct')
+    expect(result.mainline[1].moveStatus).toBeNull()
     expect(result.mainline[1].uci).toBe(PLAYER_MOVE_1)
-    expect(result.variation).toBeNull()
-  })
-
-  it('failed with autoVariation=false shows wrong move in mainline and no variation', () => {
-    const result = buildPgnDisplay(FEN, [WRONG_MOVE], SOLUTION, 'failed', [], false)
-    expect(result.mainline.some((m) => m.moveStatus === 'wrong')).toBe(true)
-    expect(result.variation).toBeNull()
-  })
-
-  it('failed with autoVariation=true immediately shows the solution as variation', () => {
-    const result = buildPgnDisplay(FEN, [WRONG_MOVE], SOLUTION, 'failed', [], true)
-    expect(result.variation).not.toBeNull()
-    expect(result.variation!.length).toBeGreaterThan(0)
-  })
-
-  it('failed with retry plies shows them in variation regardless of autoVariation', () => {
-    const result = buildPgnDisplay(FEN, [WRONG_MOVE], SOLUTION, 'failed', [CORRECT_RETRY_MOVE], false)
-    expect(result.variation).not.toBeNull()
-    expect(result.variation![0].uci).toBe(CORRECT_RETRY_MOVE)
+    expect(result.subvariations).toBeNull()
   })
 })
 
-// Reuse the same 4-ply position from the buildPgnDisplay suite above.
+describe('buildLivePgnDisplay — W1 unresolved (wrong move in mainline)', () => {
+  it('places W1 as the last mainline move with wrong status', () => {
+    const result = buildLivePgnDisplay(FEN, [OPP_MOVE], WRONG_MOVE_1)
+    expect(result.mainline).toHaveLength(2)
+    expect(result.mainline[0].moveStatus).toBe('opponent')
+    expect(result.mainline[1].uci).toBe(WRONG_MOVE_1)
+    expect(result.mainline[1].moveStatus).toBe('wrong')
+    expect(result.subvariations).toBeNull()
+  })
+})
+
+describe('buildLivePgnDisplay — W1 resolved (correct move found after W1)', () => {
+  it('demotes W1 to first subvariation and puts correct move in mainline', () => {
+    const result = buildLivePgnDisplay(FEN, [OPP_MOVE], WRONG_MOVE_1, [PLAYER_MOVE_1])
+    // Mainline: opp e4, then correct d5 (null status, not yet marked correct by backend)
+    expect(result.mainline).toHaveLength(2)
+    expect(result.mainline[0].moveStatus).toBe('opponent')
+    expect(result.mainline[1].uci).toBe(PLAYER_MOVE_1)
+    expect(result.mainline[1].moveStatus).toBeNull()
+    // W1 demoted to first subvariation
+    expect(result.subvariations).toHaveLength(1)
+    expect(result.subvariations![0][0].uci).toBe(WRONG_MOVE_1)
+    expect(result.subvariations![0][0].moveStatus).toBe('wrong')
+  })
+
+  it('W2 at the same position as W1 also goes to subvariations', () => {
+    const WRONG_MOVE_1B = 'c7c5'
+    const result = buildLivePgnDisplay(
+      FEN,
+      [OPP_MOVE],
+      WRONG_MOVE_1,
+      [PLAYER_MOVE_1],
+      [{ uci: WRONG_MOVE_1B, retryPliesAtWrongMove: [] }],
+    )
+    expect(result.subvariations).toHaveLength(2)
+    expect(result.subvariations![0][0].uci).toBe(WRONG_MOVE_1)
+    expect(result.subvariations![1][0].uci).toBe(WRONG_MOVE_1B)
+  })
+})
+
+// Player got P1 right (d7d5), opponent responded (e4xd5), player correct P2 is Qxd5 (d8d5).
+const PLAYER_MOVE_2 = 'd8d5'
+
+describe('buildLivePgnDisplay — wrong move at a later position (P2)', () => {
+  it('holds the mainline slot for the first wrong move at P2 (unresolved)', () => {
+    // Player got P1 right, opponent responded, now wrong at P2 — mirrors W1 behaviour.
+    const retryPlies = [PLAYER_MOVE_1, OPP_MOVE_2]
+    const result = buildLivePgnDisplay(
+      FEN,
+      [OPP_MOVE],
+      WRONG_MOVE_1,
+      retryPlies,
+      [{ uci: WRONG_MOVE_2, retryPliesAtWrongMove: [PLAYER_MOVE_1, OPP_MOVE_2] }],
+    )
+    // Mainline: e4, d5 (correct), exd5 (opp), Qd7?? (wrong P2 in mainline)
+    expect(result.mainline).toHaveLength(4)
+    expect(result.mainline[3].uci).toBe(WRONG_MOVE_2)
+    expect(result.mainline[3].moveStatus).toBe('wrong')
+    // W1 is in subvariations; W2 is NOT (it's in the mainline)
+    expect(result.subvariations).toHaveLength(1)
+    expect(result.subvariations![0][0].uci).toBe(WRONG_MOVE_1)
+  })
+
+  it('demotes first wrong at P2 to subvariation once P2 is resolved', () => {
+    // failedRetryPlies has grown past the snapshot → W2 is resolved
+    const retryPlies = [PLAYER_MOVE_1, OPP_MOVE_2, PLAYER_MOVE_2]
+    const result = buildLivePgnDisplay(
+      FEN,
+      [OPP_MOVE],
+      WRONG_MOVE_1,
+      retryPlies,
+      [{ uci: WRONG_MOVE_2, retryPliesAtWrongMove: [PLAYER_MOVE_1, OPP_MOVE_2] }],
+    )
+    // Mainline ends at correct P2 — no wrong move in mainline
+    expect(result.mainline[result.mainline.length - 1].uci).toBe(PLAYER_MOVE_2)
+    expect(result.mainline[result.mainline.length - 1].moveStatus).toBeNull()
+    // Both W1 and W2 are in subvariations
+    expect(result.subvariations).toHaveLength(2)
+    expect(result.subvariations![0][0].uci).toBe(WRONG_MOVE_1)
+    expect(result.subvariations![1][0].uci).toBe(WRONG_MOVE_2)
+  })
+
+  it('second wrong at P2 goes directly to subvariation (only first holds the slot)', () => {
+    const WRONG_MOVE_2B = 'g8f6'  // another wrong move at P2
+    const retryPlies = [PLAYER_MOVE_1, OPP_MOVE_2]
+    const result = buildLivePgnDisplay(
+      FEN,
+      [OPP_MOVE],
+      WRONG_MOVE_1,
+      retryPlies,
+      [
+        { uci: WRONG_MOVE_2, retryPliesAtWrongMove: [PLAYER_MOVE_1, OPP_MOVE_2] },
+        { uci: WRONG_MOVE_2B, retryPliesAtWrongMove: [PLAYER_MOVE_1, OPP_MOVE_2] },
+      ],
+    )
+    // First wrong at P2 (WRONG_MOVE_2) holds mainline; second (WRONG_MOVE_2B) in subvariations
+    expect(result.mainline[result.mainline.length - 1].uci).toBe(WRONG_MOVE_2)
+    expect(result.mainline[result.mainline.length - 1].moveStatus).toBe('wrong')
+    expect(result.subvariations).toHaveLength(2)  // W1 + WRONG_MOVE_2B
+    expect(result.subvariations!.find(sv => sv[0].uci === WRONG_MOVE_2B)).toBeDefined()
+    expect(result.subvariations!.find(sv => sv[0].uci === WRONG_MOVE_2)).toBeUndefined()
+  })
+})
+
 const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 const SOLUTION_MOVES: (string | string[])[] = ['e2e4', 'd7d5', 'e4d5', 'd8d5']
 
@@ -102,7 +176,6 @@ describe('computeFinalFen', () => {
 
   it('returns the correct terminal FEN after applying all solution moves', () => {
     const terminal = computeFinalFen(INITIAL_FEN, SOLUTION_MOVES)
-    // Verify by replaying manually with chess.js
     const chess = new Chess(INITIAL_FEN)
     chess.move({ from: 'e2', to: 'e4' })
     chess.move({ from: 'd7', to: 'd5' })

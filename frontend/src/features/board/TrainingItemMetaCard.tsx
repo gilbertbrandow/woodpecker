@@ -16,7 +16,6 @@ type DisplayMoveMin = {
 
 type TrainingItemMetaPgnDisplayMin = {
   mainline: DisplayMoveMin[]
-  variation: DisplayMoveMin[] | null
   subvariations: DisplayMoveMin[][] | null
 }
 
@@ -30,7 +29,7 @@ function MoveToken({
   numberPrefix,
 }: {
   move: DisplayMoveMin
-  line: 'main' | 'variation' | 'subvariation'
+  line: 'main' | 'subvariation'
   index: number
   subIndex?: number
   selectedPly: PlySelection | null | undefined
@@ -92,7 +91,7 @@ function MoveSequence({
   startIndex = 0,
 }: {
   moves: DisplayMoveMin[]
-  line: 'main' | 'variation' | 'subvariation'
+  line: 'main' | 'subvariation'
   subIndex?: number
   selectedPly: PlySelection | null | undefined
   onPlyClick: ((ply: PlySelection) => void) | undefined
@@ -185,7 +184,6 @@ function computeNextPly(
   pgnDisplay: TrainingItemMetaPgnDisplayMin,
 ): PlySelection | null {
   const mainLen = pgnDisplay.mainline.length
-  const varLen = pgnDisplay.variation?.length ?? 0
 
   if (selected === null || selected === undefined) {
     return mainLen > 0 ? { line: 'main', index: 0 } : null
@@ -198,13 +196,8 @@ function computeNextPly(
     return next < sv.length ? { line: 'subvariation', subIndex: selected.subIndex, index: next } : null
   }
 
-  if (selected.line === 'main') {
-    const next = selected.index + 1
-    return next < mainLen ? { line: 'main', index: next } : null
-  }
-
   const next = selected.index + 1
-  return next < varLen ? { line: 'variation', index: next } : null
+  return next < mainLen ? { line: 'main', index: next } : null
 }
 
 function computePrevPly(
@@ -214,10 +207,6 @@ function computePrevPly(
 
   if (selected.line === 'subvariation') {
     return selected.index > 0 ? { line: 'subvariation', subIndex: selected.subIndex, index: selected.index - 1 } : null
-  }
-
-  if (selected.line === 'variation') {
-    return selected.index > 0 ? { line: 'variation', index: selected.index - 1 } : null
   }
 
   return selected.index > 0 ? { line: 'main', index: selected.index - 1 } : null
@@ -403,6 +392,69 @@ function DecoyGameInfo({ g }: { g: NonNullable<DecoySourceMetadata['game']> }): 
 
 type RowEntry = { move: DisplayMoveMin; idx: number }
 type MoveRow = { moveNumber: number; white: RowEntry | null; black: RowEntry | null }
+type SvEntry = { moves: DisplayMoveMin[]; si: number }
+
+export type PgnLayout = {
+  rows: MoveRow[]
+  svAfterWhite: Map<number, SvEntry[]>
+  svAfterBlack: Map<number, SvEntry[]>
+}
+
+// Pure transform from a PGN display to the layout structure used by PgnColumnView.
+// Extracted for independent testability; the component just maps this to JSX.
+//
+// Subvariations are split into two maps by where they branch:
+// - svAfterWhite: variation branches at the White cell (mid-row). Requires the
+//   "..." placeholder + continuation layout to match standard PGN convention.
+// - svAfterBlack: variation branches at the Black cell (end-of-row).
+//
+// When the player is White (opponent moves Black first), wrong moves are White
+// moves. Without this split a variation would appear to be an alternative to
+// Black's response rather than to White's correct move.
+export function computePgnLayout(pgnDisplay: TrainingItemMetaPgnDisplayMin): PgnLayout {
+  const rows: MoveRow[] = []
+  let current: MoveRow | null = null
+  for (let i = 0; i < pgnDisplay.mainline.length; i++) {
+    const move = pgnDisplay.mainline[i]
+    if (move.isWhite) {
+      current = { moveNumber: move.moveNumber, white: { move, idx: i }, black: null }
+      rows.push(current)
+    } else if (current && current.moveNumber === move.moveNumber) {
+      current.black = { move, idx: i }
+    } else {
+      current = { moveNumber: move.moveNumber, white: null, black: { move, idx: i } }
+      rows.push(current)
+    }
+  }
+
+  const afterWhite = new Map<number, SvEntry[]>()
+  const afterBlack = new Map<number, SvEntry[]>()
+  if (pgnDisplay.subvariations && pgnDisplay.mainline.length > 1) {
+    for (let si = 0; si < pgnDisplay.subvariations.length; si++) {
+      const sv = pgnDisplay.subvariations[si]
+      const firstMove = sv?.[0]
+      if (!firstMove) continue
+      const branchIdx = pgnDisplay.mainline.findIndex(
+        m => m.moveNumber === firstMove.moveNumber && m.isWhite === firstMove.isWhite,
+      )
+      const targetIdx = branchIdx > 0 ? branchIdx : 1
+      let rowIdx = rows.length - 1
+      for (let r = 0; r < rows.length; r++) {
+        if (rows[r].white?.idx === targetIdx || rows[r].black?.idx === targetIdx) {
+          rowIdx = r
+          break
+        }
+      }
+      const isAtWhiteCell = rows[rowIdx].white?.idx === targetIdx
+      const map = isAtWhiteCell ? afterWhite : afterBlack
+      const existing = map.get(rowIdx) ?? []
+      existing.push({ moves: sv, si })
+      map.set(rowIdx, existing)
+    }
+  }
+
+  return { rows, svAfterWhite: afterWhite, svAfterBlack: afterBlack }
+}
 
 function ColumnMoveCell({
   entry,
@@ -456,35 +508,24 @@ function ColumnMoveCell({
 }
 
 function VariationLines({
-  pgnDisplay,
+  svEntries,
   selectedPly,
   onPlyClick,
   isLast = false,
 }: {
-  pgnDisplay: TrainingItemMetaPgnDisplayMin
+  svEntries: Array<{ moves: DisplayMoveMin[]; si: number }>
   selectedPly: PlySelection | null | undefined
   onPlyClick: ((ply: PlySelection) => void) | undefined
   isLast?: boolean
 }): React.ReactElement | null {
-  const lines: Array<{ moves: DisplayMoveMin[]; line: 'variation' | 'subvariation'; si: number }> =
-    React.useMemo(() => {
-      if (pgnDisplay.subvariations !== null) {
-        return pgnDisplay.subvariations.map((sv, i) => ({ moves: sv, line: 'subvariation' as const, si: i }))
-      }
-      if (pgnDisplay.variation !== null) {
-        return [{ moves: pgnDisplay.variation, line: 'variation' as const, si: 0 }]
-      }
-      return []
-    }, [pgnDisplay])
+  if (svEntries.length === 0) return null
 
-  if (lines.length === 0) return null
-
-  const multi = lines.length > 1
+  const multi = svEntries.length > 1
 
   return (
     <div className={cn('flex-[0_0_100%] bg-muted/30 pl-2 text-xs', isLast && 'border-t border-border', !isLast && 'border-b border-border')}>
       <div className={cn('py-2 pr-2', multi ? 'pl-[18px]' : 'pl-2')}>
-        {lines.map(({ moves, line, si }, i) => (
+        {svEntries.map(({ moves, si }, i) => (
           <div key={si} className={cn('relative', i > 0 && 'mt-2')}>
             {multi && (
               <span
@@ -492,7 +533,7 @@ function VariationLines({
                 className={cn(
                   'pointer-events-none absolute left-[-16px] w-[8px] border-l-2 border-border',
                   i === 0 ? '-top-2' : 'top-0',
-                  i === lines.length - 1
+                  i === svEntries.length - 1
                     ? 'h-[0.85em]'
                     : i === 0
                       ? 'h-[calc(100%+1rem)]'
@@ -507,8 +548,8 @@ function VariationLines({
             )}
             <MoveSequence
               moves={moves}
-              line={line}
-              subIndex={line === 'subvariation' ? si : undefined}
+              line="subvariation"
+              subIndex={si}
               selectedPly={selectedPly}
               onPlyClick={onPlyClick}
             />
@@ -528,52 +569,58 @@ function PgnColumnView({
   selectedPly: PlySelection | null | undefined
   onPlyClick: ((ply: PlySelection) => void) | undefined
 }): React.ReactElement {
-  const rows: MoveRow[] = React.useMemo(() => {
-    const result: MoveRow[] = []
-    let current: MoveRow | null = null
-    for (let i = 0; i < pgnDisplay.mainline.length; i++) {
-      const move = pgnDisplay.mainline[i]
-      if (move.isWhite) {
-        current = { moveNumber: move.moveNumber, white: { move, idx: i }, black: null }
-        result.push(current)
-      } else if (current && current.moveNumber === move.moveNumber) {
-        current.black = { move, idx: i }
-      } else {
-        current = { moveNumber: move.moveNumber, white: null, black: { move, idx: i } }
-        result.push(current)
-      }
-    }
-    return result
-  }, [pgnDisplay.mainline])
+  const { rows, svAfterWhite, svAfterBlack } = React.useMemo(
+    () => computePgnLayout(pgnDisplay),
+    [pgnDisplay],
+  )
 
-  const interruptAfterRow = React.useMemo(() => {
-    if (pgnDisplay.subvariations === null && pgnDisplay.variation === null) return -1
-    if (pgnDisplay.mainline.length <= 1) return -1
-    // Find where the variation branches by matching the first variation move to the mainline
-    const firstVarMove = pgnDisplay.subvariations?.[0]?.[0] ?? pgnDisplay.variation?.[0]
-    const branchIdx = firstVarMove
-      ? pgnDisplay.mainline.findIndex(m => m.moveNumber === firstVarMove.moveNumber && m.isWhite === firstVarMove.isWhite)
-      : 1
-    const targetIdx = branchIdx > 0 ? branchIdx : 1
-    for (let r = 0; r < rows.length; r++) {
-      if (rows[r].white?.idx === targetIdx || rows[r].black?.idx === targetIdx) return r
-    }
-    return rows.length - 1
-  }, [pgnDisplay, rows])
+  const numCellCls = 'flex-[0_0_13%] flex select-none items-center justify-center border-r border-border bg-muted py-0.5 text-[11px] leading-[1.75em] text-muted-foreground/60'
 
   return (
     <div className="flex flex-wrap leading-normal">
       {rows.map((row, r) => {
         const isLast = r === rows.length - 1
+        const svEntriesAfterBlack = svAfterBlack.get(r)
+        const svEntriesAfterWhite = svAfterWhite.get(r)
+
+        if (svEntriesAfterWhite) {
+          // Variation branches right after White's move. Show White cell, then a
+          // "..." Black placeholder, then the variation block. If the mainline has
+          // a Black response at this row, continue with it after the variation
+          // (blank number + "..." White placeholder + Black cell), matching the
+          // standard "2. Nc3 (...) 2... c5" PGN layout.
+          const hasBlackContinuation = row.black !== null
+          // Avoid double-border: when the variation is the very last element, let
+          // it own the top border (isLast=true on VariationLines) and skip border-b
+          // on the cells above it.
+          const preCellsBorderB = hasBlackContinuation || !isLast
+          return (
+            <React.Fragment key={row.moveNumber}>
+              <div className={cn(numCellCls, preCellsBorderB && 'border-b')}>{row.moveNumber}</div>
+              <ColumnMoveCell entry={row.white} selectedPly={selectedPly} onPlyClick={onPlyClick} bottomBorder={preCellsBorderB} showPlaceholder={row.white === null} />
+              <ColumnMoveCell entry={null} selectedPly={selectedPly} onPlyClick={onPlyClick} rightBorder={false} bottomBorder={preCellsBorderB} showPlaceholder />
+              <VariationLines svEntries={svEntriesAfterWhite} selectedPly={selectedPly} onPlyClick={onPlyClick} isLast={!hasBlackContinuation && isLast} />
+              {hasBlackContinuation && (
+                <>
+                  <div className={cn(numCellCls, !isLast && 'border-b')} />
+                  <ColumnMoveCell entry={null} selectedPly={selectedPly} onPlyClick={onPlyClick} bottomBorder={!isLast} showPlaceholder />
+                  <ColumnMoveCell entry={row.black} selectedPly={selectedPly} onPlyClick={onPlyClick} rightBorder={false} bottomBorder={!isLast} />
+                  {svEntriesAfterBlack && (
+                    <VariationLines svEntries={svEntriesAfterBlack} selectedPly={selectedPly} onPlyClick={onPlyClick} isLast={isLast} />
+                  )}
+                </>
+              )}
+            </React.Fragment>
+          )
+        }
+
         return (
           <React.Fragment key={row.moveNumber}>
-            <div className={cn('flex-[0_0_13%] flex select-none items-center justify-center border-r border-border bg-muted py-0.5 text-[11px] leading-[1.75em] text-muted-foreground/60', !isLast && 'border-b')}>
-              {row.moveNumber}
-            </div>
+            <div className={cn(numCellCls, !isLast && 'border-b')}>{row.moveNumber}</div>
             <ColumnMoveCell entry={row.white} selectedPly={selectedPly} onPlyClick={onPlyClick} bottomBorder={!isLast} showPlaceholder={row.white === null} />
             <ColumnMoveCell entry={row.black} selectedPly={selectedPly} onPlyClick={onPlyClick} rightBorder={false} bottomBorder={!isLast} />
-            {r === interruptAfterRow && (
-              <VariationLines pgnDisplay={pgnDisplay} selectedPly={selectedPly} onPlyClick={onPlyClick} isLast={interruptAfterRow === rows.length - 1} />
+            {svEntriesAfterBlack && (
+              <VariationLines svEntries={svEntriesAfterBlack} selectedPly={selectedPly} onPlyClick={onPlyClick} isLast={isLast} />
             )}
           </React.Fragment>
         )
