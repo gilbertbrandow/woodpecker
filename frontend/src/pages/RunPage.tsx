@@ -125,10 +125,10 @@ function InsightsTab({ run }: { run: Run }): React.ReactElement {
                   className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
                   style={{ transform: paceOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
                 />
-                Run pace
+                Pace
               </span>
               <span className="hidden text-xs text-muted-foreground sm:block">
-                Actual progress & required pace
+                Actual & scheduled progress
               </span>
             </button>
           </CollapsibleTrigger>
