@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import type { RunTrainingItemAttemptView, RunTrainingItemOverview, TrainingItemMetaPgnDisplay } from '../../lib/api'
-import { buildFocusPgnDisplay, buildLiveSolvingPgnDisplay } from './boardPage.helpers'
+import { buildLivePgnDisplay } from './boardPage.helpers'
 import type { Mode, PlySelection, FailedModeWrongMove } from './boardPage.helpers'
 
 type UsePgnNavigationParams = {
@@ -41,40 +41,19 @@ export function usePgnNavigation({
     setSelectedPly(null)
   }, [boardKey])
 
-  const focusPgnDisplay = useMemo((): TrainingItemMetaPgnDisplay | null => {
-    if (mode !== 'focus') return null
+  const livePgnDisplay = useMemo((): TrainingItemMetaPgnDisplay | null => {
+    if (mode === 'overview') return null
     if (!solvingView) return null
-    // While in_progress: plain correct-moves display.
-    // Once liveFocusStatus is 'failed' (wrong move played, board reverting):
-    // show the wrong move immediately as a provisional mainline entry with ??.
-    if (session.liveFocusStatus !== 'failed') {
-      return buildFocusPgnDisplay(solvingView.trainingItem.fen, session.allPliesPlayed)
-    }
-    const firstWrongMove = session.movesPlayed[session.movesPlayed.length - 1]
-    if (!firstWrongMove) return buildFocusPgnDisplay(solvingView.trainingItem.fen, session.allPliesPlayed)
-    return buildLiveSolvingPgnDisplay(
+    const hasWrongMove = mode === 'failed' || session.liveFocusStatus === 'failed'
+    const firstWrongMove = hasWrongMove
+      ? (session.movesPlayed[session.movesPlayed.length - 1] ?? undefined)
+      : undefined
+    return buildLivePgnDisplay(
       solvingView.trainingItem.fen,
       session.allPliesPlayed,
       firstWrongMove,
-      [],
-      [],
-    )
-  }, [mode, solvingView, session])
-
-  // In failed (retry) mode, build a live PGN from the retry session.
-  // W1 (session.movesPlayed[session.movesPlayed.length - 1]) holds the provisional mainline slot until
-  // the correct move is played; subsequent wrong moves become subvariations.
-  const failedFocusPgnDisplay = useMemo((): TrainingItemMetaPgnDisplay | null => {
-    if (mode !== 'failed') return null
-    if (!solvingView) return null
-    const firstWrongMove = session.movesPlayed[session.movesPlayed.length - 1]
-    if (!firstWrongMove) return null
-    return buildLiveSolvingPgnDisplay(
-      solvingView.trainingItem.fen,
-      session.allPliesPlayed,
-      firstWrongMove,
-      session.failedRetryPlies,
-      session.failedModeWrongMoves,
+      mode === 'failed' ? session.failedRetryPlies : [],
+      mode === 'failed' ? session.failedModeWrongMoves : [],
     )
   }, [mode, solvingView, session])
 
@@ -83,11 +62,7 @@ export function usePgnNavigation({
       ? overviewPgnDisplayOverride
       : (overview?.pgn ?? null)
 
-  const pgnDisplay = mode === 'overview'
-    ? overviewPgnDisplay
-    : mode === 'failed'
-      ? failedFocusPgnDisplay
-      : focusPgnDisplay
+  const pgnDisplay = mode === 'overview' ? overviewPgnDisplay : livePgnDisplay
 
   useEffect(() => {
     if (mode !== 'overview') return
@@ -104,9 +79,9 @@ export function usePgnNavigation({
 
   const isAtHead =
     selectedPly === null ||
-    (focusPgnDisplay !== null &&
+    (livePgnDisplay !== null &&
       selectedPly.line === 'main' &&
-      selectedPly.index === focusPgnDisplay.mainline.length - 1)
+      selectedPly.index === livePgnDisplay.mainline.length - 1)
 
   return { pgnDisplay, selectedPly, setSelectedPly, isAtHead }
 }

@@ -102,9 +102,12 @@ describe('buildLivePgnDisplay — W1 resolved (correct move found after W1)', ()
   })
 })
 
+// Player got P1 right (d7d5), opponent responded (e4xd5), player correct P2 is Qxd5 (d8d5).
+const PLAYER_MOVE_2 = 'd8d5'
+
 describe('buildLivePgnDisplay — wrong move at a later position (P2)', () => {
-  it('puts a wrong move at P2 directly into subvariations', () => {
-    // Player got P1 right (d7d5), opponent responded (e4xd5), now wrong at P2.
+  it('holds the mainline slot for the first wrong move at P2 (unresolved)', () => {
+    // Player got P1 right, opponent responded, now wrong at P2 — mirrors W1 behaviour.
     const retryPlies = [PLAYER_MOVE_1, OPP_MOVE_2]
     const result = buildLivePgnDisplay(
       FEN,
@@ -113,13 +116,53 @@ describe('buildLivePgnDisplay — wrong move at a later position (P2)', () => {
       retryPlies,
       [{ uci: WRONG_MOVE_2, retryPliesAtWrongMove: [PLAYER_MOVE_1, OPP_MOVE_2] }],
     )
-    // Mainline: opp e4, d5 (W1 resolved), opp exd5, Qd7 (the wrong P2 move is in subs)
-    expect(result.mainline.length).toBeGreaterThanOrEqual(2)
-    // W1 in first subvariation
-    expect(result.subvariations).not.toBeNull()
-    const wrongAtP2 = result.subvariations!.find(sv => sv[0].uci === WRONG_MOVE_2)
-    expect(wrongAtP2).toBeDefined()
-    expect(wrongAtP2![0].moveStatus).toBe('wrong')
+    // Mainline: e4, d5 (correct), exd5 (opp), Qd7?? (wrong P2 in mainline)
+    expect(result.mainline).toHaveLength(4)
+    expect(result.mainline[3].uci).toBe(WRONG_MOVE_2)
+    expect(result.mainline[3].moveStatus).toBe('wrong')
+    // W1 is in subvariations; W2 is NOT (it's in the mainline)
+    expect(result.subvariations).toHaveLength(1)
+    expect(result.subvariations![0][0].uci).toBe(WRONG_MOVE_1)
+  })
+
+  it('demotes first wrong at P2 to subvariation once P2 is resolved', () => {
+    // failedRetryPlies has grown past the snapshot → W2 is resolved
+    const retryPlies = [PLAYER_MOVE_1, OPP_MOVE_2, PLAYER_MOVE_2]
+    const result = buildLivePgnDisplay(
+      FEN,
+      [OPP_MOVE],
+      WRONG_MOVE_1,
+      retryPlies,
+      [{ uci: WRONG_MOVE_2, retryPliesAtWrongMove: [PLAYER_MOVE_1, OPP_MOVE_2] }],
+    )
+    // Mainline ends at correct P2 — no wrong move in mainline
+    expect(result.mainline[result.mainline.length - 1].uci).toBe(PLAYER_MOVE_2)
+    expect(result.mainline[result.mainline.length - 1].moveStatus).toBeNull()
+    // Both W1 and W2 are in subvariations
+    expect(result.subvariations).toHaveLength(2)
+    expect(result.subvariations![0][0].uci).toBe(WRONG_MOVE_1)
+    expect(result.subvariations![1][0].uci).toBe(WRONG_MOVE_2)
+  })
+
+  it('second wrong at P2 goes directly to subvariation (only first holds the slot)', () => {
+    const WRONG_MOVE_2B = 'g8f6'  // another wrong move at P2
+    const retryPlies = [PLAYER_MOVE_1, OPP_MOVE_2]
+    const result = buildLivePgnDisplay(
+      FEN,
+      [OPP_MOVE],
+      WRONG_MOVE_1,
+      retryPlies,
+      [
+        { uci: WRONG_MOVE_2, retryPliesAtWrongMove: [PLAYER_MOVE_1, OPP_MOVE_2] },
+        { uci: WRONG_MOVE_2B, retryPliesAtWrongMove: [PLAYER_MOVE_1, OPP_MOVE_2] },
+      ],
+    )
+    // First wrong at P2 (WRONG_MOVE_2) holds mainline; second (WRONG_MOVE_2B) in subvariations
+    expect(result.mainline[result.mainline.length - 1].uci).toBe(WRONG_MOVE_2)
+    expect(result.mainline[result.mainline.length - 1].moveStatus).toBe('wrong')
+    expect(result.subvariations).toHaveLength(2)  // W1 + WRONG_MOVE_2B
+    expect(result.subvariations!.find(sv => sv[0].uci === WRONG_MOVE_2B)).toBeDefined()
+    expect(result.subvariations!.find(sv => sv[0].uci === WRONG_MOVE_2)).toBeUndefined()
   })
 })
 

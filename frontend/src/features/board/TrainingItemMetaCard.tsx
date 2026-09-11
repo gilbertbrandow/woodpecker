@@ -392,6 +392,69 @@ function DecoyGameInfo({ g }: { g: NonNullable<DecoySourceMetadata['game']> }): 
 
 type RowEntry = { move: DisplayMoveMin; idx: number }
 type MoveRow = { moveNumber: number; white: RowEntry | null; black: RowEntry | null }
+type SvEntry = { moves: DisplayMoveMin[]; si: number }
+
+export type PgnLayout = {
+  rows: MoveRow[]
+  svAfterWhite: Map<number, SvEntry[]>
+  svAfterBlack: Map<number, SvEntry[]>
+}
+
+// Pure transform from a PGN display to the layout structure used by PgnColumnView.
+// Extracted for independent testability; the component just maps this to JSX.
+//
+// Subvariations are split into two maps by where they branch:
+// - svAfterWhite: variation branches at the White cell (mid-row). Requires the
+//   "..." placeholder + continuation layout to match standard PGN convention.
+// - svAfterBlack: variation branches at the Black cell (end-of-row).
+//
+// When the player is White (opponent moves Black first), wrong moves are White
+// moves. Without this split a variation would appear to be an alternative to
+// Black's response rather than to White's correct move.
+export function computePgnLayout(pgnDisplay: TrainingItemMetaPgnDisplayMin): PgnLayout {
+  const rows: MoveRow[] = []
+  let current: MoveRow | null = null
+  for (let i = 0; i < pgnDisplay.mainline.length; i++) {
+    const move = pgnDisplay.mainline[i]
+    if (move.isWhite) {
+      current = { moveNumber: move.moveNumber, white: { move, idx: i }, black: null }
+      rows.push(current)
+    } else if (current && current.moveNumber === move.moveNumber) {
+      current.black = { move, idx: i }
+    } else {
+      current = { moveNumber: move.moveNumber, white: null, black: { move, idx: i } }
+      rows.push(current)
+    }
+  }
+
+  const afterWhite = new Map<number, SvEntry[]>()
+  const afterBlack = new Map<number, SvEntry[]>()
+  if (pgnDisplay.subvariations && pgnDisplay.mainline.length > 1) {
+    for (let si = 0; si < pgnDisplay.subvariations.length; si++) {
+      const sv = pgnDisplay.subvariations[si]
+      const firstMove = sv?.[0]
+      if (!firstMove) continue
+      const branchIdx = pgnDisplay.mainline.findIndex(
+        m => m.moveNumber === firstMove.moveNumber && m.isWhite === firstMove.isWhite,
+      )
+      const targetIdx = branchIdx > 0 ? branchIdx : 1
+      let rowIdx = rows.length - 1
+      for (let r = 0; r < rows.length; r++) {
+        if (rows[r].white?.idx === targetIdx || rows[r].black?.idx === targetIdx) {
+          rowIdx = r
+          break
+        }
+      }
+      const isAtWhiteCell = rows[rowIdx].white?.idx === targetIdx
+      const map = isAtWhiteCell ? afterWhite : afterBlack
+      const existing = map.get(rowIdx) ?? []
+      existing.push({ moves: sv, si })
+      map.set(rowIdx, existing)
+    }
+  }
+
+  return { rows, svAfterWhite: afterWhite, svAfterBlack: afterBlack }
+}
 
 function ColumnMoveCell({
   entry,
@@ -506,66 +569,10 @@ function PgnColumnView({
   selectedPly: PlySelection | null | undefined
   onPlyClick: ((ply: PlySelection) => void) | undefined
 }): React.ReactElement {
-  const rows: MoveRow[] = React.useMemo(() => {
-    const result: MoveRow[] = []
-    let current: MoveRow | null = null
-    for (let i = 0; i < pgnDisplay.mainline.length; i++) {
-      const move = pgnDisplay.mainline[i]
-      if (move.isWhite) {
-        current = { moveNumber: move.moveNumber, white: { move, idx: i }, black: null }
-        result.push(current)
-      } else if (current && current.moveNumber === move.moveNumber) {
-        current.black = { move, idx: i }
-      } else {
-        current = { moveNumber: move.moveNumber, white: null, black: { move, idx: i } }
-        result.push(current)
-      }
-    }
-    return result
-  }, [pgnDisplay.mainline])
-
-  type SvEntry = { moves: DisplayMoveMin[]; si: number }
-
-  // Split subvariations into two maps based on whether they branch at the White
-  // cell (mid-row) or the Black cell (end-of-row) of a given row.
-  //
-  // When the player is White (opponent moves Black first), wrong moves are White
-  // moves. A naive "variation after full row" would make the variation look like
-  // an alternative to Black's response instead of to White's correct move.
-  // Splitting lets us render `...` in the Black slot, show the variation, then
-  // resume with the actual Black response — matching the standard PGN convention.
-  const { svAfterWhite, svAfterBlack } = React.useMemo((): {
-    svAfterWhite: Map<number, SvEntry[]>
-    svAfterBlack: Map<number, SvEntry[]>
-  } => {
-    const afterWhite = new Map<number, SvEntry[]>()
-    const afterBlack = new Map<number, SvEntry[]>()
-    if (!pgnDisplay.subvariations || pgnDisplay.mainline.length <= 1) {
-      return { svAfterWhite: afterWhite, svAfterBlack: afterBlack }
-    }
-    for (let si = 0; si < pgnDisplay.subvariations.length; si++) {
-      const sv = pgnDisplay.subvariations[si]
-      const firstMove = sv?.[0]
-      if (!firstMove) continue
-      const branchIdx = pgnDisplay.mainline.findIndex(
-        m => m.moveNumber === firstMove.moveNumber && m.isWhite === firstMove.isWhite,
-      )
-      const targetIdx = branchIdx > 0 ? branchIdx : 1
-      let rowIdx = rows.length - 1
-      for (let r = 0; r < rows.length; r++) {
-        if (rows[r].white?.idx === targetIdx || rows[r].black?.idx === targetIdx) {
-          rowIdx = r
-          break
-        }
-      }
-      const isAtWhiteCell = rows[rowIdx].white?.idx === targetIdx
-      const map = isAtWhiteCell ? afterWhite : afterBlack
-      const existing = map.get(rowIdx) ?? []
-      existing.push({ moves: sv, si })
-      map.set(rowIdx, existing)
-    }
-    return { svAfterWhite: afterWhite, svAfterBlack: afterBlack }
-  }, [pgnDisplay, rows])
+  const { rows, svAfterWhite, svAfterBlack } = React.useMemo(
+    () => computePgnLayout(pgnDisplay),
+    [pgnDisplay],
+  )
 
   const numCellCls = 'flex-[0_0_13%] flex select-none items-center justify-center border-r border-border bg-muted py-0.5 text-[11px] leading-[1.75em] text-muted-foreground/60'
 

@@ -214,24 +214,6 @@ function applyUciDisplay(
   }
 }
 
-// Builds a minimal PGN display for focus mode from the interleaved plies
-// played so far (opponent move at index 0, then player and opponent alternating).
-// The backend owns the full aggregate PGN; this is only for live focus display.
-export function buildFocusPgnDisplay(
-  baseFen: string,
-  plies: string[],
-): TrainingItemMetaPgnDisplay {
-  const chess = new Chess(baseFen)
-  const mainline: DisplayMove[] = []
-  for (let i = 0; i < plies.length; i++) {
-    const moveStatus: DisplayMove['moveStatus'] = i === 0 ? 'opponent' : null
-    const move = applyUciDisplay(chess, plies[i], moveStatus)
-    if (!move) break
-    mainline.push(move)
-  }
-  return { mainline, subvariations: null }
-}
-
 export type FailedModeWrongMove = {
   uci: string
   // Snapshot of failedRetryPlies at the time this wrong move was played.
@@ -239,39 +221,70 @@ export type FailedModeWrongMove = {
   retryPliesAtWrongMove: string[]
 }
 
-// Builds the live PGN during active solving after the first wrong move (W1).
+// Builds the live Aggregate PGN for a TrainingItem during active solving.
 //
-// W1 occupies the mainline slot until the correct move is played at that position.
-// Subsequent wrong moves at the same position (W2, W3…) appear as subvariations
-// immediately. Once the correct move is found, W1 is demoted to the first
-// subvariation and the correct move becomes mainline. Wrong moves at later
-// positions always go directly to subvariation.
-export function buildLiveSolvingPgnDisplay(
+// Without firstWrongMove (focus mode before any mistake): plain linear display
+// of pliesPlayed with no subvariations.
+//
+// With firstWrongMove (W1): W1 occupies the mainline slot until failedRetryPlies
+// resolves it — at which point W1 is demoted to the first subvariation and the
+// correct move becomes mainline. Subsequent wrong moves at the same position go
+// directly to subvariations.
+//
+// The same "hold the mainline slot" rule applies at every later position: the
+// first wrong move at each new frontier position occupies the mainline slot
+// (with 'wrong' status) until the correct move at that position is found.
+// This ensures computePgnLayout can always find the branch point in the mainline
+// rather than falling back to an incorrect position.
+export function buildLivePgnDisplay(
   baseFen: string,
-  allPliesPlayed: string[],          // correct focus prefix (opp + player), does not include W1
-  firstWrongMove: string,             // W1: the first wrong move of the entire attempt
-  failedRetryPlies: string[],         // correct retry plies; non-empty means W1 is resolved
-  failedModeWrongMoves: FailedModeWrongMove[], // W2, W3, … played in failed mode
+  pliesPlayed: string[],
+  firstWrongMove?: string,
+  failedRetryPlies: string[] = [],
+  failedModeWrongMoves: FailedModeWrongMove[] = [],
 ): TrainingItemMetaPgnDisplay {
+  if (firstWrongMove === undefined) {
+    const chess = new Chess(baseFen)
+    const mainline: DisplayMove[] = []
+    for (let i = 0; i < pliesPlayed.length; i++) {
+      const move = applyUciDisplay(chess, pliesPlayed[i], i === 0 ? 'opponent' : null)
+      if (!move) break
+      mainline.push(move)
+    }
+    return { mainline, subvariations: null }
+  }
+
   const w1Resolved = failedRetryPlies.length > 0
 
+  // The first wrong move at the current frontier (retryPliesAtWrongMove.length ===
+  // failedRetryPlies.length) holds the mainline slot just like W1 does at position 1.
+  // Once the correct move at that position is found, failedRetryPlies grows and this
+  // entry's snapshot falls behind — at which point it demotes to a subvariation.
+  const firstUnresolvedAtFrontier = w1Resolved
+    ? (failedModeWrongMoves.find(wm => wm.retryPliesAtWrongMove.length === failedRetryPlies.length) ?? null)
+    : null
+
   const mainlinePlies = w1Resolved
-    ? [...allPliesPlayed, ...failedRetryPlies]
-    : [...allPliesPlayed, firstWrongMove]
+    ? firstUnresolvedAtFrontier !== null
+      ? [...pliesPlayed, ...failedRetryPlies, firstUnresolvedAtFrontier.uci]
+      : [...pliesPlayed, ...failedRetryPlies]
+    : [...pliesPlayed, firstWrongMove]
 
   const mainlineChess = new Chess(baseFen)
   const mainline: DisplayMove[] = []
   for (let i = 0; i < mainlinePlies.length; i++) {
+    const isLastPly = i === mainlinePlies.length - 1
+    const isWrongInMainline =
+      (!w1Resolved && isLastPly) || (firstUnresolvedAtFrontier !== null && isLastPly)
     const moveStatus: DisplayMove['moveStatus'] =
       i === 0 ? 'opponent'
-      : !w1Resolved && i === mainlinePlies.length - 1 ? 'wrong'
+      : isWrongInMainline ? 'wrong'
       : null
     const move = applyUciDisplay(mainlineChess, mainlinePlies[i], moveStatus)
     if (!move) break
     mainline.push(move)
   }
 
-  // Build a DisplayMove for a wrong move branching from a given ply prefix.
   const makeWrongDisplay = (uci: string, prefix: string[]): DisplayMove | null => {
     const chess = new Chess(baseFen)
     for (const ply of prefix) {
@@ -284,19 +297,20 @@ export function buildLiveSolvingPgnDisplay(
 
   // Wrong moves at W1's position. Once W1 is resolved it joins this group first.
   if (w1Resolved) {
-    const d = makeWrongDisplay(firstWrongMove, allPliesPlayed)
+    const d = makeWrongDisplay(firstWrongMove, pliesPlayed)
     if (d) subvariations.push([d])
   }
-  for (const { uci, retryPliesAtWrongMove } of failedModeWrongMoves) {
-    if (retryPliesAtWrongMove.length > 0) continue
-    const d = makeWrongDisplay(uci, allPliesPlayed)
+  for (const wm of failedModeWrongMoves) {
+    if (wm.retryPliesAtWrongMove.length > 0) continue
+    const d = makeWrongDisplay(wm.uci, pliesPlayed)
     if (d) subvariations.push([d])
   }
 
-  // Wrong moves at later positions (P2+).
-  for (const { uci, retryPliesAtWrongMove } of failedModeWrongMoves) {
-    if (retryPliesAtWrongMove.length === 0) continue
-    const d = makeWrongDisplay(uci, [...allPliesPlayed, ...retryPliesAtWrongMove])
+  // Wrong moves at later positions (P2+). Skip the one currently in the mainline.
+  for (const wm of failedModeWrongMoves) {
+    if (wm.retryPliesAtWrongMove.length === 0) continue
+    if (wm === firstUnresolvedAtFrontier) continue
+    const d = makeWrongDisplay(wm.uci, [...pliesPlayed, ...wm.retryPliesAtWrongMove])
     if (d) subvariations.push([d])
   }
 
