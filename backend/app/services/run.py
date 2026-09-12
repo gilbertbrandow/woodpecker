@@ -229,6 +229,7 @@ def _run_puzzle_attempt_view_dict(run_puzzle: RunTrainingItem) -> dict[str, obje
         "trainingItem": {
             "fen": payload.contract.fen,
             "solution": payload.contract.plies,
+            "prelude": payload.contract.prelude,
             "source": payload.metadata.to_api_dict(),
         },
         "attempt": {
@@ -1640,6 +1641,7 @@ def _build_run_puzzle_overview(
         "trainingItem": {
             "fen": payload.contract.fen,
             "solution": payload.contract.plies,
+            "prelude": payload.contract.prelude,
             "source": payload.metadata.to_api_dict(),
         },
         "selectedAttemptId": resolved_selected_id,

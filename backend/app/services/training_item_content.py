@@ -19,6 +19,28 @@ from app.models.training_item import TrainingItem, TrainingItemSource
 from app.services.solve_contract import SolveContract
 
 
+def _ply_from_fen(fen: str) -> int:
+    """Return the number of half-moves played to reach the given FEN position."""
+    parts = fen.split()
+    if len(parts) < 6:
+        return 0
+    try:
+        fullmove = int(parts[5])
+    except ValueError:
+        return 0
+    return (fullmove - 1) * 2 + (1 if parts[1] == 'b' else 0)
+
+
+def _game_prelude(game: SourceGame | None, fen: str) -> list[str]:
+    """Slice game.moves to produce the prelude leading up to the puzzle FEN position."""
+    if game is None or not game.moves:
+        return []
+    ply = _ply_from_fen(fen)
+    if ply <= 0:
+        return []
+    return game.moves.split()[:ply]
+
+
 class SourceMetadata(ABC):
     @abstractmethod
     def to_api_dict(self) -> dict[str, object]: ...
@@ -139,13 +161,18 @@ def _dispatch(ti: TrainingItem) -> TrainingItemPayload:
 def _lichess_tactic_payload(training_item_id: int) -> TrainingItemPayload:
     tactic = db.session.execute(
         sa.select(LichessTactic)
-        .options(selectinload(LichessTactic.themes), selectinload(LichessTactic.openings))
+        .options(
+            selectinload(LichessTactic.themes),
+            selectinload(LichessTactic.openings),
+            selectinload(LichessTactic.game),
+        )
         .where(LichessTactic.training_item_id == training_item_id)
     ).scalar_one()
     return TrainingItemPayload(
         contract=SolveContract(
             fen=tactic.fen,
             plies=_split_moves(tactic.moves),
+            prelude=_game_prelude(tactic.game, tactic.fen),
         ),
         metadata=LichessTacticMetadata(
             display_id=tactic.puzzle_id,
@@ -162,7 +189,11 @@ def _lichess_tactic_payload_batch(
 ) -> dict[int, TrainingItemPayload]:
     tactics = db.session.execute(
         sa.select(LichessTactic)
-        .options(selectinload(LichessTactic.themes), selectinload(LichessTactic.openings))
+        .options(
+            selectinload(LichessTactic.themes),
+            selectinload(LichessTactic.openings),
+            selectinload(LichessTactic.game),
+        )
         .where(LichessTactic.training_item_id.in_(training_item_ids))
     ).scalars().all()
     return {
@@ -170,6 +201,7 @@ def _lichess_tactic_payload_batch(
             contract=SolveContract(
                 fen=t.fen,
                 plies=_split_moves(t.moves),
+                prelude=_game_prelude(t.game, t.fen),
             ),
             metadata=LichessTacticMetadata(
                 display_id=t.puzzle_id,
@@ -190,6 +222,7 @@ def _scraped_positional_payload(training_item_id: int) -> TrainingItemPayload:
             selectinload(ScrapedPositionalPuzzle.difficulty),
             selectinload(ScrapedPositionalPuzzle.themes),
             selectinload(ScrapedPositionalPuzzle.opening),
+            selectinload(ScrapedPositionalPuzzle.game),
         )
         .where(ScrapedPositionalPuzzle.training_item_id == training_item_id)
     ).scalar_one()
@@ -205,6 +238,7 @@ def _scraped_positional_payload_batch(
             selectinload(ScrapedPositionalPuzzle.difficulty),
             selectinload(ScrapedPositionalPuzzle.themes),
             selectinload(ScrapedPositionalPuzzle.opening),
+            selectinload(ScrapedPositionalPuzzle.game),
         )
         .where(ScrapedPositionalPuzzle.training_item_id.in_(training_item_ids))
     ).scalars().all()
@@ -217,6 +251,7 @@ def _build_positional_payload(puzzle: ScrapedPositionalPuzzle) -> TrainingItemPa
         contract=SolveContract(
             fen=puzzle.fen,
             plies=_split_moves(puzzle.moves),
+            prelude=_game_prelude(puzzle.game, puzzle.fen),
         ),
         metadata=ScrapedPositionalMetadata(
             internal_id=puzzle.internal_id,
@@ -333,6 +368,7 @@ def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
             plies=[_nu(decoy.opponent_move), accepted_ucis],
             decoy_lines=decoy_lines or None,
             is_decoy=True,
+            prelude=_game_prelude(game, fen),
         ),
         metadata=DecoyMetadata(
             accepted_moves=valid_moves,

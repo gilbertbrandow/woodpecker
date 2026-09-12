@@ -7,7 +7,9 @@ from app.services.training_item_content import (
     DecoyMetadata,
     LichessTacticMetadata,
     _decoy_payload,
+    _game_prelude,
     _lichess_tactic_payload,
+    _ply_from_fen,
     _split_moves,
     get_content_batch,
 )
@@ -193,6 +195,43 @@ def test_decoy_payload_sorts_accepted_moves_ascending_for_black_player() -> None
         payload = _decoy_payload(10)
     accepted = list(payload.contract.plies[1])
     assert accepted == ["d2d4", "c2c4", "e2e4"]  # ascending by cp: -5, 10, 20
+
+
+@pytest.mark.parametrize("fen,expected", [
+    ("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 0),   # start
+    ("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", 1), # after 1.e4
+    ("rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", 2), # after 1.e4 d5
+    ("rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2", 3), # after 1.e4 d5 2.e5
+])
+def test_ply_from_fen(fen: str, expected: int) -> None:
+    assert _ply_from_fen(fen) == expected
+
+
+def test_ply_from_fen_short_fen_returns_zero() -> None:
+    assert _ply_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -") == 0
+
+
+def test_game_prelude_returns_empty_when_game_is_none() -> None:
+    assert _game_prelude(None, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") == []
+
+
+def test_game_prelude_returns_empty_when_game_has_no_moves() -> None:
+    game = MagicMock()
+    game.moves = None
+    assert _game_prelude(game, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") == []
+
+
+def test_game_prelude_slices_to_ply() -> None:
+    game = MagicMock()
+    game.moves = "e2e4 d7d5 e4d5 d8d5"
+    fen = "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"
+    assert _game_prelude(game, fen) == ["e2e4", "d7d5"]
+
+
+def test_game_prelude_returns_empty_when_ply_is_zero() -> None:
+    game = MagicMock()
+    game.moves = "e2e4 d7d5"
+    assert _game_prelude(game, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") == []
 
 
 def test_get_content_batch_with_empty_list_returns_empty_dict() -> None:
