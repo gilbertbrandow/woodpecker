@@ -14,7 +14,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.models.decoy_puzzle import DecoyPuzzle
-from app.models.game import Game
+from app.models.game import SourceGame as Game
 from app.models.opening import Opening
 
 PROGRESS_INTERVAL = 500

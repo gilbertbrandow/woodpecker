@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.extensions import Base
 
 if TYPE_CHECKING:
-    from app.models.game import Game
+    from app.models.game import SourceGame
     from app.models.training_item import TrainingItem
 
 
@@ -30,7 +30,7 @@ class DecoyPuzzle(Base):
     training_item: Mapped["TrainingItem"] = relationship(
         "TrainingItem", back_populates="decoy_puzzle", uselist=False
     )
-    game: Mapped["Game | None"] = relationship("Game")
+    game: Mapped["SourceGame | None"] = relationship("SourceGame")
 
     __table_args__ = (
         Index("ix_decoy_puzzles_game_id", "game_id"),

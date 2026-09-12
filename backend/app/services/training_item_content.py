@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 from app.exceptions import NotFoundError
 from app.extensions import db
 from app.models.decoy_puzzle import DecoyPuzzle
-from app.models.game import Game
+from app.models.game import SourceGame
 from app.models.lichess_tactic import LichessTactic
 from app.models.opening import Opening
 from app.models.scraped_positional_puzzle import ScrapedPositionalPuzzle
@@ -263,7 +263,7 @@ def _opening_dict(opening: Opening) -> dict[str, object]:
 def _decoy_payload(training_item_id: int) -> TrainingItemPayload:
     decoy = db.session.execute(
         sa.select(DecoyPuzzle)
-        .options(selectinload(DecoyPuzzle.game).selectinload(Game.opening))
+        .options(selectinload(DecoyPuzzle.game).selectinload(SourceGame.opening))
         .where(DecoyPuzzle.training_item_id == training_item_id)
     ).scalar_one()
     return _build_decoy_payload(decoy)
@@ -272,13 +272,13 @@ def _decoy_payload(training_item_id: int) -> TrainingItemPayload:
 def _decoy_payload_batch(training_item_ids: list[int]) -> dict[int, TrainingItemPayload]:
     decoys = db.session.execute(
         sa.select(DecoyPuzzle)
-        .options(selectinload(DecoyPuzzle.game).selectinload(Game.opening))
+        .options(selectinload(DecoyPuzzle.game).selectinload(SourceGame.opening))
         .where(DecoyPuzzle.training_item_id.in_(training_item_ids))
     ).scalars().all()
     return {d.training_item_id: _build_decoy_payload(d) for d in decoys}
 
 
-def _serialize_game(game: Game) -> dict[str, object]:
+def _serialize_game(game: SourceGame) -> dict[str, object]:
     return {
         "white": game.white,
         "black": game.black,

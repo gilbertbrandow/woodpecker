@@ -1,5 +1,5 @@
 from app.models.decoy_puzzle import DecoyPuzzle
-from app.models.game import Game
+from app.models.game import Game, SourceGame
 from app.models.lichess_tactic import (
     LichessTactic,
     lichess_tactic_openings,
@@ -33,6 +33,7 @@ __all__ = [
     "DecoyPuzzle",
     "DecoySourceRunMetadata",
     "Game",
+    "SourceGame",
     "LichessTactic",
     "LichessTacticTheme",
     "LichessTacticsSourceRunMetadata",
