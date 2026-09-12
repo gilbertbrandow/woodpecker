@@ -242,10 +242,21 @@ export function buildLivePgnDisplay(
   firstWrongMove?: string,
   failedRetryPlies: string[] = [],
   failedModeWrongMoves: FailedModeWrongMove[] = [],
+  prelude: string[] = [],
 ): TrainingItemMetaPgnDisplay {
+  const contextMoves: DisplayMove[] = []
+  if (prelude.length > 0) {
+    const ctx = new Chess()
+    for (const uci of prelude) {
+      const move = applyUciDisplay(ctx, uci, 'context')
+      if (!move) break
+      contextMoves.push(move)
+    }
+  }
+
   if (firstWrongMove === undefined) {
     const chess = new Chess(baseFen)
-    const mainline: DisplayMove[] = []
+    const mainline: DisplayMove[] = [...contextMoves]
     for (let i = 0; i < pliesPlayed.length; i++) {
       const move = applyUciDisplay(chess, pliesPlayed[i], i === 0 ? 'opponent' : null)
       if (!move) break
@@ -271,7 +282,7 @@ export function buildLivePgnDisplay(
     : [...pliesPlayed, firstWrongMove]
 
   const mainlineChess = new Chess(baseFen)
-  const mainline: DisplayMove[] = []
+  const mainline: DisplayMove[] = [...contextMoves]
   for (let i = 0; i < mainlinePlies.length; i++) {
     const isLastPly = i === mainlinePlies.length - 1
     const isWrongInMainline =

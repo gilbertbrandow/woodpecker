@@ -54,6 +54,7 @@ export function usePgnNavigation({
       firstWrongMove,
       mode === 'failed' ? session.failedRetryPlies : [],
       mode === 'failed' ? session.failedModeWrongMoves : [],
+      solvingView.trainingItem.prelude,
     )
   }, [mode, solvingView, session])
 

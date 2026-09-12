@@ -797,7 +797,7 @@ export type DisplayMove = {
   to: string
   moveNumber: number
   isWhite: boolean
-  moveStatus: 'correct' | 'wrong' | 'opponent' | null
+  moveStatus: 'correct' | 'wrong' | 'opponent' | 'context' | null
 }
 
 export type TrainingItemMetaPgnDisplay = {
@@ -888,6 +888,7 @@ export type RunTrainingItemOverview = {
   trainingItem: {
     fen: string
     solution: (string | string[])[]
+    prelude: string[]
     source: SourceMetadata
   }
   selectedAttemptId: number | null
@@ -966,6 +967,7 @@ export type RunTrainingItemAttemptView = {
   trainingItem: {
     fen: string
     solution: (string | string[])[]
+    prelude: string[]
     source: SourceMetadata
   }
   attempt: {
