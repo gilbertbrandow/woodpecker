@@ -315,8 +315,11 @@ def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
     opening = game.opening if game else None
     fullmove = decoy.move_number // 2
     fen = decoy.fen if len(decoy.fen.split()) == 6 else f"{decoy.fen} 0 {fullmove}"
-    if decoy.analysis_url:
-        analysis_url = decoy.analysis_url
+    fen_parts = decoy.fen.split()
+    if game and game.lichess_id:
+        # FEN turn is the opponent's color; player is white when FEN shows black to move.
+        color_suffix = "" if (len(fen_parts) > 1 and fen_parts[1] == "b") else "/black"
+        analysis_url = f"https://lichess.org/{game.lichess_id}{color_suffix}#{decoy.move_number}"
     else:
         try:
             post_board = chess.Board(fen)

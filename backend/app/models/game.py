@@ -24,7 +24,7 @@ class SourceGame(Base):
     event: Mapped[str | None] = mapped_column(Text, nullable=True)
     date: Mapped[str | None] = mapped_column(Text, nullable=True)
     eco: Mapped[str | None] = mapped_column(Text, nullable=True)
-    moves: Mapped[str | None] = mapped_column(Text, nullable=True)
+    moves: Mapped[str] = mapped_column(Text, nullable=False)
     opening_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("openings.id"), nullable=True)
     source_import_run_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("source_import_runs.id"), nullable=False

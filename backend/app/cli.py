@@ -1,6 +1,5 @@
 import json
 import time
-from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
 import chess
@@ -85,13 +84,15 @@ def register_commands(app: Flask) -> None:
     @click.option("--api-token", default=None, envvar="LICHESS_API_TOKEN", help="Lichess API token (optional but recommended to avoid rate limits)")
     @click.option("--batch-size", type=int, default=300, show_default=True, help="Lichess API batch size (max 300)")
     @click.option("--dry-run", is_flag=True, default=False, help="Report counts without making any changes")
-    def backfill_source_game_moves(api_token: str | None, batch_size: int, dry_run: bool) -> None:
+    @click.option("--decoy-file", default=None, type=click.Path(exists=True), help="Path to decoy_positions.jsonl — used to populate moves for OTB games the Lichess API cannot serve")
+    def backfill_source_game_moves(api_token: str | None, batch_size: int, dry_run: bool, decoy_file: str | None) -> None:
         """Backfill SourceGame.moves and puzzle game_id FKs for all existing training data.
 
-        Processes three passes in order:
+        Processes passes in order:
           1. lichess_tactics with game_id IS NULL  → create SourceGame rows + set FK
           2. scraped_positional_puzzles with game_id IS NULL  → create SourceGame rows + set FK
-          3. games with lichess_id IS NOT NULL AND moves IS NULL  → populate moves column
+          3. games with lichess_id IS NOT NULL AND moves IS NULL  → populate moves via Lichess API
+          4. games still with moves IS NULL  → populate moves from --decoy-file JSONL (OTB games)
         """
         from datetime import datetime, timezone
 
@@ -102,8 +103,8 @@ def register_commands(app: Flask) -> None:
         from app.models.scraped_positional_puzzle import ScrapedPositionalPuzzle
         from app.models.source_import_run import (
             SourceImportOperation,
-            SourceImportSource,
             SourceImportRun,
+            SourceImportSource,
             SourceImportStatus,
         )
 
@@ -117,7 +118,7 @@ def register_commands(app: Flask) -> None:
                     move = board.parse_san(san)
                     uci.append(move.uci())
                     board.push(move)
-                except Exception:
+                except (ValueError, chess.IllegalMoveError, chess.AmbiguousMoveError):
                     return None
             return " ".join(uci)
 
@@ -170,7 +171,7 @@ def register_commands(app: Flask) -> None:
             try:
                 parts = urlsplit(url).path.strip("/").split("/")
                 return parts[0] if parts else None
-            except Exception:
+            except (AttributeError, ValueError):
                 return None
 
         def _load_opening_caches() -> tuple[dict[str, int], dict[str, list[tuple[int, str]]]]:
@@ -370,6 +371,54 @@ def register_commands(app: Flask) -> None:
         else:
             click.echo(f"  [dry-run] Would fetch moves for {len(games_needing_moves):,} games")
 
+        # --- Pass 4: games still with moves IS NULL → backfill from decoy JSONL ---
+        # The Lichess bulk export API silently skips OTB broadcast games. Those games
+        # still have moves IS NULL after Pass 3. The decoy JSONL (from the master games
+        # DB) contains full PGN for every game including OTB ones.
+        total_jsonl_populated = 0
+        if decoy_file:
+            import json as _json
+            from pathlib import Path as _Path
+
+            still_null = db.session.execute(
+                sa.select(SourceGame.id, SourceGame.lichess_id)
+                .where(SourceGame.lichess_id.isnot(None), SourceGame.moves.is_(None))
+            ).all()
+            still_null_map = {row.lichess_id: row.id for row in still_null}
+            click.echo(f"Pass 4: {len(still_null_map):,} games still need moves — reading {_Path(decoy_file).name}")
+
+            if not dry_run and still_null_map:
+                with open(decoy_file, encoding="utf-8") as fh:
+                    for line in fh:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            item = _json.loads(line)
+                        except _json.JSONDecodeError:
+                            continue
+                        url = item.get("lichessGameUrl")
+                        moves_san = item.get("moves")
+                        if not url or not moves_san:
+                            continue
+                        lichess_id = url.split("/")[-1]
+                        if lichess_id not in still_null_map:
+                            continue
+                        moves_uci = _san_to_uci(moves_san)
+                        if not moves_uci:
+                            continue
+                        db.session.execute(
+                            sa.text("UPDATE games SET moves = :moves WHERE id = :gid"),
+                            {"moves": moves_uci, "gid": still_null_map[lichess_id]},
+                        )
+                        total_jsonl_populated += 1
+                db.session.commit()
+                click.echo(f"  Pass 4: {total_jsonl_populated:,} games updated from JSONL")
+            elif dry_run:
+                click.echo(f"  [dry-run] Would read JSONL to update up to {len(still_null_map):,} games")
+        else:
+            click.echo("Pass 4: --decoy-file not provided, skipping (OTB games will remain NULL until migration cleans them up)")
+
         # --- Finalise run ---
         if not dry_run:
             run.status = SourceImportStatus.SUCCEEDED
@@ -378,11 +427,13 @@ def register_commands(app: Flask) -> None:
                 "tactics_linked": total_tactics_linked,
                 "positional_linked": total_positional_linked,
                 "moves_populated": total_moves_populated,
+                "jsonl_moves_populated": total_jsonl_populated,
             }
             db.session.commit()
 
         click.echo(
             f"\nDone. tactics_linked={total_tactics_linked:,}  "
             f"positional_linked={total_positional_linked:,}  "
-            f"moves_populated={total_moves_populated:,}"
+            f"moves_populated={total_moves_populated:,}  "
+            f"jsonl_moves_populated={total_jsonl_populated:,}"
         )
