@@ -145,7 +145,7 @@ def _lichess_tactic_payload(training_item_id: int) -> TrainingItemPayload:
     return TrainingItemPayload(
         contract=SolveContract(
             fen=tactic.fen,
-            plies=tactic.moves.split(),
+            plies=_split_moves(tactic.moves),
         ),
         metadata=LichessTacticMetadata(
             display_id=tactic.puzzle_id,
@@ -169,7 +169,7 @@ def _lichess_tactic_payload_batch(
         t.training_item_id: TrainingItemPayload(
             contract=SolveContract(
                 fen=t.fen,
-                plies=t.moves.split(),
+                plies=_split_moves(t.moves),
             ),
             metadata=LichessTacticMetadata(
                 display_id=t.puzzle_id,
@@ -216,7 +216,7 @@ def _build_positional_payload(puzzle: ScrapedPositionalPuzzle) -> TrainingItemPa
     return TrainingItemPayload(
         contract=SolveContract(
             fen=puzzle.fen,
-            plies=puzzle.moves.split(),
+            plies=_split_moves(puzzle.moves),
         ),
         metadata=ScrapedPositionalMetadata(
             internal_id=puzzle.internal_id,
@@ -231,6 +231,25 @@ def _build_positional_payload(puzzle: ScrapedPositionalPuzzle) -> TrainingItemPa
             opening=_opening_dict(puzzle.opening) if puzzle.opening else None,
         ),
     )
+
+
+# Lichess encodes castling in Chess960 UCI (king-captures-rook square: e1h1/e1a1/e8h8/e8a8).
+# chess.js only accepts standard UCI (king destination: e1g1/e1c1/e8g8/e8c8).
+# python-chess tolerates both, so we normalise at the SolveContract boundary.
+_CHESS960_CASTLING: dict[str, str] = {
+    'e1h1': 'e1g1',
+    'e1a1': 'e1c1',
+    'e8h8': 'e8g8',
+    'e8a8': 'e8c8',
+}
+
+
+def _nu(uci: str) -> str:
+    return _CHESS960_CASTLING.get(uci, uci)
+
+
+def _split_moves(moves_str: str) -> list[str]:
+    return [_nu(m) for m in moves_str.split()]
 
 
 def _opening_dict(opening: Opening) -> dict[str, object]:
@@ -286,9 +305,9 @@ def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
     fen_parts = decoy.fen.split()
     player_is_white = len(fen_parts) > 1 and fen_parts[1] == 'b'
     valid_moves.sort(key=lambda m: m.get("cp", 0), reverse=player_is_white)
-    accepted_ucis = [m["uci"] for m in valid_moves]
+    accepted_ucis = [_nu(m["uci"]) for m in valid_moves]
     decoy_lines = {
-        m["uci"]: m["line"]
+        _nu(m["uci"]): ' '.join(_nu(u) for u in m["line"].split())
         for m in decoy.accepted_moves
         if isinstance(m, dict) and "uci" in m and m.get("line")
     }
@@ -308,7 +327,7 @@ def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
     return TrainingItemPayload(
         contract=SolveContract(
             fen=fen,
-            plies=[decoy.opponent_move, accepted_ucis],
+            plies=[_nu(decoy.opponent_move), accepted_ucis],
             decoy_lines=decoy_lines or None,
             is_decoy=True,
         ),
