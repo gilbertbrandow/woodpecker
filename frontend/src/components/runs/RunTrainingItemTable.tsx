@@ -190,7 +190,9 @@ export function RunTrainingItemTable({ runId, runIdStr, isActive }: Props): Reac
           ? `https://lichess.org/training/${src.displayId}`
           : src.sourceType === 'SCRAPED_POSITIONAL'
             ? src.lichessUrl
-            : null
+            : src.sourceType === 'DECOY'
+              ? src.analysisUrl
+              : null
         return (
           <div className="flex items-center gap-0.5">
             {externalUrl !== null && (
