@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.models.decoy_puzzle import DecoyPuzzle
 from app.models.game import SourceGame as Game
 from app.models.opening import Opening
+from sources.common.source_game import populate_game_moves
 
 
 PROGRESS_INTERVAL = 500
@@ -268,10 +269,13 @@ def process_batch(
     if not new_items:
         return ImportBatchResult(imported=0, skipped_existing=skipped_existing)
 
-    game_id_map = _upsert_games(
+    game_id_map, new_game_map = _upsert_games(
         session, new_items, source_import_run_id,
         opening_by_display_name, opening_by_eco,
     )
+
+    if new_game_map:
+        populate_game_moves(session, new_game_map, api_token)
 
     decoy_rows: list[dict[str, Any]] = []
     for item in new_items:
