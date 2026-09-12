@@ -33,6 +33,7 @@ __all__ = [
     "DecoyPuzzle",
     "DecoySourceRunMetadata",
     "Game",
+    "SourceGame",
     "LichessTactic",
     "LichessTacticTheme",
     "LichessTacticsSourceRunMetadata",
