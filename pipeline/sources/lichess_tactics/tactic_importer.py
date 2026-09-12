@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.models.lichess_tactic import LichessTactic, lichess_tactic_theme_links, lichess_tactic_openings
 from app.models.lichess_tactic_theme import LichessTacticTheme
 from app.models.opening import Opening
+from sources.common.source_game import fetch_full_game_data, upsert_source_games
 
 PROGRESS_INTERVAL = 10_000
 
@@ -62,6 +63,18 @@ class TacticBatchResult:
     inserted: int
     unknown_themes: set[str] = field(default_factory=set)
     unknown_openings: set[str] = field(default_factory=set)
+
+
+def _lichess_game_id_from_url(game_url: str) -> str | None:
+    """Extract the bare game ID from a Lichess game URL (e.g. https://lichess.org/abc123DE/black → abc123DE)."""
+    try:
+        parts = [p for p in game_url.split("/") if p]
+        # URL structure: scheme, empty, host, game_id[, side]
+        # After stripping empties: ['https:', 'lichess.org', 'abc123DE', 'black?...']
+        host_idx = next(i for i, p in enumerate(parts) if "lichess" in p)
+        return parts[host_idx + 1].split("?")[0]
+    except (StopIteration, IndexError):
+        return None
 
 
 def _player_oriented_game_url(game_url: str, fen: str) -> str:
@@ -149,6 +162,9 @@ def process_tactic_batch(
     theme_cache: dict[str, int],
     opening_cache: dict[str, int],
     fuzzy_opening_cache: dict[str, int | None],
+    opening_by_display_name: dict[str, int] | None = None,
+    opening_by_eco: dict[str, list[tuple[int, str]]] | None = None,
+    api_token: str | None = None,
 ) -> TacticBatchResult:
     if not batch:
         return TacticBatchResult(inserted=0)
@@ -238,6 +254,47 @@ def process_tactic_batch(
             )
         session.commit()
 
+    # Fetch and upsert SourceGame rows for newly inserted tactics.
+    if inserted_count > 0 and opening_by_display_name is not None and opening_by_eco is not None:
+        game_id_by_url: dict[str, str] = {}
+        for tactic in batch:
+            game_url = tactic.get("game_url", "")
+            gid = _lichess_game_id_from_url(game_url)
+            if gid:
+                game_id_by_url[game_url] = gid
+
+        unique_lichess_ids = list(set(game_id_by_url.values()))
+        if unique_lichess_ids:
+            try:
+                game_data = fetch_full_game_data(unique_lichess_ids, api_token)
+            except Exception as exc:
+                click.echo(f"Warning: could not fetch SourceGame data for tactic batch: {exc}")
+                game_data = {}
+
+            game_db_id_map = upsert_source_games(
+                session, game_data, source_import_run_id, opening_by_display_name, opening_by_eco
+            )
+
+            game_url_to_db_id: dict[str, int] = {}
+            for game_url, lichess_id in game_id_by_url.items():
+                if lichess_id in game_db_id_map:
+                    game_url_to_db_id[game_url] = game_db_id_map[lichess_id]
+
+            if game_url_to_db_id:
+                for tactic in batch:
+                    game_db_id = game_url_to_db_id.get(tactic.get("game_url", ""))
+                    if game_db_id is None:
+                        continue
+                    puzzle_id = tactic["puzzle_id"]
+                    session.execute(
+                        sa.text(
+                            "UPDATE lichess_tactics SET game_id = :game_id "
+                            "WHERE puzzle_id = :puzzle_id AND game_id IS NULL"
+                        ),
+                        {"game_id": game_db_id, "puzzle_id": puzzle_id},
+                    )
+                session.commit()
+
     return TacticBatchResult(
         inserted=inserted_count,
         unknown_themes=unknown_themes,
@@ -253,6 +310,7 @@ def import_tactics(
     min_rating: int = 0,
     max_rating: int = 9999,
     batch_size: int = 500,
+    api_token: str | None = None,
 ) -> dict[str, Any]:
     _check_prerequisites(session)
 
@@ -266,6 +324,12 @@ def import_tactics(
     theme_cache: dict[str, int] = _load_cache(session, LichessTacticTheme)
     opening_cache: dict[str, int] = _load_cache(session, Opening)
     fuzzy_opening_cache: dict[str, int | None] = {}
+
+    rows = session.execute(select(Opening.id, Opening.eco, Opening.display_name)).all()
+    opening_by_display_name: dict[str, int] = {display_name: id_ for id_, eco, display_name in rows}
+    opening_by_eco: dict[str, list[tuple[int, str]]] = {}
+    for id_, eco, display_name in rows:
+        opening_by_eco.setdefault(eco, []).append((id_, display_name))
 
     tactic_batch: list[dict[str, Any]] = []
     batch_themes: list[list[str]] = []
@@ -300,6 +364,7 @@ def import_tactics(
                     batch_result = process_tactic_batch(
                         session, tactic_batch, batch_themes, batch_openings,
                         source_import_run_id, theme_cache, opening_cache, fuzzy_opening_cache,
+                        opening_by_display_name, opening_by_eco, api_token,
                     )
                     tactic_batch.clear()
                     batch_themes.clear()
@@ -317,6 +382,7 @@ def import_tactics(
             batch_result = process_tactic_batch(
                 session, tactic_batch, batch_themes, batch_openings,
                 source_import_run_id, theme_cache, opening_cache, fuzzy_opening_cache,
+                opening_by_display_name, opening_by_eco, api_token,
             )
             rows_inserted += batch_result.inserted
             all_unknown_themes |= batch_result.unknown_themes
