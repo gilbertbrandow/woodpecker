@@ -166,6 +166,43 @@ describe('buildLivePgnDisplay — wrong move at a later position (P2)', () => {
   })
 })
 
+describe('buildLivePgnDisplay — prelude (context moves before puzzle position)', () => {
+  // Puzzle starts after 1.e4 — black to move; prelude is the one move that led here.
+  const PUZZLE_FEN = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1'
+  const PRELUDE = ['e2e4']
+  const OPP_MOVE_BLK = 'e7e5'
+  const PLAYER_MOVE_WHT = 'g1f3'
+  const WRONG_MOVE_WHT = 'f2f4'
+
+  it('prepends a single context move when prelude has one ply and no puzzle moves played', () => {
+    const result = buildLivePgnDisplay(PUZZLE_FEN, [], undefined, [], [], PRELUDE)
+    expect(result.mainline).toHaveLength(1)
+    expect(result.mainline[0].uci).toBe('e2e4')
+    expect(result.mainline[0].moveStatus).toBe('context')
+    expect(result.subvariations).toBeNull()
+  })
+
+  it('context moves appear before opponent and player moves', () => {
+    const result = buildLivePgnDisplay(PUZZLE_FEN, [OPP_MOVE_BLK, PLAYER_MOVE_WHT], undefined, [], [], PRELUDE)
+    expect(result.mainline).toHaveLength(3)
+    expect(result.mainline[0].moveStatus).toBe('context')
+    expect(result.mainline[1].moveStatus).toBe('opponent')
+    expect(result.mainline[2].moveStatus).toBeNull()
+  })
+
+  it('context moves also appear in failed mode mainline', () => {
+    const result = buildLivePgnDisplay(PUZZLE_FEN, [OPP_MOVE_BLK], WRONG_MOVE_WHT, [], [], PRELUDE)
+    expect(result.mainline[0].moveStatus).toBe('context')
+    expect(result.mainline[0].uci).toBe('e2e4')
+    expect(result.mainline[result.mainline.length - 1].moveStatus).toBe('wrong')
+  })
+
+  it('returns no context moves when prelude is empty', () => {
+    const result = buildLivePgnDisplay(PUZZLE_FEN, [OPP_MOVE_BLK], undefined, [], [], [])
+    expect(result.mainline.every(m => m.moveStatus !== 'context')).toBe(true)
+  })
+})
+
 const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 const SOLUTION_MOVES: (string | string[])[] = ['e2e4', 'd7d5', 'e4d5', 'd8d5']
 

@@ -11,7 +11,7 @@ type DisplayMoveMin = {
   uci?: string
   moveNumber: number
   isWhite: boolean
-  moveStatus: 'correct' | 'wrong' | 'opponent' | null
+  moveStatus: 'correct' | 'wrong' | 'opponent' | 'context' | null
 }
 
 type TrainingItemMetaPgnDisplayMin = {
@@ -60,9 +60,11 @@ function MoveToken({
     ? { line: 'subvariation', subIndex: subIndex ?? 0, index }
     : { line, index }
 
+  const isContext = move.moveStatus === 'context'
+
   if (!onPlyClick) {
     return (
-      <span className={cn('px-0.5', isSelected && 'rounded bg-foreground text-background')}>
+      <span className={cn('px-0.5', isSelected && 'rounded bg-foreground text-background', isContext && !isSelected && 'text-muted-foreground/60')}>
         {prefix}{san}
       </span>
     )
@@ -75,6 +77,7 @@ function MoveToken({
       className={cn(
         'inline rounded px-0.5',
         isSelected ? 'bg-foreground text-background' : 'cursor-pointer hover:bg-muted',
+        isContext && !isSelected && 'text-muted-foreground/60',
       )}
     >
       {prefix}{san}
@@ -484,12 +487,14 @@ function ColumnMoveCell({
     <span className="block text-center">...</span>
   ) : null
 
+  const isContext = entry?.move.moveStatus === 'context'
   const cls = cn(
     'flex-[0_0_43.5%] border-border px-2 py-0.5 text-sm leading-[1.75em]',
     bottomBorder && 'border-b',
     rightBorder && 'border-r',
     entry && !isSelected && onPlyClick ? 'cursor-pointer hover:bg-muted' : '',
     isSelected ? 'font-bold bg-foreground/10' : '',
+    isContext && !isSelected ? 'text-muted-foreground/60' : '',
   )
 
   if (!entry || !onPlyClick) {
