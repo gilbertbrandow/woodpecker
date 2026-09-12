@@ -10,7 +10,6 @@ Opening enrichment: for puzzles at or before ply OPENING_PLY_CUTOFF, the Lichess
 game export's opening field (eco + name) is extracted and returned alongside the FEN.
 This maps to 20 full moves — the practical boundary of opening theory in these games.
 """
-import json
 import time
 from collections.abc import Callable
 from typing import Any
@@ -19,7 +18,8 @@ import chess
 import click
 import requests
 
-LICHESS_EXPORT_URL = "https://lichess.org/api/games/export/_ids"
+from sources.common.source_game import fetch_full_game_data
+
 REQUEST_TIMEOUT = 60
 RATE_LIMIT_SLEEP = 1.0
 # Positions at or before this ply (20 full moves) are candidates for opening linking.
@@ -30,35 +30,14 @@ FetchFn = Callable[[list[str], str | None], dict[str, dict[str, Any]]]
 
 def fetch_game_data(game_ids: list[str], api_token: str | None) -> dict[str, dict[str, Any]]:
     """
-    Fetch move strings and opening data for a batch of Lichess game IDs (max 300 per call).
-    Returns {game_id: {"moves": "san1 san2 ...", "opening": {"eco": "C50", "name": "...", "ply": 5} | None}}.
+    Fetch game data for enrichment, including SAN moves and opening.
+
+    Delegates to fetch_full_game_data and normalises the return value to include
+    the "moves" key (SAN string) for backward compatibility with enrich_puzzle.
+    All extra fields (white, black, elo, etc.) are also present in each entry.
     """
-    headers: dict[str, str] = {"Accept": "application/x-ndjson"}
-    if api_token:
-        headers["Authorization"] = f"Bearer {api_token}"
-
-    response = requests.post(
-        LICHESS_EXPORT_URL,
-        params={"opening": "true"},
-        data=",".join(game_ids),
-        headers={**headers, "Content-Type": "text/plain"},
-        timeout=REQUEST_TIMEOUT,
-        stream=True,
-    )
-    response.raise_for_status()
-
-    result: dict[str, dict[str, Any]] = {}
-    for raw_line in response.iter_lines():
-        if not raw_line:
-            continue
-        game: dict[str, Any] = json.loads(raw_line)
-        gid = game.get("id", "")
-        if gid:
-            result[gid] = {
-                "moves": game.get("moves", ""),
-                "opening": game.get("opening"),
-            }
-    return result
+    full = fetch_full_game_data(game_ids, api_token)
+    return {gid: {**data, "moves": data["moves_san"]} for gid, data in full.items()}
 
 
 def enrich_puzzle(
@@ -70,7 +49,7 @@ def enrich_puzzle(
     Compute the enriched FEN and moves string for one puzzle.
 
     Args:
-        moves_str: space-separated UCI move string for the full game.
+        moves_str: space-separated SAN move string for the full game.
         ply: 1-indexed ply at which the user plays (from the CSV move_number column).
         best_move: UCI move the user must play (from CSV best_move column).
 
@@ -103,19 +82,25 @@ def enrich_batch(
     batch_size: int = 300,
     *,
     fetch_fn: FetchFn = fetch_game_data,
-) -> list[tuple[str, str, dict[str, Any] | None] | None]:
+) -> tuple[list[tuple[str, str, dict[str, Any] | None] | None], dict[str, dict[str, Any]]]:
     """
     Enrich a list of puzzle dicts with FEN, moves, and opening data via Lichess API.
 
     Each puzzle dict must have keys: lichess_game_id, move_number, best_move.
-    Returns a parallel list of (enriched_fen, moves_string, opening_data) or None per puzzle.
+
+    Returns a tuple of:
+      - per-puzzle results: parallel list of (enriched_fen, moves_string, opening_data) or None
+      - game_map: {lichess_game_id: full game data dict} for all games fetched this batch,
+        suitable for passing to upsert_source_games in the importer
+
     opening_data is the Lichess opening object ({"eco", "name", "ply"}) or None when the
     puzzle is beyond OPENING_PLY_CUTOFF or the game has no recognized opening.
     """
     results: list[tuple[str, str, dict[str, Any] | None] | None] = [None] * len(puzzles)
+    combined_game_map: dict[str, dict[str, Any]] = {}
 
     for batch_start in range(0, len(puzzles), batch_size):
-        batch = puzzles[batch_start : batch_start + batch_size]
+        batch = puzzles[batch_start: batch_start + batch_size]
         game_ids = [p["lichess_game_id"] for p in batch]
 
         try:
@@ -123,6 +108,8 @@ def enrich_batch(
         except requests.HTTPError as exc:
             click.echo(f"Warning: Lichess API HTTP error for batch at offset {batch_start}: {exc}")
             continue
+
+        combined_game_map.update(game_map)
 
         for local_idx, puzzle in enumerate(batch):
             global_idx = batch_start + local_idx
@@ -141,4 +128,4 @@ def enrich_batch(
         if batch_start + batch_size < len(puzzles):
             time.sleep(RATE_LIMIT_SLEEP)
 
-    return results
+    return results, combined_game_map
