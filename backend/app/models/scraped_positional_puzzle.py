@@ -9,6 +9,7 @@ from app.models.scraped_positional_difficulty import ScrapedPositionalDifficulty
 from app.models.scraped_positional_theme import ScrapedPositionalTheme
 
 if TYPE_CHECKING:
+    from app.models.game import SourceGame
     from app.models.training_item import TrainingItem
 
 scraped_positional_theme_links = Table(
@@ -36,7 +37,9 @@ class ScrapedPositionalPuzzle(Base):
     opening_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("openings.id"), nullable=True
     )
+    game_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("games.id"), nullable=True)
 
+    game: Mapped["SourceGame | None"] = relationship("SourceGame")
     training_item: Mapped["TrainingItem"] = relationship(
         "TrainingItem", back_populates="positional_puzzle", uselist=False
     )
@@ -49,4 +52,5 @@ class ScrapedPositionalPuzzle(Base):
     __table_args__ = (
         Index("ix_scraped_positional_puzzles_difficulty_id", "difficulty_id"),
         Index("ix_scraped_positional_puzzles_opening_id", "opening_id"),
+        Index("ix_scraped_positional_puzzles_game_id", "game_id"),
     )

@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import Column, ForeignKey, Index, Integer, Table, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -5,6 +7,9 @@ from app.extensions import Base
 from app.models.lichess_tactic_theme import LichessTacticTheme
 from app.models.opening import Opening
 from app.models.training_item import TrainingItem
+
+if TYPE_CHECKING:
+    from app.models.game import SourceGame
 
 lichess_tactic_theme_links = Table(
     "lichess_tactic_theme_links",
@@ -36,7 +41,9 @@ class LichessTactic(Base):
     popularity: Mapped[int] = mapped_column(Integer, nullable=False)
     nb_plays: Mapped[int] = mapped_column(Integer, nullable=False)
     game_url: Mapped[str] = mapped_column(Text, nullable=False)
+    game_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("games.id"), nullable=True)
 
+    game: Mapped["SourceGame | None"] = relationship("SourceGame")
     training_item: Mapped[TrainingItem] = relationship(
         "TrainingItem", back_populates="lichess_tactic"
     )
@@ -50,4 +57,5 @@ class LichessTactic(Base):
     __table_args__ = (
         Index("ix_lichess_tactics_rating", "rating"),
         Index("ix_lichess_tactics_popularity", "popularity"),
+        Index("ix_lichess_tactics_game_id", "game_id"),
     )
