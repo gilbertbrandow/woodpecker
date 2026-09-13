@@ -16,13 +16,13 @@ from sqlalchemy.orm import Session
 from app.models.decoy_puzzle import DecoyPuzzle
 from app.models.game import SourceGame as Game
 from app.models.opening import Opening
-from sources.common.source_game import populate_game_moves
+from sources.common.source_game import san_moves_to_uci
 
 PROGRESS_INTERVAL = 500
 EXPECTED_SCHEMA_VERSION = 1
 _META_URL = "https://raw.githubusercontent.com/gilbertbrandow/decoys/main/meta.json"
 
-_REQUIRED_FIELDS = {"fen", "opponentMove", "acceptedMoves", "bestCp", "depth", "moveNumber"}
+_REQUIRED_FIELDS = {"fen", "opponentMove", "acceptedMoves", "bestCp", "depth", "moveNumber", "moves"}
 
 
 def check_schema_version() -> None:
@@ -96,70 +96,66 @@ def _upsert_games(
     source_import_run_id: int,
     opening_by_display_name: dict[str, int],
     opening_by_eco: dict[str, list[tuple[int, str]]],
-) -> tuple[dict[str, int], dict[str, int]]:
-    """Insert new games (keyed on lichess_id) and return (full_map, new_map).
-
-    full_map: lichess_id → game.id for all games (existing + new)
-    new_map:  lichess_id → game.id for newly inserted games only (need moves populated)
-    """
-    lichess_ids = {
-        item["lichessGameUrl"].split("/")[-1]
-        for item in items
-        if item.get("lichessGameUrl")
-    }
-    if not lichess_ids:
-        return {}
-
-    rows = session.execute(
-        select(Game.lichess_id, Game.id).where(Game.lichess_id.in_(lichess_ids))
-    ).all()
-    existing: dict[str, int] = {row.lichess_id: row.id for row in rows}
-
-    new_games: list[Game] = []
-    new_game_lichess_ids: list[str] = []
-    seen: set[str] = set(existing.keys())
-
+) -> dict[str, int]:
+    """Upsert SourceGame rows from JSONL items. Returns lichess_id → game.id for items with a URL."""
+    item_by_lichess_id: dict[str, dict[str, Any]] = {}
     for item in items:
         url = item.get("lichessGameUrl")
-        if not url:
-            continue
-        lichess_id = url.split("/")[-1]
-        if lichess_id in seen:
-            continue
-        seen.add(lichess_id)
-        new_games.append(
-            Game(
-                lichess_id=lichess_id,
-                white=item["white"],
-                black=item["black"],
-                white_elo=_safe_int(item.get("whiteElo")),
-                black_elo=_safe_int(item.get("blackElo")),
-                white_title=item.get("whiteTitle"),
-                black_title=item.get("blackTitle"),
-                event=item.get("event"),
-                date=item.get("date"),
-                eco=item.get("eco"),
-                opening_id=_find_opening_id(
-                    item.get("eco"),
-                    item.get("openingName"),
-                    opening_by_display_name,
-                    opening_by_eco,
-                ),
-                source_import_run_id=source_import_run_id,
+        if url:
+            item_by_lichess_id[url.split("/")[-1]] = item
+
+    if not item_by_lichess_id:
+        return {}
+
+    existing_rows = session.execute(
+        select(Game.lichess_id, Game.id).where(Game.lichess_id.in_(item_by_lichess_id.keys()))
+    ).all()
+    existing: dict[str, int] = {row.lichess_id: row.id for row in existing_rows}
+
+    for lichess_id, game_id in existing.items():
+        moves_uci = san_moves_to_uci(item_by_lichess_id[lichess_id]["moves"])
+        if moves_uci:
+            session.execute(
+                sa.update(Game.__table__)
+                .where(Game.__table__.c.id == game_id)
+                .values(moves=moves_uci)
             )
-        )
-        new_game_lichess_ids.append(lichess_id)
+
+    new_games: list[Game] = []
+    new_lichess_ids: list[str] = []
+    for lichess_id, item in item_by_lichess_id.items():
+        if lichess_id in existing:
+            continue
+        moves_uci = san_moves_to_uci(item["moves"])
+        if not moves_uci:
+            click.echo(f"Warning: skipping game {lichess_id}: could not convert moves to UCI")
+            continue
+        new_games.append(Game(
+            lichess_id=lichess_id,
+            moves=moves_uci,
+            white=item["white"],
+            black=item["black"],
+            white_elo=_safe_int(item.get("whiteElo")),
+            black_elo=_safe_int(item.get("blackElo")),
+            white_title=item.get("whiteTitle"),
+            black_title=item.get("blackTitle"),
+            event=item.get("event"),
+            date=item.get("date"),
+            eco=item.get("eco"),
+            opening_id=_find_opening_id(
+                item.get("eco"), item.get("openingName"),
+                opening_by_display_name, opening_by_eco,
+            ),
+            source_import_run_id=source_import_run_id,
+        ))
+        new_lichess_ids.append(lichess_id)
 
     if new_games:
         session.add_all(new_games)
         session.flush()
 
-    new_map: dict[str, int] = {}
-    for game, lichess_id in zip(new_games, new_game_lichess_ids):
-        new_map[lichess_id] = game.id
-
-    result = {**existing, **new_map}
-    return result, new_map
+    new_map = {lid: game.id for game, lid in zip(new_games, new_lichess_ids)}
+    return {**existing, **new_map}
 
 
 def process_batch(
@@ -168,7 +164,6 @@ def process_batch(
     source_import_run_id: int,
     opening_by_display_name: dict[str, int],
     opening_by_eco: dict[str, list[tuple[int, str]]],
-    api_token: str | None = None,
 ) -> ImportBatchResult:
     if not batch:
         return ImportBatchResult(imported=0, skipped_existing=0)
@@ -184,13 +179,10 @@ def process_batch(
     if not new_items:
         return ImportBatchResult(imported=0, skipped_existing=skipped_existing)
 
-    game_id_map, new_game_map = _upsert_games(
+    game_id_map = _upsert_games(
         session, new_items, source_import_run_id,
         opening_by_display_name, opening_by_eco,
     )
-
-    if new_game_map:
-        populate_game_moves(session, new_game_map, api_token)
 
     decoy_rows: list[dict[str, Any]] = []
     for item in new_items:
@@ -233,7 +225,6 @@ def import_decoys(
     source_import_run_id: int,
     limit: int | None,
     batch_size: int,
-    api_token: str | None = None,
 ) -> dict[str, Any]:
     check_schema_version()
     opening_by_display_name, opening_by_eco = _load_opening_caches(session)
@@ -279,7 +270,7 @@ def import_decoys(
             if len(pending) >= batch_size:
                 result = process_batch(
                     session, pending, source_import_run_id,
-                    opening_by_display_name, opening_by_eco, api_token,
+                    opening_by_display_name, opening_by_eco,
                 )
                 pending.clear()
                 rows_imported += result.imported
