@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { Chess } from 'chess.js'
-import { buildLivePgnDisplay, computeFinalFen, resolveOverviewBoardPosition, resolveStep, resultsInCheckmate } from '../boardPage.helpers'
+import { buildLivePgnDisplay, buildOverviewPgnDisplay, computeFinalFen, resolveOverviewBoardPosition, resolveStep, resultsInCheckmate } from '../boardPage.helpers'
 
 describe('resultsInCheckmate', () => {
   it('returns true when the move results in checkmate', () => {
@@ -270,5 +270,56 @@ describe('resolveStep', () => {
   })
   it('returns the first element for a non-empty alternatives array', () => {
     expect(resolveStep(['e7e5', 'c7c5'])).toBe('e7e5')
+  })
+})
+
+// Puzzle: 2-ply — white plays e2e4 (opponent), black responds d7d5 (player).
+// Wrong attempt: black plays d7d6 instead.
+const OVERVIEW_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+const OVERVIEW_PLIES: (string | string[])[] = ['e2e4', 'd7d5']
+
+describe('buildOverviewPgnDisplay', () => {
+  it('builds a correct mainline from the solution plies', () => {
+    const result = buildOverviewPgnDisplay(OVERVIEW_FEN, OVERVIEW_PLIES, [])
+    expect(result.mainline).toHaveLength(2)
+    expect(result.mainline[0].moveStatus).toBe('opponent')
+    expect(result.mainline[0].san).toBe('e4')
+    expect(result.mainline[1].moveStatus).toBe('correct')
+    expect(result.mainline[1].san).toBe('d5')
+  })
+
+  it('returns null subvariations when attempt played no moves', () => {
+    const result = buildOverviewPgnDisplay(OVERVIEW_FEN, OVERVIEW_PLIES, [])
+    expect(result.subvariations).toBeNull()
+  })
+
+  it('returns null subvariations for a solved attempt (no wrong move)', () => {
+    const result = buildOverviewPgnDisplay(OVERVIEW_FEN, OVERVIEW_PLIES, [['d7d5']])
+    expect(result.subvariations).toBeNull()
+  })
+
+  it('adds a wrong-move subvariation for a failed attempt', () => {
+    const result = buildOverviewPgnDisplay(OVERVIEW_FEN, OVERVIEW_PLIES, [['d7d6']])
+    expect(result.subvariations).toHaveLength(1)
+    expect(result.subvariations![0][0].moveStatus).toBe('wrong')
+    expect(result.subvariations![0][0].san).toBe('d6')
+  })
+
+  it('adds one subvariation per distinct wrong move across multiple variations', () => {
+    const result = buildOverviewPgnDisplay(OVERVIEW_FEN, OVERVIEW_PLIES, [['d7d6'], ['e7e6']])
+    expect(result.subvariations).toHaveLength(2)
+    const sans = result.subvariations!.map((sv) => sv[0].san)
+    expect(sans).toContain('d6')
+    expect(sans).toContain('e6')
+  })
+
+  it('handles a 4-ply puzzle: wrong move at position 2', () => {
+    const plies4: (string | string[])[] = ['e2e4', 'd7d5', 'e4d5', 'd8d5']
+    // Player gets ply-1 right but fails at ply-2
+    const result = buildOverviewPgnDisplay(OVERVIEW_FEN, plies4, [['d7d5', 'd8d7']])
+    expect(result.mainline).toHaveLength(4)
+    expect(result.subvariations).toHaveLength(1)
+    expect(result.subvariations![0][0].san).toBe('Qd7')
+    expect(result.subvariations![0][0].moveStatus).toBe('wrong')
   })
 })
