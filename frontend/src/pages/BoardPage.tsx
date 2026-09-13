@@ -22,7 +22,7 @@ import type { OverviewAttemptHistoryRow } from '../features/board/OverviewAttemp
 import { MobileActionsBar } from '../features/board/MobileActionsBar'
 import { useOverviewAttemptSelection } from '../features/board/useOverviewAttemptSelection'
 import { usePgnNavigation } from '../features/board/usePgnNavigation'
-import { resolveDisplayBoard, formatTimer, formatTargetSolveTime } from '../features/board/boardPage.helpers'
+import { resolveDisplayBoard, formatTimer, formatTargetSolveTime, buildOverviewPgnDisplay } from '../features/board/boardPage.helpers'
 import type { BoardState } from '../features/board/useBoardPageController'
 import { api } from '../lib/api'
 import type { AttemptSpectateView, RunTrainingItemOverview, SelectableUser, TrainingItemMetaPgnDisplay, UserRef } from '../lib/api'
@@ -183,13 +183,28 @@ export function BoardPage(): React.ReactElement | null {
     [user, handleClearSpectate],
   )
 
+  // When the user selects an attempt from the history table that differs from the
+  // server's default, build the PGN client-side so wrong-move subvariations from
+  // that specific attempt are shown. Spectate state takes priority over this.
+  const overviewPgnForSelectedAttempt = React.useMemo((): TrainingItemMetaPgnDisplay | null | undefined => {
+    if (spectateState !== null) return undefined
+    const overviewData = ctrl.overview.data
+    if (!overviewData || !selectedAttempt) return undefined
+    if (selectedAttempt.id === overviewData.selectedAttemptId) return undefined
+    return buildOverviewPgnDisplay(
+      overviewData.trainingItem.fen,
+      overviewData.trainingItem.solution,
+      selectedAttempt.moves,
+    )
+  }, [spectateState, ctrl.overview.data, selectedAttempt])
+
   const { pgnDisplay, selectedPly, setSelectedPly, isAtHead } = usePgnNavigation({
     mode: ctrl.mode,
     solvingView: ctrl.solvingView,
     session: ctrl.session,
     overview: ctrl.overview.data,
     boardKey: ctrl.board.boardKey,
-    overviewPgnDisplayOverride: spectateState?.view.pgn,
+    overviewPgnDisplayOverride: spectateState?.view.pgn ?? overviewPgnForSelectedAttempt,
   })
 
   const pgnDisplayRef = React.useRef<TrainingItemMetaPgnDisplay | null>(null)
@@ -224,7 +239,7 @@ export function BoardPage(): React.ReactElement | null {
         selectedPly,
         ctrl.mode === 'focus' ? pgnDisplay : null,
         selectedAttempt,
-        overviewPgnDisplay,
+        ctrl.mode === 'overview' ? pgnDisplay : overviewPgnDisplay,
       ),
     [ctrl.board, ctrl.mode, selectedPly, pgnDisplay, selectedAttempt, overviewPgnDisplay],
   )
@@ -442,7 +457,7 @@ export function BoardPage(): React.ReactElement | null {
     ctrl.mode === 'overview' && overviewData !== null ? (
       <MobileOverviewMetaBar
         source={overviewData.trainingItem.source}
-        pgnDisplay={overviewPgnDisplay}
+        pgnDisplay={pgnDisplay}
         trainingItemId={overviewData.runTrainingItem.trainingItemId}
         selectedPly={selectedPly}
         onPlyClick={handlePlyClick}
@@ -565,18 +580,20 @@ export function BoardPage(): React.ReactElement | null {
         rightSlot={timerRightSlot}
       />
       {sourceForMetaCard !== null && ctrl.mode !== 'overview' && (
-        <TrainingItemMetaCard
-          source={sourceForMetaCard}
-          pgnDisplay={pgnDisplay}
-          trainingItemId={trainingItemIdForMetaCard}
-          runPosition={ctrl.solvingView?.runTrainingItem.position}
-          focusMode={true}
-          selectedPly={null}
-          onPlyClick={undefined}
-        />
+        <div className="flex min-h-0 flex-1 flex-col">
+          <TrainingItemMetaCard
+            source={sourceForMetaCard}
+            pgnDisplay={pgnDisplay}
+            trainingItemId={trainingItemIdForMetaCard}
+            runPosition={ctrl.solvingView?.runTrainingItem.position}
+            focusMode={true}
+            selectedPly={selectedPly}
+            onPlyClick={handlePlyClick}
+          />
+        </div>
       )}
       {ctrl.mode === 'focus' && (
-        <div className="mt-auto">
+        <div>
           <MoveStatusCard
             lastMoveResult={displayBoard.moveFeedback.result}
             turnToMove={ctrl.board.turnToMove}
@@ -586,7 +603,7 @@ export function BoardPage(): React.ReactElement | null {
         </div>
       )}
       {ctrl.mode === 'failed' && ctrl.solvingView !== null && (
-        <div className="mt-auto flex flex-col gap-3">
+        <div className="flex flex-col gap-3">
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -631,13 +648,14 @@ export function BoardPage(): React.ReactElement | null {
           currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl, isPresent: user.isPresent, countryCode: user.countryCode }}
           topSlot={
             sourceForMetaCard !== null ? (
-              <div className="relative">
-                <div className={isOverviewTransitioning ? 'pointer-events-none opacity-40 blur-sm' : undefined}>
+              <div className="relative h-full">
+                <div className={`h-full${isOverviewTransitioning ? ' pointer-events-none opacity-40 blur-sm' : ''}`}>
                   <TrainingItemMetaCard
                     source={sourceForMetaCard}
                     pgnDisplay={pgnDisplay}
                     trainingItemId={trainingItemIdForMetaCard}
                     focusMode={false}
+                    fillHeight={true}
                     selectedPly={selectedPly}
                     onPlyClick={handlePlyClick}
                   />

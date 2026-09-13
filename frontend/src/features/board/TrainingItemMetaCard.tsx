@@ -60,11 +60,12 @@ function MoveToken({
     ? { line: 'subvariation', subIndex: subIndex ?? 0, index }
     : { line, index }
 
-  const isContext = move.moveStatus === 'context'
-
   if (!onPlyClick) {
     return (
-      <span className={cn('px-0.5', isSelected && 'rounded bg-foreground text-background', isContext && !isSelected && 'text-muted-foreground/60')}>
+      <span
+        data-pgn-selected={isSelected || undefined}
+        className={cn('px-0.5', isSelected && 'rounded bg-foreground text-background')}
+      >
         {prefix}{san}
       </span>
     )
@@ -73,11 +74,11 @@ function MoveToken({
   return (
     <button
       type="button"
+      data-pgn-selected={isSelected || undefined}
       onClick={() => onPlyClick(plyTarget)}
       className={cn(
         'inline rounded px-0.5',
         isSelected ? 'bg-foreground text-background' : 'cursor-pointer hover:bg-muted',
-        isContext && !isSelected && 'text-muted-foreground/60',
       )}
     >
       {prefix}{san}
@@ -147,25 +148,33 @@ function DecoyEvalSection({
     }
   }, [source.acceptedMoves])
 
+  // Opponent's move has moveStatus='opponent'; context moves are 'context'.
+  // We must find these by status rather than index because context moves (prelude)
+  // shift all puzzle-move indices.
+  const opponentIsWhite = React.useMemo(
+    () => pgnDisplay?.mainline.find(m => m.moveStatus === 'opponent')?.isWhite,
+    [pgnDisplay],
+  )
+
   const resolvedCp = React.useMemo((): number | null => {
-    if (!selectedPly || (selectedPly.line === 'main' && selectedPly.index === 0)) {
-      // Show the best eval the player can achieve across all accepted moves.
-      // All cp values are normalized to white's perspective (positive = white winning).
-      // mainline[0] is the opponent's move; if white played it, the player is black.
-      const opponentIsWhite = pgnDisplay?.mainline[0]?.isWhite
-      if (opponentIsWhite === undefined) return source.bestCp
-      return opponentIsWhite ? (minCp ?? source.bestCp) : (maxCp ?? source.bestCp)
-    }
-    if (selectedPly.line === 'subvariation') {
+    if (selectedPly?.line === 'subvariation') {
       const sv = pgnDisplay?.subvariations?.[selectedPly.subIndex]?.[0]
       return sv?.uci != null ? (cpByUci.get(sv.uci) ?? null) : null
     }
-    if (selectedPly.line === 'main' && selectedPly.index > 0) {
-      const move = pgnDisplay?.mainline[Math.min(selectedPly.index, 1)]
-      return move?.uci != null ? (cpByUci.get(move.uci) ?? null) : null
+
+    if (selectedPly?.line === 'main') {
+      const selectedMove = pgnDisplay?.mainline[selectedPly.index]
+      if (selectedMove?.moveStatus === 'correct') {
+        // Viewing a specific accepted move in the mainline.
+        return selectedMove.uci != null ? (cpByUci.get(selectedMove.uci) ?? null) : null
+      }
     }
-    return source.bestCp
-  }, [selectedPly, pgnDisplay, cpByUci, minCp, maxCp, source.bestCp])
+
+    // At head, or viewing a context/opponent move → best eval the player can achieve.
+    // cp values are from white's perspective; pick the best for the player's colour.
+    if (opponentIsWhite === undefined) return source.bestCp
+    return opponentIsWhite ? (minCp ?? source.bestCp) : (maxCp ?? source.bestCp)
+  }, [selectedPly, pgnDisplay, cpByUci, minCp, maxCp, source.bestCp, opponentIsWhite])
 
   return (
     <div className="flex items-center gap-2 border-t border-border px-3 py-1.5 leading-[1.75em]">
@@ -466,6 +475,8 @@ function ColumnMoveCell({
   rightBorder = true,
   bottomBorder = true,
   showPlaceholder = false,
+  headIndex,
+  firstOpponentIdx,
 }: {
   entry: RowEntry | null
   selectedPly: PlySelection | null | undefined
@@ -473,8 +484,13 @@ function ColumnMoveCell({
   rightBorder?: boolean
   bottomBorder?: boolean
   showPlaceholder?: boolean
+  headIndex?: number
+  firstOpponentIdx?: number
 }): React.ReactElement {
-  const isSelected = !!entry && selectedPly?.line === 'main' && selectedPly.index === entry.idx
+  const isSelected = !!entry && (
+    (selectedPly?.line === 'main' && selectedPly.index === entry.idx) ||
+    (headIndex !== undefined && entry.idx === headIndex)
+  )
 
   const content = entry ? (
     <>
@@ -487,23 +503,25 @@ function ColumnMoveCell({
     <span className="block text-center">...</span>
   ) : null
 
-  const isContext = entry?.move.moveStatus === 'context'
+  const isOpponent = entry !== null && firstOpponentIdx !== undefined && entry.idx === firstOpponentIdx
+
   const cls = cn(
     'flex-[0_0_43.5%] border-border px-2 py-0.5 text-sm leading-[1.75em]',
     bottomBorder && 'border-b',
     rightBorder && 'border-r',
     entry && !isSelected && onPlyClick ? 'cursor-pointer hover:bg-muted' : '',
-    isSelected ? 'font-bold bg-foreground/10' : '',
-    isContext && !isSelected ? 'text-muted-foreground/60' : '',
+    isSelected ? 'bg-foreground/10' : '',
+    isOpponent && 'ring-1 ring-inset ring-amber-500',
   )
 
   if (!entry || !onPlyClick) {
-    return <div className={cls}>{content}</div>
+    return <div data-pgn-selected={isSelected || undefined} className={cls}>{content}</div>
   }
 
   return (
     <button
       type="button"
+      data-pgn-selected={isSelected || undefined}
       onClick={() => onPlyClick({ line: 'main', index: entry.idx })}
       className={cls}
     >
@@ -569,10 +587,14 @@ function PgnColumnView({
   pgnDisplay,
   selectedPly,
   onPlyClick,
+  headIndex,
+  firstOpponentIdx,
 }: {
   pgnDisplay: TrainingItemMetaPgnDisplayMin
   selectedPly: PlySelection | null | undefined
   onPlyClick: ((ply: PlySelection) => void) | undefined
+  headIndex?: number
+  firstOpponentIdx?: number
 }): React.ReactElement {
   const { rows, svAfterWhite, svAfterBlack } = React.useMemo(
     () => computePgnLayout(pgnDisplay),
@@ -602,14 +624,14 @@ function PgnColumnView({
           return (
             <React.Fragment key={row.moveNumber}>
               <div className={cn(numCellCls, preCellsBorderB && 'border-b')}>{row.moveNumber}</div>
-              <ColumnMoveCell entry={row.white} selectedPly={selectedPly} onPlyClick={onPlyClick} bottomBorder={preCellsBorderB} showPlaceholder={row.white === null} />
+              <ColumnMoveCell entry={row.white} selectedPly={selectedPly} onPlyClick={onPlyClick} bottomBorder={preCellsBorderB} showPlaceholder={row.white === null} headIndex={headIndex} firstOpponentIdx={firstOpponentIdx} />
               <ColumnMoveCell entry={null} selectedPly={selectedPly} onPlyClick={onPlyClick} rightBorder={false} bottomBorder={preCellsBorderB} showPlaceholder />
               <VariationLines svEntries={svEntriesAfterWhite} selectedPly={selectedPly} onPlyClick={onPlyClick} isLast={!hasBlackContinuation && isLast} />
               {hasBlackContinuation && (
                 <>
                   <div className={cn(numCellCls, !isLast && 'border-b')} />
                   <ColumnMoveCell entry={null} selectedPly={selectedPly} onPlyClick={onPlyClick} bottomBorder={!isLast} showPlaceholder />
-                  <ColumnMoveCell entry={row.black} selectedPly={selectedPly} onPlyClick={onPlyClick} rightBorder={false} bottomBorder={!isLast} />
+                  <ColumnMoveCell entry={row.black} selectedPly={selectedPly} onPlyClick={onPlyClick} rightBorder={false} bottomBorder={!isLast} headIndex={headIndex} firstOpponentIdx={firstOpponentIdx} />
                   {svEntriesAfterBlack && (
                     <VariationLines svEntries={svEntriesAfterBlack} selectedPly={selectedPly} onPlyClick={onPlyClick} isLast={isLast} />
                   )}
@@ -622,8 +644,8 @@ function PgnColumnView({
         return (
           <React.Fragment key={row.moveNumber}>
             <div className={cn(numCellCls, !isLast && 'border-b')}>{row.moveNumber}</div>
-            <ColumnMoveCell entry={row.white} selectedPly={selectedPly} onPlyClick={onPlyClick} bottomBorder={!isLast} showPlaceholder={row.white === null} />
-            <ColumnMoveCell entry={row.black} selectedPly={selectedPly} onPlyClick={onPlyClick} rightBorder={false} bottomBorder={!isLast} />
+            <ColumnMoveCell entry={row.white} selectedPly={selectedPly} onPlyClick={onPlyClick} bottomBorder={!isLast} showPlaceholder={row.white === null} headIndex={headIndex} firstOpponentIdx={firstOpponentIdx} />
+            <ColumnMoveCell entry={row.black} selectedPly={selectedPly} onPlyClick={onPlyClick} rightBorder={false} bottomBorder={!isLast} headIndex={headIndex} firstOpponentIdx={firstOpponentIdx} />
             {svEntriesAfterBlack && (
               <VariationLines svEntries={svEntriesAfterBlack} selectedPly={selectedPly} onPlyClick={onPlyClick} isLast={isLast} />
             )}
@@ -638,12 +660,103 @@ function PgnDisplayBlock({
   pgnDisplay,
   selectedPly,
   onPlyClick,
+  stretch = false,
+  fillHeight = false,
 }: {
   pgnDisplay: TrainingItemMetaPgnDisplayMin
   selectedPly: PlySelection | null | undefined
   onPlyClick: ((ply: PlySelection) => void) | undefined
+  stretch?: boolean
+  fillHeight?: boolean
 }): React.ReactElement {
-  return <PgnColumnView pgnDisplay={pgnDisplay} selectedPly={selectedPly} onPlyClick={onPlyClick} />
+  const containerRef = React.useRef<HTMLDivElement>(null)
+  const prevPlyRef = React.useRef<PlySelection | null | undefined>(undefined)
+  const prevMainlineLenRef = React.useRef<number>(0)
+
+  // When at head (no explicit selection), treat the last mainline move as the
+  // current position so it is highlighted and scrolled into view.
+  const headIndex = (selectedPly === null || selectedPly === undefined) && pgnDisplay.mainline.length > 0
+    ? pgnDisplay.mainline.length - 1
+    : undefined
+
+  // Only the first opponent move gets the puzzle-start orange ring.
+  const firstOpponentRaw = pgnDisplay.mainline.findIndex(m => m.moveStatus === 'opponent')
+  const firstOpponentIdx = firstOpponentRaw !== -1 ? firstOpponentRaw : undefined
+
+  // useLayoutEffect so the scroll is applied before paint, preventing a flash
+  // of the unscrolled state on initial load.
+  React.useLayoutEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const prev = prevPlyRef.current
+    const isFirstRun = prev === undefined
+    const plyChanged = isFirstRun ||
+      prev === null ||
+      selectedPly === null ||
+      selectedPly === undefined ||
+      prev.line !== selectedPly.line ||
+      prev.index !== selectedPly.index ||
+      (prev.line === 'subvariation' && selectedPly.line === 'subvariation' && prev.subIndex !== selectedPly.subIndex)
+    prevPlyRef.current = selectedPly
+
+    const mainlineLen = pgnDisplay.mainline.length
+    const mainlineGrew = mainlineLen > prevMainlineLenRef.current
+    prevMainlineLenRef.current = mainlineLen
+
+    const scrollToShowElement = (el: Element) => {
+      el.scrollIntoView({ block: 'center' })
+    }
+
+    // On first render, scroll to the selected element or fall back to the bottom.
+    if (isFirstRun) {
+      const el = container.querySelector('[data-pgn-selected]')
+      if (el) {
+        scrollToShowElement(el)
+      } else {
+        container.scrollTop = container.scrollHeight
+      }
+      return
+    }
+
+    if (selectedPly !== null && selectedPly !== undefined) {
+      if (plyChanged) {
+        const el = container.querySelector('[data-pgn-selected]')
+        if (el) {
+          scrollToShowElement(el)
+        }
+      }
+    } else if (mainlineGrew) {
+      container.scrollTop = container.scrollHeight
+    }
+  }, [selectedPly, pgnDisplay])
+
+  // Sibling components (e.g. recharts in the attempt history table) resize after
+  // the initial paint and steal space from our flex container, invalidating the
+  // scroll position set above. Re-scroll once when the container first changes size.
+  React.useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    let prevHeight = container.clientHeight
+    const ro = new ResizeObserver(() => {
+      const h = container.clientHeight
+      if (h === prevHeight) return
+      prevHeight = h
+      const el = container.querySelector('[data-pgn-selected]')
+      if (el) el.scrollIntoView({ block: 'center' })
+      else container.scrollTop = container.scrollHeight
+      ro.disconnect()
+    })
+    ro.observe(container)
+    return () => ro.disconnect()
+  }, [])
+
+  return (
+    <div ref={containerRef} className={fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : stretch ? 'max-h-[50vh] overflow-y-auto' : undefined}>
+      <PgnColumnView pgnDisplay={pgnDisplay} selectedPly={selectedPly} onPlyClick={onPlyClick} headIndex={headIndex} firstOpponentIdx={firstOpponentIdx} />
+    </div>
+  )
 }
 
 function DecoySection({
@@ -717,6 +830,7 @@ type TrainingItemMetaCardProps = {
   focusMode?: boolean
   selectedPly?: PlySelection | null
   onPlyClick?: (ply: PlySelection) => void
+  fillHeight?: boolean
 }
 
 type PuzzleSummary = {
@@ -840,7 +954,7 @@ export function MobileOverviewMetaBar({
             </div>
           )}
           {pgnDisplay !== null && pgnDisplay.mainline.length > 0 && (
-            <div className="-mx-3 border-t border-border">
+            <div className="-mx-3 max-h-[240px] overflow-y-auto border-t border-border">
               <PgnDisplayBlock pgnDisplay={pgnDisplay} selectedPly={selectedPly} onPlyClick={onPlyClick} />
             </div>
           )}
@@ -861,6 +975,7 @@ export function TrainingItemMetaCard({
   focusMode = false,
   selectedPly,
   onPlyClick,
+  fillHeight = false,
 }: TrainingItemMetaCardProps): React.ReactElement {
   React.useEffect(() => {
     if (!onPlyClick || !pgnDisplay) return
@@ -883,11 +998,12 @@ export function TrainingItemMetaCard({
     <div className={cn(
       'flex flex-col gap-3 overflow-hidden rounded-md border border-border px-3 pt-3',
       pgnDisplay !== null && pgnDisplay.mainline.length > 0 ? 'pb-0' : 'pb-3',
+      fillHeight && 'h-full',
     )}>
       <SourceSection source={source} focusMode={focusMode} runPosition={runPosition} opening={source.opening} trainingItemId={trainingItemId} />
       {pgnDisplay !== null && pgnDisplay.mainline.length > 0 && (
-        <div className="-mx-3 border-t border-border">
-          <PgnDisplayBlock pgnDisplay={pgnDisplay} selectedPly={selectedPly} onPlyClick={onPlyClick} />
+        <div className={cn('-mx-3 border-t border-border', fillHeight && 'flex-1 min-h-0 flex flex-col')}>
+          <PgnDisplayBlock pgnDisplay={pgnDisplay} selectedPly={selectedPly} onPlyClick={onPlyClick} stretch={focusMode} fillHeight={fillHeight} />
           {!focusMode && source.sourceType === 'DECOY' && (
             <DecoyEvalSection source={source} selectedPly={selectedPly} pgnDisplay={pgnDisplay} />
           )}
