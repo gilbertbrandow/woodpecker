@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import type { RunTrainingItemAttemptView, RunTrainingItemOverview, TrainingItemMetaPgnDisplay } from '../../lib/api'
-import { buildLivePgnDisplay } from './boardPage.helpers'
+import { buildLivePgnDisplay, buildContextMoves } from './boardPage.helpers'
 import type { Mode, PlySelection, FailedModeWrongMove } from './boardPage.helpers'
 
 type UsePgnNavigationParams = {
@@ -58,10 +58,16 @@ export function usePgnNavigation({
     )
   }, [mode, solvingView, session])
 
-  const overviewPgnDisplay: TrainingItemMetaPgnDisplay | null =
-    overviewPgnDisplayOverride !== undefined
+  const overviewPgnDisplay = useMemo((): TrainingItemMetaPgnDisplay | null => {
+    const raw = overviewPgnDisplayOverride !== undefined
       ? overviewPgnDisplayOverride
       : (overview?.pgn ?? null)
+    if (raw === null) return null
+    const prelude = solvingView?.trainingItem.prelude ?? overview?.trainingItem.prelude ?? []
+    if (prelude.length === 0) return raw
+    const contextMoves = buildContextMoves(prelude)
+    return contextMoves.length > 0 ? { ...raw, mainline: [...contextMoves, ...raw.mainline] } : raw
+  }, [overview, overviewPgnDisplayOverride, solvingView])
 
   const pgnDisplay = mode === 'overview' ? overviewPgnDisplay : livePgnDisplay
 
@@ -73,6 +79,10 @@ export function usePgnNavigation({
     }
     let targetIndex = overviewPgnDisplay.mainline.length - 1
     while (targetIndex > 0 && overviewPgnDisplay.mainline[targetIndex].moveStatus === null) {
+      targetIndex--
+    }
+    // Walk back past context moves too — auto-select the last actual solving move.
+    while (targetIndex > 0 && overviewPgnDisplay.mainline[targetIndex].moveStatus === 'context') {
       targetIndex--
     }
     setSelectedPly({ line: 'main', index: targetIndex })

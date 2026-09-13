@@ -148,6 +148,81 @@ export function resolveStep(step: string | string[]): string {
   return Array.isArray(step) ? step[0] : step
 }
 
+// Builds a PGN display for a specific attempt in overview mode, client-side.
+// Mainline is always the correct solution; subvariations are wrong moves from
+// the attempt. No context moves are prepended — usePgnNavigation handles that.
+export function buildOverviewPgnDisplay(
+  baseFen: string,
+  plies: (string | string[])[],
+  attemptMoves: string[][],
+): TrainingItemMetaPgnDisplay {
+  const mainline: DisplayMove[] = []
+  if (plies.length === 0) return { mainline, subvariations: null }
+
+  const board = new Chess(baseFen)
+  const oppUci = resolveStep(plies[0])
+  const oppMove = applyUciDisplay(board, oppUci, 'opponent')
+  if (!oppMove) return { mainline, subvariations: null }
+  mainline.push(oppMove)
+
+  // Player positions: indices 1, 3, 5, … interleaved with opponent responses.
+  // Mirrors Python's range(1, len(plies), 2).
+  const playerPositionCount = Math.ceil((plies.length - 1) / 2)
+  for (let pi = 0; pi < playerPositionCount; pi++) {
+    const plyIdx = 1 + pi * 2
+    const ply = plies[plyIdx]
+
+    // For decoy: use the accepted move the user actually played if they solved it
+    let canonicalUci = resolveStep(ply)
+    const firstVariation = attemptMoves[0] ?? []
+    if (Array.isArray(ply) && pi < firstVariation.length) {
+      const played = firstVariation[pi]
+      if (ply.includes(played)) canonicalUci = played
+    }
+
+    const playerMove = applyUciDisplay(board, canonicalUci, 'correct')
+    if (!playerMove) break
+    mainline.push(playerMove)
+
+    const oppIdx = plyIdx + 1
+    if (oppIdx < plies.length) {
+      const nextOppMove = applyUciDisplay(board, resolveStep(plies[oppIdx]), 'opponent')
+      if (!nextOppMove) break
+      mainline.push(nextOppMove)
+    }
+  }
+
+  // Build subvariations: one entry per wrong move found in each variation
+  const subvariations: DisplayMove[][] = []
+  for (const variation of attemptMoves) {
+    if (!variation.length) continue
+    const varBoard = new Chess(baseFen)
+    try { applyUci(varBoard, oppUci) } catch { continue }
+    for (let pi = 0; pi < variation.length; pi++) {
+      if (pi >= playerPositionCount) break
+      const ply = plies[1 + pi * 2]
+      const played = variation[pi]
+      const isCorrect = Array.isArray(ply) ? ply.includes(played) : played === ply
+      const fenBefore = varBoard.fen()
+      try {
+        varBoard.move({ from: played.slice(0, 2), to: played.slice(2, 4), promotion: played.length === 5 ? played[4] : undefined })
+      } catch { break }
+      if (!isCorrect && !varBoard.isCheckmate()) {
+        const wrongMove = applyUciDisplay(new Chess(fenBefore), played, 'wrong')
+        if (wrongMove) subvariations.push([wrongMove])
+        break
+      }
+      // Advance past the opponent's response before the next player move
+      const oppIdx = 1 + pi * 2 + 1
+      if (oppIdx < plies.length && pi + 1 < variation.length) {
+        try { applyUci(varBoard, resolveStep(plies[oppIdx])) } catch { break }
+      }
+    }
+  }
+
+  return { mainline, subvariations: subvariations.length > 0 ? subvariations : null }
+}
+
 export function computeFinalFen(fen: string, plies: (string | string[])[]): string {
   const chess = new Chess(fen)
   for (const ply of plies) applyUci(chess, resolveStep(ply))
@@ -236,6 +311,18 @@ export type FailedModeWrongMove = {
 // (with 'wrong' status) until the correct move at that position is found.
 // This ensures computePgnLayout can always find the branch point in the mainline
 // rather than falling back to an incorrect position.
+export function buildContextMoves(prelude: string[]): DisplayMove[] {
+  if (prelude.length === 0) return []
+  const chess = new Chess()
+  const moves: DisplayMove[] = []
+  for (const uci of prelude) {
+    const move = applyUciDisplay(chess, uci, 'context')
+    if (!move) break
+    moves.push(move)
+  }
+  return moves
+}
+
 export function buildLivePgnDisplay(
   baseFen: string,
   pliesPlayed: string[],
