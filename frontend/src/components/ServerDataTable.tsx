@@ -89,6 +89,7 @@ export type ServerDataTableProps<T extends RowData> = {
   emptyMessage?: React.ReactNode
   initialSorting: SortingState
   compact?: boolean
+  pageSizeOptions?: number[]
   footerRow?: React.ReactNode
   onFooterRowClick?: () => void
   title?: string
@@ -114,6 +115,7 @@ export function ServerDataTable<T extends RowData>({
   initialCustomValues,
   initialData,
   compact,
+  pageSizeOptions,
   footerRow,
   onFooterRowClick,
   persistFilters,
@@ -497,6 +499,7 @@ export function ServerDataTable<T extends RowData>({
       emptyMessage={emptyMessage}
       initialSorting={initialSorting}
       compact={compact}
+      pageSizeOptions={pageSizeOptions}
       footerRow={footerRow}
       onFooterRowClick={onFooterRowClick}
       filtersRight={!!title}

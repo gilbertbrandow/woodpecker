@@ -83,8 +83,9 @@ const _features = {
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
 
-function pageSizeOptions(current: number): number[] {
-  return [...new Set([...PAGE_SIZE_OPTIONS, current])].sort((a, b) => a - b)
+function pageSizeOptions(current: number, custom?: number[]): number[] {
+  const base = custom ?? PAGE_SIZE_OPTIONS
+  return [...new Set([...base, current])].sort((a, b) => a - b)
 }
 
 export type ServerPagination = {
@@ -119,6 +120,7 @@ type DataTableProps<T extends RowData> = {
   compact?: boolean
   hideSearch?: boolean
   pageSize?: number
+  pageSizeOptions?: number[]
   initialSorting?: SortingState
   onRowClick?: (row: T) => void
   getRowClassName?: (row: T) => string
@@ -144,6 +146,7 @@ export function DataTable<T extends RowData>({
   compact = false,
   hideSearch = false,
   pageSize = 10,
+  pageSizeOptions: pageSizeOptionsProp,
   initialSorting = [],
   onRowClick,
   getRowClassName,
@@ -488,7 +491,7 @@ export function DataTable<T extends RowData>({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {pageSizeOptions(serverPagination.pageSize).map((s) => (
+                {pageSizeOptions(serverPagination.pageSize, pageSizeOptionsProp).map((s) => (
                   <SelectItem key={s} value={String(s)} className="text-xs">{s}</SelectItem>
                 ))}
               </SelectContent>
@@ -541,7 +544,7 @@ export function DataTable<T extends RowData>({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {pageSizeOptions(table.store.state.pagination.pageSize).map((s) => (
+                {pageSizeOptions(table.store.state.pagination.pageSize, pageSizeOptionsProp).map((s) => (
                   <SelectItem key={s} value={String(s)} className="text-xs">{s}</SelectItem>
                 ))}
               </SelectContent>

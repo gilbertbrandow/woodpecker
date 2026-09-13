@@ -33,7 +33,8 @@ export type OverviewAttemptHistoryRow = {
   subsetName?: string
 }
 
-const PAGE_SIZE = 10
+const PAGE_SIZE = 5
+const SIDEBAR_PAGE_SIZE_OPTIONS = [1, 3, 5, 10]
 
 const RESULT_OPTIONS = [
   { label: 'Solved', value: 'solved', icon: <Check className="h-3.5 w-3.5 text-green-600" /> },
@@ -241,6 +242,7 @@ export function OverviewAttemptHistoryTable({
       columns={columns}
       filters={filters}
       pageSize={PAGE_SIZE}
+      pageSizeOptions={SIDEBAR_PAGE_SIZE_OPTIONS}
       fetchData={fetchData}
       instanceKey={trainingItemId}
       initialCustomValues={initialCustomValues}
