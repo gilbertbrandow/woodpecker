@@ -49,7 +49,7 @@ def list_items(paginator: Paginator, opening: FilterList) -> dict:
 
     base_q = (
         select(DecoyPuzzle)
-        .join(Game, SourceGame.id == DecoyPuzzle.game_id, isouter=True)
+        .join(SourceGame, SourceGame.id == DecoyPuzzle.game_id, isouter=True)
         .where(*conditions)
     )
 
