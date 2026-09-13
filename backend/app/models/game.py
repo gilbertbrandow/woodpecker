@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from app.models.source_import_run import SourceImportRun
 
 
-class Game(Base):
+class SourceGame(Base):
     __tablename__ = "games"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -24,6 +24,7 @@ class Game(Base):
     event: Mapped[str | None] = mapped_column(Text, nullable=True)
     date: Mapped[str | None] = mapped_column(Text, nullable=True)
     eco: Mapped[str | None] = mapped_column(Text, nullable=True)
+    moves: Mapped[str | None] = mapped_column(Text, nullable=True)
     opening_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("openings.id"), nullable=True)
     source_import_run_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("source_import_runs.id"), nullable=False
@@ -37,3 +38,7 @@ class Game(Base):
         Index("ix_games_opening_id", "opening_id"),
         Index("ix_games_source_import_run_id", "source_import_run_id"),
     )
+
+
+# Backward-compatibility alias — prefer SourceGame in new code
+Game = SourceGame

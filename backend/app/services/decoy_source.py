@@ -3,7 +3,7 @@ from sqlalchemy.orm import selectinload
 
 from app.extensions import db
 from app.models.decoy_puzzle import DecoyPuzzle
-from app.models.game import Game
+from app.models.game import SourceGame
 from app.models.opening import Opening
 from app.models.source_import_run import (
     DecoySourceRunMetadata,
@@ -45,11 +45,11 @@ def list_items(paginator: Paginator, opening: FilterList) -> dict:
             .where(Opening.name == opening_name)
             .scalar_subquery()
         )
-        conditions.append(Game.opening_id == opening_id_subq)
+        conditions.append(SourceGame.opening_id == opening_id_subq)
 
     base_q = (
         select(DecoyPuzzle)
-        .join(Game, Game.id == DecoyPuzzle.game_id, isouter=True)
+        .join(SourceGame, SourceGame.id == DecoyPuzzle.game_id, isouter=True)
         .where(*conditions)
     )
 
@@ -62,7 +62,7 @@ def list_items(paginator: Paginator, opening: FilterList) -> dict:
         db.session.execute(
             base_q
             .options(
-                selectinload(DecoyPuzzle.game).selectinload(Game.opening),
+                selectinload(DecoyPuzzle.game).selectinload(SourceGame.opening),
             )
             .order_by(DecoyPuzzle.id)
             .limit(paginator.page_size)
