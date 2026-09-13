@@ -35,20 +35,22 @@ export function OverviewSidebarRight({
 }: OverviewSidebarRightProps): React.ReactElement {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="flex flex-col gap-4">
+      {topSlot != null && (
+        <div className="flex min-h-0 flex-1 flex-col">
           {topSlot}
-          {showTable && (
-            <OverviewAttemptHistoryTable
-              trainingItemId={trainingItemId}
-              currentUser={currentUser}
-              selectedAttemptId={selectedAttemptId}
-              onRowClick={onRowClick}
-              onUserFilterChange={onUserFilterChange}
-            />
-          )}
         </div>
-      </div>
+      )}
+      {showTable && (
+        <div className="my-2">
+          <OverviewAttemptHistoryTable
+            trainingItemId={trainingItemId}
+            currentUser={currentUser}
+            selectedAttemptId={selectedAttemptId}
+            onRowClick={onRowClick}
+            onUserFilterChange={onUserFilterChange}
+          />
+        </div>
+      )}
       <OverviewActionsSection
         nextPuzzleDisabledReason={nextPuzzleDisabledReason}
         isLoadingNextPuzzle={isLoadingNextPuzzle}
