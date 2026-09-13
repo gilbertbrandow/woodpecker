@@ -150,7 +150,9 @@ export function resolveStep(step: string | string[]): string {
 
 export function computeFinalFen(fen: string, plies: (string | string[])[]): string {
   const chess = new Chess(fen)
-  for (const ply of plies) applyUci(chess, resolveStep(ply))
+  for (const ply of plies) {
+    try { applyUci(chess, resolveStep(ply)) } catch { break }
+  }
   return chess.fen()
 }
 

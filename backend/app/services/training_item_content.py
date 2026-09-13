@@ -145,7 +145,7 @@ def _lichess_tactic_payload(training_item_id: int) -> TrainingItemPayload:
     return TrainingItemPayload(
         contract=SolveContract(
             fen=tactic.fen,
-            plies=_split_moves(tactic.moves),
+            plies=_parse_moves(tactic.fen, tactic.moves),
         ),
         metadata=LichessTacticMetadata(
             display_id=tactic.puzzle_id,
@@ -169,7 +169,7 @@ def _lichess_tactic_payload_batch(
         t.training_item_id: TrainingItemPayload(
             contract=SolveContract(
                 fen=t.fen,
-                plies=_split_moves(t.moves),
+                plies=_parse_moves(t.fen, t.moves),
             ),
             metadata=LichessTacticMetadata(
                 display_id=t.puzzle_id,
@@ -216,7 +216,7 @@ def _build_positional_payload(puzzle: ScrapedPositionalPuzzle) -> TrainingItemPa
     return TrainingItemPayload(
         contract=SolveContract(
             fen=puzzle.fen,
-            plies=_split_moves(puzzle.moves),
+            plies=_parse_moves(puzzle.fen, puzzle.moves),
         ),
         metadata=ScrapedPositionalMetadata(
             internal_id=puzzle.internal_id,
@@ -233,23 +233,30 @@ def _build_positional_payload(puzzle: ScrapedPositionalPuzzle) -> TrainingItemPa
     )
 
 
-# Lichess encodes castling in Chess960 UCI (king-captures-rook square: e1h1/e1a1/e8h8/e8a8).
-# chess.js only accepts standard UCI (king destination: e1g1/e1c1/e8g8/e8c8).
-# python-chess tolerates both, so we normalise at the SolveContract boundary.
-_CHESS960_CASTLING: dict[str, str] = {
-    'e1h1': 'e1g1',
-    'e1a1': 'e1c1',
-    'e8h8': 'e8g8',
-    'e8a8': 'e8c8',
-}
+def _parse_moves(fen: str, moves_str: str) -> list[str]:
+    """Parse and validate a space-separated UCI move sequence against the given FEN.
 
+    Walks a chess.Board from *fen*, checks every move for legality, and returns
+    the canonical UCI string for each move as python-chess represents it.  This
+    means castling is always returned in standard UCI form (e1g1/e1c1/e8g8/e8c8)
+    regardless of how the source encoded it, and any rook move that happens to
+    share a square pattern with castling (e.g. Re1-h1 in a position with no
+    castling rights) is preserved correctly.
 
-def _nu(uci: str) -> str:
-    return _CHESS960_CASTLING.get(uci, uci)
-
-
-def _split_moves(moves_str: str) -> list[str]:
-    return [_nu(m) for m in moves_str.split()]
+    Raises ValueError if any move is malformed or illegal in its board context.
+    """
+    board = chess.Board(fen)
+    result = []
+    for uci in moves_str.split():
+        try:
+            move = chess.Move.from_uci(uci)
+        except ValueError as exc:
+            raise ValueError(f"Malformed UCI '{uci}' in puzzle (fen={fen})") from exc
+        if move not in board.legal_moves:
+            raise ValueError(f"Illegal move '{uci}' in puzzle (fen={board.fen()})")
+        result.append(move.uci())
+        board.push(move)
+    return result
 
 
 def _opening_dict(opening: Opening) -> dict[str, object]:
@@ -305,9 +312,9 @@ def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
     fen_parts = decoy.fen.split()
     player_is_white = len(fen_parts) > 1 and fen_parts[1] == 'b'
     valid_moves.sort(key=lambda m: m.get("cp", 0), reverse=player_is_white)
-    accepted_ucis = [_nu(m["uci"]) for m in valid_moves]
+    accepted_ucis = [m["uci"] for m in valid_moves]
     decoy_lines = {
-        _nu(m["uci"]): ' '.join(_nu(u) for u in m["line"].split())
+        m["uci"]: m["line"]
         for m in decoy.accepted_moves
         if isinstance(m, dict) and "uci" in m and m.get("line")
     }
@@ -327,7 +334,7 @@ def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
     return TrainingItemPayload(
         contract=SolveContract(
             fen=fen,
-            plies=[_nu(decoy.opponent_move), accepted_ucis],
+            plies=[decoy.opponent_move, accepted_ucis],
             decoy_lines=decoy_lines or None,
             is_decoy=True,
         ),

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type { SoundEvent } from './useBoardSounds'
 import { sanToSoundEvents } from './useBoardSounds'
 import { useNavigate } from '@tanstack/react-router'
-import { Chess, type Square } from 'chess.js'
+import { Chess, type Move, type Square } from 'chess.js'
 import { toast } from '../../lib/toast'
 import { api, type RunTrainingItemAttemptView, type RunTrainingItemOverview } from '../../lib/api'
 import { useAuth } from '../../context/auth'
@@ -307,7 +307,12 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       const ch = chessRef.current
       if (!ch) return
       const firstMove = resolveStep(solutionMovesRef.current[0] ?? '')
-      const firstApplied = applyUci(ch, firstMove)
+      let firstApplied: Move
+      try {
+        firstApplied = applyUci(ch, firstMove)
+      } catch {
+        return
+      }
       allPliesRef.current = [firstMove]
       setAllPliesPlayed([firstMove])
       const lm: [string, string] = [firstMove.slice(0, 2), firstMove.slice(2, 4)]
@@ -554,7 +559,12 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const applyOpponentMove = useCallback((uci: string): void => {
     const chess = chessRef.current
     if (!chess) return
-    const applied = applyUci(chess, uci)
+    let applied: Move
+    try {
+      applied = applyUci(chess, uci)
+    } catch {
+      return
+    }
     if (modeRef.current === 'focus') {
       allPliesRef.current = [...allPliesRef.current, uci]
       setAllPliesPlayed(allPliesRef.current)
@@ -575,7 +585,12 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     const chess = chessRef.current
     if (!chess) return
 
-    const applied = applyUci(chess, uci)
+    let applied: Move
+    try {
+      applied = applyUci(chess, uci)
+    } catch {
+      return
+    }
     if (modeRef.current === 'focus') {
       movesPlayedRef.current = [...movesPlayedRef.current, uci]
       setMovesPlayed(movesPlayedRef.current)
@@ -810,7 +825,13 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     const uci = resolveStep(solutionMoves[moveIndex] ?? '')
     inputBlockedRef.current = true
     setInputBlocked(true)
-    applyUci(chess, uci)
+    try {
+      applyUci(chess, uci)
+    } catch {
+      inputBlockedRef.current = false
+      setInputBlocked(false)
+      return
+    }
     setFen(chess.fen())
     setLastMove([uci.slice(0, 2), uci.slice(2, 4)])
     setDests(computeDests(chess))
