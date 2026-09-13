@@ -16,6 +16,7 @@ from app.models.opening import Opening
 from app.models.scraped_positional_difficulty import ScrapedPositionalDifficulty
 from app.models.scraped_positional_puzzle import ScrapedPositionalPuzzle, scraped_positional_theme_links
 from app.models.scraped_positional_theme import ScrapedPositionalTheme
+from sources.common.source_game import upsert_source_games
 from sources.scraped_positional.enrichment import OPENING_PLY_CUTOFF, enrich_batch
 from sources.scraped_positional.theme_seeder import THEME_COLUMN_NAMES
 
@@ -128,11 +129,12 @@ def process_puzzle_batch(
     if not new_puzzles:
         return PuzzleBatchResult(imported=0, skipped_existing=skipped_existing, enrichment_failures=0)
 
-    enriched = enrich_batch(new_puzzles, api_token)
+    enriched, game_map = enrich_batch(new_puzzles, api_token)
 
     enrichment_failures = 0
     insertable: list[dict[str, Any]] = []
     insertable_themes: list[list[str]] = []
+    insertable_lichess_game_ids: list[str] = []
     for puzzle, result in zip(new_puzzles, enriched):
         if result is None:
             enrichment_failures += 1
@@ -158,6 +160,7 @@ def process_puzzle_batch(
             "opening_id": opening_id,
         })
         insertable_themes.append(puzzle["themes"])
+        insertable_lichess_game_ids.append(puzzle["lichess_game_id"])
 
     if not insertable:
         return PuzzleBatchResult(imported=0, skipped_existing=skipped_existing, enrichment_failures=enrichment_failures)
@@ -190,6 +193,27 @@ def process_puzzle_batch(
         ),
     )
     inserted_puzzle_map: dict[int, int] = {row.internal_id: row.id for row in puzzle_result}
+
+    # Upsert SourceGame rows using the full game data already fetched during enrichment.
+    game_lichess_id_map = upsert_source_games(
+        session,
+        {gid: game_map[gid] for gid in insertable_lichess_game_ids if gid in game_map},
+        source_import_run_id,
+        opening_by_display_name,
+        opening_by_eco,
+    )
+
+    # Set game_id FK on newly inserted puzzle rows.
+    for puzzle_data, lichess_game_id in zip(insertable, insertable_lichess_game_ids):
+        puzzle_db_id = inserted_puzzle_map.get(puzzle_data["internal_id"])
+        game_db_id = game_lichess_id_map.get(lichess_game_id)
+        if puzzle_db_id is not None and game_db_id is not None:
+            session.execute(
+                sa.update(ScrapedPositionalPuzzle.__table__)
+                .where(ScrapedPositionalPuzzle.__table__.c.id == puzzle_db_id)
+                .values(game_id=game_db_id)
+            )
+
     session.commit()
 
     theme_links: list[dict[str, int]] = []
