@@ -145,7 +145,7 @@ def build_pgn(
                 "isWhite": is_white,
                 "moveStatus": move_status,
             }
-        except ValueError:
+        except (ValueError, AssertionError):
             return None
 
     # ── Determine the canonical player move for the mainline ──────────────────
