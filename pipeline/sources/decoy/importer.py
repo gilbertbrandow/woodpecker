@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.models.decoy_puzzle import DecoyPuzzle
 from app.models.game import SourceGame as Game
 from app.models.opening import Opening
+from sources.common.source_game import populate_game_moves
 
 PROGRESS_INTERVAL = 500
 EXPECTED_SCHEMA_VERSION = 1
@@ -95,8 +96,12 @@ def _upsert_games(
     source_import_run_id: int,
     opening_by_display_name: dict[str, int],
     opening_by_eco: dict[str, list[tuple[int, str]]],
-) -> dict[str, int]:
-    """Insert new games (keyed on lichess_id) and return lichess_id → game.id map."""
+) -> tuple[dict[str, int], dict[str, int]]:
+    """Insert new games (keyed on lichess_id) and return (full_map, new_map).
+
+    full_map: lichess_id → game.id for all games (existing + new)
+    new_map:  lichess_id → game.id for newly inserted games only (need moves populated)
+    """
     lichess_ids = {
         item["lichessGameUrl"].split("/")[-1]
         for item in items
@@ -149,10 +154,12 @@ def _upsert_games(
         session.add_all(new_games)
         session.flush()
 
-    result = dict(existing)
+    new_map: dict[str, int] = {}
     for game, lichess_id in zip(new_games, new_game_lichess_ids):
-        result[lichess_id] = game.id
-    return result
+        new_map[lichess_id] = game.id
+
+    result = {**existing, **new_map}
+    return result, new_map
 
 
 def process_batch(
@@ -161,6 +168,7 @@ def process_batch(
     source_import_run_id: int,
     opening_by_display_name: dict[str, int],
     opening_by_eco: dict[str, list[tuple[int, str]]],
+    api_token: str | None = None,
 ) -> ImportBatchResult:
     if not batch:
         return ImportBatchResult(imported=0, skipped_existing=0)
@@ -176,10 +184,13 @@ def process_batch(
     if not new_items:
         return ImportBatchResult(imported=0, skipped_existing=skipped_existing)
 
-    game_id_map = _upsert_games(
+    game_id_map, new_game_map = _upsert_games(
         session, new_items, source_import_run_id,
         opening_by_display_name, opening_by_eco,
     )
+
+    if new_game_map:
+        populate_game_moves(session, new_game_map, api_token)
 
     decoy_rows: list[dict[str, Any]] = []
     for item in new_items:
@@ -222,6 +233,7 @@ def import_decoys(
     source_import_run_id: int,
     limit: int | None,
     batch_size: int,
+    api_token: str | None = None,
 ) -> dict[str, Any]:
     check_schema_version()
     opening_by_display_name, opening_by_eco = _load_opening_caches(session)
@@ -267,7 +279,7 @@ def import_decoys(
             if len(pending) >= batch_size:
                 result = process_batch(
                     session, pending, source_import_run_id,
-                    opening_by_display_name, opening_by_eco,
+                    opening_by_display_name, opening_by_eco, api_token,
                 )
                 pending.clear()
                 rows_imported += result.imported
