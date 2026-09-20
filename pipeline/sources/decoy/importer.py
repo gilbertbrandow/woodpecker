@@ -116,8 +116,8 @@ def _upsert_games(
         moves_uci = san_moves_to_uci(item_by_lichess_id[lichess_id]["moves"])
         if moves_uci:
             session.execute(
-                sa.update(Game.__table__)
-                .where(Game.__table__.c.id == game_id)
+                sa.update(Game)
+                .where(Game.id == game_id)
                 .values(moves=moves_uci)
             )
 
