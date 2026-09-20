@@ -122,7 +122,7 @@ def register_commands(app: Flask) -> None:
                     return None
             return " ".join(uci)
 
-        def _fetch_games(game_ids: list[str]) -> dict[str, dict]:
+        def _fetch_games(game_ids: list[str], strict: bool = True) -> dict[str, dict]:
             headers: dict[str, str] = {"Accept": "application/x-ndjson"}
             if api_token:
                 headers["Authorization"] = f"Bearer {api_token}"
@@ -168,10 +168,12 @@ def register_commands(app: Flask) -> None:
             missing = set(game_ids) - set(result.keys())
             if missing:
                 sample = ", ".join(sorted(missing)[:5])
-                raise click.ClickException(
-                    f"Lichess did not return {len(missing)} requested game(s) — aborting. "
-                    f"First missing IDs: {sample}"
-                )
+                if strict:
+                    raise click.ClickException(
+                        f"Lichess did not return {len(missing)} requested game(s) — aborting. "
+                        f"First missing IDs: {sample}"
+                    )
+                click.echo(f"  Note: Lichess skipped {len(missing)} game(s) (OTB/unavailable): {sample}{'…' if len(missing) > 5 else ''}")
             return result
 
         def _lichess_id_from_url(url: str) -> str | None:
@@ -358,7 +360,7 @@ def register_commands(app: Flask) -> None:
             for batch_start in range(0, len(ids_list), batch_size):
                 batch = ids_list[batch_start: batch_start + batch_size]
                 try:
-                    api_data = _fetch_games(batch)
+                    api_data = _fetch_games(batch, strict=False)
                 except requests.HTTPError as exc:
                     click.echo(f"  Warning: API error for batch at offset {batch_start}: {exc}")
                     continue
@@ -475,17 +477,26 @@ def register_commands(app: Flask) -> None:
             click.echo("[dry-run] No changes made.")
             return
 
+        unused_tactic_ids_sql = (
+            "SELECT lt.id FROM lichess_tactics lt "
+            "JOIN training_items ti ON ti.id = lt.training_item_id "
+            "WHERE ti.source_import_run_id = ANY(:run_ids) "
+            "AND ti.id NOT IN (SELECT training_item_id FROM run_training_items) "
+            "AND ti.id NOT IN (SELECT training_item_id FROM subset_training_items)"
+        )
+        click.echo("Deleting lichess_tactic_openings...")
+        db.session.execute(
+            sa.text(f"DELETE FROM lichess_tactic_openings WHERE lichess_tactic_id IN ({unused_tactic_ids_sql})"),
+            {"run_ids": parsed_ids},
+        )
+        click.echo("Deleting lichess_tactic_theme_links...")
+        db.session.execute(
+            sa.text(f"DELETE FROM lichess_tactic_theme_links WHERE lichess_tactic_id IN ({unused_tactic_ids_sql})"),
+            {"run_ids": parsed_ids},
+        )
         click.echo("Deleting lichess_tactics...")
         db.session.execute(
-            sa.text(
-                "DELETE FROM lichess_tactics "
-                "WHERE training_item_id IN ("
-                "  SELECT id FROM training_items "
-                "  WHERE source_import_run_id = ANY(:run_ids) "
-                "  AND id NOT IN (SELECT training_item_id FROM run_training_items) "
-                "  AND id NOT IN (SELECT training_item_id FROM subset_training_items) "
-                ")"
-            ),
+            sa.text(f"DELETE FROM lichess_tactics WHERE id IN ({unused_tactic_ids_sql})"),
             {"run_ids": parsed_ids},
         )
         db.session.commit()
@@ -600,7 +611,7 @@ def register_commands(app: Flask) -> None:
                     VALUES
                         (:run_id, :imported, :total, :themes, :openings,
                          :min_r, :max_r, :avg_r,
-                         :buckets::jsonb, :theme_j::jsonb, :opening_j::jsonb, :now)
+                         CAST(:buckets AS jsonb), CAST(:theme_j AS jsonb), CAST(:opening_j AS jsonb), :now)
                     ON CONFLICT (source_import_run_id) DO UPDATE SET
                         imported_count              = EXCLUDED.imported_count,
                         total_tactics_after_run     = EXCLUDED.total_tactics_after_run,
