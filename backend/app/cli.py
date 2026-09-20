@@ -165,6 +165,13 @@ def register_commands(app: Flask) -> None:
                         "date": date_str,
                         "eco": opening.get("eco") if opening else None,
                     }
+            missing = set(game_ids) - set(result.keys())
+            if missing:
+                sample = ", ".join(sorted(missing)[:5])
+                raise click.ClickException(
+                    f"Lichess did not return {len(missing)} requested game(s) — aborting. "
+                    f"First missing IDs: {sample}"
+                )
             return result
 
         def _lichess_id_from_url(url: str) -> str | None:
@@ -237,7 +244,7 @@ def register_commands(app: Flask) -> None:
             if new_rows:
                 from sqlalchemy.dialects.postgresql import insert as pg_insert
                 inserted = db.session.execute(
-                    pg_insert(SourceGame.__table__)
+                    pg_insert(SourceGame)
                     .values(new_rows)
                     .on_conflict_do_nothing(index_elements=["lichess_id"])
                     .returning(SourceGame.__table__.c.id, SourceGame.__table__.c.lichess_id)
@@ -278,18 +285,18 @@ def register_commands(app: Flask) -> None:
         ).all()
         click.echo(f"Pass 1: {len(tactics_without_game):,} lichess_tactics need game_id")
 
-        tactic_lichess_ids = [
-            (row.id, row.puzzle_id, _lichess_id_from_url(row.game_url))
+        tactic_lichess_ids: list[tuple[int, str, str]] = [
+            (row.id, row.puzzle_id, gid)
             for row in tactics_without_game
+            if (gid := _lichess_id_from_url(row.game_url)) is not None
         ]
-        tactic_lichess_ids = [(tid, pid, gid) for tid, pid, gid in tactic_lichess_ids if gid]
         unique_tactic_game_ids = list({gid for _, _, gid in tactic_lichess_ids})
 
         if not dry_run and unique_tactic_game_ids:
             for batch_start in range(0, len(unique_tactic_game_ids), batch_size):
                 batch = unique_tactic_game_ids[batch_start: batch_start + batch_size]
                 game_map = _upsert_games_from_api(batch, run_id, by_name, by_eco)
-                for tactic_id, puzzle_id, lichess_id in tactic_lichess_ids:
+                for tactic_id, _, lichess_id in tactic_lichess_ids:
                     db_game_id = game_map.get(lichess_id)
                     if db_game_id:
                         db.session.execute(
@@ -311,18 +318,18 @@ def register_commands(app: Flask) -> None:
         ).all()
         click.echo(f"Pass 2: {len(positional_without_game):,} scraped_positional_puzzles need game_id")
 
-        positional_lichess_ids = [
-            (row.id, row.internal_id, _lichess_id_from_url(row.lichess_url))
+        positional_lichess_ids: list[tuple[int, str, str]] = [
+            (row.id, row.internal_id, gid)
             for row in positional_without_game
+            if (gid := _lichess_id_from_url(row.lichess_url)) is not None
         ]
-        positional_lichess_ids = [(pid, iid, gid) for pid, iid, gid in positional_lichess_ids if gid]
         unique_positional_game_ids = list({gid for _, _, gid in positional_lichess_ids})
 
         if not dry_run and unique_positional_game_ids:
             for batch_start in range(0, len(unique_positional_game_ids), batch_size):
                 batch = unique_positional_game_ids[batch_start: batch_start + batch_size]
                 game_map = _upsert_games_from_api(batch, run_id, by_name, by_eco)
-                for puzzle_db_id, internal_id, lichess_id in positional_lichess_ids:
+                for puzzle_db_id, _, lichess_id in positional_lichess_ids:
                     db_game_id = game_map.get(lichess_id)
                     if db_game_id:
                         db.session.execute(
@@ -344,7 +351,7 @@ def register_commands(app: Flask) -> None:
         ).all()
         click.echo(f"Pass 3: {len(games_without_moves):,} games need moves populated")
 
-        games_needing_moves = {row.lichess_id: row.id for row in games_without_moves}
+        games_needing_moves: dict[str, int] = {row.lichess_id: row.id for row in games_without_moves if row.lichess_id}
 
         if not dry_run and games_needing_moves:
             ids_list = list(games_needing_moves.keys())
@@ -437,3 +444,190 @@ def register_commands(app: Flask) -> None:
             f"moves_populated={total_moves_populated:,}  "
             f"jsonl_moves_populated={total_jsonl_populated:,}"
         )
+
+    @app.cli.command("delete-unused-lichess-tactics")
+    @click.option("--run-ids", required=True, help="Comma-separated source_import_run IDs to clean up (e.g. 1,2)")
+    @click.option("--dry-run", is_flag=True, default=False, help="Print counts without deleting anything")
+    def delete_unused_lichess_tactics(run_ids: str, dry_run: bool) -> None:
+        """Delete lichess tactics (and their training_items) that belong to the given import
+        runs but have never been placed in any run or subset. Safe to re-run."""
+        from app.extensions import db
+
+        parsed_ids = [int(x.strip()) for x in run_ids.split(",")]
+        click.echo(f"Target import run IDs: {parsed_ids}  dry_run={dry_run}")
+
+        tactic_count = db.session.execute(
+            sa.text(
+                "SELECT COUNT(*) FROM lichess_tactics "
+                "WHERE training_item_id IN ("
+                "  SELECT id FROM training_items "
+                "  WHERE source_import_run_id = ANY(:run_ids) "
+                "  AND id NOT IN (SELECT training_item_id FROM run_training_items) "
+                "  AND id NOT IN (SELECT training_item_id FROM subset_training_items) "
+                ")"
+            ),
+            {"run_ids": parsed_ids},
+        ).scalar_one()
+
+        click.echo(f"Unused lichess_tactics to delete: {tactic_count:,}")
+
+        if dry_run:
+            click.echo("[dry-run] No changes made.")
+            return
+
+        click.echo("Deleting lichess_tactics...")
+        db.session.execute(
+            sa.text(
+                "DELETE FROM lichess_tactics "
+                "WHERE training_item_id IN ("
+                "  SELECT id FROM training_items "
+                "  WHERE source_import_run_id = ANY(:run_ids) "
+                "  AND id NOT IN (SELECT training_item_id FROM run_training_items) "
+                "  AND id NOT IN (SELECT training_item_id FROM subset_training_items) "
+                ")"
+            ),
+            {"run_ids": parsed_ids},
+        )
+        db.session.commit()
+        click.echo("Deleting orphaned training_items...")
+        result = db.session.execute(
+            sa.text(
+                "DELETE FROM training_items "
+                "WHERE source_import_run_id = ANY(:run_ids) "
+                "AND id NOT IN (SELECT training_item_id FROM lichess_tactics WHERE training_item_id IS NOT NULL) "
+                "AND id NOT IN (SELECT training_item_id FROM decoy_puzzles WHERE training_item_id IS NOT NULL) "
+                "AND id NOT IN (SELECT training_item_id FROM scraped_positional_puzzles WHERE training_item_id IS NOT NULL)"
+            ),
+            {"run_ids": parsed_ids},
+        )
+        db.session.commit()
+        click.echo(f"Done. Deleted {tactic_count:,} tactics and {result.rowcount:,} training_items.")  # type: ignore[attr-defined]
+
+        # --- Recompute metadata for affected runs ---
+        from datetime import datetime, timezone
+
+        click.echo("Recomputing metadata for affected runs...")
+        runs = db.session.execute(
+            sa.text("SELECT id FROM source_import_runs WHERE id = ANY(:ids) AND source = 'LICHESS_TACTICS'"),
+            {"ids": parsed_ids},
+        ).fetchall()
+
+        total_tactics = db.session.execute(sa.text("SELECT COUNT(*) FROM lichess_tactics")).scalar_one()
+
+        for (run_id,) in runs:
+            click.echo(f"Recomputing run #{run_id}...")
+
+            stats = db.session.execute(
+                sa.text("""
+                    SELECT
+                        COUNT(lt.id)          AS imported_count,
+                        MIN(lt.rating)        AS min_rating,
+                        MAX(lt.rating)        AS max_rating,
+                        AVG(lt.rating)::int   AS average_rating
+                    FROM lichess_tactics lt
+                    JOIN training_items ti ON ti.id = lt.training_item_id
+                    WHERE ti.source_import_run_id = :run_id
+                """),
+                {"run_id": run_id},
+            ).one()
+
+            with_themes = db.session.execute(
+                sa.text("""
+                    SELECT COUNT(DISTINCT lt.id)
+                    FROM lichess_tactics lt
+                    JOIN training_items ti ON ti.id = lt.training_item_id
+                    JOIN lichess_tactic_theme_links ltt ON ltt.lichess_tactic_id = lt.id
+                    WHERE ti.source_import_run_id = :run_id
+                """),
+                {"run_id": run_id},
+            ).scalar_one()
+
+            with_openings = db.session.execute(
+                sa.text("""
+                    SELECT COUNT(DISTINCT lt.id)
+                    FROM lichess_tactics lt
+                    JOIN training_items ti ON ti.id = lt.training_item_id
+                    JOIN lichess_tactic_openings lto ON lto.lichess_tactic_id = lt.id
+                    WHERE ti.source_import_run_id = :run_id
+                """),
+                {"run_id": run_id},
+            ).scalar_one()
+
+            rating_buckets = db.session.execute(
+                sa.text("""
+                    SELECT (FLOOR(lt.rating / 50) * 50)::int AS bucket, COUNT(*) AS cnt
+                    FROM lichess_tactics lt
+                    JOIN training_items ti ON ti.id = lt.training_item_id
+                    WHERE ti.source_import_run_id = :run_id
+                    GROUP BY bucket ORDER BY bucket
+                """),
+                {"run_id": run_id},
+            ).fetchall()
+
+            theme_counts = db.session.execute(
+                sa.text("""
+                    SELECT th.name, COUNT(*) AS cnt
+                    FROM lichess_tactic_theme_links ltt
+                    JOIN lichess_tactic_themes th ON th.id = ltt.lichess_tactic_theme_id
+                    JOIN lichess_tactics lt ON lt.id = ltt.lichess_tactic_id
+                    JOIN training_items ti ON ti.id = lt.training_item_id
+                    WHERE ti.source_import_run_id = :run_id
+                    GROUP BY th.name
+                """),
+                {"run_id": run_id},
+            ).fetchall()
+
+            opening_counts = db.session.execute(
+                sa.text("""
+                    SELECT o.name, COUNT(*) AS cnt
+                    FROM lichess_tactic_openings lto
+                    JOIN openings o ON o.id = lto.opening_id
+                    JOIN lichess_tactics lt ON lt.id = lto.lichess_tactic_id
+                    JOIN training_items ti ON ti.id = lt.training_item_id
+                    WHERE ti.source_import_run_id = :run_id
+                    GROUP BY o.name
+                """),
+                {"run_id": run_id},
+            ).fetchall()
+
+            db.session.execute(
+                sa.text("""
+                    INSERT INTO lichess_tactics_source_run_metadata
+                        (source_import_run_id, imported_count, total_tactics_after_run,
+                         tactics_with_themes_count, tactics_with_openings_count,
+                         min_rating, max_rating, average_rating,
+                         rating_bucket_counts_json, theme_counts_json, opening_counts_json, generated_at)
+                    VALUES
+                        (:run_id, :imported, :total, :themes, :openings,
+                         :min_r, :max_r, :avg_r,
+                         :buckets::jsonb, :theme_j::jsonb, :opening_j::jsonb, :now)
+                    ON CONFLICT (source_import_run_id) DO UPDATE SET
+                        imported_count              = EXCLUDED.imported_count,
+                        total_tactics_after_run     = EXCLUDED.total_tactics_after_run,
+                        tactics_with_themes_count   = EXCLUDED.tactics_with_themes_count,
+                        tactics_with_openings_count = EXCLUDED.tactics_with_openings_count,
+                        min_rating                  = EXCLUDED.min_rating,
+                        max_rating                  = EXCLUDED.max_rating,
+                        average_rating              = EXCLUDED.average_rating,
+                        rating_bucket_counts_json   = EXCLUDED.rating_bucket_counts_json,
+                        theme_counts_json           = EXCLUDED.theme_counts_json,
+                        opening_counts_json         = EXCLUDED.opening_counts_json,
+                        generated_at                = EXCLUDED.generated_at
+                """),
+                {
+                    "run_id": run_id,
+                    "imported": int(stats.imported_count or 0),
+                    "total": total_tactics,
+                    "themes": int(with_themes),
+                    "openings": int(with_openings),
+                    "min_r": int(stats.min_rating or 0),
+                    "max_r": int(stats.max_rating or 0),
+                    "avg_r": int(stats.average_rating) if stats.average_rating is not None else None,
+                    "buckets": json.dumps({str(b): int(c) for b, c in rating_buckets}),
+                    "theme_j": json.dumps({n: int(c) for n, c in theme_counts}),
+                    "opening_j": json.dumps({n: int(c) for n, c in opening_counts}),
+                    "now": datetime.now(tz=timezone.utc),
+                },
+            )
+            db.session.commit()
+            click.echo(f"  Run #{run_id}: {int(stats.imported_count or 0):,} tactics remaining, total_tactics_after_run={total_tactics:,}")
