@@ -154,15 +154,6 @@ def upsert_source_games(
     existing_map: dict[str, int] = {row.lichess_id: row.id for row in existing_rows}
     result: dict[str, int] = dict(existing_map)
 
-    for lichess_id, game_id in existing_map.items():
-        moves_uci = game_data[lichess_id].get("moves_uci")
-        if moves_uci is not None:
-            session.execute(
-                sa.update(SourceGame)
-                .where(SourceGame.id == game_id)
-                .values(moves=moves_uci)
-            )
-
     new_rows: list[dict[str, Any]] = []
     for lichess_id, data in game_data.items():
         if lichess_id in existing_map:

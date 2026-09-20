@@ -16,13 +16,12 @@ from sqlalchemy.orm import Session
 from app.models.decoy_puzzle import DecoyPuzzle
 from app.models.game import SourceGame as Game
 from app.models.opening import Opening
-from sources.common.source_game import san_moves_to_uci
 
 PROGRESS_INTERVAL = 500
-EXPECTED_SCHEMA_VERSION = 1
+EXPECTED_SCHEMA_VERSION = 2
 _META_URL = "https://raw.githubusercontent.com/gilbertbrandow/decoys/main/meta.json"
 
-_REQUIRED_FIELDS = {"fen", "opponentMove", "acceptedMoves", "bestCp", "depth", "moveNumber", "moves"}
+_REQUIRED_FIELDS = {"fen", "opponentMove", "acceptedMoves", "bestCp", "depth", "moveNumber", "game_moves"}
 
 
 def check_schema_version() -> None:
@@ -112,23 +111,14 @@ def _upsert_games(
     ).all()
     existing: dict[str, int] = {row.lichess_id: row.id for row in existing_rows}
 
-    for lichess_id, game_id in existing.items():
-        moves_uci = san_moves_to_uci(item_by_lichess_id[lichess_id]["moves"])
-        if moves_uci:
-            session.execute(
-                sa.update(Game)
-                .where(Game.id == game_id)
-                .values(moves=moves_uci)
-            )
-
     new_games: list[Game] = []
     new_lichess_ids: list[str] = []
     for lichess_id, item in item_by_lichess_id.items():
         if lichess_id in existing:
             continue
-        moves_uci = san_moves_to_uci(item["moves"])
+        moves_uci = item.get("game_moves")
         if not moves_uci:
-            click.echo(f"Warning: skipping game {lichess_id}: could not convert moves to UCI")
+            click.echo(f"Warning: skipping game {lichess_id}: missing game_moves")
             continue
         new_games.append(Game(
             lichess_id=lichess_id,
