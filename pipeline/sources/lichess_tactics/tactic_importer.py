@@ -309,6 +309,9 @@ def import_tactics(
     limit: int | None = None,
     min_rating: int = 0,
     max_rating: int = 9999,
+    min_popularity: int = 0,
+    min_nb_plays: int = 0,
+    min_themes: int = 0,
     batch_size: int = 500,
     api_token: str | None = None,
 ) -> dict[str, Any]:
@@ -343,7 +346,15 @@ def import_tactics(
         for row in reader:
             rows_read += 1
             rating = int(row["Rating"])
-            if rating < min_rating or rating > max_rating:
+            popularity = int(row["Popularity"])
+            nb_plays = int(row["NbPlays"])
+            theme_count = len(row["Themes"].split()) if row["Themes"] else 0
+            if (
+                rating < min_rating or rating > max_rating
+                or popularity < min_popularity
+                or nb_plays < min_nb_plays
+                or theme_count < min_themes
+            ):
                 rows_skipped += 1
             else:
                 fen = row["FEN"]
@@ -353,8 +364,8 @@ def import_tactics(
                     "moves": row["Moves"],
                     "rating": rating,
                     "rating_deviation": int(row["RatingDeviation"]),
-                    "popularity": int(row["Popularity"]),
-                    "nb_plays": int(row["NbPlays"]),
+                    "popularity": popularity,
+                    "nb_plays": nb_plays,
                     "game_url": _player_oriented_game_url(row["GameUrl"], fen),
                 })
                 batch_themes.append(row["Themes"].split() if row["Themes"] else [])

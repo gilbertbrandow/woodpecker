@@ -57,6 +57,9 @@ def tactics_ensure_data() -> None:
 @click.option("--limit", type=int, default=None, help="Maximum number of tactics to import")
 @click.option("--min-rating", type=int, default=0, show_default=True, help="Minimum puzzle rating")
 @click.option("--max-rating", type=int, default=9999, show_default=True, help="Maximum puzzle rating")
+@click.option("--min-popularity", type=int, default=0, show_default=True, help="Minimum Lichess popularity score (-100 to 100)")
+@click.option("--min-nb-plays", type=int, default=0, show_default=True, help="Minimum number of times the puzzle has been played")
+@click.option("--min-themes", type=int, default=0, show_default=True, help="Minimum number of themes a puzzle must have")
 @click.option("--batch-size", type=int, default=500, show_default=True, help="DB insert batch size")
 @click.option("--api-token", default=None, envvar="LICHESS_API_TOKEN", help="Lichess API token for SourceGame fetches")
 def tactics_import(
@@ -64,6 +67,9 @@ def tactics_import(
     limit: int | None,
     min_rating: int,
     max_rating: int,
+    min_popularity: int,
+    min_nb_plays: int,
+    min_themes: int,
     batch_size: int,
     api_token: str | None,
 ) -> None:
@@ -78,6 +84,9 @@ def tactics_import(
                 "limit": limit,
                 "min_rating": min_rating,
                 "max_rating": max_rating,
+                "min_popularity": min_popularity,
+                "min_nb_plays": min_nb_plays,
+                "min_themes": min_themes,
                 "batch_size": batch_size,
                 "file": str(file),
             },
@@ -87,7 +96,7 @@ def tactics_import(
                 "skipped_existing_count",
                 "total_tactics_after_run",
             ],
-            fn=lambda sess, run_id: import_tactics(sess, file, run_id, limit, min_rating, max_rating, batch_size, api_token),
+            fn=lambda sess, run_id: import_tactics(sess, file, run_id, limit, min_rating, max_rating, min_popularity, min_nb_plays, min_themes, batch_size, api_token),
             metadata_factory=lambda run_id, stats, generated_at: LichessTacticsSourceRunMetadata(
                 source_import_run_id=run_id,
                 imported_count=stats["imported_count"],
