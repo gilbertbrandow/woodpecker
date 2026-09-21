@@ -1,5 +1,6 @@
 import { Chess, type Move } from 'chess.js'
 import type { DisplayMove, PositionStatus, TrainingItemMetaPgnDisplay, OverviewAttemptView } from '../../lib/api'
+import { getStored, setStored } from '../../lib/storage'
 
 export type Mode = 'loading' | 'focus' | 'failed' | 'overview'
 export type Orientation = 'white' | 'black'
@@ -40,14 +41,42 @@ export const LG_BREAKPOINT = 1024
 export const V_PAD_DESKTOP = 96
 export const MOBILE_H_PAD = 24
 
-export function computeBoardSize(): number {
-  const isDesktop = window.innerWidth >= LG_BREAKPOINT
-  if (isDesktop) {
+export const MIN_BOARD_SIZE = 200
+export const MIN_BOARD_SCALE = 0.4
+export const BOARD_SCALE_STORAGE_KEY = 'board.scale'
+
+export function isDesktopBoardLayout(): boolean {
+  return window.innerWidth >= LG_BREAKPOINT
+}
+
+// Largest board that fits the viewport; the user's scale only ever shrinks from here.
+export function computeMaxBoardSize(): number {
+  if (isDesktopBoardLayout()) {
     const availH = window.innerHeight - HEADER_H - FOOTER_H - V_PAD_DESKTOP
     const availW = window.innerWidth - H_PAD_MD - 2 * MIN_SIDEBAR - 2 * BOARD_GAP
-    return Math.max(200, Math.min(availH, availW))
+    return Math.max(MIN_BOARD_SIZE, Math.min(availH, availW))
   }
-  return Math.max(200, window.innerWidth - MOBILE_H_PAD)
+  return Math.max(MIN_BOARD_SIZE, window.innerWidth - MOBILE_H_PAD)
+}
+
+export function clampBoardScale(scale: number): number {
+  if (!Number.isFinite(scale)) return 1
+  return Math.min(1, Math.max(MIN_BOARD_SCALE, scale))
+}
+
+export function readBoardScale(): number {
+  const stored = getStored<unknown>(BOARD_SCALE_STORAGE_KEY)
+  return typeof stored === 'number' ? clampBoardScale(stored) : 1
+}
+
+export function writeBoardScale(scale: number): void {
+  setStored(BOARD_SCALE_STORAGE_KEY, clampBoardScale(scale))
+}
+
+export function computeBoardSize(scale: number = readBoardScale()): number {
+  const max = computeMaxBoardSize()
+  if (!isDesktopBoardLayout()) return max
+  return Math.max(MIN_BOARD_SIZE, Math.round(max * clampBoardScale(scale)))
 }
 export const MOVE_FEEDBACK_SUCCESS_MS = 200
 export const WRONG_REVERT_MS = 500
