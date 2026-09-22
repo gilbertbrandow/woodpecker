@@ -1,3 +1,3 @@
-boto3==1.43.92
-boto3-stubs[s3]==1.43.92
-sentry-sdk==2.69.1
+boto3==1.43.98
+boto3-stubs[s3]==1.43.98
+sentry-sdk==2.69.2
