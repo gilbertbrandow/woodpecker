@@ -458,7 +458,7 @@ def register_commands(app: Flask) -> None:
         parsed_ids = [int(x.strip()) for x in run_ids.split(",")]
         click.echo(f"Target import run IDs: {parsed_ids}  dry_run={dry_run}")
 
-        tactic_count = db.session.execute(
+        tactic_count: int = db.session.execute(
             sa.text(
                 "SELECT COUNT(*) FROM lichess_tactics "
                 "WHERE training_item_id IN ("
@@ -523,7 +523,7 @@ def register_commands(app: Flask) -> None:
             {"ids": parsed_ids},
         ).fetchall()
 
-        total_tactics = db.session.execute(sa.text("SELECT COUNT(*) FROM lichess_tactics")).scalar_one()
+        total_tactics: int = db.session.execute(sa.text("SELECT COUNT(*) FROM lichess_tactics")).scalar_one()
 
         for (run_id,) in runs:
             click.echo(f"Recomputing run #{run_id}...")
@@ -542,7 +542,7 @@ def register_commands(app: Flask) -> None:
                 {"run_id": run_id},
             ).one()
 
-            with_themes = db.session.execute(
+            with_themes: int = db.session.execute(
                 sa.text("""
                     SELECT COUNT(DISTINCT lt.id)
                     FROM lichess_tactics lt
@@ -553,7 +553,7 @@ def register_commands(app: Flask) -> None:
                 {"run_id": run_id},
             ).scalar_one()
 
-            with_openings = db.session.execute(
+            with_openings: int = db.session.execute(
                 sa.text("""
                     SELECT COUNT(DISTINCT lt.id)
                     FROM lichess_tactics lt
