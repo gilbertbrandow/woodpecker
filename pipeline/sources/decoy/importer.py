@@ -3,7 +3,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import chess
 import click
@@ -53,6 +53,15 @@ def _safe_int(val: Any) -> int | None:
         return None
 
 
+def _lichess_id_from_url(url: str) -> str | None:
+    """Extract bare game ID from a Lichess URL (strips /side suffix and #fragment)."""
+    try:
+        parts = [p for p in urlsplit(url).path.split("/") if p]
+        return parts[0] if parts else None
+    except (AttributeError, ValueError):
+        return None
+
+
 def _build_analysis_url(fen: str, opponent_move: str) -> str:
     """Return a Lichess analysis URL pointing to the position the player must solve."""
     try:
@@ -97,56 +106,144 @@ def _upsert_games(
     opening_by_display_name: dict[str, int],
     opening_by_eco: dict[str, list[tuple[int, str]]],
 ) -> dict[str, int]:
-    """Upsert SourceGame rows from JSONL items. Returns lichess_id → game.id for items with a URL."""
-    item_by_lichess_id: dict[str, dict[str, Any]] = {}
+    """Upsert SourceGame rows from JSONL items. Returns fen → game.id for all items.
+
+    Two groups:
+      Online (lichessGameUrl present): deduplicated by lichess_id, upserted with
+        on_conflict_do_nothing so concurrent imports never raise IntegrityError.
+      OTB (no lichessGameUrl but game_moves present): deduplicated by
+        (white, black, event, date) since these are real-world games with no Lichess ID.
+    """
+    fen_to_game_id: dict[str, int] = {}
+
+    # ── Online games ──────────────────────────────────────────────────────────
+    # Deduplicate within the batch by lichess_id; first occurrence wins for game data.
+    lichess_id_to_item: dict[str, dict[str, Any]] = {}
+    lichess_id_to_fens: dict[str, list[str]] = {}
     for item in items:
         url = item.get("lichessGameUrl")
-        if url:
-            item_by_lichess_id[url.split("/")[-1]] = item
-
-    if not item_by_lichess_id:
-        return {}
-
-    existing_rows = session.execute(
-        select(Game.lichess_id, Game.id).where(Game.lichess_id.in_(item_by_lichess_id.keys()))
-    ).all()
-    existing: dict[str, int] = {row.lichess_id: row.id for row in existing_rows}
-
-    new_games: list[Game] = []
-    new_lichess_ids: list[str] = []
-    for lichess_id, item in item_by_lichess_id.items():
-        if lichess_id in existing:
+        if not url:
             continue
-        moves_uci = item.get("game_moves")
-        if not moves_uci:
-            click.echo(f"Warning: skipping game {lichess_id}: missing game_moves")
+        gid = _lichess_id_from_url(url)
+        if not gid:
             continue
-        new_games.append(Game(
-            lichess_id=lichess_id,
-            moves=moves_uci,
-            white=item["white"],
-            black=item["black"],
-            white_elo=_safe_int(item.get("whiteElo")),
-            black_elo=_safe_int(item.get("blackElo")),
-            white_title=item.get("whiteTitle"),
-            black_title=item.get("blackTitle"),
-            event=item.get("event"),
-            date=item.get("date"),
-            eco=item.get("eco"),
-            opening_id=_find_opening_id(
-                item.get("eco"), item.get("openingName"),
-                opening_by_display_name, opening_by_eco,
-            ),
-            source_import_run_id=source_import_run_id,
-        ))
-        new_lichess_ids.append(lichess_id)
+        lichess_id_to_item.setdefault(gid, item)
+        lichess_id_to_fens.setdefault(gid, []).append(item["fen"])
 
-    if new_games:
-        session.add_all(new_games)
-        session.flush()
+    if lichess_id_to_item:
+        existing = {
+            row.lichess_id: row.id
+            for row in session.execute(
+                select(Game.lichess_id, Game.id)
+                .where(Game.lichess_id.in_(lichess_id_to_item.keys()))
+            ).all()
+        }
+        new_rows: list[dict[str, Any]] = []
+        for lichess_id, item in lichess_id_to_item.items():
+            if lichess_id in existing:
+                continue
+            moves_uci = item.get("game_moves")
+            if not moves_uci:
+                click.echo(f"Warning: skipping game {lichess_id}: missing game_moves")
+                continue
+            new_rows.append({
+                "lichess_id": lichess_id,
+                "moves": moves_uci,
+                "white": item.get("white", "?"),
+                "black": item.get("black", "?"),
+                "white_elo": _safe_int(item.get("whiteElo")),
+                "black_elo": _safe_int(item.get("blackElo")),
+                "white_title": item.get("whiteTitle"),
+                "black_title": item.get("blackTitle"),
+                "event": item.get("event"),
+                "date": item.get("date"),
+                "eco": item.get("eco"),
+                "opening_id": _find_opening_id(
+                    item.get("eco"), item.get("openingName"),
+                    opening_by_display_name, opening_by_eco,
+                ),
+                "source_import_run_id": source_import_run_id,
+            })
+        if new_rows:
+            inserted = session.execute(
+                pg_insert(cast(sa.Table, Game.__table__))
+                .values(new_rows)
+                .on_conflict_do_nothing(index_elements=["lichess_id"])
+                .returning(Game.__table__.c.id, Game.__table__.c.lichess_id)
+            ).all()
+            session.flush()
+            for row in inserted:
+                existing[row.lichess_id] = row.id
+            # Re-query any IDs that on_conflict_do_nothing silenced (already existed)
+            missing = [gid for gid in lichess_id_to_item if gid not in existing]
+            if missing:
+                for row in session.execute(
+                    select(Game.lichess_id, Game.id).where(Game.lichess_id.in_(missing))
+                ).all():
+                    existing[row.lichess_id] = row.id
 
-    new_map = {lid: game.id for game, lid in zip(new_games, new_lichess_ids)}
-    return {**existing, **new_map}
+        for lichess_id, fens in lichess_id_to_fens.items():
+            db_id = existing.get(lichess_id)
+            if db_id:
+                for fen in fens:
+                    fen_to_game_id[fen] = db_id
+
+    # ── OTB games (no lichessGameUrl, have game_moves) ────────────────────────
+    # Deduplicate by (white, black, event, date) — multiple puzzles from the same
+    # OTB game should all point to the same SourceGame row.
+    OtbKey = tuple[str | None, str | None, str | None, str | None]
+    otb_key_to_item: dict[OtbKey, dict[str, Any]] = {}
+    otb_key_to_fens: dict[OtbKey, list[str]] = {}
+    for item in items:
+        if item.get("lichessGameUrl") or not item.get("game_moves"):
+            continue
+        key: OtbKey = (
+            item.get("white"), item.get("black"),
+            item.get("event"), item.get("date"),
+        )
+        otb_key_to_item.setdefault(key, item)
+        otb_key_to_fens.setdefault(key, []).append(item["fen"])
+
+    for key, item in otb_key_to_item.items():
+        white, black, event, date = key
+        existing_id = session.execute(
+            select(Game.id).where(
+                Game.lichess_id.is_(None),
+                Game.white == (white or "?"),
+                Game.black == (black or "?"),
+                Game.event == event,
+                Game.date == date,
+            )
+        ).scalar_one_or_none()
+        if existing_id:
+            db_id = existing_id
+        else:
+            new_game = Game(
+                lichess_id=None,
+                moves=item["game_moves"],
+                white=white or "?",
+                black=black or "?",
+                white_elo=_safe_int(item.get("whiteElo")),
+                black_elo=_safe_int(item.get("blackElo")),
+                white_title=item.get("whiteTitle"),
+                black_title=item.get("blackTitle"),
+                event=event,
+                date=date,
+                eco=item.get("eco"),
+                opening_id=_find_opening_id(
+                    item.get("eco"), item.get("openingName"),
+                    opening_by_display_name, opening_by_eco,
+                ),
+                source_import_run_id=source_import_run_id,
+            )
+            session.add(new_game)
+            session.flush()
+            db_id = new_game.id
+
+        for fen in otb_key_to_fens[key]:
+            fen_to_game_id[fen] = db_id
+
+    return fen_to_game_id
 
 
 def process_batch(
@@ -185,9 +282,7 @@ def process_batch(
             ),
             {"run_id": source_import_run_id},
         ).scalar_one()
-        url = item.get("lichessGameUrl")
-        lichess_id = url.split("/")[-1] if url else None
-        game_id = game_id_map.get(lichess_id) if lichess_id else None
+        game_id = game_id_map.get(item["fen"])
         analysis_url = _build_analysis_url(item["fen"], item["opponentMove"])
         decoy_rows.append({
             "training_item_id": ti_id,

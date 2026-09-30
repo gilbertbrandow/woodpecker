@@ -67,14 +67,11 @@ class TacticBatchResult:
 
 
 def _lichess_game_id_from_url(game_url: str) -> str | None:
-    """Extract the bare game ID from a Lichess game URL (e.g. https://lichess.org/abc123DE/black → abc123DE)."""
+    """Extract the bare game ID from a Lichess game URL (e.g. https://lichess.org/abc123DE/black#56 → abc123DE)."""
     try:
-        parts = [p for p in game_url.split("/") if p]
-        # URL structure: scheme, empty, host, game_id[, side]
-        # After stripping empties: ['https:', 'lichess.org', 'abc123DE', 'black?...']
-        host_idx = next(i for i, p in enumerate(parts) if "lichess" in p)
-        return parts[host_idx + 1].split("?")[0]
-    except (StopIteration, IndexError):
+        path_parts = [p for p in urlsplit(game_url).path.split("/") if p]
+        return path_parts[0] if path_parts else None
+    except (AttributeError, ValueError):
         return None
 
 
@@ -319,7 +316,7 @@ def process_tactic_batch(
                 session, game_data, source_import_run_id, opening_by_display_name, opening_by_eco
             )
 
-            game_url_to_db_id: dict[str, int] = {}
+            game_url_to_db_id = {}
             for game_url, lichess_id in game_id_by_url.items():
                 if lichess_id in game_db_id_map:
                     game_url_to_db_id[game_url] = game_db_id_map[lichess_id]
