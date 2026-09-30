@@ -67,8 +67,27 @@ def _make_run(session, user, schedule):  # type: ignore[misc]
 
 
 def _make_lichess_tactic(session, *, rating: int = 1500):  # type: ignore[misc]
+    from app.models.game import SourceGame
     from app.models.lichess_tactic import LichessTactic
+    from app.models.source_import_run import (
+        SourceImportOperation,
+        SourceImportRun,
+        SourceImportSource,
+        SourceImportStatus,
+    )
     from app.models.training_item import TrainingItem, TrainingItemSource
+    source_run = SourceImportRun(
+        source=SourceImportSource.LICHESS_TACTICS,
+        operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
+        status=SourceImportStatus.SUCCEEDED,
+        started_at=datetime.now(timezone.utc),
+        finished_at=datetime.now(timezone.utc),
+    )
+    session.add(source_run)
+    session.flush()
+    game = SourceGame(white="?", black="?", moves="e2e4", source_import_run_id=source_run.id)
+    session.add(game)
+    session.flush()
     item = TrainingItem(source_type=TrainingItemSource.LICHESS_TACTIC)
     session.add(item)
     session.flush()
@@ -82,6 +101,7 @@ def _make_lichess_tactic(session, *, rating: int = 1500):  # type: ignore[misc]
         popularity=90,
         nb_plays=100,
         game_url="https://lichess.org/test",
+        game_id=game.id,
     )
     session.add(tactic)
     session.flush()
@@ -108,11 +128,30 @@ def _get_or_create_difficulty(session, *, value: int, min_rating: int | None, ma
 
 
 def _make_scraped_positional(session, *, min_rating: int | None = 1600, max_rating: int | None = 1800):  # type: ignore[misc]
+    from app.models.game import SourceGame
     from app.models.scraped_positional_puzzle import ScrapedPositionalPuzzle
+    from app.models.source_import_run import (
+        SourceImportOperation,
+        SourceImportRun,
+        SourceImportSource,
+        SourceImportStatus,
+    )
     from app.models.training_item import TrainingItem, TrainingItemSource
     difficulty = _get_or_create_difficulty(
         session, value=min_rating or 9999, min_rating=min_rating, max_rating=max_rating
     )
+    source_run = SourceImportRun(
+        source=SourceImportSource.LICHESS_TACTICS,
+        operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
+        status=SourceImportStatus.SUCCEEDED,
+        started_at=datetime.now(timezone.utc),
+        finished_at=datetime.now(timezone.utc),
+    )
+    session.add(source_run)
+    session.flush()
+    game = SourceGame(white="?", black="?", moves="e2e4", source_import_run_id=source_run.id)
+    session.add(game)
+    session.flush()
     item = TrainingItem(source_type=TrainingItemSource.SCRAPED_POSITIONAL)
     session.add(item)
     session.flush()
@@ -123,6 +162,7 @@ def _make_scraped_positional(session, *, min_rating: int | None = 1600, max_rati
         moves="e2e4",
         lichess_url=f"https://lichess.org/analysis/{item.id}",
         difficulty_id=difficulty.id,
+        game_id=game.id,
     )
     session.add(puzzle)
     session.flush()

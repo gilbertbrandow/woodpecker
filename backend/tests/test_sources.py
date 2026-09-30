@@ -40,11 +40,16 @@ def _make_source_run(session):  # type: ignore[misc]
 
 
 def _make_tactic(session, puzzle_id: str, rating: int = 1500, source_run=None):  # type: ignore[misc]
+    from app.models.game import SourceGame
     from app.models.lichess_tactic import LichessTactic
     from app.models.training_item import TrainingItem, TrainingItemSource
 
     if source_run is None:
         source_run = _make_source_run(session)
+
+    game = SourceGame(white="?", black="?", moves="e2e4", source_import_run_id=source_run.id)
+    session.add(game)
+    session.flush()
 
     item = TrainingItem(
         source_type=TrainingItemSource.LICHESS_TACTIC,
@@ -63,6 +68,7 @@ def _make_tactic(session, puzzle_id: str, rating: int = 1500, source_run=None): 
         popularity=80,
         nb_plays=50,
         game_url=f"https://lichess.org/{puzzle_id}",
+        game_id=game.id,
     )
     session.add(tactic)
     session.flush()

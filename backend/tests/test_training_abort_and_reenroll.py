@@ -8,6 +8,7 @@ from tests.conftest import _seed_world  # type: ignore[import]
 
 def _seed_base(session):
     """Seed a user, schedule, and training without an active run."""
+    from app.models.game import SourceGame
     from app.models.lichess_tactic import LichessTactic
     from app.models.schedule import Schedule
     from app.models.source_import_run import (
@@ -31,6 +32,10 @@ def _seed_base(session):
     session.add(source_run)
     session.flush()
 
+    game = SourceGame(white="?", black="?", moves="e2e4", source_import_run_id=source_run.id)
+    session.add(game)
+    session.flush()
+
     training_item = TrainingItem(
         source_type=TrainingItemSource.LICHESS_TACTIC,
         source_import_run_id=source_run.id,
@@ -48,6 +53,7 @@ def _seed_base(session):
         popularity=90,
         nb_plays=100,
         game_url="https://lichess.org/test",
+        game_id=game.id,
     )
     session.add(tactic)
     session.flush()

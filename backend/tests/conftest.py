@@ -53,6 +53,7 @@ def db_session(app: Flask, _db_schema: None):  # type: ignore[misc]
 
 
 def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
+    from app.models.game import SourceGame
     from app.models.lichess_tactic import LichessTactic
     from app.models.run import Run, RunTrainingItem, TrainingAttempt
     from app.models.schedule import Schedule
@@ -82,6 +83,10 @@ def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
     session.add(source_run)
     session.flush()
 
+    game = SourceGame(white="?", black="?", moves="e2e4", source_import_run_id=source_run.id)
+    session.add(game)
+    session.flush()
+
     training_item = TrainingItem(
         source_type=TrainingItemSource.LICHESS_TACTIC,
         source_import_run_id=source_run.id,
@@ -99,6 +104,7 @@ def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
         popularity=90,
         nb_plays=100,
         game_url="https://lichess.org/test",
+        game_id=game.id,
     )
     session.add(tactic)
     session.flush()

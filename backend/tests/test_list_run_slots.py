@@ -16,6 +16,7 @@ def _dt(hours: float) -> datetime:
 
 
 def _seed(session, run_defs: list[dict]) -> dict:
+    from app.models.game import SourceGame
     from app.models.lichess_tactic import LichessTactic
     from app.models.schedule import Schedule
     from app.models.source_import_run import (
@@ -39,6 +40,10 @@ def _seed(session, run_defs: list[dict]) -> dict:
     session.add(source_run)
     session.flush()
 
+    game = SourceGame(white="?", black="?", moves="e2e4", source_import_run_id=source_run.id)
+    session.add(game)
+    session.flush()
+
     item = TrainingItem(
         source_type=TrainingItemSource.LICHESS_TACTIC,
         source_import_run_id=source_run.id,
@@ -56,6 +61,7 @@ def _seed(session, run_defs: list[dict]) -> dict:
         popularity=90,
         nb_plays=100,
         game_url="https://lichess.org/test",
+        game_id=game.id,
     ))
     session.flush()
 

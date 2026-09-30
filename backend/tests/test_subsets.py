@@ -60,8 +60,27 @@ def _get_or_create_theme(session, name: str, display_name: str | None = None):  
 
 
 def _make_tactic(session, puzzle_id: str, rating: int = 1500):  # type: ignore[misc]
+    from app.models.game import SourceGame
     from app.models.lichess_tactic import LichessTactic
+    from app.models.source_import_run import (
+        SourceImportOperation,
+        SourceImportRun,
+        SourceImportSource,
+        SourceImportStatus,
+    )
     from app.models.training_item import TrainingItem, TrainingItemSource
+    source_run = SourceImportRun(
+        source=SourceImportSource.LICHESS_TACTICS,
+        operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
+        status=SourceImportStatus.SUCCEEDED,
+        started_at=datetime.now(timezone.utc),
+        finished_at=datetime.now(timezone.utc),
+    )
+    session.add(source_run)
+    session.flush()
+    game = SourceGame(white="?", black="?", moves="e2e4", source_import_run_id=source_run.id)
+    session.add(game)
+    session.flush()
     item = TrainingItem(source_type=TrainingItemSource.LICHESS_TACTIC)
     session.add(item)
     session.flush()
@@ -75,6 +94,7 @@ def _make_tactic(session, puzzle_id: str, rating: int = 1500):  # type: ignore[m
         popularity=80,
         nb_plays=50,
         game_url=f"https://lichess.org/{puzzle_id}",
+        game_id=game.id,
     )
     session.add(tactic)
     session.flush()
@@ -88,10 +108,17 @@ def _make_positional(  # type: ignore[misc]
     theme_names: list[str] | None = None,
     opening_name: str | None = None,
 ):
+    from app.models.game import SourceGame
     from app.models.opening import Opening
     from app.models.scraped_positional_puzzle import (
         ScrapedPositionalPuzzle,
         scraped_positional_theme_links,
+    )
+    from app.models.source_import_run import (
+        SourceImportOperation,
+        SourceImportRun,
+        SourceImportSource,
+        SourceImportStatus,
     )
     from app.models.training_item import TrainingItem, TrainingItemSource
 
@@ -108,6 +135,19 @@ def _make_positional(  # type: ignore[misc]
             session.flush()
         opening_id = opening.id
 
+    source_run = SourceImportRun(
+        source=SourceImportSource.LICHESS_TACTICS,
+        operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
+        status=SourceImportStatus.SUCCEEDED,
+        started_at=datetime.now(timezone.utc),
+        finished_at=datetime.now(timezone.utc),
+    )
+    session.add(source_run)
+    session.flush()
+    game = SourceGame(white="?", black="?", moves="e2e4", source_import_run_id=source_run.id)
+    session.add(game)
+    session.flush()
+
     item = TrainingItem(source_type=TrainingItemSource.SCRAPED_POSITIONAL)
     session.add(item)
     session.flush()
@@ -120,6 +160,7 @@ def _make_positional(  # type: ignore[misc]
         lichess_url=f"https://lichess.org/analysis/{internal_id}",
         difficulty_id=difficulty.id,
         opening_id=opening_id,
+        game_id=game.id,
     )
     session.add(puzzle)
     session.flush()
@@ -157,7 +198,26 @@ def _add_item_to_subset(session, subset, training_item, position: int = 0):  # t
 
 def _make_decoy(session, accepted_moves: list | None = None):  # type: ignore[misc]
     from app.models.decoy_puzzle import DecoyPuzzle
+    from app.models.game import SourceGame
+    from app.models.source_import_run import (
+        SourceImportOperation,
+        SourceImportRun,
+        SourceImportSource,
+        SourceImportStatus,
+    )
     from app.models.training_item import TrainingItem, TrainingItemSource
+    source_run = SourceImportRun(
+        source=SourceImportSource.LICHESS_TACTICS,
+        operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
+        status=SourceImportStatus.SUCCEEDED,
+        started_at=datetime.now(timezone.utc),
+        finished_at=datetime.now(timezone.utc),
+    )
+    session.add(source_run)
+    session.flush()
+    game = SourceGame(white="?", black="?", moves="e2e4", source_import_run_id=source_run.id)
+    session.add(game)
+    session.flush()
     item = TrainingItem(source_type=TrainingItemSource.DECOY)
     session.add(item)
     session.flush()
@@ -174,6 +234,7 @@ def _make_decoy(session, accepted_moves: list | None = None):  # type: ignore[mi
         best_cp=50,
         depth=20,
         move_number=22,
+        game_id=game.id,
     )
     session.add(puzzle)
     session.flush()
