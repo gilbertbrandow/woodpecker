@@ -154,15 +154,6 @@ def upsert_source_games(
     existing_map: dict[str, int] = {row.lichess_id: row.id for row in existing_rows}
     result: dict[str, int] = dict(existing_map)
 
-    for lichess_id, game_id in existing_map.items():
-        moves_uci = game_data[lichess_id].get("moves_uci")
-        if moves_uci is not None:
-            session.execute(
-                sa.update(SourceGame.__table__)
-                .where(SourceGame.__table__.c.id == game_id)
-                .values(moves=moves_uci)
-            )
-
     new_rows: list[dict[str, Any]] = []
     for lichess_id, data in game_data.items():
         if lichess_id in existing_map:
@@ -189,7 +180,7 @@ def upsert_source_games(
 
     if new_rows:
         inserted = session.execute(
-            pg_insert(SourceGame.__table__)
+            pg_insert(SourceGame)
             .values(new_rows)
             .on_conflict_do_nothing(index_elements=["lichess_id"])
             .returning(SourceGame.__table__.c.id, SourceGame.__table__.c.lichess_id)
@@ -227,8 +218,8 @@ def populate_game_moves(
                 continue
             db_id = lichess_id_to_game_id[lichess_id]
             session.execute(
-                sa.update(SourceGame.__table__)
-                .where(SourceGame.__table__.c.id == db_id)
+                sa.update(SourceGame)
+                .where(SourceGame.id == db_id)
                 .values(moves=data["moves_uci"])
             )
             updated += 1

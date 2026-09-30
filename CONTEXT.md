@@ -12,6 +12,14 @@ _Avoid_: puzzle (overloaded with UI usage), item
 A named external puzzle data provider. Each Source has its own Pipeline importer, a source-specific metadata table, and its own solving semantics — what counts as "correct" is defined per Source, not by the generic solving engine. Current sources: `LICHESS_TACTIC`, `SCRAPED_POSITIONAL`, `DECOY`.
 _Avoid_: dataset, data source
 
+**SourceGame**:
+The chess game (played on Lichess or OTB) that a TrainingItem was extracted from. Stores game-level facts — players, ELO, event, ECO, Lichess ID, and the full UCI move sequence. Multiple TrainingItems may reference the same SourceGame. A SourceGame only exists in this system because at least one TrainingItem was sourced from it.
+_Avoid_: game, game record, match
+
+**SourceGame Prelude**:
+The slice of a SourceGame's UCI move sequence from game start up to (but not including) the opponent's first automatic move in the SolveContract. Shown in the board panel to contextualise the puzzle within its originating game. Derived at serve time from `SourceGame.moves` by slicing at the ply encoded in the puzzle's enriched FEN.
+_Avoid_: pre-puzzle moves, game context, game history
+
 **Lichess Tactic**:
 A TrainingItem sourced from the Lichess tactics database. Solved by playing a full exact UCI move sequence. Overview shows the Lichess puzzle ID, themes, and opening.
 
@@ -67,7 +75,7 @@ The standalone Python + Click CLI that imports data from external sources into t
 _Avoid_: importer, ingestion script, scraper
 
 **SourceImportRun**:
-A database record (`source_import_runs`) tracking one execution of a Pipeline import command. Only `lichess-tactics tactics import` creates one; openings and themes imports leave no run trace.
+A database record (`source_import_runs`) tracking one execution of a Pipeline import command. Both `lichess-tactics tactics import` and `scraped-positional puzzles import` create one; openings and themes imports leave no run trace. The `SOURCE_GAME_BACKFILL` source type creates a SourceImportRun to track the one-time job that populates `SourceGame.moves` for TrainingItems imported before SourceGame enrichment was added to the importers.
 _Avoid_: import run, pipeline run, pipeline execution
 
 **Theme**:

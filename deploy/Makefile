@@ -79,7 +79,7 @@ prod-lichess-tactics-validate:
 	@DATABASE_URL=$(PROD_DB_URL) $(MAKE) -s -C ../pipeline lichess-tactics-validate
 
 prod-lichess-tactics-import: _confirm-prod-mutation
-	@DATABASE_URL=$(PROD_DB_URL) $(MAKE) -s -C ../pipeline lichess-tactics-import ARGS="$(ARGS)"
+	@DATABASE_URL=$(PROD_DB_URL) $(MAKE) -s -C ../pipeline import-lichess-tactics ARGS="$(ARGS)"
 
 prod-lichess-tactics-themes-import: _confirm-prod-mutation
 	@DATABASE_URL=$(PROD_DB_URL) $(MAKE) -s -C ../pipeline lichess-tactics-themes-import

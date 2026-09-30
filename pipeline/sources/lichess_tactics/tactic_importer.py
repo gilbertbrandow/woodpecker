@@ -14,6 +14,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
+from app.models.game import SourceGame
 from app.models.lichess_tactic import LichessTactic, lichess_tactic_theme_links, lichess_tactic_openings
 from app.models.lichess_tactic_theme import LichessTacticTheme
 from app.models.opening import Opening
@@ -162,28 +163,66 @@ def process_tactic_batch(
     theme_cache: dict[str, int],
     opening_cache: dict[str, int],
     fuzzy_opening_cache: dict[str, int | None],
-    opening_by_display_name: dict[str, int] | None = None,
-    opening_by_eco: dict[str, list[tuple[int, str]]] | None = None,
+    opening_by_display_name: dict[str, int],
+    opening_by_eco: dict[str, list[tuple[int, str]]],
     api_token: str | None = None,
 ) -> TacticBatchResult:
     if not batch:
         return TacticBatchResult(inserted=0)
 
+    # --- Step 1: Ensure SourceGame rows exist before inserting tactics ---
+    # Collect unique Lichess game IDs referenced by this batch.
+    game_url_to_lichess_id: dict[str, str] = {}
+    for tactic in batch:
+        game_url = tactic.get("game_url", "")
+        gid = _lichess_game_id_from_url(game_url)
+        if gid:
+            game_url_to_lichess_id[game_url] = gid
+
+    game_url_to_db_id: dict[str, int] = {}
+    if game_url_to_lichess_id:
+        unique_lichess_ids = list(set(game_url_to_lichess_id.values()))
+
+        # Check which games already exist — only fetch the missing ones from the API.
+        existing_game_rows = session.execute(
+            select(SourceGame.lichess_id, SourceGame.id)
+            .where(SourceGame.lichess_id.in_(unique_lichess_ids))
+        ).all()
+        existing_game_map: dict[str, int] = {r.lichess_id: r.id for r in existing_game_rows}
+
+        missing_ids = [gid for gid in unique_lichess_ids if gid not in existing_game_map]
+        new_game_map: dict[str, int] = {}
+        if missing_ids:
+            try:
+                game_data = fetch_full_game_data(missing_ids, api_token)
+            except Exception as exc:
+                click.echo(f"Warning: could not fetch SourceGame data for tactic batch: {exc}")
+                game_data = {}
+            if game_data:
+                new_game_map = upsert_source_games(
+                    session, game_data, source_import_run_id,
+                    opening_by_display_name, opening_by_eco,
+                )
+
+        game_db_id_map = {**existing_game_map, **new_game_map}
+        for game_url, lichess_id in game_url_to_lichess_id.items():
+            if lichess_id in game_db_id_map:
+                game_url_to_db_id[game_url] = game_db_id_map[lichess_id]
+
+    # --- Step 2: Skip tactics that already exist ---
     tactic_puzzle_ids = [t["puzzle_id"] for t in batch]
-
-    existing_rows = session.execute(
-        select(LichessTactic.puzzle_id, LichessTactic.training_item_id).where(
-            LichessTactic.puzzle_id.in_(tactic_puzzle_ids)
-        )
-    ).all()
-    existing_map: dict[str, int] = {r.puzzle_id: r.training_item_id for r in existing_rows}
-
-    new_tactics = [t for t in batch if t["puzzle_id"] not in existing_map]
+    existing_puzzle_ids: set[str] = set(
+        session.scalars(
+            select(LichessTactic.puzzle_id).where(LichessTactic.puzzle_id.in_(tactic_puzzle_ids))
+        ).all()
+    )
+    new_tactics = [t for t in batch if t["puzzle_id"] not in existing_puzzle_ids]
 
     unknown_themes: set[str] = set()
     unknown_openings: set[str] = set()
     inserted_count = 0
 
+    # --- Step 3: Insert new tactics with game_id already set ---
     if new_tactics:
         ti_result = cast(
             CursorResult[Any],
@@ -199,7 +238,11 @@ def process_tactic_batch(
         new_ids = [row.id for row in ti_result]
 
         lichess_tactic_rows = [
-            {**tactic, "training_item_id": new_ids[i]}
+            {
+                **tactic,
+                "training_item_id": new_ids[i],
+                "game_id": game_url_to_db_id.get(tactic.get("game_url", "")),
+            }
             for i, tactic in enumerate(new_tactics)
         ]
         stmt = pg_insert(cast(sa.Table, LichessTactic.__table__)).values(lichess_tactic_rows).on_conflict_do_nothing(
@@ -209,6 +252,7 @@ def process_tactic_batch(
         session.commit()
         inserted_count = result.rowcount if result.rowcount >= 0 else 0
 
+    # --- Step 4: Theme and opening associations ---
     if inserted_count > 0:
         all_tactic_id_map = {
             row.puzzle_id: row.id
@@ -309,6 +353,9 @@ def import_tactics(
     limit: int | None = None,
     min_rating: int = 0,
     max_rating: int = 9999,
+    min_popularity: int = 0,
+    min_nb_plays: int = 0,
+    min_themes: int = 0,
     batch_size: int = 500,
     api_token: str | None = None,
 ) -> dict[str, Any]:
@@ -343,7 +390,15 @@ def import_tactics(
         for row in reader:
             rows_read += 1
             rating = int(row["Rating"])
-            if rating < min_rating or rating > max_rating:
+            popularity = int(row["Popularity"])
+            nb_plays = int(row["NbPlays"])
+            theme_count = len(row["Themes"].split()) if row["Themes"] else 0
+            if (
+                rating < min_rating or rating > max_rating
+                or popularity < min_popularity
+                or nb_plays < min_nb_plays
+                or theme_count < min_themes
+            ):
                 rows_skipped += 1
             else:
                 fen = row["FEN"]
@@ -353,8 +408,8 @@ def import_tactics(
                     "moves": row["Moves"],
                     "rating": rating,
                     "rating_deviation": int(row["RatingDeviation"]),
-                    "popularity": int(row["Popularity"]),
-                    "nb_plays": int(row["NbPlays"]),
+                    "popularity": popularity,
+                    "nb_plays": nb_plays,
                     "game_url": _player_oriented_game_url(row["GameUrl"], fen),
                 })
                 batch_themes.append(row["Themes"].split() if row["Themes"] else [])

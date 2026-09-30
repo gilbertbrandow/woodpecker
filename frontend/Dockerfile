@@ -22,7 +22,7 @@ RUN --mount=type=secret,id=sentry_auth_token \
     SENTRY_AUTH_TOKEN=$(cat /run/secrets/sentry_auth_token) npm run build
 
 FROM nginx:1.31.6-alpine AS prod
-RUN apk upgrade --no-cache libcrypto3 libssl3 libexpat libuuid
+RUN apk upgrade --no-cache
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80

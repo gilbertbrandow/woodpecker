@@ -209,8 +209,8 @@ def process_puzzle_batch(
         game_db_id = game_lichess_id_map.get(lichess_game_id)
         if puzzle_db_id is not None and game_db_id is not None:
             session.execute(
-                sa.update(ScrapedPositionalPuzzle.__table__)
-                .where(ScrapedPositionalPuzzle.__table__.c.id == puzzle_db_id)
+                sa.update(ScrapedPositionalPuzzle)
+                .where(ScrapedPositionalPuzzle.id == puzzle_db_id)
                 .values(game_id=game_db_id)
             )
 
