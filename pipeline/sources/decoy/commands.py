@@ -40,7 +40,8 @@ def puzzles_ensure_data() -> None:
 )
 @click.option("--limit", type=int, default=None, help="Maximum number of decoys to import")
 @click.option("--batch-size", type=int, default=200, show_default=True, help="DB insert batch size")
-def puzzles_import(file_path: Path | None, limit: int | None, batch_size: int) -> None:
+@click.option("--api-token", default=None, envvar="LICHESS_API_TOKEN", help="Lichess API token for SourceGame moves fetch")
+def puzzles_import(file_path: Path | None, limit: int | None, batch_size: int, api_token: str | None) -> None:
     """Import decoy puzzles from a JSONL file (idempotent, keyed on FEN)."""
     file = file_path if file_path else ensure_source_file("decoy_positions")
     with Session() as session:
@@ -50,7 +51,7 @@ def puzzles_import(file_path: Path | None, limit: int | None, batch_size: int) -
             operation=SourceImportOperation.DECOY_IMPORT,
             parameters={"limit": limit, "batch_size": batch_size, "file": str(file)},
             summary_keys=["imported_count", "skipped_existing_count", "total_decoys_after_run"],
-            fn=lambda sess, run_id: import_decoys(sess, file, run_id, limit, batch_size),
+            fn=lambda sess, run_id: import_decoys(sess, file, run_id, limit, batch_size, api_token),
             metadata_factory=lambda run_id, stats, generated_at: DecoySourceRunMetadata(
                 source_import_run_id=run_id,
                 imported_count=stats["imported_count"],

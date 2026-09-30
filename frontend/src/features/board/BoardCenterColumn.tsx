@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Volume2, VolumeOff } from 'lucide-react'
 import { Toggle } from '../../components/ui/toggle'
 import { BoardSurface } from './BoardSurface'
+import { BoardResizeHandle } from './BoardResizeHandle'
 import { SessionAttemptStrip } from '../../components/SessionAttemptStrip'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
 import type { BoardSurfaceProps } from './BoardSurface'
@@ -93,6 +94,7 @@ export function BoardCenterColumn({
         )}
         <BoardSurface {...boardSurfaceProps} />
         {overlay}
+        <BoardResizeHandle boardSize={board.boardSize} onResize={actions.resizeBoard} onCommit={actions.commitBoardResize} />
       </div>
       <div className="mt-3 flex h-6 items-center gap-2">
         <div className="min-w-0 flex-1">

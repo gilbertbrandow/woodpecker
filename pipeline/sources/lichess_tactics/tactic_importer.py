@@ -298,6 +298,47 @@ def process_tactic_batch(
             )
         session.commit()
 
+    # Fetch and upsert SourceGame rows for newly inserted tactics.
+    if inserted_count > 0 and opening_by_display_name is not None and opening_by_eco is not None:
+        game_id_by_url: dict[str, str] = {}
+        for tactic in batch:
+            game_url = tactic.get("game_url", "")
+            gid = _lichess_game_id_from_url(game_url)
+            if gid:
+                game_id_by_url[game_url] = gid
+
+        unique_lichess_ids = list(set(game_id_by_url.values()))
+        if unique_lichess_ids:
+            try:
+                game_data = fetch_full_game_data(unique_lichess_ids, api_token)
+            except Exception as exc:
+                click.echo(f"Warning: could not fetch SourceGame data for tactic batch: {exc}")
+                game_data = {}
+
+            game_db_id_map = upsert_source_games(
+                session, game_data, source_import_run_id, opening_by_display_name, opening_by_eco
+            )
+
+            game_url_to_db_id: dict[str, int] = {}
+            for game_url, lichess_id in game_id_by_url.items():
+                if lichess_id in game_db_id_map:
+                    game_url_to_db_id[game_url] = game_db_id_map[lichess_id]
+
+            if game_url_to_db_id:
+                for tactic in batch:
+                    game_db_id = game_url_to_db_id.get(tactic.get("game_url", ""))
+                    if game_db_id is None:
+                        continue
+                    puzzle_id = tactic["puzzle_id"]
+                    session.execute(
+                        sa.text(
+                            "UPDATE lichess_tactics SET game_id = :game_id "
+                            "WHERE puzzle_id = :puzzle_id AND game_id IS NULL"
+                        ),
+                        {"game_id": game_db_id, "puzzle_id": puzzle_id},
+                    )
+                session.commit()
+
     return TacticBatchResult(
         inserted=inserted_count,
         unknown_themes=unknown_themes,

@@ -17,6 +17,7 @@ from app.models.decoy_puzzle import DecoyPuzzle
 from app.models.game import SourceGame as Game
 from app.models.opening import Opening
 
+
 PROGRESS_INTERVAL = 500
 EXPECTED_SCHEMA_VERSION = 2
 _META_URL = "https://raw.githubusercontent.com/gilbertbrandow/decoys/main/meta.json"
@@ -154,6 +155,7 @@ def process_batch(
     source_import_run_id: int,
     opening_by_display_name: dict[str, int],
     opening_by_eco: dict[str, list[tuple[int, str]]],
+    api_token: str | None = None,
 ) -> ImportBatchResult:
     if not batch:
         return ImportBatchResult(imported=0, skipped_existing=0)
@@ -215,6 +217,7 @@ def import_decoys(
     source_import_run_id: int,
     limit: int | None,
     batch_size: int,
+    api_token: str | None = None,
 ) -> dict[str, Any]:
     check_schema_version()
     opening_by_display_name, opening_by_eco = _load_opening_caches(session)
@@ -260,7 +263,7 @@ def import_decoys(
             if len(pending) >= batch_size:
                 result = process_batch(
                     session, pending, source_import_run_id,
-                    opening_by_display_name, opening_by_eco,
+                    opening_by_display_name, opening_by_eco, api_token,
                 )
                 pending.clear()
                 rows_imported += result.imported

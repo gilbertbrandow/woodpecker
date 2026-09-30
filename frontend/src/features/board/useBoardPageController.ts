@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type { SoundEvent } from './useBoardSounds'
 import { sanToSoundEvents } from './useBoardSounds'
 import { useNavigate } from '@tanstack/react-router'
-import { Chess, type Square } from 'chess.js'
+import { Chess, type Move, type Square } from 'chess.js'
 import { toast } from '../../lib/toast'
 import { api, type RunTrainingItemAttemptView, type RunTrainingItemOverview } from '../../lib/api'
 import { useAuth } from '../../context/auth'
@@ -17,15 +17,11 @@ import {
   resultsInCheckmate,
   playerColor,
   resolveOverviewBoardPosition,
-  HEADER_H,
-  FOOTER_H,
-  H_PAD_MD,
-  MIN_SIDEBAR,
-  BOARD_GAP,
-  LG_BREAKPOINT,
-  V_PAD_DESKTOP,
-  MOBILE_H_PAD,
   computeBoardSize,
+  computeMaxBoardSize,
+  clampBoardScale,
+  readBoardScale,
+  writeBoardScale,
   MOVE_FEEDBACK_SUCCESS_MS,
   WRONG_REVERT_MS,
   FAILED_TO_OVERVIEW_MS,
@@ -55,6 +51,8 @@ export type BoardPageActions = {
   handleRetake: () => Promise<void>
   handleNextPuzzle: () => Promise<void>
   dismissRunComplete: () => void
+  resizeBoard: (size: number) => void
+  commitBoardResize: () => void
 }
 
 export type BoardPageControllerResult = {
@@ -163,23 +161,26 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const [lastMoveResult, setLastMoveResult] = useState<MoveFeedbackResult | null>(null)
   const [lastMoveSquare, setLastMoveSquare] = useState<string | null>(null)
   const [isShowingMoveFeedback, setIsShowingMoveFeedback] = useState(false)
-  const [boardSize, setBoardSize] = useState(() => computeBoardSize())
+  const [boardScale, setBoardScale] = useState(() => readBoardScale())
+  const [boardSize, setBoardSize] = useState(() => computeBoardSize(boardScale))
 
   useEffect(() => {
-    const compute = (): void => {
-      const isDesktop = window.innerWidth >= LG_BREAKPOINT
-      if (isDesktop) {
-        const availH = window.innerHeight - HEADER_H - FOOTER_H - V_PAD_DESKTOP
-        const availW = window.innerWidth - H_PAD_MD - 2 * MIN_SIDEBAR - 2 * BOARD_GAP
-        setBoardSize(Math.max(200, Math.min(availH, availW)))
-      } else {
-        const availWMobile = window.innerWidth - MOBILE_H_PAD
-        setBoardSize(Math.max(200, availWMobile))
-      }
-    }
+    const compute = (): void => setBoardSize(computeBoardSize(boardScale))
     compute()
     window.addEventListener('resize', compute)
     return () => window.removeEventListener('resize', compute)
+  }, [boardScale])
+
+  const boardScaleRef = useRef(boardScale)
+
+  const resizeBoard = useCallback((size: number): void => {
+    const next = clampBoardScale(size / computeMaxBoardSize())
+    boardScaleRef.current = next
+    setBoardScale(next)
+  }, [])
+
+  const commitBoardResize = useCallback((): void => {
+    writeBoardScale(boardScaleRef.current)
   }, [])
 
   const setFen = useCallback((fen: string): void => {
@@ -307,7 +308,12 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       const ch = chessRef.current
       if (!ch) return
       const firstMove = resolveStep(solutionMovesRef.current[0] ?? '')
-      const firstApplied = applyUci(ch, firstMove)
+      let firstApplied: Move
+      try {
+        firstApplied = applyUci(ch, firstMove)
+      } catch {
+        return
+      }
       allPliesRef.current = [firstMove]
       setAllPliesPlayed([firstMove])
       const lm: [string, string] = [firstMove.slice(0, 2), firstMove.slice(2, 4)]
@@ -554,7 +560,12 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
   const applyOpponentMove = useCallback((uci: string): void => {
     const chess = chessRef.current
     if (!chess) return
-    const applied = applyUci(chess, uci)
+    let applied: Move
+    try {
+      applied = applyUci(chess, uci)
+    } catch {
+      return
+    }
     if (modeRef.current === 'focus') {
       allPliesRef.current = [...allPliesRef.current, uci]
       setAllPliesPlayed(allPliesRef.current)
@@ -575,7 +586,12 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     const chess = chessRef.current
     if (!chess) return
 
-    const applied = applyUci(chess, uci)
+    let applied: Move
+    try {
+      applied = applyUci(chess, uci)
+    } catch {
+      return
+    }
     if (modeRef.current === 'focus') {
       movesPlayedRef.current = [...movesPlayedRef.current, uci]
       setMovesPlayed(movesPlayedRef.current)
@@ -810,7 +826,13 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
     const uci = resolveStep(solutionMoves[moveIndex] ?? '')
     inputBlockedRef.current = true
     setInputBlocked(true)
-    applyUci(chess, uci)
+    try {
+      applyUci(chess, uci)
+    } catch {
+      inputBlockedRef.current = false
+      setInputBlocked(false)
+      return
+    }
     setFen(chess.fen())
     setLastMove([uci.slice(0, 2), uci.slice(2, 4)])
     setDests(computeDests(chess))
@@ -949,6 +971,8 @@ export function useBoardPageController(params: BoardPageControllerParams): Board
       handleRetake,
       handleNextPuzzle,
       dismissRunComplete,
+      resizeBoard,
+      commitBoardResize,
     },
   }
 }
