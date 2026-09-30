@@ -756,7 +756,7 @@ def register_commands(app: Flask) -> None:
                         if existing_game:
                             db_game_id = existing_game
                         else:
-                            result = db.session.execute(
+                            result: int = db.session.execute(
                                 _pg_insert(SourceGame)
                                 .values([data])
                                 .returning(SourceGame.__table__.c.id)
