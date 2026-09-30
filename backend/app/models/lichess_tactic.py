@@ -41,9 +41,9 @@ class LichessTactic(Base):
     popularity: Mapped[int] = mapped_column(Integer, nullable=False)
     nb_plays: Mapped[int] = mapped_column(Integer, nullable=False)
     game_url: Mapped[str] = mapped_column(Text, nullable=False)
-    game_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("games.id"), nullable=True)
+    game_id: Mapped[int] = mapped_column(Integer, ForeignKey("games.id"), nullable=False)
 
-    game: Mapped["SourceGame | None"] = relationship("SourceGame")
+    game: Mapped["SourceGame"] = relationship("SourceGame")
     training_item: Mapped[TrainingItem] = relationship(
         "TrainingItem", back_populates="lichess_tactic"
     )

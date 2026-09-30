@@ -93,6 +93,7 @@ def register_commands(app: Flask) -> None:
           2. scraped_positional_puzzles with game_id IS NULL  → create SourceGame rows + set FK
           3. games with lichess_id IS NOT NULL AND moves IS NULL  → populate moves via Lichess API
           4. games still with moves IS NULL  → populate moves from --decoy-file JSONL (OTB games)
+          5. decoy_puzzles with game_id IS NULL  → link via --decoy-file JSONL (tries API first, falls back to JSONL for OTB games)
         """
         from datetime import datetime, timezone
 
@@ -279,27 +280,120 @@ def register_commands(app: Flask) -> None:
         total_tactics_linked = 0
         total_positional_linked = 0
         total_moves_populated = 0
+        total_decoys_linked = 0
 
         # --- Pass 1: lichess_tactics with game_id IS NULL ---
-        tactics_without_game = db.session.execute(
-            sa.select(LichessTactic.id, LichessTactic.puzzle_id, LichessTactic.game_url)
+        n_null_tactics = db.session.scalar(
+            sa.select(sa.func.count()).select_from(LichessTactic).where(LichessTactic.game_id.is_(None))
+        ) or 0
+        click.echo(f"Pass 1: {n_null_tactics:,} lichess_tactics need game_id")
+
+        # Pass 1a: Direct SQL join — links tactics to games that ALREADY exist in the DB.
+        # Strips #fragment and /side suffix from game_url to get the bare Lichess game ID,
+        # then matches against games.lichess_id. No API call needed; runs in milliseconds.
+        if not dry_run and n_null_tactics:
+            result_1a = db.session.execute(sa.text("""
+                UPDATE lichess_tactics lt
+                SET game_id = g.id
+                FROM games g
+                WHERE lt.game_id IS NULL
+                  AND g.lichess_id IS NOT NULL
+                  AND g.lichess_id = split_part(
+                        regexp_replace(lt.game_url, '[#?].*$', ''),
+                        '/', 4)
+            """))
+            db.session.commit()
+            linked_1a = result_1a.rowcount  # type: ignore[attr-defined]
+            total_tactics_linked += linked_1a
+            click.echo(f"  Pass 1a: {linked_1a:,} tactics linked to existing games (no API needed)")
+        elif dry_run:
+            linked_1a_estimate = db.session.scalar(sa.text("""
+                SELECT COUNT(*) FROM lichess_tactics lt
+                JOIN games g ON g.lichess_id = split_part(
+                      regexp_replace(lt.game_url, '[#?].*$', ''), '/', 4)
+                WHERE lt.game_id IS NULL AND g.lichess_id IS NOT NULL
+            """)) or 0
+            click.echo(f"  [dry-run] Pass 1a: would link {linked_1a_estimate:,} tactics to existing games")
+
+        # Pass 1b: Fetch games from Lichess API for tactics whose game doesn't exist yet.
+        tactics_still_null = db.session.execute(
+            sa.select(LichessTactic.id, LichessTactic.game_url)
             .where(LichessTactic.game_id.is_(None))
         ).all()
-        click.echo(f"Pass 1: {len(tactics_without_game):,} lichess_tactics need game_id")
-
-        tactic_lichess_ids: list[tuple[int, str, str]] = [
-            (row.id, row.puzzle_id, gid)
-            for row in tactics_without_game
+        tactic_lichess_ids: list[tuple[int, str]] = [
+            (row.id, gid)
+            for row in tactics_still_null
             if (gid := _lichess_id_from_url(row.game_url)) is not None
         ]
-        unique_tactic_game_ids = list({gid for _, _, gid in tactic_lichess_ids})
+        unique_tactic_game_ids = list({gid for _, gid in tactic_lichess_ids})
+        click.echo(f"  Pass 1b: {len(tactics_still_null):,} tactics still null → {len(unique_tactic_game_ids):,} unique game IDs to fetch from API")
 
         if not dry_run and unique_tactic_game_ids:
             for batch_start in range(0, len(unique_tactic_game_ids), batch_size):
                 batch = unique_tactic_game_ids[batch_start: batch_start + batch_size]
-                game_map = _upsert_games_from_api(batch, run_id, by_name, by_eco)
-                for tactic_id, _, lichess_id in tactic_lichess_ids:
-                    db_game_id = game_map.get(lichess_id)
+
+                # Check which already exist (may have been inserted by a concurrent batch)
+                existing = {
+                    row.lichess_id: row.id
+                    for row in db.session.execute(
+                        sa.select(SourceGame.lichess_id, SourceGame.id)
+                        .where(SourceGame.lichess_id.in_(batch))
+                    ).all()
+                }
+                new_ids = [gid for gid in batch if gid not in existing]
+                if new_ids:
+                    try:
+                        api_data = _fetch_games(new_ids, strict=False)
+                    except requests.HTTPError as exc:
+                        click.echo(f"  Warning: API error at batch {batch_start // batch_size + 1}: {exc}")
+                        api_data = {}
+                    time.sleep(1.0)
+
+                    new_rows = []
+                    for lichess_id in new_ids:
+                        data = api_data.get(lichess_id)
+                        if not data:
+                            continue
+                        opening = data.get("opening") or {}
+                        opening_name = opening.get("name") if isinstance(opening, dict) else None
+                        eco = data.get("eco")
+                        oid: int | None = None
+                        if opening_name and opening_name in by_name:
+                            oid = by_name[opening_name]
+                        elif eco and eco in by_eco:
+                            oid = by_eco[eco][0][0]
+                        new_rows.append({
+                            "lichess_id": lichess_id,
+                            "white": data.get("white") or "?",
+                            "black": data.get("black") or "?",
+                            "white_elo": data.get("white_elo"),
+                            "black_elo": data.get("black_elo"),
+                            "white_title": data.get("white_title"),
+                            "black_title": data.get("black_title"),
+                            "event": data.get("event"),
+                            "date": data.get("date"),
+                            "eco": eco,
+                            "moves": data.get("moves_uci"),
+                            "opening_id": oid,
+                            "source_import_run_id": run_id,
+                        })
+                    if new_rows:
+                        from sqlalchemy.dialects.postgresql import insert as pg_insert
+                        inserted = db.session.execute(
+                            pg_insert(SourceGame)
+                            .values(new_rows)
+                            .on_conflict_do_nothing(index_elements=["lichess_id"])
+                            .returning(SourceGame.__table__.c.id, SourceGame.__table__.c.lichess_id)
+                        ).all()
+                        db.session.commit()
+                        for row in inserted:
+                            existing[row.lichess_id] = row.id
+
+                # Link tactics for this batch
+                for tactic_id, lichess_id in tactic_lichess_ids:
+                    if lichess_id not in batch:
+                        continue
+                    db_game_id = existing.get(lichess_id)
                     if db_game_id:
                         db.session.execute(
                             sa.text("UPDATE lichess_tactics SET game_id = :gid WHERE id = :tid AND game_id IS NULL"),
@@ -307,11 +401,12 @@ def register_commands(app: Flask) -> None:
                         )
                 db.session.commit()
                 total_tactics_linked += len(batch)
-                click.echo(f"  Pass 1: batch {batch_start // batch_size + 1} done ({total_tactics_linked:,}/{len(unique_tactic_game_ids):,} game IDs processed)")
-                if batch_start + batch_size < len(unique_tactic_game_ids):
-                    time.sleep(1.0)
-        else:
-            click.echo(f"  [dry-run] Would process {len(unique_tactic_game_ids):,} unique game IDs")
+                click.echo(
+                    f"  Pass 1b: batch {batch_start // batch_size + 1}/{(len(unique_tactic_game_ids) + batch_size - 1) // batch_size}"
+                    f" done ({total_tactics_linked:,} game IDs processed total)"
+                )
+        elif dry_run:
+            click.echo(f"  [dry-run] Pass 1b: would fetch {len(unique_tactic_game_ids):,} games from API")
 
         # --- Pass 2: scraped_positional_puzzles with game_id IS NULL ---
         positional_without_game = db.session.execute(
@@ -428,6 +523,260 @@ def register_commands(app: Flask) -> None:
         else:
             click.echo("Pass 4: --decoy-file not provided, skipping (OTB games will remain NULL until migration cleans them up)")
 
+        # --- Pass 5: decoy_puzzles with game_id IS NULL → link via decoy JSONL ---
+        # Decoys imported before the game_id FK column existed (run #4, Jun 2026) have
+        # NULL game_id. Two sub-groups:
+        #   A) Records with lichessGameUrl → use lichess_id; try API first, JSONL moves as fallback
+        #   B) Records without lichessGameUrl (OTB source) → create SourceGame with lichess_id=NULL
+        #      directly from JSONL game_moves; deduplicated by (white, black, event, date)
+        if decoy_file:
+            import json as _json
+            from pathlib import Path as _Path
+
+            from sqlalchemy.dialects.postgresql import insert as _pg_insert
+
+            from app.models.decoy_puzzle import DecoyPuzzle
+
+            null_decoys = db.session.execute(
+                sa.select(DecoyPuzzle.id, DecoyPuzzle.fen)
+                .where(DecoyPuzzle.game_id.is_(None))
+            ).all()
+            click.echo(f"Pass 5: {len(null_decoys):,} decoy_puzzles need game_id — scanning {_Path(decoy_file).name}")
+
+            if null_decoys:
+                fen_to_decoy_id: dict[str, int] = {row.fen: row.id for row in null_decoys}
+
+                # Group A: online games (have lichessGameUrl)
+                lichess_id_to_decoy_ids: dict[str, list[int]] = {}
+                lichess_id_to_jsonl: dict[str, dict] = {}
+
+                # Group B: OTB games (no lichessGameUrl, have game_moves)
+                # Keyed by (white, black, event, date) to deduplicate across FENs
+                OtbKey = tuple[str, str, str | None, str | None]
+                otb_key_to_decoy_ids: dict[OtbKey, list[int]] = {}
+                otb_key_to_data: dict[OtbKey, dict] = {}
+
+                def _otb_key(item: dict) -> OtbKey:
+                    return (
+                        item.get("white", "?"),
+                        item.get("black", "?"),
+                        item.get("event"),
+                        item.get("date"),
+                    )
+
+                with open(decoy_file, encoding="utf-8") as fh:
+                    for line in fh:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            item = _json.loads(line)
+                        except _json.JSONDecodeError:
+                            continue
+                        fen = item.get("fen")
+                        if not fen or fen not in fen_to_decoy_id:
+                            continue
+                        url = item.get("lichessGameUrl")
+                        game_moves = item.get("game_moves")
+                        eco = item.get("eco")
+                        opening_name = item.get("openingName")
+                        oid = None
+                        if opening_name and opening_name in by_name:
+                            oid = by_name[opening_name]
+                        elif eco and eco in by_eco:
+                            oid = by_eco[eco][0][0]
+
+                        if url:
+                            # Group A
+                            gid = _lichess_id_from_url(url)
+                            if not gid:
+                                continue
+                            lichess_id_to_decoy_ids.setdefault(gid, []).append(fen_to_decoy_id[fen])
+                            if gid not in lichess_id_to_jsonl and game_moves:
+                                lichess_id_to_jsonl[gid] = {
+                                    "lichess_id": gid,
+                                    "white": item.get("white", "?"),
+                                    "black": item.get("black", "?"),
+                                    "white_elo": int(item["whiteElo"]) if item.get("whiteElo") else None,
+                                    "black_elo": int(item["blackElo"]) if item.get("blackElo") else None,
+                                    "white_title": item.get("whiteTitle"),
+                                    "black_title": item.get("blackTitle"),
+                                    "event": item.get("event"),
+                                    "date": item.get("date"),
+                                    "eco": eco,
+                                    "moves": game_moves,
+                                    "opening_id": oid,
+                                    "source_import_run_id": run_id,
+                                }
+                        elif game_moves:
+                            # Group B (OTB)
+                            key = _otb_key(item)
+                            otb_key_to_decoy_ids.setdefault(key, []).append(fen_to_decoy_id[fen])
+                            if key not in otb_key_to_data:
+                                otb_key_to_data[key] = {
+                                    "lichess_id": None,
+                                    "white": item.get("white", "?"),
+                                    "black": item.get("black", "?"),
+                                    "white_elo": int(item["whiteElo"]) if item.get("whiteElo") else None,
+                                    "black_elo": int(item["blackElo"]) if item.get("blackElo") else None,
+                                    "white_title": item.get("whiteTitle"),
+                                    "black_title": item.get("blackTitle"),
+                                    "event": item.get("event"),
+                                    "date": item.get("date"),
+                                    "eco": eco,
+                                    "moves": game_moves,
+                                    "opening_id": oid,
+                                    "source_import_run_id": run_id,
+                                }
+
+                n_a = sum(len(v) for v in lichess_id_to_decoy_ids.values())
+                n_b = sum(len(v) for v in otb_key_to_decoy_ids.values())
+                click.echo(
+                    f"  Group A (online): {len(lichess_id_to_decoy_ids):,} unique game IDs for {n_a:,} decoys  "
+                    f"| Group B (OTB): {len(otb_key_to_data):,} unique games for {n_b:,} decoys"
+                )
+
+                # ── Group A: online games via Lichess ID ──────────────────────────
+                unique_ids = list(lichess_id_to_decoy_ids.keys())
+                if not dry_run and unique_ids:
+                    for batch_start in range(0, len(unique_ids), batch_size):
+                        batch = unique_ids[batch_start: batch_start + batch_size]
+
+                        game_map = {
+                            row.lichess_id: row.id
+                            for row in db.session.execute(
+                                sa.select(SourceGame.lichess_id, SourceGame.id)
+                                .where(SourceGame.lichess_id.in_(batch))
+                            ).all()
+                        }
+
+                        api_needed = [gid for gid in batch if gid not in game_map]
+                        if api_needed:
+                            try:
+                                api_data = _fetch_games(api_needed, strict=False)
+                            except requests.HTTPError as exc:
+                                click.echo(f"  Warning: API error for Pass 5 batch: {exc}")
+                                api_data = {}
+                            time.sleep(1.0)
+                            api_rows = []
+                            for lichess_id in api_needed:
+                                if lichess_id in game_map:
+                                    continue
+                                data = api_data.get(lichess_id)
+                                if not data:
+                                    continue
+                                opening = data.get("opening") or {}
+                                opening_name = opening.get("name") if isinstance(opening, dict) else None
+                                eco = data.get("eco")
+                                oid = None
+                                if opening_name and opening_name in by_name:
+                                    oid = by_name[opening_name]
+                                elif eco and eco in by_eco:
+                                    oid = by_eco[eco][0][0]
+                                api_rows.append({
+                                    "lichess_id": lichess_id,
+                                    "white": data.get("white") or "?",
+                                    "black": data.get("black") or "?",
+                                    "white_elo": data.get("white_elo"),
+                                    "black_elo": data.get("black_elo"),
+                                    "white_title": data.get("white_title"),
+                                    "black_title": data.get("black_title"),
+                                    "event": data.get("event"),
+                                    "date": data.get("date"),
+                                    "eco": eco,
+                                    "moves": data.get("moves_uci"),
+                                    "opening_id": oid,
+                                    "source_import_run_id": run_id,
+                                })
+                            if api_rows:
+                                inserted_api = db.session.execute(
+                                    _pg_insert(SourceGame)
+                                    .values(api_rows)
+                                    .on_conflict_do_nothing(index_elements=["lichess_id"])
+                                    .returning(SourceGame.__table__.c.id, SourceGame.__table__.c.lichess_id)
+                                ).all()
+                                db.session.commit()
+                                for row in inserted_api:
+                                    game_map[row.lichess_id] = row.id
+
+                            # API-skipped games (OTB broadcast via URL) → JSONL fallback
+                            jsonl_fallback = [
+                                lichess_id_to_jsonl[gid]
+                                for gid in api_needed
+                                if gid not in game_map and gid in lichess_id_to_jsonl
+                            ]
+                            if jsonl_fallback:
+                                inserted_fb = db.session.execute(
+                                    _pg_insert(SourceGame)
+                                    .values(jsonl_fallback)
+                                    .on_conflict_do_nothing(index_elements=["lichess_id"])
+                                    .returning(SourceGame.__table__.c.id, SourceGame.__table__.c.lichess_id)
+                                ).all()
+                                db.session.commit()
+                                for row in inserted_fb:
+                                    game_map[row.lichess_id] = row.id
+                                fb_ids = [r["lichess_id"] for r in jsonl_fallback]
+                                for existing_row in db.session.execute(
+                                    sa.select(SourceGame.lichess_id, SourceGame.id)
+                                    .where(SourceGame.lichess_id.in_(fb_ids))
+                                ).all():
+                                    game_map.setdefault(existing_row.lichess_id, existing_row.id)
+
+                        for gid in batch:
+                            db_game_id = game_map.get(gid)
+                            if not db_game_id:
+                                continue
+                            for decoy_id in lichess_id_to_decoy_ids.get(gid, []):
+                                db.session.execute(
+                                    sa.text("UPDATE decoy_puzzles SET game_id = :gid WHERE id = :did AND game_id IS NULL"),
+                                    {"gid": db_game_id, "did": decoy_id},
+                                )
+                                total_decoys_linked += 1
+                        db.session.commit()
+                        click.echo(f"  Pass 5A: batch {batch_start // batch_size + 1} done ({total_decoys_linked:,} decoys linked so far)")
+                        if batch_start + batch_size < len(unique_ids):
+                            time.sleep(1.0)
+
+                # ── Group B: OTB games (lichess_id IS NULL) ───────────────────────
+                if not dry_run and otb_key_to_data:
+                    click.echo(f"  Pass 5B: processing {len(otb_key_to_data):,} OTB games for {n_b:,} decoys")
+                    for key, data in otb_key_to_data.items():
+                        white, black, event, date = key
+                        # Idempotency: check if we already have this OTB game
+                        existing_game = db.session.execute(
+                            sa.select(SourceGame.id)
+                            .where(
+                                SourceGame.lichess_id.is_(None),
+                                SourceGame.white == white,
+                                SourceGame.black == black,
+                                SourceGame.event == event,
+                                SourceGame.date == date,
+                            )
+                        ).scalar_one_or_none()
+                        if existing_game:
+                            db_game_id = existing_game
+                        else:
+                            result = db.session.execute(
+                                _pg_insert(SourceGame)
+                                .values([data])
+                                .returning(SourceGame.__table__.c.id)
+                            ).scalar_one()
+                            db_game_id = result
+                        for decoy_id in otb_key_to_decoy_ids[key]:
+                            db.session.execute(
+                                sa.text("UPDATE decoy_puzzles SET game_id = :gid WHERE id = :did AND game_id IS NULL"),
+                                {"gid": db_game_id, "did": decoy_id},
+                            )
+                            total_decoys_linked += 1
+                    db.session.commit()
+                    click.echo(f"  Pass 5B: done ({n_b:,} OTB decoys linked, total={total_decoys_linked:,})")
+
+                if dry_run:
+                    click.echo(f"  [dry-run] Would link up to {n_a:,} online decoys via {len(unique_ids):,} games")
+                    click.echo(f"  [dry-run] Would link up to {n_b:,} OTB decoys via {len(otb_key_to_data):,} games")
+        else:
+            click.echo("Pass 5: --decoy-file not provided, skipping decoy game_id linking")
+
         # --- Finalise run ---
         if not dry_run:
             run.status = SourceImportStatus.SUCCEEDED
@@ -437,6 +786,7 @@ def register_commands(app: Flask) -> None:
                 "positional_linked": total_positional_linked,
                 "moves_populated": total_moves_populated,
                 "jsonl_moves_populated": total_jsonl_populated,
+                "decoys_linked": total_decoys_linked,
             }
             db.session.commit()
 
@@ -444,7 +794,8 @@ def register_commands(app: Flask) -> None:
             f"\nDone. tactics_linked={total_tactics_linked:,}  "
             f"positional_linked={total_positional_linked:,}  "
             f"moves_populated={total_moves_populated:,}  "
-            f"jsonl_moves_populated={total_jsonl_populated:,}"
+            f"jsonl_moves_populated={total_jsonl_populated:,}  "
+            f"decoys_linked={total_decoys_linked:,}"
         )
 
     @app.cli.command("delete-unused-lichess-tactics")

@@ -24,13 +24,13 @@ class DecoyPuzzle(Base):
     best_cp: Mapped[int] = mapped_column(Integer, nullable=False)
     depth: Mapped[int] = mapped_column(Integer, nullable=False)
     move_number: Mapped[int] = mapped_column(Integer, nullable=False)
-    game_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("games.id"), nullable=True)
+    game_id: Mapped[int] = mapped_column(Integer, ForeignKey("games.id"), nullable=False)
     analysis_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     training_item: Mapped["TrainingItem"] = relationship(
         "TrainingItem", back_populates="decoy_puzzle", uselist=False
     )
-    game: Mapped["SourceGame | None"] = relationship("SourceGame")
+    game: Mapped["SourceGame"] = relationship("SourceGame")
 
     __table_args__ = (
         Index("ix_decoy_puzzles_game_id", "game_id"),
