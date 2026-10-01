@@ -151,7 +151,7 @@ jobs:
           ignore-unfixed: true
           severity: CRITICAL,HIGH
           cache: "true"
-          version: "v0.74.0"
+          version: "v0.75.0"
 
       - name: Upload Trivy results
         uses: github/codeql-action/upload-sarif@v4
@@ -185,7 +185,7 @@ jobs:
           ignore-unfixed: true
           severity: CRITICAL,HIGH
           cache: "true"
-          version: "v0.74.0"
+          version: "v0.75.0"
 
       - name: Upload Trivy results
         uses: github/codeql-action/upload-sarif@v4
@@ -216,7 +216,7 @@ jobs:
           ignore-unfixed: true
           severity: CRITICAL,HIGH
           cache: "true"
-          version: "v0.74.0"
+          version: "v0.75.0"
 
       - name: Upload Trivy results
         uses: github/codeql-action/upload-sarif@v4
@@ -247,7 +247,7 @@ jobs:
           ignore-unfixed: true
           severity: CRITICAL,HIGH
           cache: "true"
-          version: "v0.74.0"
+          version: "v0.75.0"
 
       - name: Upload base image Trivy results
         uses: github/codeql-action/upload-sarif@v4
@@ -269,7 +269,7 @@ jobs:
           ignore-unfixed: true
           severity: CRITICAL,HIGH
           cache: "true"
-          version: "v0.74.0"
+          version: "v0.75.0"
 
       - name: Upload openings image Trivy results
         uses: github/codeql-action/upload-sarif@v4
@@ -291,7 +291,7 @@ jobs:
           ignore-unfixed: true
           severity: CRITICAL,HIGH
           cache: "true"
-          version: "v0.74.0"
+          version: "v0.75.0"
 
       - name: Upload lichess-tactics image Trivy results
         uses: github/codeql-action/upload-sarif@v4
