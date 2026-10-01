@@ -2,6 +2,7 @@ sqlalchemy>=2.0
 psycopg2-binary>=2.9
 click>=8.0
 requests>=2.33
+urllib3>=2.8.0
 pyyaml>=6.0
 types-pyyaml>=6.0
 types-requests>=2.31
