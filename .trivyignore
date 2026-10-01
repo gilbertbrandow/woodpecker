@@ -10,3 +10,11 @@ GHSA-6v7p-g79w-8964
 # real installation. The installed version is clean.
 CVE-2025-47273
 CVE-2026-59890
+
+# pip 25.x vendors urllib3 2.7.0 internally (pip/_vendor/urllib3). Our
+# application installs urllib3>=2.8.0 as a direct dependency, so the runtime
+# copy is patched. The pip-vendored copy is only used during image build (pip
+# install) and is not reachable by our application code.
+CVE-2026-97687
+CVE-2026-97688
+CVE-2026-97689
