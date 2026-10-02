@@ -31,10 +31,8 @@ def _ply_from_fen(fen: str) -> int:
     return (fullmove - 1) * 2 + (1 if parts[1] == 'b' else 0)
 
 
-def _game_prelude(game: SourceGame | None, fen: str) -> list[str]:
+def _game_prelude(game: SourceGame, fen: str) -> list[str]:
     """Slice game.moves to produce the prelude leading up to the puzzle FEN position."""
-    if game is None or not game.moves:
-        return []
     ply = _ply_from_fen(fen)
     if ply <= 0:
         return []
@@ -171,7 +169,7 @@ def _lichess_tactic_payload(training_item_id: int) -> TrainingItemPayload:
     return TrainingItemPayload(
         contract=SolveContract(
             fen=tactic.fen,
-            plies=_split_moves(tactic.moves),
+            plies=_parse_moves(tactic.fen, tactic.moves),
             prelude=_game_prelude(tactic.game, tactic.fen),
         ),
         metadata=LichessTacticMetadata(
@@ -200,7 +198,7 @@ def _lichess_tactic_payload_batch(
         t.training_item_id: TrainingItemPayload(
             contract=SolveContract(
                 fen=t.fen,
-                plies=_split_moves(t.moves),
+                plies=_parse_moves(t.fen, t.moves),
                 prelude=_game_prelude(t.game, t.fen),
             ),
             metadata=LichessTacticMetadata(
@@ -250,7 +248,7 @@ def _build_positional_payload(puzzle: ScrapedPositionalPuzzle) -> TrainingItemPa
     return TrainingItemPayload(
         contract=SolveContract(
             fen=puzzle.fen,
-            plies=_split_moves(puzzle.moves),
+            plies=_parse_moves(puzzle.fen, puzzle.moves),
             prelude=_game_prelude(puzzle.game, puzzle.fen),
         ),
         metadata=ScrapedPositionalMetadata(

@@ -9,8 +9,8 @@ from app.services.training_item_content import (
     _decoy_payload,
     _game_prelude,
     _lichess_tactic_payload,
+    _parse_moves,
     _ply_from_fen,
-    _split_moves,
     get_content_batch,
 )
 
@@ -210,15 +210,6 @@ def test_ply_from_fen(fen: str, expected: int) -> None:
 def test_ply_from_fen_short_fen_returns_zero() -> None:
     assert _ply_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -") == 0
 
-
-def test_game_prelude_returns_empty_when_game_is_none() -> None:
-    assert _game_prelude(None, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") == []
-
-
-def test_game_prelude_returns_empty_when_game_has_no_moves() -> None:
-    game = MagicMock()
-    game.moves = None
-    assert _game_prelude(game, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") == []
 
 
 def test_game_prelude_slices_to_ply() -> None:
