@@ -42,16 +42,9 @@ export const ChartContainer = React.forwardRef<
   React.useEffect(() => {
     const el = innerRef.current
     if (!el) return
-    if (el.offsetWidth > 0 && el.offsetHeight > 0) {
-      setHasSize(true)
-      return
-    }
-    const observer = new ResizeObserver(() => {
-      if (el.offsetWidth > 0 && el.offsetHeight > 0) {
-        setHasSize(true)
-        observer.disconnect()
-      }
-    })
+    const check = () => setHasSize(el.offsetWidth > 0 && el.offsetHeight > 0)
+    check()
+    const observer = new ResizeObserver(check)
     observer.observe(el)
     return () => observer.disconnect()
   }, [])

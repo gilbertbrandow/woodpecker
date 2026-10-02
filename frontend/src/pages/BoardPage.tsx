@@ -23,9 +23,10 @@ import { MobileActionsBar } from '../features/board/MobileActionsBar'
 import { useOverviewAttemptSelection } from '../features/board/useOverviewAttemptSelection'
 import { usePgnNavigation } from '../features/board/usePgnNavigation'
 import { resolveDisplayBoard, formatTimer, formatTargetSolveTime, buildOverviewPgnDisplay } from '../features/board/boardPage.helpers'
-import type { BoardState } from '../features/board/useBoardPageController'
+import type { PlySelection } from '../features/board/boardPage.helpers'
+import type { BoardState, Mode } from '../features/board/useBoardPageController'
 import { api } from '../lib/api'
-import type { AttemptSpectateView, RunTrainingItemOverview, SelectableUser, TrainingItemMetaPgnDisplay, UserRef } from '../lib/api'
+import type { AttemptSpectateView, RunTrainingItemOverview, SelectableUser, SourceMetadata, TrainingItemMetaPgnDisplay, UserRef } from '../lib/api'
 import { useBoardSounds, sanToSoundEvents } from '../features/board/useBoardSounds'
 import { BoardPageSkeleton } from '../features/board/BoardPageSkeleton'
 import { useIsDesktop } from '../hooks/use-mobile'
@@ -39,6 +40,164 @@ function parsePositiveInt(value: unknown): number | null {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null
   }
   return null
+}
+
+type FocusModeRightColumnProps = {
+  source: SourceMetadata | null
+  pgnDisplay: TrainingItemMetaPgnDisplay | null
+  trainingItemId: number | undefined
+  runPosition: number | undefined
+  selectedPly: PlySelection | null | undefined
+  onPlyClick: (ply: PlySelection) => void
+  mode: Mode
+  inputBlocked: boolean
+  isAtHead: boolean
+  onShowHint: () => void
+  onShowSolution: () => void
+  displayBoard: BoardState
+  ctrlBoard: BoardState
+}
+
+function FocusModeRightColumn({
+  source,
+  pgnDisplay,
+  trainingItemId,
+  runPosition,
+  selectedPly,
+  onPlyClick,
+  mode,
+  inputBlocked,
+  isAtHead,
+  onShowHint,
+  onShowSolution,
+  displayBoard,
+  ctrlBoard,
+}: FocusModeRightColumnProps): React.ReactElement {
+  return (
+    <>
+      {source !== null && (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <TrainingItemMetaCard
+            source={source}
+            pgnDisplay={pgnDisplay}
+            trainingItemId={trainingItemId}
+            runPosition={runPosition}
+            focusMode={true}
+            selectedPly={selectedPly}
+            onPlyClick={onPlyClick}
+          />
+        </div>
+      )}
+      {(mode === 'focus' || mode === 'failed') && (
+        <div className="mt-2 flex flex-col gap-3">
+          <div className={`flex gap-2${mode !== 'failed' ? ' invisible' : ''}`}>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={onShowHint}
+              disabled={inputBlocked || !isAtHead}
+            >
+              <Lightbulb className="mr-2 h-4 w-4" />
+              Hint
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={onShowSolution}
+              disabled={inputBlocked || !isAtHead}
+            >
+              <Eye className="mr-2 h-4 w-4" />
+              Solution
+            </Button>
+          </div>
+          <MoveStatusCard
+            lastMoveResult={displayBoard.moveFeedback.result}
+            turnToMove={ctrlBoard.turnToMove}
+            kingPieceUrl={ctrlBoard.kingPieceUrl}
+            darkKingPieceUrl={ctrlBoard.darkKingPieceUrl}
+          />
+        </div>
+      )}
+    </>
+  )
+}
+
+type OverviewModeRightColumnProps = {
+  showTable: boolean
+  selectedAttemptId: number | null
+  onRowClick: (row: OverviewAttemptHistoryRow) => void
+  onUserFilterChange?: (users: SelectableUser[]) => void
+  isLoadingNextPuzzle: boolean
+  onNextPuzzle: () => void
+  onRetake: () => void
+  nextPuzzleDisabledReason: string | null
+  analyzeUrl: string | null
+  sidebarTrainingItemId: number
+  currentUser: SelectableUser
+  source: SourceMetadata | null
+  pgnDisplay: TrainingItemMetaPgnDisplay | null
+  metaCardTrainingItemId: number | undefined
+  selectedPly: PlySelection | null | undefined
+  onPlyClick: (ply: PlySelection) => void
+  isTransitioning: boolean
+}
+
+function OverviewModeRightColumn({
+  showTable,
+  selectedAttemptId,
+  onRowClick,
+  onUserFilterChange,
+  isLoadingNextPuzzle,
+  onNextPuzzle,
+  onRetake,
+  nextPuzzleDisabledReason,
+  analyzeUrl,
+  sidebarTrainingItemId,
+  currentUser,
+  source,
+  pgnDisplay,
+  metaCardTrainingItemId,
+  selectedPly,
+  onPlyClick,
+  isTransitioning,
+}: OverviewModeRightColumnProps): React.ReactElement {
+  const topSlot = source !== null ? (
+    <div className="relative">
+      <div className={isTransitioning ? 'pointer-events-none opacity-40 blur-sm' : ''}>
+        <TrainingItemMetaCard
+          source={source}
+          pgnDisplay={pgnDisplay}
+          trainingItemId={metaCardTrainingItemId}
+          focusMode={false}
+          fillHeight={false}
+          selectedPly={selectedPly}
+          onPlyClick={onPlyClick}
+        />
+      </div>
+      {isTransitioning && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      )}
+    </div>
+  ) : undefined
+
+  return (
+    <OverviewSidebarRight
+      showTable={showTable}
+      selectedAttemptId={selectedAttemptId}
+      onRowClick={onRowClick}
+      onUserFilterChange={onUserFilterChange}
+      isLoadingNextPuzzle={isLoadingNextPuzzle}
+      onNextPuzzle={onNextPuzzle}
+      onRetake={onRetake}
+      nextPuzzleDisabledReason={nextPuzzleDisabledReason}
+      analyzeUrl={analyzeUrl}
+      trainingItemId={sidebarTrainingItemId}
+      currentUser={currentUser}
+      topSlot={topSlot}
+    />
+  )
 }
 
 export function BoardPage(): React.ReactElement | null {
@@ -579,61 +738,25 @@ export function BoardPage(): React.ReactElement | null {
         targetMaxSolveTenths={timerTargetMaxSolveTenths}
         rightSlot={timerRightSlot}
       />
-      {sourceForMetaCard !== null && ctrl.mode !== 'overview' && (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <TrainingItemMetaCard
-            source={sourceForMetaCard}
-            pgnDisplay={pgnDisplay}
-            trainingItemId={trainingItemIdForMetaCard}
-            runPosition={ctrl.solvingView?.runTrainingItem.position}
-            focusMode={true}
-            selectedPly={selectedPly}
-            onPlyClick={handlePlyClick}
-          />
-        </div>
-      )}
-      {ctrl.mode === 'focus' && (
-        <div>
-          <MoveStatusCard
-            lastMoveResult={displayBoard.moveFeedback.result}
-            turnToMove={ctrl.board.turnToMove}
-            kingPieceUrl={ctrl.board.kingPieceUrl}
-            darkKingPieceUrl={ctrl.board.darkKingPieceUrl}
-          />
-        </div>
-      )}
-      {ctrl.mode === 'failed' && ctrl.solvingView !== null && (
-        <div className="flex flex-col gap-3">
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={ctrl.actions.handleShowHint}
-              disabled={ctrl.inputBlocked || !isAtHead}
-            >
-              <Lightbulb className="mr-2 h-4 w-4" />
-              Hint
-            </Button>
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={ctrl.actions.handleShowSolution}
-              disabled={ctrl.inputBlocked || !isAtHead}
-            >
-              <Eye className="mr-2 h-4 w-4" />
-              Solution
-            </Button>
-          </div>
-          <MoveStatusCard
-            lastMoveResult={displayBoard.moveFeedback.result}
-            turnToMove={ctrl.board.turnToMove}
-            kingPieceUrl={ctrl.board.kingPieceUrl}
-            darkKingPieceUrl={ctrl.board.darkKingPieceUrl}
-          />
-        </div>
+      {ctrl.mode !== 'overview' && (
+        <FocusModeRightColumn
+          source={sourceForMetaCard}
+          pgnDisplay={pgnDisplay}
+          trainingItemId={trainingItemIdForMetaCard}
+          runPosition={ctrl.solvingView?.runTrainingItem.position}
+          selectedPly={selectedPly}
+          onPlyClick={handlePlyClick}
+          mode={ctrl.mode}
+          inputBlocked={ctrl.inputBlocked}
+          isAtHead={isAtHead}
+          onShowHint={ctrl.actions.handleShowHint}
+          onShowSolution={ctrl.actions.handleShowSolution}
+          displayBoard={displayBoard}
+          ctrlBoard={ctrl.board}
+        />
       )}
       {ctrl.mode === 'overview' && displayedOverviewData !== null && user !== null && (
-        <OverviewSidebarRight
+        <OverviewModeRightColumn
           key={runTrainingItemId}
           showTable={isDesktop}
           selectedAttemptId={spectateState?.view.attemptId ?? selectedAttemptId}
@@ -644,30 +767,14 @@ export function BoardPage(): React.ReactElement | null {
           onRetake={() => { handleClearSpectate(); void ctrl.actions.handleRetake() }}
           nextPuzzleDisabledReason={overviewData?.actions.nextTrainingItem.disabledReason ?? null}
           analyzeUrl={overviewData?.actions.analyze.url ?? null}
-          trainingItemId={displayedOverviewData.runTrainingItem.trainingItemId}
+          sidebarTrainingItemId={displayedOverviewData.runTrainingItem.trainingItemId}
           currentUser={{ id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl, isPresent: user.isPresent, countryCode: user.countryCode }}
-          topSlot={
-            sourceForMetaCard !== null ? (
-              <div className="relative h-full">
-                <div className={`h-full${isOverviewTransitioning ? ' pointer-events-none opacity-40 blur-sm' : ''}`}>
-                  <TrainingItemMetaCard
-                    source={sourceForMetaCard}
-                    pgnDisplay={pgnDisplay}
-                    trainingItemId={trainingItemIdForMetaCard}
-                    focusMode={false}
-                    fillHeight={true}
-                    selectedPly={selectedPly}
-                    onPlyClick={handlePlyClick}
-                  />
-                </div>
-                {isOverviewTransitioning && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  </div>
-                )}
-              </div>
-            ) : undefined
-          }
+          source={sourceForMetaCard}
+          pgnDisplay={pgnDisplay}
+          metaCardTrainingItemId={trainingItemIdForMetaCard}
+          selectedPly={selectedPly}
+          onPlyClick={handlePlyClick}
+          isTransitioning={isOverviewTransitioning}
         />
       )}
     </>

@@ -77,7 +77,7 @@ function MoveToken({
       data-pgn-selected={isSelected || undefined}
       onClick={() => onPlyClick(plyTarget)}
       className={cn(
-        'inline rounded px-0.5',
+        'inline rounded px-0.5 outline-none',
         isSelected ? 'bg-foreground text-background' : 'cursor-pointer hover:bg-muted',
       )}
     >
@@ -403,26 +403,23 @@ function DecoyGameInfo({ g }: { g: NonNullable<DecoySourceMetadata['game']> }): 
 }
 
 type RowEntry = { move: DisplayMoveMin; idx: number }
-type MoveRow = { moveNumber: number; white: RowEntry | null; black: RowEntry | null }
 type SvEntry = { moves: DisplayMoveMin[]; si: number }
-
-export type PgnLayout = {
-  rows: MoveRow[]
-  svAfterWhite: Map<number, SvEntry[]>
-  svAfterBlack: Map<number, SvEntry[]>
+type MoveRow = {
+  moveNumber: number
+  white: RowEntry | null
+  black: RowEntry | null
+  svAfterWhite?: SvEntry[]
+  svAfterBlack?: SvEntry[]
 }
+
+export type PgnLayout = { rows: MoveRow[] }
 
 // Pure transform from a PGN display to the layout structure used by PgnColumnView.
 // Extracted for independent testability; the component just maps this to JSX.
 //
-// Subvariations are split into two maps by where they branch:
-// - svAfterWhite: variation branches at the White cell (mid-row). Requires the
-//   "..." placeholder + continuation layout to match standard PGN convention.
-// - svAfterBlack: variation branches at the Black cell (end-of-row).
-//
-// When the player is White (opponent moves Black first), wrong moves are White
-// moves. Without this split a variation would appear to be an alternative to
-// Black's response rather than to White's correct move.
+// Subvariations are embedded on each MoveRow via svAfterWhite (variation branches
+// mid-row, requiring the "..." placeholder + continuation layout) or svAfterBlack
+// (variation branches at end-of-row).
 export function computePgnLayout(pgnDisplay: TrainingItemMetaPgnDisplayMin): PgnLayout {
   const rows: MoveRow[] = []
   let current: MoveRow | null = null
@@ -439,8 +436,6 @@ export function computePgnLayout(pgnDisplay: TrainingItemMetaPgnDisplayMin): Pgn
     }
   }
 
-  const afterWhite = new Map<number, SvEntry[]>()
-  const afterBlack = new Map<number, SvEntry[]>()
   if (pgnDisplay.subvariations && pgnDisplay.mainline.length > 1) {
     for (let si = 0; si < pgnDisplay.subvariations.length; si++) {
       const sv = pgnDisplay.subvariations[si]
@@ -457,15 +452,30 @@ export function computePgnLayout(pgnDisplay: TrainingItemMetaPgnDisplayMin): Pgn
           break
         }
       }
-      const isAtWhiteCell = rows[rowIdx].white?.idx === targetIdx
-      const map = isAtWhiteCell ? afterWhite : afterBlack
-      const existing = map.get(rowIdx) ?? []
-      existing.push({ moves: sv, si })
-      map.set(rowIdx, existing)
+      const row = rows[rowIdx]
+      if (row.white?.idx === targetIdx) {
+        row.svAfterWhite = [...(row.svAfterWhite ?? []), { moves: sv, si }]
+      } else {
+        row.svAfterBlack = [...(row.svAfterBlack ?? []), { moves: sv, si }]
+      }
     }
   }
 
-  return { rows, svAfterWhite: afterWhite, svAfterBlack: afterBlack }
+  return { rows }
+}
+
+function moveCellState(
+  entry: RowEntry | null,
+  selectedPly: PlySelection | null | undefined,
+  headIndex: number | undefined,
+  firstOpponentIdx: number | undefined,
+): { isSelected: boolean; isOpponent: boolean } {
+  const isSelected = !!entry && (
+    (selectedPly?.line === 'main' && selectedPly.index === entry.idx) ||
+    (headIndex !== undefined && entry.idx === headIndex)
+  )
+  const isOpponent = entry !== null && firstOpponentIdx !== undefined && entry.idx === firstOpponentIdx
+  return { isSelected, isOpponent }
 }
 
 function ColumnMoveCell({
@@ -487,10 +497,7 @@ function ColumnMoveCell({
   headIndex?: number
   firstOpponentIdx?: number
 }): React.ReactElement {
-  const isSelected = !!entry && (
-    (selectedPly?.line === 'main' && selectedPly.index === entry.idx) ||
-    (headIndex !== undefined && entry.idx === headIndex)
-  )
+  const { isSelected, isOpponent } = moveCellState(entry, selectedPly, headIndex, firstOpponentIdx)
 
   const content = entry ? (
     <>
@@ -500,13 +507,11 @@ function ColumnMoveCell({
       )}
     </>
   ) : showPlaceholder ? (
-    <span className="block text-center">...</span>
+    <span className="block text-center opacity-40">...</span>
   ) : null
 
-  const isOpponent = entry !== null && firstOpponentIdx !== undefined && entry.idx === firstOpponentIdx
-
   const cls = cn(
-    'flex-[0_0_43.5%] border-border px-2 py-0.5 text-sm leading-[1.75em]',
+    'flex-[0_0_43.5%] border-border px-2 py-0.5 text-sm leading-[1.75em] outline-none',
     bottomBorder && 'border-b',
     rightBorder && 'border-r',
     entry && !isSelected && onPlyClick ? 'cursor-pointer hover:bg-muted' : '',
@@ -596,7 +601,7 @@ function PgnColumnView({
   headIndex?: number
   firstOpponentIdx?: number
 }): React.ReactElement {
-  const { rows, svAfterWhite, svAfterBlack } = React.useMemo(
+  const { rows } = React.useMemo(
     () => computePgnLayout(pgnDisplay),
     [pgnDisplay],
   )
@@ -607,10 +612,8 @@ function PgnColumnView({
     <div className="flex flex-wrap leading-normal">
       {rows.map((row, r) => {
         const isLast = r === rows.length - 1
-        const svEntriesAfterBlack = svAfterBlack.get(r)
-        const svEntriesAfterWhite = svAfterWhite.get(r)
 
-        if (svEntriesAfterWhite) {
+        if (row.svAfterWhite) {
           // Variation branches right after White's move. Show White cell, then a
           // "..." Black placeholder, then the variation block. If the mainline has
           // a Black response at this row, continue with it after the variation
@@ -626,14 +629,14 @@ function PgnColumnView({
               <div className={cn(numCellCls, preCellsBorderB && 'border-b')}>{row.moveNumber}</div>
               <ColumnMoveCell entry={row.white} selectedPly={selectedPly} onPlyClick={onPlyClick} bottomBorder={preCellsBorderB} showPlaceholder={row.white === null} headIndex={headIndex} firstOpponentIdx={firstOpponentIdx} />
               <ColumnMoveCell entry={null} selectedPly={selectedPly} onPlyClick={onPlyClick} rightBorder={false} bottomBorder={preCellsBorderB} showPlaceholder />
-              <VariationLines svEntries={svEntriesAfterWhite} selectedPly={selectedPly} onPlyClick={onPlyClick} isLast={!hasBlackContinuation && isLast} />
+              <VariationLines svEntries={row.svAfterWhite} selectedPly={selectedPly} onPlyClick={onPlyClick} isLast={!hasBlackContinuation && isLast} />
               {hasBlackContinuation && (
                 <>
                   <div className={cn(numCellCls, !isLast && 'border-b')} />
                   <ColumnMoveCell entry={null} selectedPly={selectedPly} onPlyClick={onPlyClick} bottomBorder={!isLast} showPlaceholder />
                   <ColumnMoveCell entry={row.black} selectedPly={selectedPly} onPlyClick={onPlyClick} rightBorder={false} bottomBorder={!isLast} headIndex={headIndex} firstOpponentIdx={firstOpponentIdx} />
-                  {svEntriesAfterBlack && (
-                    <VariationLines svEntries={svEntriesAfterBlack} selectedPly={selectedPly} onPlyClick={onPlyClick} isLast={isLast} />
+                  {row.svAfterBlack && (
+                    <VariationLines svEntries={row.svAfterBlack} selectedPly={selectedPly} onPlyClick={onPlyClick} isLast={isLast} />
                   )}
                 </>
               )}
@@ -646,8 +649,8 @@ function PgnColumnView({
             <div className={cn(numCellCls, !isLast && 'border-b')}>{row.moveNumber}</div>
             <ColumnMoveCell entry={row.white} selectedPly={selectedPly} onPlyClick={onPlyClick} bottomBorder={!isLast} showPlaceholder={row.white === null} headIndex={headIndex} firstOpponentIdx={firstOpponentIdx} />
             <ColumnMoveCell entry={row.black} selectedPly={selectedPly} onPlyClick={onPlyClick} rightBorder={false} bottomBorder={!isLast} headIndex={headIndex} firstOpponentIdx={firstOpponentIdx} />
-            {svEntriesAfterBlack && (
-              <VariationLines svEntries={svEntriesAfterBlack} selectedPly={selectedPly} onPlyClick={onPlyClick} isLast={isLast} />
+            {row.svAfterBlack && (
+              <VariationLines svEntries={row.svAfterBlack} selectedPly={selectedPly} onPlyClick={onPlyClick} isLast={isLast} />
             )}
           </React.Fragment>
         )
@@ -660,14 +663,12 @@ function PgnDisplayBlock({
   pgnDisplay,
   selectedPly,
   onPlyClick,
-  stretch = false,
-  fillHeight = false,
+  scrollable = false,
 }: {
   pgnDisplay: TrainingItemMetaPgnDisplayMin
   selectedPly: PlySelection | null | undefined
   onPlyClick: ((ply: PlySelection) => void) | undefined
-  stretch?: boolean
-  fillHeight?: boolean
+  scrollable?: boolean
 }): React.ReactElement {
   const containerRef = React.useRef<HTMLDivElement>(null)
   const prevPlyRef = React.useRef<PlySelection | null | undefined>(undefined)
@@ -753,7 +754,7 @@ function PgnDisplayBlock({
   }, [])
 
   return (
-    <div ref={containerRef} className={fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : stretch ? 'max-h-[50vh] overflow-y-auto' : undefined}>
+    <div ref={containerRef} className={scrollable ? 'flex-1 min-h-0 overflow-y-auto' : undefined}>
       <PgnColumnView pgnDisplay={pgnDisplay} selectedPly={selectedPly} onPlyClick={onPlyClick} headIndex={headIndex} firstOpponentIdx={firstOpponentIdx} />
     </div>
   )
@@ -892,7 +893,7 @@ export function MobileOverviewMetaBar({
   const { puzzleId, ratingDisplay, sourceType } = resolvePuzzleSummary(source, trainingItemId)
 
   return (
-    <div className={cn('relative border border-border bg-background', isOpen ? 'rounded-t-md' : 'rounded-md')}>
+    <div className="overflow-hidden rounded-md border border-border bg-background">
       <button
         type="button"
         onClick={() => setIsOpen((v) => !v)}
@@ -917,7 +918,7 @@ export function MobileOverviewMetaBar({
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-[-1px] right-[-1px] z-50 flex flex-col gap-3 rounded-b-md border border-t-0 border-border bg-background px-3 pt-3 shadow-md">
+        <div className="flex flex-col gap-3 border-t border-border px-3 py-3">
           {decoyGame !== null && (
             <DecoyGameInfo g={decoyGame} />
           )}
@@ -954,12 +955,14 @@ export function MobileOverviewMetaBar({
             </div>
           )}
           {pgnDisplay !== null && pgnDisplay.mainline.length > 0 && (
-            <div className="-mx-3 max-h-[240px] overflow-y-auto border-t border-border">
-              <PgnDisplayBlock pgnDisplay={pgnDisplay} selectedPly={selectedPly} onPlyClick={onPlyClick} />
+            <div className="-mx-3 -mb-3 border-t border-border">
+              <div className="max-h-48 overflow-y-auto">
+                <PgnDisplayBlock pgnDisplay={pgnDisplay} selectedPly={selectedPly} onPlyClick={onPlyClick} />
+              </div>
+              {source.sourceType === 'DECOY' && (
+                <DecoyEvalSection source={source} selectedPly={selectedPly} pgnDisplay={pgnDisplay} />
+              )}
             </div>
-          )}
-          {source.sourceType === 'DECOY' && (
-            <DecoyEvalSection source={source} selectedPly={selectedPly} pgnDisplay={pgnDisplay} />
           )}
         </div>
       )}
@@ -983,10 +986,19 @@ export function TrainingItemMetaCard({
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
       e.preventDefault()
-      const next =
-        e.key === 'ArrowRight'
-          ? computeNextPly(selectedPly, pgnDisplay)
-          : computePrevPly(selectedPly)
+      // selectedPly === null means "at head" (latest position, last move highlighted).
+      // ArrowLeft from head should step back to the penultimate move; ArrowRight is a
+      // no-op since we're already at the latest position.
+      if (selectedPly === null || selectedPly === undefined) {
+        if (e.key === 'ArrowLeft') {
+          const prevIdx = pgnDisplay.mainline.length - 2
+          if (prevIdx >= 0) onPlyClick({ line: 'main', index: prevIdx })
+        }
+        return
+      }
+      const next = e.key === 'ArrowRight'
+        ? computeNextPly(selectedPly, pgnDisplay)
+        : computePrevPly(selectedPly)
       if (next !== null) onPlyClick(next)
     }
 
@@ -994,16 +1006,17 @@ export function TrainingItemMetaCard({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onPlyClick, selectedPly, pgnDisplay])
 
+  const heightConstrained = focusMode || fillHeight
   return (
     <div className={cn(
       'flex flex-col gap-3 overflow-hidden rounded-md border border-border px-3 pt-3',
       pgnDisplay !== null && pgnDisplay.mainline.length > 0 ? 'pb-0' : 'pb-3',
-      fillHeight && 'h-full',
+      heightConstrained && 'h-fit max-h-full',
     )}>
       <SourceSection source={source} focusMode={focusMode} runPosition={runPosition} opening={source.opening} trainingItemId={trainingItemId} />
       {pgnDisplay !== null && pgnDisplay.mainline.length > 0 && (
-        <div className={cn('-mx-3 border-t border-border', fillHeight && 'flex-1 min-h-0 flex flex-col')}>
-          <PgnDisplayBlock pgnDisplay={pgnDisplay} selectedPly={selectedPly} onPlyClick={onPlyClick} stretch={focusMode} fillHeight={fillHeight} />
+        <div className={cn('-mx-3 border-t border-border', heightConstrained && 'flex-1 min-h-0 flex flex-col')}>
+          <PgnDisplayBlock pgnDisplay={pgnDisplay} selectedPly={selectedPly} onPlyClick={onPlyClick} scrollable={heightConstrained} />
           {!focusMode && source.sourceType === 'DECOY' && (
             <DecoyEvalSection source={source} selectedPly={selectedPly} pgnDisplay={pgnDisplay} />
           )}

@@ -50,19 +50,17 @@ describe('computePgnLayout — rows', () => {
 })
 
 describe('computePgnLayout — subvariation placement', () => {
-  it('returns empty maps when there are no subvariations', () => {
+  it('has no subvariations when there are none in input', () => {
     const layout = computePgnLayout({ mainline: [m(1, true, 'e4'), m(1, false, 'd5')], subvariations: null })
-    expect(layout.svAfterWhite.size).toBe(0)
-    expect(layout.svAfterBlack.size).toBe(0)
+    expect(layout.rows.every(r => !r.svAfterWhite && !r.svAfterBlack)).toBe(true)
   })
 
-  it('returns empty maps when mainline has only one move (no branching possible)', () => {
+  it('has no subvariations when mainline has only one move (no branching possible)', () => {
     const layout = computePgnLayout({
       mainline: [m(1, true, 'e4')],
       subvariations: [[m(1, true, 'e3', 'wrong')]],
     })
-    expect(layout.svAfterWhite.size).toBe(0)
-    expect(layout.svAfterBlack.size).toBe(0)
+    expect(layout.rows.every(r => !r.svAfterWhite && !r.svAfterBlack)).toBe(true)
   })
 
   it('Black wrong move branches at Black cell → svAfterBlack', () => {
@@ -71,11 +69,9 @@ describe('computePgnLayout — subvariation placement', () => {
       mainline: [m(1, true, 'e4', 'opponent'), m(1, false, 'd5', 'correct')],
       subvariations: [[m(1, false, 'd6', 'wrong')]],
     })
-    expect(layout.svAfterBlack.size).toBe(1)
-    expect(layout.svAfterWhite.size).toBe(0)
-    // The subvariation is attached to row 0 (the only row)
-    const entries = layout.svAfterBlack.get(0)
+    const entries = layout.rows[0].svAfterBlack
     expect(entries).toHaveLength(1)
+    expect(layout.rows[0].svAfterWhite).toBeUndefined()
     expect(entries![0].moves[0].san).toBe('d6')
     expect(entries![0].si).toBe(0)
   })
@@ -87,10 +83,9 @@ describe('computePgnLayout — subvariation placement', () => {
       mainline: [m(5, false, 'd5', 'opponent'), m(6, true, 'Nc3', 'correct')],
       subvariations: [[m(6, true, 'c3', 'wrong')]],
     })
-    expect(layout.svAfterWhite.size).toBe(1)
-    expect(layout.svAfterBlack.size).toBe(0)
-    const entries = layout.svAfterWhite.get(1)  // row 1 holds the White move at move 6
+    const entries = layout.rows[1].svAfterWhite  // row 1 holds the White move at move 6
     expect(entries).toHaveLength(1)
+    expect(layout.rows[1].svAfterBlack).toBeUndefined()
     expect(entries![0].moves[0].san).toBe('c3')
   })
 
@@ -102,7 +97,7 @@ describe('computePgnLayout — subvariation placement', () => {
         [m(1, false, 'c5', 'wrong')],
       ],
     })
-    const entries = layout.svAfterBlack.get(0)
+    const entries = layout.rows[0].svAfterBlack
     expect(entries).toHaveLength(2)
     expect(entries![0].si).toBe(0)
     expect(entries![1].si).toBe(1)
@@ -120,7 +115,7 @@ describe('computePgnLayout — subvariation placement', () => {
       subvariations: [[m(2, false, 'Qd7', 'wrong')]],
     })
     // Qd7 branches at move 2, Black cell → row 1 (which holds move 2)
-    const entries = layout.svAfterBlack.get(1)
+    const entries = layout.rows[1].svAfterBlack
     expect(entries).toHaveLength(1)
     expect(entries![0].moves[0].san).toBe('Qd7')
   })
