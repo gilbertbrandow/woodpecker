@@ -6,6 +6,7 @@ from db import Session
 from downloader import ensure_source_file
 from run_support import execute_import_run
 from sources.decoy.importer import import_decoys
+from sources.decoy.repair import repair_decoy_games
 from app.models.source_import_run import (
     DecoySourceRunMetadata,
     SourceImportOperation,
@@ -60,3 +61,35 @@ def puzzles_import(file_path: Path | None, limit: int | None, batch_size: int) -
                 generated_at=generated_at,
             ),
         )
+
+
+
+
+@puzzles.command("repair-games")
+@click.option(
+    "--file",
+    "file_path",
+    default=None,
+    type=click.Path(exists=True, path_type=Path),
+    help="Path to decoy_positions.jsonl (downloaded automatically if omitted)",
+)
+@click.option("--apply", is_flag=True, default=False, help="Write changes (default is a dry run)")
+def puzzles_repair_games(file_path: Path | None, apply: bool) -> None:
+    """One-off (#398): relink every decoy puzzle to its own full source game.
+
+    Verifies all decoy puzzles against the dataset before committing and rolls
+    back if anything is still wrong.
+    """
+    file = file_path if file_path else ensure_source_file("decoy_positions")
+    with Session() as session:
+        report = repair_decoy_games(session, file, apply)
+
+    for key, count in sorted(report.stats.items()):
+        click.echo(f"  {key:42} {count}")
+    if report.problems:
+        click.echo("Verification FAILED — nothing written:")
+        for key, count in sorted(report.problems.items()):
+            click.echo(f"  {key:42} {count}")
+        raise SystemExit(1)
+    click.echo("Verification passed.")
+    click.echo("APPLIED" if report.applied else "DRY RUN — pass --apply to write")
