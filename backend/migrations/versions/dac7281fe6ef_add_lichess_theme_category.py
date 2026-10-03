@@ -1,7 +1,7 @@
 """add lichess theme category
 
 Revision ID: dac7281fe6ef
-Revises: w6x7y8z9a0b1
+Revises: v5w6x7y8z9a0
 Create Date: 2026-10-03 11:20:53.377143
 
 """
@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "dac7281fe6ef"
-down_revision = "w6x7y8z9a0b1"
+down_revision = "v5w6x7y8z9a0"
 branch_labels = None
 depends_on = None
 
