@@ -82,6 +82,10 @@ _Avoid_: import run, pipeline run, pipeline execution
 A categorical tag applied to Lichess tactics (e.g. `fork`, `pin`, `skewer`). Seeded by the `lichess-tactics themes import` Pipeline command, which must run before tactic import.
 _Avoid_: tag, category, topic
 
+**ThemeCategory**:
+The semantic classification of a Theme, indicating its training utility. Values: `PATTERN` (genuine transferable tactical pattern — e.g. fork, pin, back rank mate), `MECHANICAL` (forced/goal-defined outcome with no pattern to learn — e.g. mateIn3), `META` (game-context label unrelated to the position — e.g. masterVsMaster, middlegame), `NOISE` (no training signal — e.g. eval-threshold labels like advantage, puzzle-length descriptors like long). Applies to Lichess Tactic Themes only; Scraped Positional Themes are all genuine patterns and carry no category.
+_Avoid_: theme type, theme class
+
 **ECO code**:
 A standardized encyclopedia code identifying a chess opening by its initial move sequence (e.g. `A00`, `D30`). Used by the `openings` Pipeline source.
 _Avoid_: opening code
