@@ -88,6 +88,7 @@ function FocusModeRightColumn({
             trainingItemId={trainingItemId}
             runPosition={runPosition}
             focusMode={true}
+            fillHeight={true}
             selectedPly={selectedPly}
             onPlyClick={onPlyClick}
             opening={opening}
@@ -173,8 +174,8 @@ function OverviewModeRightColumn({
   game,
 }: OverviewModeRightColumnProps): React.ReactElement {
   const topSlot = source !== null ? (
-    <div className="relative flex min-h-0 flex-1 flex-col">
-      <div className={cn('flex min-h-0 flex-1 flex-col', isTransitioning ? 'pointer-events-none opacity-40 blur-sm' : '')}>
+    <div className="relative flex min-h-0 flex-[0_1_auto] flex-col">
+      <div className={cn('flex min-h-0 flex-[0_1_auto] flex-col', isTransitioning ? 'pointer-events-none opacity-40 blur-sm' : '')}>
         <TrainingItemMetaCard
           source={source}
           pgnDisplay={pgnDisplay}

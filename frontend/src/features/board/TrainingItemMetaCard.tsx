@@ -758,7 +758,7 @@ function PgnDisplayBlock({
   }, [])
 
   return (
-    <div ref={containerRef} className={scrollable ? 'flex-1 min-h-0 overflow-y-auto' : undefined}>
+    <div ref={containerRef} className={scrollable ? 'flex-auto min-h-0 overflow-y-auto' : undefined}>
       <PgnColumnView pgnDisplay={pgnDisplay} selectedPly={selectedPly} onPlyClick={onPlyClick} headIndex={headIndex} firstOpponentIdx={firstOpponentIdx} />
     </div>
   )
@@ -989,6 +989,7 @@ export function TrainingItemMetaCard({
   focusMode = false,
   selectedPly,
   onPlyClick,
+  fillHeight = false,
 }: TrainingItemMetaCardProps): React.ReactElement {
   React.useEffect(() => {
     if (!onPlyClick || !pgnDisplay) return
@@ -1018,14 +1019,18 @@ export function TrainingItemMetaCard({
 
   return (
     <div className={cn(
-      'flex min-h-0 flex-1 flex-col gap-3 overflow-hidden rounded-md border border-border px-3 pt-3',
+      // Without fillHeight the card sizes to its content and only shrinks (with the
+      // move list scrolling) when the column is too short, so short games don't
+      // leave empty space that pushes siblings down.
+      'flex min-h-0 flex-col gap-3 overflow-hidden rounded-md border border-border px-3 pt-3',
+      fillHeight ? 'flex-1' : 'flex-[0_1_auto]',
       pgnDisplay !== null && pgnDisplay.mainline.length > 0 ? 'pb-0' : 'pb-3',
     )}>
       <div className="shrink-0">
         <SourceSection source={source} focusMode={focusMode} runPosition={runPosition} opening={opening} game={game} trainingItemId={trainingItemId} />
       </div>
       {pgnDisplay !== null && pgnDisplay.mainline.length > 0 && (
-        <div className="-mx-3 flex min-h-0 flex-1 flex-col border-t border-border">
+        <div className="-mx-3 flex min-h-0 flex-auto flex-col border-t border-border">
           <PgnDisplayBlock pgnDisplay={pgnDisplay} selectedPly={selectedPly} onPlyClick={onPlyClick} scrollable={true} />
           {!focusMode && source.sourceType === 'DECOY' && (
             <DecoyEvalSection source={source} selectedPly={selectedPly} pgnDisplay={pgnDisplay} />
