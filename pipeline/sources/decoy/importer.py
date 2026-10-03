@@ -99,6 +99,63 @@ def _find_opening_id(
     return None
 
 
+OtbGameKey = tuple[str, str, str | None, str | None, str]
+
+
+def otb_game_key(item: dict[str, Any]) -> OtbGameKey:
+    """Identity of a game without a Lichess ID.
+
+    Players, event and date alone are not unique: the same two players can play
+    several games on one day (e.g. a blitz match), so the full moves are part of the key.
+    """
+    return (
+        item.get("white") or "?", item.get("black") or "?",
+        item.get("event"), item.get("date"),
+        " ".join(item["game_moves"].split()),
+    )
+
+
+def find_otb_game_id(session: Session, key: OtbGameKey) -> int | None:
+    white, black, event, date, moves = key
+    return session.execute(
+        select(Game.id).where(
+            Game.lichess_id.is_(None),
+            Game.white == white,
+            Game.black == black,
+            Game.event == event,
+            Game.date == date,
+            Game.moves == moves,
+        )
+    ).scalars().first()
+
+
+def new_game_from_item(
+    item: dict[str, Any],
+    lichess_id: str | None,
+    source_import_run_id: int,
+    opening_by_display_name: dict[str, int],
+    opening_by_eco: dict[str, list[tuple[int, str]]],
+) -> Game:
+    return Game(
+        lichess_id=lichess_id,
+        moves=" ".join(item["game_moves"].split()),
+        white=item.get("white") or "?",
+        black=item.get("black") or "?",
+        white_elo=_safe_int(item.get("whiteElo")),
+        black_elo=_safe_int(item.get("blackElo")),
+        white_title=item.get("whiteTitle"),
+        black_title=item.get("blackTitle"),
+        event=item.get("event"),
+        date=item.get("date"),
+        eco=item.get("eco"),
+        opening_id=_find_opening_id(
+            item.get("eco"), item.get("openingName"),
+            opening_by_display_name, opening_by_eco,
+        ),
+        source_import_run_id=source_import_run_id,
+    )
+
+
 def _upsert_games(
     session: Session,
     items: list[dict[str, Any]],
@@ -111,8 +168,8 @@ def _upsert_games(
     Two groups:
       Online (lichessGameUrl present): deduplicated by lichess_id, upserted with
         on_conflict_do_nothing so concurrent imports never raise IntegrityError.
-      OTB (no lichessGameUrl but game_moves present): deduplicated by
-        (white, black, event, date) since these are real-world games with no Lichess ID.
+      OTB (no lichessGameUrl but game_moves present): deduplicated by otb_game_key,
+        i.e. players, event, date and the full moves.
     """
     fen_to_game_id: dict[str, int] = {}
 
@@ -189,52 +246,23 @@ def _upsert_games(
                     fen_to_game_id[fen] = db_id
 
     # ── OTB games (no lichessGameUrl, have game_moves) ────────────────────────
-    # Deduplicate by (white, black, event, date) — multiple puzzles from the same
-    # OTB game should all point to the same SourceGame row.
-    OtbKey = tuple[str | None, str | None, str | None, str | None]
-    otb_key_to_item: dict[OtbKey, dict[str, Any]] = {}
-    otb_key_to_fens: dict[OtbKey, list[str]] = {}
+    # Multiple puzzles from the same OTB game should all point to the same SourceGame row.
+    otb_key_to_item: dict[OtbGameKey, dict[str, Any]] = {}
+    otb_key_to_fens: dict[OtbGameKey, list[str]] = {}
     for item in items:
         if item.get("lichessGameUrl") or not item.get("game_moves"):
             continue
-        key: OtbKey = (
-            item.get("white"), item.get("black"),
-            item.get("event"), item.get("date"),
-        )
+        key = otb_game_key(item)
         otb_key_to_item.setdefault(key, item)
         otb_key_to_fens.setdefault(key, []).append(item["fen"])
 
     for key, item in otb_key_to_item.items():
-        white, black, event, date = key
-        existing_id = session.execute(
-            select(Game.id).where(
-                Game.lichess_id.is_(None),
-                Game.white == (white or "?"),
-                Game.black == (black or "?"),
-                Game.event == event,
-                Game.date == date,
-            )
-        ).scalar_one_or_none()
+        existing_id = find_otb_game_id(session, key)
         if existing_id:
             db_id = existing_id
         else:
-            new_game = Game(
-                lichess_id=None,
-                moves=item["game_moves"],
-                white=white or "?",
-                black=black or "?",
-                white_elo=_safe_int(item.get("whiteElo")),
-                black_elo=_safe_int(item.get("blackElo")),
-                white_title=item.get("whiteTitle"),
-                black_title=item.get("blackTitle"),
-                event=event,
-                date=date,
-                eco=item.get("eco"),
-                opening_id=_find_opening_id(
-                    item.get("eco"), item.get("openingName"),
-                    opening_by_display_name, opening_by_eco,
-                ),
-                source_import_run_id=source_import_run_id,
+            new_game = new_game_from_item(
+                item, None, source_import_run_id, opening_by_display_name, opening_by_eco,
             )
             session.add(new_game)
             session.flush()
