@@ -318,10 +318,13 @@ class TestLichessTacticsSourceRunMetadata:
         _login(client, _make_user(db_session).id)
         run = _make_source_run(db_session)
 
+        from app.models.theme_category import ThemeCategory
+
         theme = LichessTacticTheme(
             name="test_theme_enrichment_unique",
             display_name="Test Theme",
             description="A test tactical motif.",
+            category=ThemeCategory.PATTERN,
         )
         db_session.add(theme)
         db_session.flush()

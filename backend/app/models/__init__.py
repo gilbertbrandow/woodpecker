@@ -25,6 +25,7 @@ from app.models.source_import_run import (
     SourceImportStatus,
 )
 from app.models.subset import Subset, SubsetTrainingItem
+from app.models.theme_category import ThemeCategory
 from app.models.training import Training
 from app.models.training_item import TrainingItem, TrainingItemSource
 from app.models.user import User, WaitlistEntry, WhitelistEntry
@@ -50,6 +51,7 @@ __all__ = [
     "SourceImportStatus",
     "Subset",
     "SubsetTrainingItem",
+    "ThemeCategory",
     "Training",
     "TrainingAttempt",
     "TrainingItem",
