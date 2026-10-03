@@ -15,20 +15,35 @@ from app.models.source_import_run import (
     SourceImportSource,
     SourceImportStatus,
 )
+from app.services.training_item_content import _ply_from_fen, lichess_analysis_url
 from app.table_query import FilterList, Paginator, RangeFilter, SetFilter
 
 TOP_THEMES_LIMIT = 25
 
 
 def _serialize_tactic(t: LichessTactic) -> dict:
+    game = t.game
+    fen_parts = t.fen.split()
+    ply = _ply_from_fen(t.fen)
+    analysis_url = lichess_analysis_url(
+        game.lichess_id if game else None,
+        t.fen,
+        ply,
+        player_is_white=len(fen_parts) > 1 and fen_parts[1] == "w",
+    )
     return {
         "puzzleId": t.puzzle_id,
         "rating": t.rating,
         "popularity": t.popularity,
         "nbPlays": t.nb_plays,
-        "gameUrl": t.game_url,
+        "analysisUrl": analysis_url,
+        "trainingUrl": f"https://lichess.org/training/{t.puzzle_id}",
+        "ratingDisplay": str(t.rating),
         "themes": [{"name": th.name, "displayName": th.display_name} for th in t.themes],
-        "openings": [{"name": o.name, "displayName": o.display_name, "eco": o.eco} for o in t.openings],
+        "opening": (
+            {"name": t.openings[-1].name, "displayName": t.openings[-1].display_name, "eco": t.openings[-1].eco}
+            if t.openings else None
+        ),
     }
 
 
@@ -123,6 +138,7 @@ def list_items(
             .options(
                 selectinload(LichessTactic.themes),
                 selectinload(LichessTactic.openings),
+                selectinload(LichessTactic.game),
             )
             .order_by(LichessTactic.rating)
             .limit(paginator.page_size)

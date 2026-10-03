@@ -90,10 +90,7 @@ function LabelBadges({ items }: { items: { name: string; displayName?: string | 
 }
 
 function OpeningCell({ row }: { row: TrainingItemRow }): React.ReactElement {
-  const opening =
-    row.sourceType === 'LICHESS_TACTIC'
-      ? (row.openings[1] ?? row.openings[0] ?? null)
-      : row.opening
+  const opening = row.opening
 
   if (!opening) return <span className="text-muted-foreground">—</span>
 
@@ -288,11 +285,7 @@ export function PuzzleTable({ subsetId, locked, onTotalChange }: PuzzleTableProp
       enableSorting: false,
       meta: { className: locked ? 'sticky right-0 bg-background' : 'sticky right-14 bg-background' } satisfies ColMeta,
       cell: ({ row }) => {
-        const url = row.original.sourceType === 'LICHESS_TACTIC'
-          ? row.original.gameUrl
-          : row.original.sourceType === 'SCRAPED_POSITIONAL'
-          ? row.original.lichessUrl
-          : row.original.analysisUrl
+        const url = row.original.analysisUrl
         if (!url) return null
         return (
           <a

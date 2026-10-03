@@ -99,9 +99,7 @@ def register_commands(app: Flask) -> None:
 
         from app.extensions import db
         from app.models.game import SourceGame
-        from app.models.lichess_tactic import LichessTactic
         from app.models.opening import Opening
-        from app.models.scraped_positional_puzzle import ScrapedPositionalPuzzle
         from app.models.source_import_run import (
             SourceImportOperation,
             SourceImportRun,
@@ -277,169 +275,10 @@ def register_commands(app: Flask) -> None:
             click.echo(f"Created SourceImportRun #{run_id}")
 
         by_name, by_eco = _load_opening_caches()
-        total_tactics_linked = 0
-        total_positional_linked = 0
         total_moves_populated = 0
         total_decoys_linked = 0
 
-        # --- Pass 1: lichess_tactics with game_id IS NULL ---
-        n_null_tactics = db.session.scalar(
-            sa.select(sa.func.count()).select_from(LichessTactic).where(LichessTactic.game_id.is_(None))
-        ) or 0
-        click.echo(f"Pass 1: {n_null_tactics:,} lichess_tactics need game_id")
-
-        # Pass 1a: Direct SQL join — links tactics to games that ALREADY exist in the DB.
-        # Strips #fragment and /side suffix from game_url to get the bare Lichess game ID,
-        # then matches against games.lichess_id. No API call needed; runs in milliseconds.
-        if not dry_run and n_null_tactics:
-            result_1a = db.session.execute(sa.text("""
-                UPDATE lichess_tactics lt
-                SET game_id = g.id
-                FROM games g
-                WHERE lt.game_id IS NULL
-                  AND g.lichess_id IS NOT NULL
-                  AND g.lichess_id = split_part(
-                        regexp_replace(lt.game_url, '[#?].*$', ''),
-                        '/', 4)
-            """))
-            db.session.commit()
-            linked_1a = result_1a.rowcount  # type: ignore[attr-defined]
-            total_tactics_linked += linked_1a
-            click.echo(f"  Pass 1a: {linked_1a:,} tactics linked to existing games (no API needed)")
-        elif dry_run:
-            linked_1a_estimate = db.session.scalar(sa.text("""
-                SELECT COUNT(*) FROM lichess_tactics lt
-                JOIN games g ON g.lichess_id = split_part(
-                      regexp_replace(lt.game_url, '[#?].*$', ''), '/', 4)
-                WHERE lt.game_id IS NULL AND g.lichess_id IS NOT NULL
-            """)) or 0
-            click.echo(f"  [dry-run] Pass 1a: would link {linked_1a_estimate:,} tactics to existing games")
-
-        # Pass 1b: Fetch games from Lichess API for tactics whose game doesn't exist yet.
-        tactics_still_null = db.session.execute(
-            sa.select(LichessTactic.id, LichessTactic.game_url)
-            .where(LichessTactic.game_id.is_(None))
-        ).all()
-        tactic_lichess_ids: list[tuple[int, str]] = [
-            (row.id, gid)
-            for row in tactics_still_null
-            if (gid := _lichess_id_from_url(row.game_url)) is not None
-        ]
-        unique_tactic_game_ids = list({gid for _, gid in tactic_lichess_ids})
-        click.echo(f"  Pass 1b: {len(tactics_still_null):,} tactics still null → {len(unique_tactic_game_ids):,} unique game IDs to fetch from API")
-
-        if not dry_run and unique_tactic_game_ids:
-            for batch_start in range(0, len(unique_tactic_game_ids), batch_size):
-                batch = unique_tactic_game_ids[batch_start: batch_start + batch_size]
-
-                # Check which already exist (may have been inserted by a concurrent batch)
-                existing = {
-                    row.lichess_id: row.id
-                    for row in db.session.execute(
-                        sa.select(SourceGame.lichess_id, SourceGame.id)
-                        .where(SourceGame.lichess_id.in_(batch))
-                    ).all()
-                }
-                new_ids = [gid for gid in batch if gid not in existing]
-                if new_ids:
-                    try:
-                        api_data = _fetch_games(new_ids, strict=False)
-                    except requests.HTTPError as exc:
-                        click.echo(f"  Warning: API error at batch {batch_start // batch_size + 1}: {exc}")
-                        api_data = {}
-                    time.sleep(1.0)
-
-                    new_rows = []
-                    for lichess_id in new_ids:
-                        data = api_data.get(lichess_id)
-                        if not data:
-                            continue
-                        opening = data.get("opening") or {}
-                        opening_name = opening.get("name") if isinstance(opening, dict) else None
-                        eco = data.get("eco")
-                        oid: int | None = None
-                        if opening_name and opening_name in by_name:
-                            oid = by_name[opening_name]
-                        elif eco and eco in by_eco:
-                            oid = by_eco[eco][0][0]
-                        new_rows.append({
-                            "lichess_id": lichess_id,
-                            "white": data.get("white") or "?",
-                            "black": data.get("black") or "?",
-                            "white_elo": data.get("white_elo"),
-                            "black_elo": data.get("black_elo"),
-                            "white_title": data.get("white_title"),
-                            "black_title": data.get("black_title"),
-                            "event": data.get("event"),
-                            "date": data.get("date"),
-                            "eco": eco,
-                            "moves": data.get("moves_uci"),
-                            "opening_id": oid,
-                            "source_import_run_id": run_id,
-                        })
-                    if new_rows:
-                        from sqlalchemy.dialects.postgresql import insert as pg_insert
-                        inserted = db.session.execute(
-                            pg_insert(SourceGame)
-                            .values(new_rows)
-                            .on_conflict_do_nothing(index_elements=["lichess_id"])
-                            .returning(SourceGame.__table__.c.id, SourceGame.__table__.c.lichess_id)
-                        ).all()
-                        db.session.commit()
-                        for row in inserted:
-                            existing[row.lichess_id] = row.id
-
-                # Link tactics for this batch
-                for tactic_id, lichess_id in tactic_lichess_ids:
-                    if lichess_id not in batch:
-                        continue
-                    db_game_id = existing.get(lichess_id)
-                    if db_game_id:
-                        db.session.execute(
-                            sa.text("UPDATE lichess_tactics SET game_id = :gid WHERE id = :tid AND game_id IS NULL"),
-                            {"gid": db_game_id, "tid": tactic_id},
-                        )
-                db.session.commit()
-                total_tactics_linked += len(batch)
-                click.echo(
-                    f"  Pass 1b: batch {batch_start // batch_size + 1}/{(len(unique_tactic_game_ids) + batch_size - 1) // batch_size}"
-                    f" done ({total_tactics_linked:,} game IDs processed total)"
-                )
-        elif dry_run:
-            click.echo(f"  [dry-run] Pass 1b: would fetch {len(unique_tactic_game_ids):,} games from API")
-
-        # --- Pass 2: scraped_positional_puzzles with game_id IS NULL ---
-        positional_without_game = db.session.execute(
-            sa.select(ScrapedPositionalPuzzle.id, ScrapedPositionalPuzzle.internal_id, ScrapedPositionalPuzzle.lichess_url)
-            .where(ScrapedPositionalPuzzle.game_id.is_(None))
-        ).all()
-        click.echo(f"Pass 2: {len(positional_without_game):,} scraped_positional_puzzles need game_id")
-
-        positional_lichess_ids: list[tuple[int, str, str]] = [
-            (row.id, row.internal_id, gid)
-            for row in positional_without_game
-            if (gid := _lichess_id_from_url(row.lichess_url)) is not None
-        ]
-        unique_positional_game_ids = list({gid for _, _, gid in positional_lichess_ids})
-
-        if not dry_run and unique_positional_game_ids:
-            for batch_start in range(0, len(unique_positional_game_ids), batch_size):
-                batch = unique_positional_game_ids[batch_start: batch_start + batch_size]
-                game_map = _upsert_games_from_api(batch, run_id, by_name, by_eco)
-                for puzzle_db_id, _, lichess_id in positional_lichess_ids:
-                    db_game_id = game_map.get(lichess_id)
-                    if db_game_id:
-                        db.session.execute(
-                            sa.text("UPDATE scraped_positional_puzzles SET game_id = :gid WHERE id = :pid AND game_id IS NULL"),
-                            {"gid": db_game_id, "pid": puzzle_db_id},
-                        )
-                db.session.commit()
-                total_positional_linked += len(batch)
-                click.echo(f"  Pass 2: batch {batch_start // batch_size + 1} done ({total_positional_linked:,}/{len(unique_positional_game_ids):,} game IDs processed)")
-                if batch_start + batch_size < len(unique_positional_game_ids):
-                    time.sleep(1.0)
-        else:
-            click.echo(f"  [dry-run] Would process {len(unique_positional_game_ids):,} unique game IDs")
+        # Passes 1 and 2 removed: game_id IS NOT NULL enforced by migration v5w6x7y8z9a0.
 
         # --- Pass 3: games with lichess_id IS NOT NULL AND moves IS NULL ---
         games_without_moves = db.session.execute(
@@ -464,7 +303,7 @@ def register_commands(app: Flask) -> None:
                     if not data or not data.get("moves_uci"):
                         continue
                     db.session.execute(
-                        sa.text("UPDATE games SET moves = :moves WHERE id = :gid"),
+                        sa.text("UPDATE source_games SET moves = :moves WHERE id = :gid"),
                         {"moves": data["moves_uci"], "gid": games_needing_moves[lichess_id]},
                     )
                     total_moves_populated += 1
@@ -512,7 +351,7 @@ def register_commands(app: Flask) -> None:
                         if not moves_uci:
                             continue
                         db.session.execute(
-                            sa.text("UPDATE games SET moves = :moves WHERE id = :gid"),
+                            sa.text("UPDATE source_games SET moves = :moves WHERE id = :gid"),
                             {"moves": moves_uci, "gid": still_null_map[lichess_id]},
                         )
                         total_jsonl_populated += 1
@@ -782,8 +621,6 @@ def register_commands(app: Flask) -> None:
             run.status = SourceImportStatus.SUCCEEDED
             run.finished_at = datetime.now(tz=timezone.utc)
             run.summary_json = {
-                "tactics_linked": total_tactics_linked,
-                "positional_linked": total_positional_linked,
                 "moves_populated": total_moves_populated,
                 "jsonl_moves_populated": total_jsonl_populated,
                 "decoys_linked": total_decoys_linked,
@@ -791,9 +628,7 @@ def register_commands(app: Flask) -> None:
             db.session.commit()
 
         click.echo(
-            f"\nDone. tactics_linked={total_tactics_linked:,}  "
-            f"positional_linked={total_positional_linked:,}  "
-            f"moves_populated={total_moves_populated:,}  "
+            f"\nDone. moves_populated={total_moves_populated:,}  "
             f"jsonl_moves_populated={total_jsonl_populated:,}  "
             f"decoys_linked={total_decoys_linked:,}"
         )

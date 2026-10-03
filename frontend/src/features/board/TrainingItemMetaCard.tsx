@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '../../lib/utils'
-import type { DecoySourceMetadata, LichessTacticSourceMetadata, ScrapedPositionalSourceMetadata, SourceMetadata } from '../../lib/api'
+import type { DecoyGame, DecoySourceMetadata, LichessTacticSourceMetadata, ScrapedPositionalSourceMetadata, SourceMetadata, TrainingItemOpening } from '../../lib/api'
 import type { PlySelection } from './boardPage.helpers'
 import { TrainingItemTypeBadge } from '../../components/TrainingItemTypeBadge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip'
@@ -367,7 +367,7 @@ function PlayerLabel({ name, title, elo }: { name: string; title: string | null;
   )
 }
 
-function DecoyGameInfo({ g }: { g: NonNullable<DecoySourceMetadata['game']> }): React.ReactElement {
+function DecoyGameInfo({ g }: { g: DecoyGame }): React.ReactElement {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
@@ -765,16 +765,16 @@ function PgnDisplayBlock({
 }
 
 function DecoySection({
-  source,
   focusMode,
   runPosition,
   opening,
+  game,
   trainingItemId,
 }: {
-  source: DecoySourceMetadata
   focusMode: boolean
   runPosition: number | undefined
   opening: OpeningInfo | null
+  game: DecoyGame | null
   trainingItemId?: number
 }): React.ReactElement {
   if (focusMode) {
@@ -791,7 +791,7 @@ function DecoySection({
         <span className="shrink-0 font-mono text-sm">#{trainingItemId ?? '—'}</span>
         <TrainingItemTypeBadge source="DECOY" />
       </div>
-      {source.game !== null && <DecoyGameInfo g={source.game} />}
+      {game !== null && <DecoyGameInfo g={game} />}
       {opening !== null && (
         <div className="flex items-center gap-1.5 overflow-hidden">
           <span className="shrink-0 font-mono text-xs font-semibold">{opening.eco}</span>
@@ -807,12 +807,14 @@ function SourceSection({
   focusMode,
   runPosition,
   opening,
+  game,
   trainingItemId,
 }: {
   source: SourceMetadata
   focusMode: boolean
   runPosition: number | undefined
   opening: OpeningInfo | null
+  game: DecoyGame | null
   trainingItemId?: number
 }): React.ReactElement | null {
   if (source.sourceType === 'LICHESS_TACTIC') {
@@ -822,13 +824,15 @@ function SourceSection({
     return <ScrapedPositionalSection source={source} focusMode={focusMode} runPosition={runPosition} opening={opening} trainingItemId={trainingItemId} />
   }
   if (source.sourceType === 'DECOY') {
-    return <DecoySection source={source} focusMode={focusMode} runPosition={runPosition} opening={opening} trainingItemId={trainingItemId} />
+    return <DecoySection focusMode={focusMode} runPosition={runPosition} opening={opening} game={game} trainingItemId={trainingItemId} />
   }
   return null
 }
 
 type TrainingItemMetaCardProps = {
   source: SourceMetadata
+  opening: TrainingItemOpening | null
+  game: DecoyGame | null
   pgnDisplay: TrainingItemMetaPgnDisplayMin | null
   trainingItemId?: number
   runPosition?: number
@@ -872,6 +876,8 @@ function resolvePuzzleSummary(source: SourceMetadata, trainingItemId: number | u
 
 type MobileOverviewMetaBarProps = {
   source: SourceMetadata
+  opening: TrainingItemOpening | null
+  game: DecoyGame | null
   pgnDisplay: TrainingItemMetaPgnDisplayMin | null
   trainingItemId?: number
   selectedPly?: PlySelection | null
@@ -880,6 +886,8 @@ type MobileOverviewMetaBarProps = {
 
 export function MobileOverviewMetaBar({
   source,
+  opening,
+  game,
   pgnDisplay,
   trainingItemId,
   selectedPly,
@@ -887,12 +895,9 @@ export function MobileOverviewMetaBar({
 }: MobileOverviewMetaBarProps): React.ReactElement {
   const [isOpen, setIsOpen] = React.useState(false)
 
-  const opening = source.opening
-  const themes: Array<{ name: string; displayName: string | null; description?: string | null }> =
-    source.sourceType !== 'DECOY' ? source.themes : []
-  const decoyGame = source.sourceType === 'DECOY' ? source.game : null
+  const themes = source.themes
   const hasDetails =
-    opening !== null || themes.length > 0 || (pgnDisplay !== null && pgnDisplay.mainline.length > 0) || decoyGame !== null
+    opening !== null || themes.length > 0 || (pgnDisplay !== null && pgnDisplay.mainline.length > 0) || game !== null
 
   const { puzzleId, ratingDisplay, sourceType } = resolvePuzzleSummary(source, trainingItemId)
 
@@ -923,8 +928,8 @@ export function MobileOverviewMetaBar({
 
       {isOpen && (
         <div className="flex flex-col gap-3 border-t border-border px-3 py-3">
-          {decoyGame !== null && (
-            <DecoyGameInfo g={decoyGame} />
+          {game !== null && (
+            <DecoyGameInfo g={game} />
           )}
           {opening !== null && (
             <div className="flex items-center gap-1.5 overflow-hidden">
@@ -976,6 +981,8 @@ export function MobileOverviewMetaBar({
 
 export function TrainingItemMetaCard({
   source,
+  opening,
+  game,
   pgnDisplay,
   trainingItemId,
   runPosition,
@@ -1015,7 +1022,7 @@ export function TrainingItemMetaCard({
       pgnDisplay !== null && pgnDisplay.mainline.length > 0 ? 'pb-0' : 'pb-3',
     )}>
       <div className="shrink-0">
-        <SourceSection source={source} focusMode={focusMode} runPosition={runPosition} opening={source.opening} trainingItemId={trainingItemId} />
+        <SourceSection source={source} focusMode={focusMode} runPosition={runPosition} opening={opening} game={game} trainingItemId={trainingItemId} />
       </div>
       {pgnDisplay !== null && pgnDisplay.mainline.length > 0 && (
         <div className="-mx-3 flex min-h-0 flex-1 flex-col border-t border-border">

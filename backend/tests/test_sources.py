@@ -67,7 +67,6 @@ def _make_tactic(session, puzzle_id: str, rating: int = 1500, source_run=None): 
         rating_deviation=100,
         popularity=80,
         nb_plays=50,
-        game_url=f"https://lichess.org/{puzzle_id}",
         game_id=game.id,
     )
     session.add(tactic)
@@ -284,7 +283,7 @@ class TestLichessTacticsItems:
 
         puzzle = client.get("/sources/lichess-tactics/items").get_json()["puzzles"][0]
 
-        assert {"puzzleId", "rating", "popularity", "nbPlays", "gameUrl", "themes", "openings"}.issubset(puzzle.keys())
+        assert {"puzzleId", "rating", "popularity", "nbPlays", "analysisUrl", "trainingUrl", "ratingDisplay", "themes", "opening"}.issubset(puzzle.keys())
 
 
 # ── Source run metadata ────────────────────────────────────────────────────────

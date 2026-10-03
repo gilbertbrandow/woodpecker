@@ -27,7 +27,7 @@ import { resolveDisplayBoard, formatTimer, formatTargetSolveTime, buildOverviewP
 import type { PlySelection } from '../features/board/boardPage.helpers'
 import type { BoardState, Mode } from '../features/board/useBoardPageController'
 import { api } from '../lib/api'
-import type { AttemptSpectateView, RunTrainingItemOverview, SelectableUser, SourceMetadata, TrainingItemMetaPgnDisplay, UserRef } from '../lib/api'
+import type { AttemptSpectateView, DecoyGame, RunTrainingItemOverview, SelectableUser, SourceMetadata, TrainingItemMetaPgnDisplay, TrainingItemOpening, UserRef } from '../lib/api'
 import { useBoardSounds, sanToSoundEvents } from '../features/board/useBoardSounds'
 import { BoardPageSkeleton } from '../features/board/BoardPageSkeleton'
 import { useIsDesktop } from '../hooks/use-mobile'
@@ -57,6 +57,8 @@ type FocusModeRightColumnProps = {
   onShowSolution: () => void
   displayBoard: BoardState
   ctrlBoard: BoardState
+  opening: TrainingItemOpening | null
+  game: DecoyGame | null
 }
 
 function FocusModeRightColumn({
@@ -73,6 +75,8 @@ function FocusModeRightColumn({
   onShowSolution,
   displayBoard,
   ctrlBoard,
+  opening,
+  game,
 }: FocusModeRightColumnProps): React.ReactElement {
   return (
     <>
@@ -86,6 +90,8 @@ function FocusModeRightColumn({
             focusMode={true}
             selectedPly={selectedPly}
             onPlyClick={onPlyClick}
+            opening={opening}
+            game={game}
           />
         </div>
       )}
@@ -141,6 +147,8 @@ type OverviewModeRightColumnProps = {
   selectedPly: PlySelection | null | undefined
   onPlyClick: (ply: PlySelection) => void
   isTransitioning: boolean
+  opening: TrainingItemOpening | null
+  game: DecoyGame | null
 }
 
 function OverviewModeRightColumn({
@@ -161,6 +169,8 @@ function OverviewModeRightColumn({
   selectedPly,
   onPlyClick,
   isTransitioning,
+  opening,
+  game,
 }: OverviewModeRightColumnProps): React.ReactElement {
   const topSlot = source !== null ? (
     <div className="relative flex min-h-0 flex-1 flex-col">
@@ -172,6 +182,8 @@ function OverviewModeRightColumn({
           focusMode={false}
           selectedPly={selectedPly}
           onPlyClick={onPlyClick}
+          opening={opening}
+          game={game}
         />
       </div>
       {isTransitioning && (
@@ -563,6 +575,16 @@ export function BoardPage(): React.ReactElement | null {
       ? displayedOverviewData.trainingItem.source
       : (ctrl.solvingView?.trainingItem.source ?? null)
 
+  const openingForMetaCard =
+    ctrl.mode === 'overview' && displayedOverviewData !== null
+      ? displayedOverviewData.trainingItem.opening
+      : (ctrl.solvingView?.trainingItem.opening ?? null)
+
+  const gameForMetaCard =
+    ctrl.mode === 'overview' && displayedOverviewData !== null
+      ? displayedOverviewData.trainingItem.game
+      : (ctrl.solvingView?.trainingItem.game ?? null)
+
   const trainingItemIdForMetaCard =
     ctrl.mode === 'overview' && displayedOverviewData !== null
       ? displayedOverviewData.runTrainingItem.trainingItemId
@@ -611,6 +633,8 @@ export function BoardPage(): React.ReactElement | null {
         trainingItemId={overviewData.runTrainingItem.trainingItemId}
         selectedPly={selectedPly}
         onPlyClick={handlePlyClick}
+        opening={overviewData.trainingItem.opening}
+        game={overviewData.trainingItem.game}
       />
     ) : ctrl.solvingView !== null ? (
       <AttemptTypeCard
@@ -744,6 +768,8 @@ export function BoardPage(): React.ReactElement | null {
           onShowSolution={ctrl.actions.handleShowSolution}
           displayBoard={displayBoard}
           ctrlBoard={ctrl.board}
+          opening={openingForMetaCard}
+          game={gameForMetaCard}
         />
       )}
       {ctrl.mode === 'overview' && displayedOverviewData !== null && user !== null && (
@@ -766,6 +792,8 @@ export function BoardPage(): React.ReactElement | null {
           selectedPly={selectedPly}
           onPlyClick={handlePlyClick}
           isTransitioning={isOverviewTransitioning}
+          opening={openingForMetaCard}
+          game={gameForMetaCard}
         />
       )}
     </>

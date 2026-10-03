@@ -10,6 +10,7 @@ from app.extensions import db
 from app.models.schedule import Schedule
 from app.models.subset import Subset, SubsetTrainingItem
 from app.models.user import User
+from app.services.training_item_content import _ply_from_fen, lichess_analysis_url
 from app.services.user_ref import user_ref, user_ref_from_row
 from app.table_query import DateFilter, FilterList, Paginator, RangeFilter, SortParam
 
@@ -404,7 +405,7 @@ def _sample_decoys(
                         WHEN :opening_strength = 0 THEN 1.0
                         WHEN EXISTS (
                             SELECT 1 FROM decoy_puzzles dp2
-                            JOIN games g2 ON g2.id = dp2.game_id
+                            JOIN source_games g2 ON g2.id = dp2.game_id
                             WHERE dp2.training_item_id = e.id
                               AND g2.opening_id IN (SELECT id FROM opening_descendants)
                         ) THEN 1.0
@@ -729,9 +730,10 @@ def list_active_puzzles(
     # ── Lichess tactics ──────────────────────────────────────────────────────
     lichess_rows = db.session.execute(
         sa.text("""
-            SELECT p.id, p.puzzle_id, p.rating, p.popularity, p.nb_plays, p.game_url,
-                   p.training_item_id
+            SELECT p.id, p.puzzle_id, p.rating, p.popularity, p.nb_plays,
+                   p.training_item_id, p.fen, g.lichess_id AS game_lichess_id
             FROM lichess_tactics p
+            LEFT JOIN source_games g ON g.id = p.game_id
             WHERE p.training_item_id = ANY(:ids)
         """),
         {"ids": lichess_ti_ids},
@@ -771,12 +773,14 @@ def list_active_puzzles(
     # ── Scraped positionals ──────────────────────────────────────────────────
     positional_rows = db.session.execute(
         sa.text("""
-            SELECT p.id, p.internal_id, p.lichess_url, p.training_item_id,
+            SELECT p.id, p.internal_id, p.training_item_id, p.fen,
+                   g.lichess_id AS game_lichess_id,
                    d.value AS difficulty, d.label AS difficulty_label,
                    d.min_rating AS difficulty_min_rating, d.max_rating AS difficulty_max_rating,
                    o.name AS opening_name, o.display_name AS opening_display_name, o.eco AS opening_eco
             FROM scraped_positional_puzzles p
             JOIN scraped_positional_difficulties d ON d.id = p.difficulty_id
+            LEFT JOIN source_games g ON g.id = p.game_id
             LEFT JOIN openings o ON o.id = p.opening_id
             WHERE p.training_item_id = ANY(:ids)
         """),
@@ -804,10 +808,11 @@ def list_active_puzzles(
     # ── Decoys ───────────────────────────────────────────────────────────────
     decoy_rows = db.session.execute(
         sa.text("""
-            SELECT dp.id, dp.training_item_id, dp.best_cp, dp.analysis_url,
+            SELECT dp.id, dp.training_item_id, dp.best_cp, dp.move_number, dp.fen,
+                   g.lichess_id AS game_lichess_id,
                    o.name AS opening_name, o.display_name AS opening_display_name, o.eco AS opening_eco
             FROM decoy_puzzles dp
-            LEFT JOIN games g ON g.id = dp.game_id
+            LEFT JOIN source_games g ON g.id = dp.game_id
             LEFT JOIN openings o ON o.id = g.opening_id
             WHERE dp.training_item_id = ANY(:ids)
         """),
@@ -824,6 +829,14 @@ def list_active_puzzles(
             r = lichess_by_ti.get(ti_id)
             if r is None:
                 continue
+            lt_openings = lt_opening_map.get(r.id, [])
+            opening = lt_openings[-1] if lt_openings else None
+            fen_parts = r.fen.split()
+            ply = _ply_from_fen(r.fen)
+            analysis_url = lichess_analysis_url(
+                r.game_lichess_id, r.fen, ply,
+                player_is_white=len(fen_parts) > 1 and fen_parts[1] == "w",
+            )
             puzzles.append({
                 "sourceType": "LICHESS_TACTIC",
                 "trainingItemId": ti_id,
@@ -831,9 +844,11 @@ def list_active_puzzles(
                 "rating": r.rating,
                 "popularity": r.popularity,
                 "nbPlays": r.nb_plays,
-                "gameUrl": r.game_url,
+                "analysisUrl": analysis_url,
+                "trainingUrl": f"https://lichess.org/training/{r.puzzle_id}",
+                "ratingDisplay": str(r.rating),
                 "themes": lt_theme_map.get(r.id, []),
-                "openings": lt_opening_map.get(r.id, []),
+                "opening": opening,
             })
         elif ti_row.source_type == "SCRAPED_POSITIONAL":
             r = positional_by_ti.get(ti_id)
@@ -843,11 +858,25 @@ def list_active_puzzles(
                 {"name": r.opening_name, "displayName": r.opening_display_name or r.opening_name, "eco": r.opening_eco}
                 if r.opening_name else None
             )
+            fen_parts = r.fen.split()
+            ply = _ply_from_fen(r.fen)
+            analysis_url = lichess_analysis_url(
+                r.game_lichess_id, r.fen, ply,
+                player_is_white=len(fen_parts) > 1 and fen_parts[1] == "w",
+            )
+            if r.difficulty_min_rating is not None and r.difficulty_max_rating is not None:
+                pos_rating_display: str | None = f"{r.difficulty_min_rating}–{r.difficulty_max_rating}"
+            elif r.difficulty_label:
+                pos_rating_display = r.difficulty_label
+            else:
+                pos_rating_display = None
             puzzles.append({
                 "sourceType": "SCRAPED_POSITIONAL",
                 "trainingItemId": ti_id,
                 "internalId": r.internal_id,
-                "lichessUrl": r.lichess_url,
+                "analysisUrl": analysis_url,
+                "trainingUrl": None,
+                "ratingDisplay": pos_rating_display,
                 "difficulty": r.difficulty,
                 "difficultyLabel": r.difficulty_label,
                 "difficultyMinRating": r.difficulty_min_rating,
@@ -863,11 +892,18 @@ def list_active_puzzles(
                 {"name": r.opening_name, "displayName": r.opening_display_name or r.opening_name, "eco": r.opening_eco}
                 if r.opening_name else None
             )
+            fen_parts = r.fen.split()
+            decoy_analysis_url = lichess_analysis_url(
+                r.game_lichess_id, r.fen, r.move_number,
+                player_is_white=len(fen_parts) > 1 and fen_parts[1] == "b",
+            )
             puzzles.append({
                 "sourceType": "DECOY",
                 "trainingItemId": ti_id,
                 "bestCp": r.best_cp,
-                "analysisUrl": r.analysis_url,
+                "analysisUrl": decoy_analysis_url,
+                "trainingUrl": None,
+                "ratingDisplay": None,
                 "opening": opening,
             })
 
@@ -1055,7 +1091,7 @@ def _decoy_stats(training_item_ids: list[int]) -> dict[str, object]:
         sa.text("""
             SELECT o.name, o.display_name, COUNT(*) AS cnt
             FROM decoy_puzzles dp
-            LEFT JOIN games g ON g.id = dp.game_id
+            LEFT JOIN source_games g ON g.id = dp.game_id
             LEFT JOIN openings o ON o.id = g.opening_id
             WHERE dp.training_item_id = ANY(:ids)
               AND o.name IS NOT NULL

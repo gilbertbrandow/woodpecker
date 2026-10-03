@@ -171,18 +171,14 @@ export type LichessTacticSourceMetadata = {
   sourceType: 'LICHESS_TACTIC'
   displayId: string
   rating: number
-  gameUrl: string
   themes: LichessTacticTheme[]
-  opening: TrainingItemOpening | null
 }
 
 export type ScrapedPositionalSourceMetadata = {
   sourceType: 'SCRAPED_POSITIONAL'
   internalId: number
-  lichessUrl: string
   difficulty: ScrapedPositionalDifficulty
   themes: { name: string; displayName: string; description: string | null }[]
-  opening: TrainingItemOpening | null
 }
 
 export type DecoyAcceptedMove = {
@@ -197,10 +193,8 @@ export type DecoySourceMetadata = {
   acceptedMoves: DecoyAcceptedMove[]
   bestCp: number
   depth: number
-  analysisUrl: string | null
   moveNumber: number
-  game: DecoyGame | null
-  opening: TrainingItemOpening | null
+  themes: LichessTacticTheme[]
 }
 
 export type DecoyOpeningCount = {
@@ -230,12 +224,11 @@ export type DecoyGame = {
 export type DecoyItem = {
   id: number
   fen: string
-  opponentMove: string
   acceptedMoves: DecoyAcceptedMove[]
   bestCp: number
   depth: number
   moveNumber: number
-  analysisUrl: string | null
+  analysisUrl: string
   opening: TrainingItemOpening | null
   game: DecoyGame | null
 }
@@ -256,9 +249,11 @@ export type LichessTactic = {
   rating: number
   popularity: number
   nbPlays: number
-  gameUrl: string
+  analysisUrl: string
+  trainingUrl: string
+  ratingDisplay: string
   themes: LichessTacticTheme[]
-  openings: LichessTacticOpening[]
+  opening: TrainingItemOpening | null
 }
 
 export type LichessTacticRow = LichessTactic & { sourceType: 'LICHESS_TACTIC' }
@@ -267,7 +262,9 @@ export type ScrapedPositionalRow = {
   trainingItemId: number
   sourceType: 'SCRAPED_POSITIONAL'
   internalId: number
-  lichessUrl: string
+  analysisUrl: string
+  trainingUrl: string | null
+  ratingDisplay: string | null
   difficulty: number
   difficultyLabel: string
   difficultyMinRating: number | null
@@ -280,7 +277,9 @@ export type DecoyRow = {
   trainingItemId: number
   sourceType: 'DECOY'
   bestCp: number
-  analysisUrl: string | null
+  analysisUrl: string
+  trainingUrl: string | null
+  ratingDisplay: string | null
   opening: TrainingItemOpening | null
 }
 
@@ -768,6 +767,9 @@ export type RunTrainingItemListItem = {
   positionStatus: PositionStatus
   tryCount: number
   timeMs: number | null
+  analysisUrl: string
+  trainingUrl: string | null
+  ratingDisplay: string | null
 }
 
 export type RunTrainingItemList = {
@@ -890,6 +892,11 @@ export type RunTrainingItemOverview = {
     solution: (string | string[])[]
     prelude: string[]
     source: SourceMetadata
+    analysisUrl: string
+    trainingUrl: string | null
+    opening: TrainingItemOpening | null
+    game: DecoyGame | null
+    ratingDisplay: string | null
   }
   selectedAttemptId: number | null
   pgn: TrainingItemMetaPgnDisplay | null
@@ -969,6 +976,11 @@ export type RunTrainingItemAttemptView = {
     solution: (string | string[])[]
     prelude: string[]
     source: SourceMetadata
+    analysisUrl: string
+    trainingUrl: string | null
+    opening: TrainingItemOpening | null
+    game: DecoyGame | null
+    ratingDisplay: string | null
   }
   attempt: {
     id: number
@@ -1099,7 +1111,8 @@ export type ScrapedPositionalDifficulty = {
 
 export type ScrapedPositionalPuzzle = {
   internalId: number
-  lichessUrl: string
+  analysisUrl: string
+  ratingDisplay: string | null
   difficulty: ScrapedPositionalDifficulty
   themes: { name: string; displayName: string }[]
   opening: { name: string; displayName: string; eco: string } | null

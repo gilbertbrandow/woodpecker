@@ -100,7 +100,6 @@ def _make_lichess_tactic(session, *, rating: int = 1500):  # type: ignore[misc]
         rating_deviation=80,
         popularity=90,
         nb_plays=100,
-        game_url="https://lichess.org/test",
         game_id=game.id,
     )
     session.add(tactic)
@@ -160,7 +159,6 @@ def _make_scraped_positional(session, *, min_rating: int | None = 1600, max_rati
         internal_id=item.id,
         fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
         moves="e2e4",
-        lichess_url=f"https://lichess.org/analysis/{item.id}",
         difficulty_id=difficulty.id,
         game_id=game.id,
     )
