@@ -300,12 +300,14 @@ def _serialize_game(game: SourceGame) -> dict[str, object]:
 def _build_lichess_tactic_payload(tactic: LichessTactic) -> TrainingItemPayload:
     game = tactic.game
     fen_parts = tactic.fen.split()
-    ply = _ply_from_fen(tactic.fen)
+    # Lichess puzzle FEN is the position BEFORE the opponent's setup move (moves[0]).
+    # The player acts at ply+1 (after setup). Orientation is inverted vs FEN active color.
+    ply = _ply_from_fen(tactic.fen) + 1
     analysis_url = lichess_analysis_url(
         game.lichess_id,
         tactic.fen,
         ply,
-        player_is_white=len(fen_parts) > 1 and fen_parts[1] == "w",
+        player_is_white=len(fen_parts) > 1 and fen_parts[1] == "b",
     )
     return TrainingItemPayload(
         contract=SolveContract(
@@ -333,12 +335,13 @@ def _build_positional_payload(puzzle: ScrapedPositionalPuzzle) -> TrainingItemPa
     game = puzzle.game
     d = puzzle.difficulty
     fen_parts = puzzle.fen.split()
-    ply = _ply_from_fen(puzzle.fen)
+    # Same convention as Lichess tactics: FEN is before opponent's move (moves[0]).
+    ply = _ply_from_fen(puzzle.fen) + 1
     analysis_url = lichess_analysis_url(
         game.lichess_id,
         puzzle.fen,
         ply,
-        player_is_white=len(fen_parts) > 1 and fen_parts[1] == "w",
+        player_is_white=len(fen_parts) > 1 and fen_parts[1] == "b",
     )
     if d.min_rating is not None and d.max_rating is not None:
         rating_display: str | None = f"{d.min_rating}–{d.max_rating}"
@@ -401,7 +404,8 @@ def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
     # game.moves stores the full sequence (Lichess) or prelude-through-opponent-move (OTB).
     opponent_move = game.moves.split()[decoy.move_number - 2]
     if game.lichess_id:
-        analysis_url = lichess_analysis_url(game.lichess_id, fen, decoy.move_number, player_is_white)
+        # move_number is the player's ply; anchor to move_number-1 (after opponent's decoy, before player acts)
+        analysis_url = lichess_analysis_url(game.lichess_id, fen, decoy.move_number - 1, player_is_white)
     else:
         # OTB game: push opponent_move to reach the position the player must solve
         try:
@@ -410,7 +414,7 @@ def _build_decoy_payload(decoy: DecoyPuzzle) -> TrainingItemPayload:
             fallback_fen = post_board.fen()
         except ValueError:
             fallback_fen = fen
-        analysis_url = lichess_analysis_url(None, fallback_fen, decoy.move_number, player_is_white)
+        analysis_url = lichess_analysis_url(None, fallback_fen, decoy.move_number - 1, player_is_white)
     return TrainingItemPayload(
         contract=SolveContract(
             fen=fen,

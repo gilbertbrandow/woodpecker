@@ -6,6 +6,8 @@ from app.services.solve_contract import SolveContract
 from app.services.training_item_content import (
     DecoyMetadata,
     LichessTacticMetadata,
+    _build_lichess_tactic_payload,
+    _build_positional_payload,
     _decoy_payload,
     _game_prelude,
     _lichess_tactic_payload,
@@ -295,3 +297,101 @@ def test_decoy_payload_fullmove_number_from_four_part_fen(
         mock_db.session.execute.return_value.scalar_one.return_value = decoy
         payload = _decoy_payload(10)
     assert payload.contract.fen == f"{four_part_fen} 0 {expected_fullmove}"
+
+
+# ── Analysis URL ply and orientation ─────────────────────────────────────────
+# The stored FEN for tactics and positionals is the position BEFORE the opponent's
+# setup move (moves[0]). The player acts one ply later, so the URL must anchor to
+# ply+1 and the orientation must be the OPPOSITE of the FEN's active color.
+
+def _stub_tactic_with_game_id(
+    fen: str,
+    moves: str = "e2e4 d7d5",
+    lichess_id: str = "gameid1",
+    game_moves: str = "e2e4 " + " ".join(["e7e5"] * 29),
+) -> MagicMock:
+    t = _stub_tactic(fen=fen, moves=moves)
+    t.game.lichess_id = lichess_id
+    t.game.moves = game_moves
+    return t
+
+
+@pytest.mark.parametrize("fen,moves,expected_ply", [
+    # FEN at ply 0 (starting position, White to move) → URL ply 1
+    ("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "e2e4 d7d5", 1),
+    # FEN at ply 1 (after 1.e4, Black to move) → URL ply 2
+    ("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "e7e5 g1f3", 2),
+    # FEN at ply 5 (after 1.e4 e5 2.Nf3 Nc6 3.Bb5, Black to move) → URL ply 6
+    ("r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3", "a7a6 b5a4", 6),
+])
+def test_tactic_analysis_url_ply_is_fen_ply_plus_one(fen: str, moves: str, expected_ply: int) -> None:
+    tactic = _stub_tactic_with_game_id(fen=fen, moves=moves)
+    payload = _build_lichess_tactic_payload(tactic)
+    assert payload.analysis_url.endswith(f"#{expected_ply}")
+
+
+def test_tactic_analysis_url_white_fen_gives_black_orientation() -> None:
+    # FEN has White to move → White plays setup move → player is Black → /black
+    fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    tactic = _stub_tactic_with_game_id(fen=fen, moves="e2e4 d7d5")
+    payload = _build_lichess_tactic_payload(tactic)
+    assert "/black" in payload.analysis_url
+
+
+def test_tactic_analysis_url_black_fen_gives_white_orientation() -> None:
+    # FEN has Black to move → Black plays setup move → player is White → no /black
+    fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"
+    tactic = _stub_tactic_with_game_id(fen=fen, moves="e7e5 g1f3")
+    payload = _build_lichess_tactic_payload(tactic)
+    assert "/black" not in payload.analysis_url
+
+
+def _stub_positional(
+    fen: str,
+    moves: str = "e2e4 d7d5",
+    lichess_id: str = "gameid2",
+    game_moves: str = "e2e4 " + " ".join(["e7e5"] * 29),
+) -> MagicMock:
+    p = MagicMock()
+    p.fen = fen
+    p.moves = moves
+    game = MagicMock()
+    game.lichess_id = lichess_id
+    game.moves = game_moves
+    game.opening = None
+    p.game = game
+    p.opening = None
+    difficulty = MagicMock()
+    difficulty.min_rating = 1600
+    difficulty.max_rating = 1800
+    difficulty.label = None
+    difficulty.value = "intermediate"
+    p.difficulty = difficulty
+    p.themes = []
+    return p
+
+
+def test_positional_analysis_url_ply_is_fen_ply_plus_one() -> None:
+    # FEN at ply 2 (after 1.e4 e5, White to move) → URL ply 3; White is opponent → /black
+    fen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"
+    puzzle = _stub_positional(fen=fen, moves="g1f3 b8c6")
+    payload = _build_positional_payload(puzzle)
+    assert payload.analysis_url == "https://lichess.org/gameid2/black#3"
+
+
+def test_positional_analysis_url_white_fen_gives_black_orientation() -> None:
+    fen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"
+    puzzle = _stub_positional(fen=fen, moves="g1f3 b8c6")
+    payload = _build_positional_payload(puzzle)
+    assert "/black" in payload.analysis_url
+
+
+def test_decoy_analysis_url_ply_is_move_number_minus_one() -> None:
+    # move_number=4 means player responds at ply 4; URL anchors to ply 3 (after opponent's decoy).
+    # _stub_decoy FEN has 'b' to move → opponent is Black → player is White → no /black.
+    decoy = _stub_decoy(move_number=4)
+    decoy.game.lichess_id = "gameid3"
+    with patch("app.services.training_item_content.db") as mock_db:
+        mock_db.session.execute.return_value.scalar_one.return_value = decoy
+        payload = _decoy_payload(10)
+    assert payload.analysis_url == "https://lichess.org/gameid3#3"

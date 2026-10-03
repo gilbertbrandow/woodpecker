@@ -24,12 +24,12 @@ TOP_THEMES_LIMIT = 25
 def _serialize_tactic(t: LichessTactic) -> dict:
     game = t.game
     fen_parts = t.fen.split()
-    ply = _ply_from_fen(t.fen)
+    ply = _ply_from_fen(t.fen) + 1  # +1: tactic FEN is before opponent's setup move
     analysis_url = lichess_analysis_url(
         game.lichess_id if game else None,
         t.fen,
         ply,
-        player_is_white=len(fen_parts) > 1 and fen_parts[1] == "w",
+        player_is_white=len(fen_parts) > 1 and fen_parts[1] == "b",
     )
     return {
         "puzzleId": t.puzzle_id,
