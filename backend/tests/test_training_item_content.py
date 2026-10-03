@@ -6,12 +6,15 @@ from app.services.solve_contract import SolveContract
 from app.services.training_item_content import (
     DecoyMetadata,
     LichessTacticMetadata,
+    _build_lichess_tactic_payload,
+    _build_positional_payload,
     _decoy_payload,
     _game_prelude,
     _lichess_tactic_payload,
     _parse_moves,
     _ply_from_fen,
     get_content_batch,
+    lichess_analysis_url,
 )
 
 STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -24,7 +27,6 @@ def _stub_tactic(
     moves: str = "e2e4 d7d5",
     puzzle_id: str = "abc123",
     rating: int = 1500,
-    game_url: str = "https://lichess.org/game/abc",
     themes: list | None = None,
 ) -> MagicMock:
     t = MagicMock()
@@ -33,10 +35,51 @@ def _stub_tactic(
     t.moves = moves
     t.puzzle_id = puzzle_id
     t.rating = rating
-    t.game_url = game_url
     t.themes = themes or []
     t.openings = []
+    game = MagicMock()
+    game.lichess_id = None
+    game.moves = "e2e4 e7e5"
+    game.opening = None
+    t.game = game
     return t
+
+
+# ── lichess_analysis_url ─────────────────────────────────────────────────────
+
+def test_analysis_url_with_lichess_id_white_player() -> None:
+    url = lichess_analysis_url("abc123", "any_fen", 10, player_is_white=True)
+    assert url == "https://lichess.org/abc123#10"
+
+
+def test_analysis_url_with_lichess_id_black_player() -> None:
+    url = lichess_analysis_url("abc123", "any_fen", 10, player_is_white=False)
+    assert url == "https://lichess.org/abc123/black#10"
+
+
+def test_analysis_url_ply_zero_anchor_included() -> None:
+    url = lichess_analysis_url("gid", "any_fen", 0, player_is_white=True)
+    assert url.endswith("#0")
+
+
+def test_analysis_url_no_lichess_id_falls_back_to_analysis_board() -> None:
+    fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"
+    url = lichess_analysis_url(None, fen, 1, player_is_white=True)
+    assert url.startswith("https://lichess.org/analysis/")
+    assert "KQkq" in url
+
+
+def test_analysis_url_no_lichess_id_ignores_ply_and_orientation() -> None:
+    fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    url_white = lichess_analysis_url(None, fen, 5, player_is_white=True)
+    url_black = lichess_analysis_url(None, fen, 5, player_is_white=False)
+    assert url_white == url_black  # both fall back to same FEN URL
+
+
+def test_analysis_url_fen_with_slashes_is_url_safe() -> None:
+    fen = "8/8/8/8/8/8/8/8 w - - 0 1"
+    url = lichess_analysis_url(None, fen, 0, player_is_white=True)
+    assert " " not in url
 
 
 # ── _parse_moves ─────────────────────────────────────────────────────────────
@@ -87,14 +130,13 @@ def test_lichess_payload_splits_moves_into_plies() -> None:
 
 
 def test_lichess_payload_maps_metadata_fields() -> None:
-    tactic = _stub_tactic(puzzle_id="xyz99", rating=1800, game_url="https://lichess.org/g/xyz")
+    tactic = _stub_tactic(puzzle_id="xyz99", rating=1800)
     with patch("app.services.training_item_content.db") as mock_db:
         mock_db.session.execute.return_value.scalar_one.return_value = tactic
         payload = _lichess_tactic_payload(1)
     assert isinstance(payload.metadata, LichessTacticMetadata)
     assert payload.metadata.display_id == "xyz99"
     assert payload.metadata.rating == 1800
-    assert payload.metadata.game_url == "https://lichess.org/g/xyz"
 
 
 def test_lichess_metadata_to_api_dict_has_source_type_discriminant() -> None:
@@ -114,17 +156,15 @@ def _stub_decoy(
     *,
     training_item_id: int = 10,
     fen: str = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
-    opponent_move: str = "e2e4",
     accepted_moves: list | None = None,
     best_cp: int = 12,
     move_number: int = 2,
     depth: int = 20,
-    analysis_url: str | None = None,
+    game_moves: str = "e2e4 " + " ".join(["e7e5"] * 29),
 ) -> MagicMock:
     d = MagicMock()
     d.training_item_id = training_item_id
     d.fen = fen
-    d.opponent_move = opponent_move
     d.accepted_moves = accepted_moves or [
         {"uci": "e7e5", "cp": 12, "dropCp": 0, "line": "e7e5"},
         {"uci": "c7c5", "cp": 8, "dropCp": 4, "line": "c7c5"},
@@ -133,8 +173,11 @@ def _stub_decoy(
     d.best_cp = best_cp
     d.move_number = move_number
     d.depth = depth
-    d.analysis_url = analysis_url
-    d.game = None
+    game = MagicMock()
+    game.lichess_id = None
+    game.moves = game_moves
+    game.opening = None
+    d.game = game
     return d
 
 
@@ -158,7 +201,6 @@ def test_decoy_metadata_to_api_dict_has_correct_shape() -> None:
     assert api["sourceType"] == "DECOY"
     assert api["bestCp"] == 12
     assert len(api["acceptedMoves"]) == 3  # type: ignore[arg-type]
-    assert api["opening"] is None
 
 
 def test_decoy_payload_sorts_accepted_moves_descending_for_white_player() -> None:
@@ -225,6 +267,13 @@ def test_game_prelude_returns_empty_when_ply_is_zero() -> None:
     assert _game_prelude(game, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") == []
 
 
+def test_game_prelude_raises_on_four_part_fen() -> None:
+    game = MagicMock()
+    game.moves = "e2e4 d7d5"
+    with pytest.raises(ValueError, match="6-part FEN"):
+        _game_prelude(game, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -")
+
+
 def test_get_content_batch_with_empty_list_returns_empty_dict() -> None:
     result = get_content_batch([])
     assert result == {}
@@ -243,8 +292,106 @@ def test_decoy_payload_fullmove_number_from_four_part_fen(
 ) -> None:
     # 4-part FEN (no halfmove/fullmove); the service must append them correctly.
     four_part_fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq -"
-    decoy = _stub_decoy(fen=four_part_fen, move_number=move_number, analysis_url="https://x")
+    decoy = _stub_decoy(fen=four_part_fen, move_number=move_number)
     with patch("app.services.training_item_content.db") as mock_db:
         mock_db.session.execute.return_value.scalar_one.return_value = decoy
         payload = _decoy_payload(10)
     assert payload.contract.fen == f"{four_part_fen} 0 {expected_fullmove}"
+
+
+# ── Analysis URL ply and orientation ─────────────────────────────────────────
+# The stored FEN for tactics and positionals is the position BEFORE the opponent's
+# setup move (moves[0]). The player acts one ply later, so the URL must anchor to
+# ply+1 and the orientation must be the OPPOSITE of the FEN's active color.
+
+def _stub_tactic_with_game_id(
+    fen: str,
+    moves: str = "e2e4 d7d5",
+    lichess_id: str = "gameid1",
+    game_moves: str = "e2e4 " + " ".join(["e7e5"] * 29),
+) -> MagicMock:
+    t = _stub_tactic(fen=fen, moves=moves)
+    t.game.lichess_id = lichess_id
+    t.game.moves = game_moves
+    return t
+
+
+@pytest.mark.parametrize("fen,moves,expected_ply", [
+    # FEN at ply 0 (starting position, White to move) → URL ply 1
+    ("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "e2e4 d7d5", 1),
+    # FEN at ply 1 (after 1.e4, Black to move) → URL ply 2
+    ("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "e7e5 g1f3", 2),
+    # FEN at ply 5 (after 1.e4 e5 2.Nf3 Nc6 3.Bb5, Black to move) → URL ply 6
+    ("r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3", "a7a6 b5a4", 6),
+])
+def test_tactic_analysis_url_ply_is_fen_ply_plus_one(fen: str, moves: str, expected_ply: int) -> None:
+    tactic = _stub_tactic_with_game_id(fen=fen, moves=moves)
+    payload = _build_lichess_tactic_payload(tactic)
+    assert payload.analysis_url.endswith(f"#{expected_ply}")
+
+
+def test_tactic_analysis_url_white_fen_gives_black_orientation() -> None:
+    # FEN has White to move → White plays setup move → player is Black → /black
+    fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    tactic = _stub_tactic_with_game_id(fen=fen, moves="e2e4 d7d5")
+    payload = _build_lichess_tactic_payload(tactic)
+    assert "/black" in payload.analysis_url
+
+
+def test_tactic_analysis_url_black_fen_gives_white_orientation() -> None:
+    # FEN has Black to move → Black plays setup move → player is White → no /black
+    fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"
+    tactic = _stub_tactic_with_game_id(fen=fen, moves="e7e5 g1f3")
+    payload = _build_lichess_tactic_payload(tactic)
+    assert "/black" not in payload.analysis_url
+
+
+def _stub_positional(
+    fen: str,
+    moves: str = "e2e4 d7d5",
+    lichess_id: str = "gameid2",
+    game_moves: str = "e2e4 " + " ".join(["e7e5"] * 29),
+) -> MagicMock:
+    p = MagicMock()
+    p.fen = fen
+    p.moves = moves
+    game = MagicMock()
+    game.lichess_id = lichess_id
+    game.moves = game_moves
+    game.opening = None
+    p.game = game
+    p.opening = None
+    difficulty = MagicMock()
+    difficulty.min_rating = 1600
+    difficulty.max_rating = 1800
+    difficulty.label = None
+    difficulty.value = "intermediate"
+    p.difficulty = difficulty
+    p.themes = []
+    return p
+
+
+def test_positional_analysis_url_ply_is_fen_ply_plus_one() -> None:
+    # FEN at ply 2 (after 1.e4 e5, White to move) → URL ply 3; White is opponent → /black
+    fen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"
+    puzzle = _stub_positional(fen=fen, moves="g1f3 b8c6")
+    payload = _build_positional_payload(puzzle)
+    assert payload.analysis_url == "https://lichess.org/gameid2/black#3"
+
+
+def test_positional_analysis_url_white_fen_gives_black_orientation() -> None:
+    fen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"
+    puzzle = _stub_positional(fen=fen, moves="g1f3 b8c6")
+    payload = _build_positional_payload(puzzle)
+    assert "/black" in payload.analysis_url
+
+
+def test_decoy_analysis_url_ply_is_move_number_minus_one() -> None:
+    # move_number=4 means player responds at ply 4; URL anchors to ply 3 (after opponent's decoy).
+    # _stub_decoy FEN has 'b' to move → opponent is Black → player is White → no /black.
+    decoy = _stub_decoy(move_number=4)
+    decoy.game.lichess_id = "gameid3"
+    with patch("app.services.training_item_content.db") as mock_db:
+        mock_db.session.execute.return_value.scalar_one.return_value = decoy
+        payload = _decoy_payload(10)
+    assert payload.analysis_url == "https://lichess.org/gameid3#3"

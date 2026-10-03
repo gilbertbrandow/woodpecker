@@ -16,18 +16,37 @@ from app.models.source_import_run import (
     SourceImportSource,
     SourceImportStatus,
 )
+from app.services.training_item_content import _ply_from_fen, lichess_analysis_url
 from app.table_query import FilterList, Paginator, SetFilter
 
 
 def _serialize_puzzle(p: ScrapedPositionalPuzzle) -> dict:
+    game = p.game
+    d = p.difficulty
+    fen_parts = p.fen.split()
+    ply = _ply_from_fen(p.fen)
+    analysis_url = lichess_analysis_url(
+        game.lichess_id if game else None,
+        p.fen,
+        ply,
+        player_is_white=len(fen_parts) > 1 and fen_parts[1] == "w",
+    )
+    if d.min_rating is not None and d.max_rating is not None:
+        rating_display: str | None = f"{d.min_rating}–{d.max_rating}"
+    elif d.label:
+        rating_display = d.label
+    else:
+        rating_display = None
     return {
         "internalId": p.internal_id,
-        "lichessUrl": p.lichess_url,
+        "analysisUrl": analysis_url,
+        "trainingUrl": None,
+        "ratingDisplay": rating_display,
         "difficulty": {
-            "value": p.difficulty.value,
-            "label": p.difficulty.label,
-            "minRating": p.difficulty.min_rating,
-            "maxRating": p.difficulty.max_rating,
+            "value": d.value,
+            "label": d.label,
+            "minRating": d.min_rating,
+            "maxRating": d.max_rating,
         },
         "themes": [{"name": th.name, "displayName": th.display_name} for th in p.themes],
         "opening": (
@@ -116,6 +135,7 @@ def list_items(
                 selectinload(ScrapedPositionalPuzzle.difficulty),
                 selectinload(ScrapedPositionalPuzzle.themes),
                 selectinload(ScrapedPositionalPuzzle.opening),
+                selectinload(ScrapedPositionalPuzzle.game),
             )
             .order_by(ScrapedPositionalPuzzle.id)
             .limit(paginator.page_size)

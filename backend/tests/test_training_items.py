@@ -53,7 +53,6 @@ def _seed_training_item_world(session) -> dict[str, object]:  # type: ignore[mis
         rating_deviation=100,
         popularity=90,
         nb_plays=100,
-        game_url="https://lichess.org/test",
         game_id=game.id,
     )
     session.add(tactic)
@@ -280,7 +279,6 @@ class TestSpectateView:
             rating_deviation=100,
             popularity=90,
             nb_plays=100,
-            game_url="https://lichess.org/test2",
             game_id=game2.id,
         ))
         db_session.flush()

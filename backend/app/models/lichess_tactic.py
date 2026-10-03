@@ -40,8 +40,7 @@ class LichessTactic(Base):
     rating_deviation: Mapped[int] = mapped_column(Integer, nullable=False)
     popularity: Mapped[int] = mapped_column(Integer, nullable=False)
     nb_plays: Mapped[int] = mapped_column(Integer, nullable=False)
-    game_url: Mapped[str] = mapped_column(Text, nullable=False)
-    game_id: Mapped[int] = mapped_column(Integer, ForeignKey("games.id"), nullable=False)
+    game_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_games.id"), nullable=False)
 
     game: Mapped["SourceGame"] = relationship("SourceGame")
     training_item: Mapped[TrainingItem] = relationship(

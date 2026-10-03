@@ -3,9 +3,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
-from urllib.parse import quote, urlsplit
+from urllib.parse import urlsplit
 
-import chess
 import click
 import requests
 import sqlalchemy as sa
@@ -22,7 +21,7 @@ PROGRESS_INTERVAL = 500
 EXPECTED_SCHEMA_VERSION = 2
 _META_URL = "https://raw.githubusercontent.com/gilbertbrandow/decoys/main/meta.json"
 
-_REQUIRED_FIELDS = {"fen", "opponentMove", "acceptedMoves", "bestCp", "depth", "moveNumber", "game_moves"}
+_REQUIRED_FIELDS = {"fen", "acceptedMoves", "bestCp", "depth", "moveNumber", "game_moves"}
 
 
 def check_schema_version() -> None:
@@ -60,18 +59,6 @@ def _lichess_id_from_url(url: str) -> str | None:
         return parts[0] if parts else None
     except (AttributeError, ValueError):
         return None
-
-
-def _build_analysis_url(fen: str, opponent_move: str) -> str:
-    """Return a Lichess analysis URL pointing to the position the player must solve."""
-    try:
-        parts = fen.split()
-        full_fen = fen if len(parts) == 6 else f"{fen} 0 1"
-        board = chess.Board(full_fen)
-        board.push_uci(opponent_move)
-        return f"https://lichess.org/analysis/{quote(board.fen(), safe='/')}"
-    except Exception:
-        return f"https://lichess.org/analysis/{quote(fen, safe='/')}"
 
 
 def _load_opening_caches(session: Session) -> tuple[dict[str, int], dict[str, list[tuple[int, str]]]]:
@@ -310,17 +297,14 @@ def process_batch(
             {"run_id": source_import_run_id},
         ).scalar_one()
         game_id = game_id_map.get(item["fen"])
-        analysis_url = _build_analysis_url(item["fen"], item["opponentMove"])
         decoy_rows.append({
             "training_item_id": ti_id,
             "fen": item["fen"],
-            "opponent_move": item["opponentMove"],
             "accepted_moves": item["acceptedMoves"],
             "best_cp": item["bestCp"],
             "depth": item["depth"],
             "move_number": item["moveNumber"],
             "game_id": game_id,
-            "analysis_url": analysis_url,
         })
 
     session.execute(
@@ -418,7 +402,7 @@ def import_decoys(
         sa_text("""
             SELECT COALESCE(o.display_name, 'Unknown') AS name, COUNT(*) AS cnt
             FROM decoy_puzzles dp
-            LEFT JOIN games g ON g.id = dp.game_id
+            LEFT JOIN source_games g ON g.id = dp.game_id
             LEFT JOIN openings o ON o.id = g.opening_id
             WHERE dp.training_item_id IN (
                 SELECT id FROM training_items WHERE source_import_run_id = :run_id

@@ -181,7 +181,7 @@ const COLUMNS: ColumnDef<StockFeatures, ScrapedPositionalPuzzle>[] = [
     enableSorting: false,
     cell: ({ row }) => (
       <a
-        href={row.original.lichessUrl}
+        href={row.original.analysisUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="text-muted-foreground hover:text-foreground"
