@@ -16,7 +16,6 @@ from sqlalchemy.orm import Session
 from app.models.decoy_puzzle import DecoyPuzzle
 from app.models.game import SourceGame as Game
 from app.models.opening import Opening
-from sources.common.source_game import san_moves_to_uci
 
 
 PROGRESS_INTERVAL = 500
@@ -107,7 +106,6 @@ def _upsert_games(
     opening_by_display_name: dict[str, int],
     opening_by_eco: dict[str, list[tuple[int, str]]],
 ) -> dict[str, int]:
-<<<<<<< HEAD
     """Upsert SourceGame rows from JSONL items. Returns fen → game.id for all items.
 
     Two groups:
@@ -241,70 +239,11 @@ def _upsert_games(
             session.add(new_game)
             session.flush()
             db_id = new_game.id
-=======
-    """Upsert SourceGame rows from JSONL items. Returns lichess_id → game.id for items with a URL."""
-    item_by_lichess_id: dict[str, dict[str, Any]] = {}
-    for item in items:
-        url = item.get("lichessGameUrl")
-        if url:
-            item_by_lichess_id[url.split("/")[-1]] = item
-
-    if not item_by_lichess_id:
-        return {}
-
-    existing_rows = session.execute(
-        select(Game.lichess_id, Game.id).where(Game.lichess_id.in_(item_by_lichess_id.keys()))
-    ).all()
-    existing: dict[str, int] = {row.lichess_id: row.id for row in existing_rows}
-
-    for lichess_id, game_id in existing.items():
-        moves_uci = san_moves_to_uci(item_by_lichess_id[lichess_id]["moves"])
-        if moves_uci:
-            session.execute(
-                sa.update(Game.__table__)
-                .where(Game.__table__.c.id == game_id)
-                .values(moves=moves_uci)
-            )
-
-    new_games: list[Game] = []
-    new_lichess_ids: list[str] = []
-    for lichess_id, item in item_by_lichess_id.items():
-        if lichess_id in existing:
-            continue
-        moves_uci = san_moves_to_uci(item["moves"])
-        if not moves_uci:
-            click.echo(f"Warning: skipping game {lichess_id}: could not convert moves to UCI")
-            continue
-        new_games.append(Game(
-            lichess_id=lichess_id,
-            moves=moves_uci,
-            white=item["white"],
-            black=item["black"],
-            white_elo=_safe_int(item.get("whiteElo")),
-            black_elo=_safe_int(item.get("blackElo")),
-            white_title=item.get("whiteTitle"),
-            black_title=item.get("blackTitle"),
-            event=item.get("event"),
-            date=item.get("date"),
-            eco=item.get("eco"),
-            opening_id=_find_opening_id(
-                item.get("eco"), item.get("openingName"),
-                opening_by_display_name, opening_by_eco,
-            ),
-            source_import_run_id=source_import_run_id,
-        ))
-        new_lichess_ids.append(lichess_id)
->>>>>>> 516d2a3 (Pipeline: decoy importer reads moves from JSONL — drop Lichess API call (#324))
 
         for fen in otb_key_to_fens[key]:
             fen_to_game_id[fen] = db_id
 
-<<<<<<< HEAD
     return fen_to_game_id
-=======
-    new_map = {lid: game.id for game, lid in zip(new_games, new_lichess_ids)}
-    return {**existing, **new_map}
->>>>>>> 516d2a3 (Pipeline: decoy importer reads moves from JSONL — drop Lichess API call (#324))
 
 
 def process_batch(
