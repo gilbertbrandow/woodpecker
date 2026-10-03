@@ -63,11 +63,14 @@ export function usePgnNavigation({
       ? overviewPgnDisplayOverride
       : (overview?.pgn ?? null)
     if (raw === null) return null
-    const prelude = solvingView?.trainingItem.prelude ?? overview?.trainingItem.prelude ?? []
+    // Always take the prelude from the overview: solvingView can still hold the
+    // last puzzle that was played (e.g. after navigating back via the attempt
+    // strip), and its game moves would be prepended to this puzzle's PGN.
+    const prelude = overview?.trainingItem.prelude ?? []
     if (prelude.length === 0) return raw
     const contextMoves = buildContextMoves(prelude)
     return contextMoves.length > 0 ? { ...raw, mainline: [...contextMoves, ...raw.mainline] } : raw
-  }, [overview, overviewPgnDisplayOverride, solvingView])
+  }, [overview, overviewPgnDisplayOverride])
 
   const pgnDisplay = mode === 'overview' ? overviewPgnDisplay : livePgnDisplay
 

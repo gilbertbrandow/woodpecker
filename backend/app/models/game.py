@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class SourceGame(Base):
-    __tablename__ = "games"
+    __tablename__ = "source_games"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     lichess_id: Mapped[str | None] = mapped_column(Text, unique=True, nullable=True)
@@ -34,10 +34,6 @@ class SourceGame(Base):
     source_import_run: Mapped["SourceImportRun"] = relationship("SourceImportRun")
 
     __table_args__ = (
-        Index("ix_games_opening_id", "opening_id"),
-        Index("ix_games_source_import_run_id", "source_import_run_id"),
+        Index("ix_source_games_opening_id", "opening_id"),
+        Index("ix_source_games_source_import_run_id", "source_import_run_id"),
     )
-
-
-# Backward-compatibility alias — prefer SourceGame in new code
-Game = SourceGame

@@ -121,20 +121,9 @@ const columns: ColumnDef<StockFeatures, RunTrainingItemListItem>[] = [
     header: 'Rating',
     meta: { className: 'min-w-24', icon: DATA_ICONS.rating },
     enableSorting: false,
-    cell: ({ row }) => {
-      const src = row.original.source
-      if (src.sourceType === 'LICHESS_TACTIC') {
-        return <span className="tabular-nums">{src.rating}</span>
-      }
-      if (src.sourceType === 'SCRAPED_POSITIONAL') {
-        const { minRating, maxRating } = src.difficulty
-        if (minRating != null && maxRating != null) {
-          return <span className="tabular-nums">{minRating}–{maxRating}</span>
-        }
-        return <span className="text-sm">{src.difficulty.label}</span>
-      }
-      return <span className="text-muted-foreground">—</span>
-    },
+    cell: ({ row }) => (
+      <span className="tabular-nums">{row.original.ratingDisplay ?? '—'}</span>
+    ),
   }),
   col({
     accessorKey: 'positionStatus',
@@ -185,27 +174,17 @@ export function RunTrainingItemTable({ runId, runIdStr, isActive }: Props): Reac
       meta: { className: 'sticky right-0 bg-background w-0' },
       cell: ({ row }) => {
         const item = row.original
-        const src = item.source
-        const externalUrl = src.sourceType === 'LICHESS_TACTIC'
-          ? `https://lichess.org/training/${src.displayId}`
-          : src.sourceType === 'SCRAPED_POSITIONAL'
-            ? src.lichessUrl
-            : src.sourceType === 'DECOY'
-              ? src.analysisUrl
-              : null
         return (
           <div className="flex items-center gap-0.5">
-            {externalUrl !== null && (
-              <ActionButton
-                tooltip="Open on Lichess"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  window.open(externalUrl, '_blank', 'noopener,noreferrer')
-                }}
-              >
-                <ExternalLink className="h-4 w-4" />
-              </ActionButton>
-            )}
+            <ActionButton
+              tooltip="Open on Lichess"
+              onClick={(e) => {
+                e.stopPropagation()
+                window.open(item.analysisUrl, '_blank', 'noopener,noreferrer')
+              }}
+            >
+              <ExternalLink className="h-4 w-4" />
+            </ActionButton>
             <ActionButton
               tooltip={isActive ? 'Solve this puzzle' : 'Run is not active'}
               disabled={!isActive}

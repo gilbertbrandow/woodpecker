@@ -25,10 +25,6 @@ from app.services.chess_board import build_pgn, compute_attempt_board
 from app.services.schedule_config import ScheduleConfig
 from app.services.solve_contract import SolveContract
 from app.services.training_item_content import (
-    DecoyMetadata,
-    LichessTacticMetadata,
-    ScrapedPositionalMetadata,
-    SourceMetadata,
     get_content,
     get_content_batch,
 )
@@ -231,6 +227,11 @@ def _run_puzzle_attempt_view_dict(run_puzzle: RunTrainingItem) -> dict[str, obje
             "solution": payload.contract.plies,
             "prelude": payload.contract.prelude,
             "source": payload.metadata.to_api_dict(),
+            "analysisUrl": payload.analysis_url,
+            "trainingUrl": payload.training_url,
+            "opening": payload.opening,
+            "game": payload.game,
+            "ratingDisplay": payload.rating_display,
         },
         "attempt": {
             "id": in_progress_attempt.id,
@@ -1202,6 +1203,9 @@ def list_run_puzzles(
             ),
             "tryCount": int(row.try_count) if row.try_count is not None else 0,
             "timeMs": int(row.time_ms) if row.time_ms is not None else None,
+            "analysisUrl": payloads[row.training_item_id].analysis_url,
+            "trainingUrl": payloads[row.training_item_id].training_url,
+            "ratingDisplay": payloads[row.training_item_id].rating_display,
         }
         for row in rows
     ]
@@ -1448,7 +1452,7 @@ def _compute_progress_card(
     return {"runProgress": run_progress_row, "trainingProgress": training_progress_row}
 
 
-def _compute_overview_actions(run: Run, metadata: SourceMetadata) -> dict[str, object]:
+def _compute_overview_actions(run: Run, analysis_url: str) -> dict[str, object]:
     next_enabled = run.completed_at is None and run.aborted_at is None
     disabled_reason: str | None = None
     if run.completed_at is not None:
@@ -1456,19 +1460,10 @@ def _compute_overview_actions(run: Run, metadata: SourceMetadata) -> dict[str, o
     elif run.aborted_at is not None:
         disabled_reason = "Run aborted"
 
-    if isinstance(metadata, LichessTacticMetadata):
-        analyze_url: str | None = metadata.game_url
-    elif isinstance(metadata, ScrapedPositionalMetadata):
-        analyze_url = metadata.lichess_url
-    elif isinstance(metadata, DecoyMetadata):
-        analyze_url = metadata.analysis_url
-    else:
-        analyze_url = None
-
     return {
         "runStatus": run.status,
         "retake": {"enabled": True},
-        "analyze": {"enabled": analyze_url is not None, "url": analyze_url},
+        "analyze": {"enabled": True, "url": analysis_url},
         "nextTrainingItem": {"enabled": next_enabled, "disabledReason": disabled_reason},
     }
 
@@ -1643,6 +1638,11 @@ def _build_run_puzzle_overview(
             "solution": payload.contract.plies,
             "prelude": payload.contract.prelude,
             "source": payload.metadata.to_api_dict(),
+            "analysisUrl": payload.analysis_url,
+            "trainingUrl": payload.training_url,
+            "opening": payload.opening,
+            "game": payload.game,
+            "ratingDisplay": payload.rating_display,
         },
         "selectedAttemptId": resolved_selected_id,
         "pgn": pgn_display,
@@ -1659,7 +1659,7 @@ def _build_run_puzzle_overview(
         "progress": _compute_progress_card(
             run, all_run_item_stats, total_queue, run_progress_delta_pct, training_id
         ),
-        "actions": _compute_overview_actions(run, payload.metadata),
+        "actions": _compute_overview_actions(run, payload.analysis_url),
         "timer": {
             "targetMinSolveTenths": target_min_solve_tenths,
             "targetMaxSolveTenths": target_max_solve_tenths,

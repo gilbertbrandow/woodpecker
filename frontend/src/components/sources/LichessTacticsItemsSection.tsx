@@ -152,7 +152,7 @@ const COLUMNS: ColumnDef<StockFeatures, LichessTactic>[] = [
     meta: { icon: Compass, defaultHidden: true },
     enableSorting: false,
     cell: ({ row }) => {
-      const opening = row.original.openings[0]
+      const opening = row.original.opening
       if (!opening) return <span className="text-xs text-muted-foreground">—</span>
       const label =
         opening.displayName.length > OPENING_MAX_CHARS
@@ -179,7 +179,7 @@ const COLUMNS: ColumnDef<StockFeatures, LichessTactic>[] = [
     enableSorting: false,
     cell: ({ row }) => (
       <a
-        href={row.original.gameUrl}
+        href={row.original.analysisUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="text-muted-foreground hover:text-foreground"

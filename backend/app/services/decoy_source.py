@@ -11,22 +11,28 @@ from app.models.source_import_run import (
     SourceImportSource,
     SourceImportStatus,
 )
-from app.services.training_item_content import _serialize_game
+from app.services.training_item_content import _serialize_game, lichess_analysis_url
 from app.table_query import FilterList, Paginator
 
 
 def _serialize_puzzle(dp: DecoyPuzzle) -> dict:
     game = dp.game
     opening = game.opening if game else None
+    fen_parts = dp.fen.split()
+    analysis_url = lichess_analysis_url(
+        game.lichess_id if game else None,
+        dp.fen,
+        dp.move_number,
+        player_is_white=len(fen_parts) > 1 and fen_parts[1] == "b",
+    )
     return {
         "id": dp.id,
         "fen": dp.fen,
-        "opponentMove": dp.opponent_move,
         "acceptedMoves": dp.accepted_moves,
         "bestCp": dp.best_cp,
         "depth": dp.depth,
         "moveNumber": dp.move_number,
-        "analysisUrl": dp.analysis_url,
+        "analysisUrl": analysis_url,
         "opening": (
             {"name": opening.name, "displayName": opening.display_name, "eco": opening.eco}
             if opening else None

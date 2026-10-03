@@ -30,14 +30,13 @@ class ScrapedPositionalPuzzle(Base):
     internal_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
     fen: Mapped[str] = mapped_column(Text, nullable=False)
     moves: Mapped[str] = mapped_column(Text, nullable=False)
-    lichess_url: Mapped[str] = mapped_column(Text, nullable=False)
     difficulty_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("scraped_positional_difficulties.id"), nullable=False
     )
     opening_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("openings.id"), nullable=True
     )
-    game_id: Mapped[int] = mapped_column(Integer, ForeignKey("games.id"), nullable=False)
+    game_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_games.id"), nullable=False)
 
     game: Mapped["SourceGame"] = relationship("SourceGame")
     training_item: Mapped["TrainingItem"] = relationship(

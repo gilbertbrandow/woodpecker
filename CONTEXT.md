@@ -17,7 +17,7 @@ The chess game (played on Lichess or OTB) that a TrainingItem was extracted from
 _Avoid_: game, game record, match
 
 **SourceGame Prelude**:
-The slice of a SourceGame's UCI move sequence from game start up to (but not including) the opponent's first automatic move in the SolveContract. Shown in the board panel to contextualise the puzzle within its originating game. Derived at serve time from `SourceGame.moves` by slicing at the ply encoded in the puzzle's enriched FEN.
+The slice of a SourceGame's UCI move sequence from game start up to (but not including) the opponent's first automatic move in the SolveContract. Shown in the board panel to contextualise the puzzle within its originating game. Derived at serve time from `SourceGame.moves` by slicing at the ply encoded in the puzzle's enriched FEN. For Lichess Tactics and Scraped Positionals the FEN is always 6-part (enriched at import time); for Decoys the `TrainingItemContent` implementation enriches a 4-part FEN using `DecoyPuzzle.move_number // 2` as the fullmove counter before deriving the prelude.
 _Avoid_: pre-puzzle moves, game context, game history
 
 **Lichess Tactic**:
@@ -108,6 +108,22 @@ _Avoid_: solution contract, move sequence, puzzle contract
 **SourceMetadata**:
 An opaque, source-typed structure carrying display data for one TrainingItem. Tagged with `sourceType` as a discriminant. The backend passes it through to the API response without inspecting its contents. The frontend dispatches on `sourceType` in exactly one place — the overview metadata card — and is otherwise fully source-agnostic. Each Source defines its own SourceMetadata shape; rating is source-specific and lives here, not at the top level.
 _Avoid_: source data, puzzle metadata, display metadata
+
+**TrainingItemContent**:
+A Python interface (ABC) implemented by each source-specific content class (one per Source). Defines the contract for producing a `TrainingItemPayload` from a source-specific DB record, including computing `analysis_url`. Distinct from the `TrainingItem` DB model, which carries only identity and a `source_type` tag — `TrainingItemContent` is the interface that produces what is needed to serve and solve a TrainingItem.
+_Avoid_: TrainingItem (the DB model), SourceContent, PuzzlePayloadProvider
+
+**TrainingItemPayload**:
+The concrete, source-agnostic output of a `TrainingItemContent` implementation. Contains a `SolveContract`, a `SourceMetadata`, and five shared fields computed by every `TrainingItemContent` implementation — all at serve time, never stored:
+
+- `analysis_url: str` — always non-null; Lichess game URL with ply anchor when `SourceGame.lichess_id` is present, Lichess analysis board URL with puzzle FEN otherwise. Canonical field name `analysisUrl` replaces per-source aliases `gameUrl` and `lichessUrl` everywhere.
+- `training_url: str | None` — Lichess training re-practice URL (`https://lichess.org/training/{puzzleId}`); non-null only for `LICHESS_TACTIC`.
+- `opening: dict | None` — `{ name, displayName, eco }` for the opening associated with the puzzle; null when none available.
+- `game: dict | None` — serialized SourceGame header (`{ white, black, whiteTitle, blackTitle, whiteElo, blackElo, event, date, lichessId }`); null when SourceGame has no meaningful header (rare).
+- `rating_display: str | None` — pre-formatted difficulty string for display: the numeric rating for `LICHESS_TACTIC`, the ELO range or label for `SCRAPED_POSITIONAL`, null for `DECOY`. Eliminates source-type branching in all frontend table and card components.
+
+`SourceMetadata` remains opaque and carries only genuinely source-specific display data (themes, accepted moves, difficulty tiers, etc.).
+_Avoid_: payload, puzzle payload, content payload
 
 ## Relationships
 

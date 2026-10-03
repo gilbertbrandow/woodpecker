@@ -93,7 +93,6 @@ def _make_tactic(session, puzzle_id: str, rating: int = 1500):  # type: ignore[m
         rating_deviation=100,
         popularity=80,
         nb_plays=50,
-        game_url=f"https://lichess.org/{puzzle_id}",
         game_id=game.id,
     )
     session.add(tactic)
@@ -157,7 +156,6 @@ def _make_positional(  # type: ignore[misc]
         internal_id=internal_id,
         fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
         moves="e2e4",
-        lichess_url=f"https://lichess.org/analysis/{internal_id}",
         difficulty_id=difficulty.id,
         opening_id=opening_id,
         game_id=game.id,
@@ -229,7 +227,6 @@ def _make_decoy(session, accepted_moves: list | None = None):  # type: ignore[mi
     puzzle = DecoyPuzzle(
         training_item_id=item.id,
         fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-        opponent_move="e7e5",
         accepted_moves=moves,
         best_cp=50,
         depth=20,

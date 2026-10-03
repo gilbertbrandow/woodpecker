@@ -19,13 +19,13 @@ class DecoyPuzzle(Base):
         Integer, ForeignKey("training_items.id"), unique=True, nullable=False
     )
     fen: Mapped[str] = mapped_column(Text, nullable=False)
-    opponent_move: Mapped[str] = mapped_column(Text, nullable=False)
     accepted_moves: Mapped[list] = mapped_column(JSONB, nullable=False)
     best_cp: Mapped[int] = mapped_column(Integer, nullable=False)
     depth: Mapped[int] = mapped_column(Integer, nullable=False)
+    # 1-indexed ply of the player's response move; the opponent's decoy is at ply
+    # move_number - 1 (SQL 1-indexed) = SourceGame.moves.split()[move_number - 2].
     move_number: Mapped[int] = mapped_column(Integer, nullable=False)
-    game_id: Mapped[int] = mapped_column(Integer, ForeignKey("games.id"), nullable=False)
-    analysis_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    game_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_games.id"), nullable=False)
 
     training_item: Mapped["TrainingItem"] = relationship(
         "TrainingItem", back_populates="decoy_puzzle", uselist=False

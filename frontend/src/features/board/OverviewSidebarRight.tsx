@@ -36,12 +36,12 @@ export function OverviewSidebarRight({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {topSlot != null && (
-        <div className="min-h-0 flex-1 flex flex-col">
+        <div className="min-h-0 flex-[0_1_auto] flex flex-col">
           {topSlot}
         </div>
       )}
       {showTable && (
-        <div className="mt-2 shrink-0">
+        <div className="mt-12 shrink-0">
           <OverviewAttemptHistoryTable
             trainingItemId={trainingItemId}
             currentUser={currentUser}
@@ -51,8 +51,8 @@ export function OverviewSidebarRight({
           />
         </div>
       )}
-      {topSlot == null && <div className="flex-1" />}
-      <div className="mt-3 shrink-0">
+      <div className="flex-1" />
+      <div className="mt-12 shrink-0">
         <OverviewActionsSection
           nextPuzzleDisabledReason={nextPuzzleDisabledReason}
           isLoadingNextPuzzle={isLoadingNextPuzzle}

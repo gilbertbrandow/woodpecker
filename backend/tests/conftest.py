@@ -103,7 +103,6 @@ def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
         rating_deviation=100,
         popularity=90,
         nb_plays=100,
-        game_url="https://lichess.org/test",
         game_id=game.id,
     )
     session.add(tactic)
