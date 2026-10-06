@@ -190,11 +190,12 @@ def process_tactic_batch(
         missing_ids = [gid for gid in unique_lichess_ids if gid not in existing_game_map]
         new_game_map: dict[str, int] = {}
         if missing_ids:
-            try:
-                game_data = fetch_full_game_data(missing_ids, api_token)
-            except Exception as exc:
-                click.echo(f"Warning: could not fetch SourceGame data for tactic batch: {exc}")
-                game_data = {}
+            game_data: dict[str, dict[str, Any]] = {}
+            for i in range(0, len(missing_ids), 300):
+                try:
+                    game_data.update(fetch_full_game_data(missing_ids[i:i + 300], api_token))
+                except Exception as exc:
+                    click.echo(f"Warning: could not fetch SourceGame data for tactic batch: {exc}")
             if game_data:
                 new_game_map = upsert_source_games(
                     session, game_data, source_import_run_id,
@@ -214,6 +215,11 @@ def process_tactic_batch(
         ).all()
     )
     new_tactics = [t for t in batch if t["puzzle_id"] not in existing_puzzle_ids]
+
+    unresolved = [t for t in new_tactics if t.get("game_url", "") not in game_url_to_db_id]
+    if unresolved:
+        click.echo(f"Warning: skipping {len(unresolved)} tactic(s) with no resolvable SourceGame")
+        new_tactics = [t for t in new_tactics if t.get("game_url", "") in game_url_to_db_id]
 
     unknown_themes: set[str] = set()
     unknown_openings: set[str] = set()
@@ -236,9 +242,9 @@ def process_tactic_batch(
 
         lichess_tactic_rows = [
             {
-                **tactic,
+                **{k: v for k, v in tactic.items() if k != "game_url"},
                 "training_item_id": new_ids[i],
-                "game_id": game_url_to_db_id.get(tactic.get("game_url", "")),
+                "game_id": game_url_to_db_id[tactic["game_url"]],
             }
             for i, tactic in enumerate(new_tactics)
         ]
@@ -294,47 +300,6 @@ def process_tactic_batch(
                 pg_insert(lichess_tactic_openings).values(opening_assoc).on_conflict_do_nothing()
             )
         session.commit()
-
-    # Fetch and upsert SourceGame rows for newly inserted tactics.
-    if inserted_count > 0 and opening_by_display_name is not None and opening_by_eco is not None:
-        game_id_by_url: dict[str, str] = {}
-        for tactic in batch:
-            game_url = tactic.get("game_url", "")
-            gid = _lichess_game_id_from_url(game_url)
-            if gid:
-                game_id_by_url[game_url] = gid
-
-        unique_lichess_ids = list(set(game_id_by_url.values()))
-        if unique_lichess_ids:
-            try:
-                game_data = fetch_full_game_data(unique_lichess_ids, api_token)
-            except Exception as exc:
-                click.echo(f"Warning: could not fetch SourceGame data for tactic batch: {exc}")
-                game_data = {}
-
-            game_db_id_map = upsert_source_games(
-                session, game_data, source_import_run_id, opening_by_display_name, opening_by_eco
-            )
-
-            game_url_to_db_id = {}
-            for game_url, lichess_id in game_id_by_url.items():
-                if lichess_id in game_db_id_map:
-                    game_url_to_db_id[game_url] = game_db_id_map[lichess_id]
-
-            if game_url_to_db_id:
-                for tactic in batch:
-                    game_db_id = game_url_to_db_id.get(tactic.get("game_url", ""))
-                    if game_db_id is None:
-                        continue
-                    puzzle_id = tactic["puzzle_id"]
-                    session.execute(
-                        sa.text(
-                            "UPDATE lichess_tactics SET game_id = :game_id "
-                            "WHERE puzzle_id = :puzzle_id AND game_id IS NULL"
-                        ),
-                        {"game_id": game_db_id, "puzzle_id": puzzle_id},
-                    )
-                session.commit()
 
     return TacticBatchResult(
         inserted=inserted_count,

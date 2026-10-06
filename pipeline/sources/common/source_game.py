@@ -1,18 +1,16 @@
 """
 Shared utilities for fetching and upserting SourceGame rows from the Lichess API.
 
-Used by all three importers (LichessTactic, ScrapedPositional, Decoy) and the
-backfill CLI to populate games.moves and games.game_id foreign keys.
+Used by the LichessTactic and ScrapedPositional importers to resolve the
+source_games rows their puzzles' game_id foreign keys point at.
 """
 import json
-import time
 from datetime import datetime, timezone
 from typing import Any
 
 import chess
 import click
 import requests
-import sqlalchemy as sa
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
@@ -21,7 +19,6 @@ from app.models.game import SourceGame
 
 LICHESS_EXPORT_URL = "https://lichess.org/api/games/export/_ids"
 REQUEST_TIMEOUT = 60
-RATE_LIMIT_SLEEP = 1.0
 
 
 def san_moves_to_uci(san_moves: str) -> str | None:
@@ -138,10 +135,11 @@ def upsert_source_games(
     opening_by_eco: dict[str, list[tuple[int, str]]],
 ) -> dict[str, int]:
     """
-    Insert new SourceGame rows and update moves on existing ones.
+    Insert SourceGame rows for games not yet in the DB.
 
     game_data is keyed by lichess_id; values are dicts as returned by fetch_full_game_data.
     Returns a lichess_id → db game.id map covering all provided IDs that are now in the DB.
+    Games whose moves could not be converted to UCI are skipped (moves is NOT NULL).
     """
     if not game_data:
         return {}
@@ -157,6 +155,9 @@ def upsert_source_games(
     new_rows: list[dict[str, Any]] = []
     for lichess_id, data in game_data.items():
         if lichess_id in existing_map:
+            continue
+        if not data.get("moves_uci"):
+            click.echo(f"Warning: skipping game {lichess_id}: moves could not be converted to UCI")
             continue
         opening = data.get("opening") or {}
         opening_name = opening.get("name") if isinstance(opening, dict) else None
@@ -190,39 +191,3 @@ def upsert_source_games(
 
     return result
 
-
-def populate_game_moves(
-    session: Session,
-    lichess_id_to_game_id: dict[str, int],
-    api_token: str | None,
-    batch_size: int = 300,
-) -> int:
-    """
-    Fetch and store UCI moves for existing SourceGame rows that have no moves yet.
-
-    lichess_id_to_game_id maps lichess_id → db game.id for rows that need updating.
-    Returns the number of games updated.
-    """
-    ids = list(lichess_id_to_game_id.keys())
-    updated = 0
-    for batch_start in range(0, len(ids), batch_size):
-        batch_ids = ids[batch_start: batch_start + batch_size]
-        try:
-            game_map = fetch_full_game_data(batch_ids, api_token)
-        except requests.HTTPError as exc:
-            click.echo(f"Warning: Lichess API error for batch at offset {batch_start}: {exc}")
-            continue
-        for lichess_id in batch_ids:
-            data = game_map.get(lichess_id)
-            if not data or not data.get("moves_uci"):
-                continue
-            db_id = lichess_id_to_game_id[lichess_id]
-            session.execute(
-                sa.update(SourceGame)
-                .where(SourceGame.id == db_id)
-                .values(moves=data["moves_uci"])
-            )
-            updated += 1
-        if batch_start + batch_size < len(ids):
-            time.sleep(RATE_LIMIT_SLEEP)
-    return updated
