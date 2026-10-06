@@ -209,7 +209,7 @@ export function BoardSurface({
           events: { after: onMove },
         }}
         draggable={{ showGhost: true }}
-        lastMove={lastMove}
+        lastMove={lastMove ? [lastMove[0], lastMove[1]] : []}
         check={check}
         animation={{ enabled: animationEnabled, duration: animationDuration }}
         highlight={{ lastMove: true, check: true }}

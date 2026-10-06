@@ -33,7 +33,6 @@ function makeSolvingView(prelude: string[], fen: string = START_FEN): RunTrainin
   } as unknown as RunTrainingItemAttemptView
 }
 
-// Puzzle starts after the game prelude 1.e4 e5; the opponent (white) opens with Nf3.
 const AFTER_E4_E5_FEN = 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2'
 const PRELUDE = ['e2e4', 'e7e5']
 
@@ -70,13 +69,11 @@ describe('usePgnNavigation — browsing the game before solving (#406)', () => {
   it('follows the live board after a move made from the head reached by browsing', () => {
     const { result, rerender } = renderFocusNavigation(['g1f3'])
 
-    // Browse the whole game from the start, then step forward to the latest move.
     act(() => result.current.setSelectedPly({ line: 'main', index: 0 }))
     act(() => result.current.setSelectedPly({ line: 'main', index: 1 }))
     act(() => result.current.setSelectedPly({ line: 'main', index: 2 }))
     expect(result.current.isAtHead).toBe(true)
 
-    // The user plays Nc6 and the opponent answers Bb5.
     rerender({ plies: ['g1f3', 'b8c6', 'f1b5'] })
 
     expect(result.current.isAtHead).toBe(true)
@@ -86,7 +83,6 @@ describe('usePgnNavigation — browsing the game before solving (#406)', () => {
 
   it('follows the live board in failed mode after the correct retry is played from the head', () => {
     const solvingView = makeSolvingView(PRELUDE, AFTER_E4_E5_FEN)
-    // 1...d6 was wrong: it stays in the mainline but the live board is back at Nf3.
     const failedSession = (failedRetryPlies: string[]): Session => ({
       ...EMPTY_SESSION,
       allPliesPlayed: ['g1f3'],
@@ -100,12 +96,10 @@ describe('usePgnNavigation — browsing the game before solving (#406)', () => {
       { initialProps: { retry: [] as string[] } },
     )
 
-    // Inspect the wrong move, then step back to the live position (Nf3).
     act(() => result.current.setSelectedPly({ line: 'main', index: 3 }))
     act(() => result.current.setSelectedPly({ line: 'main', index: 2 }))
     expect(result.current.isAtHead).toBe(true)
 
-    // The user finds Nc6 and the opponent answers Bb5.
     rerender({ retry: ['b8c6', 'f1b5'] })
 
     expect(result.current.isAtHead).toBe(true)
@@ -116,7 +110,6 @@ describe('usePgnNavigation — browsing the game before solving (#406)', () => {
   it('keeps an earlier browsed position when the opponent reply arrives', () => {
     const { result, rerender } = renderFocusNavigation(['g1f3', 'b8c6'])
 
-    // User reviews the prelude while waiting for the opponent's reply.
     act(() => result.current.setSelectedPly({ line: 'main', index: 1 }))
     rerender({ plies: ['g1f3', 'b8c6', 'f1b5'] })
 
