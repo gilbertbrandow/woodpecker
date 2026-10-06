@@ -99,16 +99,11 @@ export function usePgnNavigation({
 
   const lastLiveIdx = (livePgnDisplay?.mainline.length ?? 0) - 1
   const liveLastMoveIsWrong = livePgnDisplay !== null && livePgnDisplay.mainline[lastLiveIdx]?.moveStatus === 'wrong'
-  // Index of the ply whose position is the live board (a reverted wrong move sits after it).
   const liveHeadIdx: number | null =
     livePgnDisplay === null ? null
     : liveLastMoveIsWrong ? (lastLiveIdx >= 1 ? lastLiveIdx - 1 : null)
     : lastLiveIdx
 
-  // Browsing the PGN back to the head leaves an explicit selection on that ply
-  // rather than null. When a move then advances the head, that selection would
-  // pin the board to the old position (#406), so follow the head instead.
-  // Compared by index: `session` is a fresh object every render.
   const [prevLiveHeadIdx, setPrevLiveHeadIdx] = useState<number | null>(liveHeadIdx)
   if (liveHeadIdx !== prevLiveHeadIdx) {
     setPrevLiveHeadIdx(liveHeadIdx)
