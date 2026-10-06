@@ -287,6 +287,15 @@ def process_batch(
         opening_by_display_name, opening_by_eco,
     )
 
+    # game_id is NOT NULL — e.g. an unparseable lichessGameUrl resolves to no game.
+    unresolved = [item for item in new_items if item["fen"] not in game_id_map]
+    if unresolved:
+        click.echo(f"Warning: skipping {len(unresolved)} decoy(s) with no resolvable SourceGame")
+        new_items = [item for item in new_items if item["fen"] in game_id_map]
+        if not new_items:
+            session.commit()
+            return ImportBatchResult(imported=0, skipped_existing=skipped_existing)
+
     decoy_rows: list[dict[str, Any]] = []
     for item in new_items:
         ti_id = session.execute(
@@ -296,7 +305,6 @@ def process_batch(
             ),
             {"run_id": source_import_run_id},
         ).scalar_one()
-        game_id = game_id_map.get(item["fen"])
         decoy_rows.append({
             "training_item_id": ti_id,
             "fen": item["fen"],
@@ -304,7 +312,7 @@ def process_batch(
             "best_cp": item["bestCp"],
             "depth": item["depth"],
             "move_number": item["moveNumber"],
-            "game_id": game_id,
+            "game_id": game_id_map[item["fen"]],
         })
 
     session.execute(
