@@ -113,6 +113,15 @@ ssh ubuntu@"$EC2_HOST" "sudo certbot certonly --standalone \
   -d $DOMAIN_NAME -d www.$DOMAIN_NAME \
   --non-interactive --agree-tos -m $CERTBOT_EMAIL"
 
+echo "==> Switching certificate renewal to webroot..."
+ssh ubuntu@"$EC2_HOST" "sudo mkdir -p /var/www/certbot /etc/letsencrypt/renewal-hooks/deploy \
+  && sudo sed -i -e '/^authenticator = /d' -e '/^webroot_path = /d' -e '/^\[\[webroot_map\]\]/,\$d' /etc/letsencrypt/renewal/$DOMAIN_NAME.conf \
+  && printf 'authenticator = webroot\nwebroot_path = /var/www/certbot,\n[[webroot_map]]\n%s = /var/www/certbot\nwww.%s = /var/www/certbot\n' $DOMAIN_NAME $DOMAIN_NAME \
+    | sudo tee -a /etc/letsencrypt/renewal/$DOMAIN_NAME.conf > /dev/null \
+  && printf '#!/bin/bash\ncd /opt/woodpecker\ndocker compose -f docker-compose.yml -f docker-compose-prod.yml restart nginx\n' \
+    | sudo tee /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh > /dev/null \
+  && sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh"
+
 echo "==> Pushing nginx config..."
 sed "s/<domain>/$DOMAIN_NAME/g" "$NGINX_TEMPLATE" \
   | ssh ubuntu@"$EC2_HOST" "cat > /opt/woodpecker/deploy/nginx/default.conf"
