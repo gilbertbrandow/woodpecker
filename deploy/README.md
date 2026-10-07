@@ -90,7 +90,15 @@ Application secrets live in `/opt/woodpecker/.env` on the server only.
 
 ## TLS
 
-Cert from Let's Encrypt via `certbot --webroot`. Stored at `/etc/letsencrypt/live/woodpeckerchess.com/`, mounted read-only into the nginx container. Renewed automatically by `certbot.timer` (systemd, twice daily). A deploy hook at `/etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh` reloads the nginx container after renewal.
+Cert from Let's Encrypt, stored at `/etc/letsencrypt/live/woodpeckerchess.com/` and mounted read-only into the nginx container. The first certificate on a fresh instance is issued with `certbot --standalone` (nginx is not running yet); `instance-bootstrap` then switches renewal to `webroot` (`/var/www/certbot`) so renewals work while nginx holds port 80. Renewed automatically by `certbot.timer` (systemd, twice daily) from 30 days before expiry. A deploy hook at `/etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh` restarts the nginx container after renewal.
+
+The port-80 server block must keep the HTTPS redirect inside `location /`. A server-level `return` runs before location matching and would redirect `/.well-known/acme-challenge/` too, breaking renewal (this caused the 2026-10-07 expiry).
+
+Let's Encrypt no longer emails expiry reminders, and the Route 53 health check does not validate certificates, so a failing renewal is otherwise silent. The `tls-cert-check` workflow fails on every PR to `main` when the live certificate has fewer than 20 days left, which means renewal has been failing for at least 10 days. Check renewal health on the server with:
+
+```bash
+ssh ubuntu@$EC2_HOST "sudo certbot certificates && sudo certbot renew --dry-run --no-random-sleep-on-renew"
+```
 
 To update the nginx config:
 
@@ -218,7 +226,7 @@ The bootstrap script is the authoritative record of every configuration decision
 | needrestart list-only | Prevents `unattended-upgrades` from auto-restarting Docker after package installs |
 | Mask multipathd | Manages redundant SAN/NAS paths — meaningless on EC2 EBS single-path volumes (~26 MB freed) |
 | Remove amazon-ssm-agent snap | IAM role lacks SSM permissions; agent is inactive and provides no value. SSH key access is the only access method (~14 MB freed) |
-| TLS certificate | `certbot --standalone` for apex and `www` |
+| TLS certificate | `certbot --standalone` for apex and `www`, then renewal switched to `webroot` and the nginx reload deploy hook installed |
 | nginx config | Pushes `deploy/nginx/https.conf` (rendered for the domain) |
 
 ## Monitoring
