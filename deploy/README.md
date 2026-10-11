@@ -220,6 +220,7 @@ The bootstrap script is the authoritative record of every configuration decision
 | needrestart list-only | Prevents `unattended-upgrades` from auto-restarting Docker after package installs |
 | Mask multipathd | Manages redundant SAN/NAS paths — meaningless on EC2 EBS single-path volumes (~26 MB freed) |
 | Remove amazon-ssm-agent snap | IAM role lacks SSM permissions; agent is inactive and provides no value. SSH key access is the only access method (~14 MB freed) |
+| AWS CLI | Installed if missing — used for operator backup listing and restore commands on the host |
 | TLS certificate | `certbot --standalone` for apex and `www`, then renewal switched to `webroot` and the nginx reload deploy hook installed |
 
 ## Monitoring

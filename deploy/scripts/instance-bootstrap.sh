@@ -105,6 +105,18 @@ echo "    fwupd daemon masked"
 # snapd itself is left in place to avoid apt dependency friction.
 sudo snap remove amazon-ssm-agent 2>/dev/null && echo "    amazon-ssm-agent snap removed" || echo "    amazon-ssm-agent already absent"
 
+if ! command -v aws &>/dev/null; then
+  sudo apt-get update -q
+  sudo apt-get install -y unzip
+  curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+  unzip -q /tmp/awscliv2.zip -d /tmp/
+  sudo /tmp/aws/install
+  rm -rf /tmp/awscliv2.zip /tmp/aws
+  echo "    AWS CLI installed"
+else
+  echo "    AWS CLI already present"
+fi
+
 HARDEN
 
 echo "==> Obtaining TLS certificate..."
