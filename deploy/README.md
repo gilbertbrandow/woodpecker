@@ -62,7 +62,7 @@ Four long-running Docker containers managed by Docker Compose at `/opt/woodpecke
 1. PR → CI runs lint, typecheck, tests. Merge blocked until all pass.
 2. Maintainer publishes a GitHub Release → `deploy.yml` triggers.
 3. Builds `backend`, `frontend`, and `backup` Docker images, tags `<version>` + `latest`, pushes to GHCR.
-4. SSHes into EC2, pulls images, restarts containers, waits for backend health, runs `flask db upgrade`.
+4. SSHes into EC2, pulls images, restarts containers, installs the edge nginx config, waits for backend health, runs `flask db upgrade`.
 
 Migrations run on every deploy via Alembic. Idempotent.
 
@@ -75,7 +75,7 @@ Migrations run on every deploy via Alembic. Idempotent.
 
 **Tag format:** `vMAJOR.MINOR.PATCH` — follow [semver](https://semver.org). Increment PATCH for fixes, MINOR for new features, MAJOR for breaking changes.
 
-The nginx config on the server (`/opt/woodpecker/deploy/nginx/default.conf`) is **not touched by deploys** — it lives on the host and is managed manually to protect the SSL config from being overwritten.
+The edge nginx config is **deployed from the repo on every release**. `deploy/nginx/https.conf` is the source of truth: the deploy renders it for the domain, writes it to `/opt/woodpecker/deploy/nginx/default.conf`, and validates it with `nginx -t` before restarting nginx. If validation fails, the previous config is restored and the deploy fails, so a broken config never goes live. Never edit `default.conf` on the host — the next deploy overwrites it.
 
 ## GitHub secrets
 
@@ -92,13 +92,7 @@ Application secrets live in `/opt/woodpecker/.env` on the server only.
 
 Cert from Let's Encrypt via `certbot --webroot`. Stored at `/etc/letsencrypt/live/woodpeckerchess.com/`, mounted read-only into the nginx container. Renewed automatically by `certbot.timer` (systemd, twice daily). A deploy hook at `/etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh` reloads the nginx container after renewal.
 
-To update the nginx config:
-
-```bash
-sed 's/<domain>/woodpeckerchess.com/g' deploy/nginx/https.conf > /tmp/nginx-ssl.conf
-scp /tmp/nginx-ssl.conf ubuntu@$EC2_HOST:/opt/woodpecker/deploy/nginx/default.conf
-ssh ubuntu@$EC2_HOST "cd /opt/woodpecker && docker compose -f docker-compose.yml -f docker-compose-prod.yml restart nginx"
-```
+Certificates stay on the host; only the nginx config is repo-managed. To change the nginx config, edit `deploy/nginx/https.conf` and publish a release. Keep the port-80 `/.well-known/acme-challenge/` location reachable — the HTTP→HTTPS redirect must live inside `location /`, not at server level, or `certbot --webroot` renewals fail.
 
 ## Backups
 
