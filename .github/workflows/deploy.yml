@@ -54,6 +54,15 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/woodpecker-frontend:${{ steps.tag.outputs.value }}
             ghcr.io/${{ github.repository_owner }}/woodpecker-frontend:latest
 
+      - name: Build and push edge
+        uses: docker/build-push-action@v7
+        with:
+          context: deploy/nginx
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/woodpecker-edge:${{ steps.tag.outputs.value }}
+            ghcr.io/${{ github.repository_owner }}/woodpecker-edge:latest
+
       - name: Build and push backup
         uses: docker/build-push-action@v7
         with:

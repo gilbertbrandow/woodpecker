@@ -47,7 +47,7 @@ Four long-running Docker containers managed by Docker Compose at `/opt/woodpecke
 
 | Container | Role |
 | --------- | ---- |
-| nginx:1.27 | TLS termination, reverse proxy (ports 80 + 443) |
+| edge | nginx 1.31 with `deploy/nginx/https.conf` baked in · TLS termination, reverse proxy (ports 80 + 443) |
 | frontend | nginx serving static React build |
 | backend | Gunicorn · Flask · 1 worker · 4 threads |
 | db | Postgres 16 · bind-mounted from `/mnt/woodpecker-data/pgdata` (dedicated EBS volume) |
@@ -61,7 +61,7 @@ Four long-running Docker containers managed by Docker Compose at `/opt/woodpecke
 
 1. PR → CI runs lint, typecheck, tests. Merge blocked until all pass.
 2. Maintainer publishes a GitHub Release → `deploy.yml` triggers.
-3. Builds `backend`, `frontend`, and `backup` Docker images, tags `<version>` + `latest`, pushes to GHCR.
+3. Builds `backend`, `frontend`, `edge`, and `backup` Docker images, tags `<version>` + `latest`, pushes to GHCR.
 4. SSHes into EC2, pulls images, restarts containers, waits for backend health, runs `flask db upgrade`.
 
 Migrations run on every deploy via Alembic. Idempotent.
@@ -75,7 +75,7 @@ Migrations run on every deploy via Alembic. Idempotent.
 
 **Tag format:** `vMAJOR.MINOR.PATCH` — follow [semver](https://semver.org). Increment PATCH for fixes, MINOR for new features, MAJOR for breaking changes.
 
-The nginx config on the server (`/opt/woodpecker/deploy/nginx/default.conf`) is **not touched by deploys** — it lives on the host and is managed manually to protect the SSL config from being overwritten.
+The edge nginx config is **baked into the `edge` image** (`deploy/nginx/Dockerfile` copies `deploy/nginx/https.conf`). Nothing nginx-related lives on the host apart from the certificates and the certbot webroot (`/var/www/certbot`). CI builds the image and runs `nginx -t` against it on every PR, so a broken config fails the PR, not the deploy. Rolling back `IMAGE_TAG` rolls back the edge config together with the app.
 
 ## GitHub secrets
 
@@ -100,13 +100,7 @@ Let's Encrypt no longer emails expiry reminders, and the Route 53 health check d
 ssh ubuntu@$EC2_HOST "sudo certbot certificates && sudo certbot renew --dry-run --no-random-sleep-on-renew"
 ```
 
-To update the nginx config:
-
-```bash
-sed 's/<domain>/woodpeckerchess.com/g' deploy/nginx/https.conf > /tmp/nginx-ssl.conf
-scp /tmp/nginx-ssl.conf ubuntu@$EC2_HOST:/opt/woodpecker/deploy/nginx/default.conf
-ssh ubuntu@$EC2_HOST "cd /opt/woodpecker && docker compose -f docker-compose.yml -f docker-compose-prod.yml restart nginx"
-```
+Certificates stay on the host and are mounted read-only into the edge container. To change the nginx config, edit `deploy/nginx/https.conf` and publish a release.
 
 ## Backups
 
@@ -227,7 +221,6 @@ The bootstrap script is the authoritative record of every configuration decision
 | Mask multipathd | Manages redundant SAN/NAS paths — meaningless on EC2 EBS single-path volumes (~26 MB freed) |
 | Remove amazon-ssm-agent snap | IAM role lacks SSM permissions; agent is inactive and provides no value. SSH key access is the only access method (~14 MB freed) |
 | TLS certificate | `certbot --standalone` for apex and `www`, then renewal switched to `webroot` and the nginx reload deploy hook installed |
-| nginx config | Pushes `deploy/nginx/https.conf` (rendered for the domain) |
 
 ## Monitoring
 

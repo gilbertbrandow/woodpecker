@@ -119,7 +119,7 @@ db-backup-validate-clean:
 # GitHub release. Requires DOMAIN_NAME and CERTBOT_EMAIL in ~/.woodpecker-prod-env.
 
 instance-bootstrap:
-	@$(SCRIPTS_DIR)/instance-bootstrap.sh $(EC2_HOST) $(DOMAIN_NAME) $(CERTBOT_EMAIL) $(DEPLOY_DIR)/nginx/https.conf
+	@$(SCRIPTS_DIR)/instance-bootstrap.sh $(EC2_HOST) $(DOMAIN_NAME) $(CERTBOT_EMAIL)
 
 # ── Operator ───────────────────────────────────────────────────────────────────
 

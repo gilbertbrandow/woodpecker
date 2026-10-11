@@ -7,7 +7,6 @@ set -euo pipefail
 EC2_HOST="${1:?EC2_HOST not set — add to ~/.woodpecker-prod-env}"
 DOMAIN_NAME="${2:?DOMAIN_NAME not set — add to ~/.woodpecker-prod-env}"
 CERTBOT_EMAIL="${3:?CERTBOT_EMAIL not set — add to ~/.woodpecker-prod-env}"
-NGINX_TEMPLATE="${4:?nginx template path not provided}"
 
 echo "==> Waiting for SSH on $EC2_HOST..."
 until ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new ubuntu@"$EC2_HOST" true 2>/dev/null; do
@@ -121,10 +120,6 @@ ssh ubuntu@"$EC2_HOST" "sudo mkdir -p /var/www/certbot /etc/letsencrypt/renewal-
   && printf '#!/bin/bash\ncd /opt/woodpecker\ndocker compose -f docker-compose.yml -f docker-compose-prod.yml restart nginx\n' \
     | sudo tee /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh > /dev/null \
   && sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh"
-
-echo "==> Pushing nginx config..."
-sed "s/<domain>/$DOMAIN_NAME/g" "$NGINX_TEMPLATE" \
-  | ssh ubuntu@"$EC2_HOST" "cat > /opt/woodpecker/deploy/nginx/default.conf"
 
 echo ""
 echo "Bootstrap complete. Publish a GitHub release to deploy the application."
