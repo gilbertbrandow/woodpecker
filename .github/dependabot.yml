@@ -79,6 +79,17 @@ updates:
         patterns:
           - "*"
 
+  - package-ecosystem: docker
+    directory: /deploy/nginx
+    schedule:
+      interval: daily
+    labels:
+      - dependencies
+    groups:
+      edge-docker:
+        patterns:
+          - "*"
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
