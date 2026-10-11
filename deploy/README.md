@@ -47,7 +47,7 @@ Four long-running Docker containers managed by Docker Compose at `/opt/woodpecke
 
 | Container | Role |
 | --------- | ---- |
-| nginx:1.27 | TLS termination, reverse proxy (ports 80 + 443) |
+| edge | nginx 1.31 with `deploy/nginx/https.conf` baked in · TLS termination, reverse proxy (ports 80 + 443) |
 | frontend | nginx serving static React build |
 | backend | Gunicorn · Flask · 1 worker · 4 threads |
 | db | Postgres 16 · bind-mounted from `/mnt/woodpecker-data/pgdata` (dedicated EBS volume) |
@@ -61,8 +61,8 @@ Four long-running Docker containers managed by Docker Compose at `/opt/woodpecke
 
 1. PR → CI runs lint, typecheck, tests. Merge blocked until all pass.
 2. Maintainer publishes a GitHub Release → `deploy.yml` triggers.
-3. Builds `backend`, `frontend`, and `backup` Docker images, tags `<version>` + `latest`, pushes to GHCR.
-4. SSHes into EC2, pulls images, restarts containers, installs the edge nginx config, waits for backend health, runs `flask db upgrade`.
+3. Builds `backend`, `frontend`, `edge`, and `backup` Docker images, tags `<version>` + `latest`, pushes to GHCR.
+4. SSHes into EC2, pulls images, restarts containers, waits for backend health, runs `flask db upgrade`.
 
 Migrations run on every deploy via Alembic. Idempotent.
 
@@ -75,7 +75,7 @@ Migrations run on every deploy via Alembic. Idempotent.
 
 **Tag format:** `vMAJOR.MINOR.PATCH` — follow [semver](https://semver.org). Increment PATCH for fixes, MINOR for new features, MAJOR for breaking changes.
 
-The edge nginx config is **deployed from the repo on every release**. `deploy/nginx/https.conf` is the source of truth: the deploy renders it for the domain, writes it to `/opt/woodpecker/deploy/nginx/default.conf`, and validates it with `nginx -t` before restarting nginx. If validation fails, the previous config is restored and the deploy fails, so a broken config never goes live. Never edit `default.conf` on the host — the next deploy overwrites it.
+The edge nginx config is **baked into the `edge` image** (`deploy/nginx/Dockerfile` copies `deploy/nginx/https.conf`). Nothing nginx-related lives on the host apart from the certificates and the certbot webroot (`/var/www/certbot`). CI builds the image and runs `nginx -t` against it on every PR, so a broken config fails the PR, not the deploy. Rolling back `IMAGE_TAG` rolls back the edge config together with the app.
 
 ## GitHub secrets
 
@@ -92,7 +92,7 @@ Application secrets live in `/opt/woodpecker/.env` on the server only.
 
 Cert from Let's Encrypt via `certbot --webroot`. Stored at `/etc/letsencrypt/live/woodpeckerchess.com/`, mounted read-only into the nginx container. Renewed automatically by `certbot.timer` (systemd, twice daily). A deploy hook at `/etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh` reloads the nginx container after renewal.
 
-Certificates stay on the host; only the nginx config is repo-managed. To change the nginx config, edit `deploy/nginx/https.conf` and publish a release. Keep the port-80 `/.well-known/acme-challenge/` location reachable — the HTTP→HTTPS redirect must live inside `location /`, not at server level, or `certbot --webroot` renewals fail.
+Certificates stay on the host and are mounted read-only into the edge container. To change the nginx config, edit `deploy/nginx/https.conf` and publish a release. Keep the port-80 `/.well-known/acme-challenge/` location reachable — the HTTP→HTTPS redirect must live inside `location /`, not at server level, or `certbot --webroot` renewals fail.
 
 ## Backups
 
@@ -213,7 +213,6 @@ The bootstrap script is the authoritative record of every configuration decision
 | Mask multipathd | Manages redundant SAN/NAS paths — meaningless on EC2 EBS single-path volumes (~26 MB freed) |
 | Remove amazon-ssm-agent snap | IAM role lacks SSM permissions; agent is inactive and provides no value. SSH key access is the only access method (~14 MB freed) |
 | TLS certificate | `certbot --standalone` for apex and `www` |
-| nginx config | Pushes `deploy/nginx/https.conf` (rendered for the domain) |
 
 ## Monitoring
 

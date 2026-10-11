@@ -46,12 +46,13 @@ services:
       - backup
 
   nginx:
-    image: nginx:1.27-alpine
+    image: ghcr.io/${GHCR_OWNER}/woodpecker-edge:${IMAGE_TAG:-latest}
+    build:
+      context: ./deploy/nginx
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - /opt/woodpecker/deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /var/www/certbot:/var/www/certbot:ro
     depends_on:

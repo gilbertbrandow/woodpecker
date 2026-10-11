@@ -54,6 +54,15 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/woodpecker-frontend:${{ steps.tag.outputs.value }}
             ghcr.io/${{ github.repository_owner }}/woodpecker-frontend:latest
 
+      - name: Build and push edge
+        uses: docker/build-push-action@v7
+        with:
+          context: deploy/nginx
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/woodpecker-edge:${{ steps.tag.outputs.value }}
+            ghcr.io/${{ github.repository_owner }}/woodpecker-edge:latest
+
       - name: Build and push backup
         uses: docker/build-push-action@v7
         with:
@@ -79,7 +88,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.yml,docker-compose-prod.yml,deploy/docker-compose-db-tunnel.yml,deploy/nginx/https.conf"
+          source: "docker-compose.yml,docker-compose-prod.yml,deploy/docker-compose-db-tunnel.yml"
           target: /opt/woodpecker
 
       - name: Copy scripts to EC2
@@ -158,18 +167,6 @@ jobs:
             docker compose -f docker-compose.yml -f docker-compose-prod.yml pull
             docker pull ghcr.io/${GHCR_OWNER}/woodpecker-backup:${IMAGE_TAG}
             docker compose -f docker-compose.yml -f docker-compose-prod.yml up -d --remove-orphans
-
-            NGINX_CONF=/opt/woodpecker/deploy/nginx/default.conf
-            cp "$NGINX_CONF" "$NGINX_CONF.prev"
-            sed 's/<domain>/woodpeckerchess.com/g' /opt/woodpecker/deploy/nginx/https.conf > "$NGINX_CONF.next"
-            cat "$NGINX_CONF.next" > "$NGINX_CONF"
-            rm "$NGINX_CONF.next"
-            if ! docker compose -f docker-compose.yml -f docker-compose-prod.yml exec -T nginx nginx -t; then
-              echo "nginx config failed validation; restoring previous config"
-              cat "$NGINX_CONF.prev" > "$NGINX_CONF"
-              exit 1
-            fi
-
             docker compose -f docker-compose.yml -f docker-compose-prod.yml restart nginx
             echo "Waiting for backend..."
             for i in $(seq 1 30); do
