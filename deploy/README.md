@@ -75,7 +75,7 @@ Migrations run on every deploy via Alembic. Idempotent.
 
 **Tag format:** `vMAJOR.MINOR.PATCH` — follow [semver](https://semver.org). Increment PATCH for fixes, MINOR for new features, MAJOR for breaking changes.
 
-The edge nginx config is **baked into the `edge` image** (`deploy/nginx/Dockerfile` copies `deploy/nginx/https.conf`). Nothing nginx-related lives on the host apart from the certificates and the certbot webroot (`/var/www/certbot`). CI builds the image and runs `nginx -t` against it on every PR, so a broken config fails the PR, not the deploy. Rolling back `IMAGE_TAG` rolls back the edge config together with the app.
+The edge nginx config is **baked into the `edge` image** (`deploy/nginx/Dockerfile` copies `deploy/nginx/https.conf`). Nothing nginx-related lives on the host apart from the certificates and the certbot webroot (`/var/www/certbot`). CI builds the image and runs `nginx -t` against it on every PR, so a broken config fails the PR, not the deploy. A rollback (see [Rollback](#rollback)) restores the edge config together with the app.
 
 ## GitHub secrets
 
@@ -220,6 +220,7 @@ The bootstrap script is the authoritative record of every configuration decision
 | needrestart list-only | Prevents `unattended-upgrades` from auto-restarting Docker after package installs |
 | Mask multipathd | Manages redundant SAN/NAS paths — meaningless on EC2 EBS single-path volumes (~26 MB freed) |
 | Remove amazon-ssm-agent snap | IAM role lacks SSM permissions; agent is inactive and provides no value. SSH key access is the only access method (~14 MB freed) |
+| AWS CLI | Installed if missing — used for operator backup listing and restore commands on the host |
 | TLS certificate | `certbot --standalone` for apex and `www`, then renewal switched to `webroot` and the nginx reload deploy hook installed |
 
 ## Monitoring
@@ -307,11 +308,14 @@ GUI tools (Beekeeper, TablePlus, etc.): run `db-tunnel-start`, connect to `local
 
 ## Rollback
 
-```bash
-ssh ubuntu@$EC2_HOST
-cd /opt/woodpecker
-IMAGE_TAG=v1.2.2 docker compose -f docker-compose.yml -f docker-compose-prod.yml up -d
-docker compose -f docker-compose.yml -f docker-compose-prod.yml exec -T backend flask --app app db downgrade -1
-```
+Run the **rollback** workflow: GitHub → Actions → rollback → Run workflow, with the release `tag` to return to.
+
+1. **Validate:** the tag must be `vMAJOR.MINOR.PATCH` and all four images (`backend`, `frontend`, `edge`, `backup`) must exist in GHCR for it. Releases before the edge image (#423) are refused before anything touches the host.
+2. **Pull** the target images on EC2.
+3. **Optionally downgrade migrations** (`downgrade_migrations`, off by default). The target release's migration head is read from its backend image, and the downgrade runs on the *currently running* backend, because only the newer code has the migration files needed to step down. Leave it off unless the newer release's migrations are incompatible with the older code.
+4. **Switch:** records `IMAGE_TAG=<tag>` in `/opt/woodpecker/.env`, then `up -d` and restarts nginx. Migrations are never upgraded during a rollback.
+5. **Smoke check** `/`, `/app` and `/api/auth/ping`.
+
+`IMAGE_TAG` in `.env` is the version the host runs. Deploys write it and rollbacks change it, so later compose commands (the nightly backup, `db-tunnel-start`) use the same version instead of `latest`. Deploys and rollbacks share a concurrency group, so they never run at the same time. To roll forward again, publish a new release or run the workflow with the newer tag.
 
 Version tags are in the GHCR package history and the GitHub Releases page.

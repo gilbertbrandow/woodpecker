@@ -1,0 +1,135 @@
+name: rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to roll back to (e.g. v0.9.15)"
+        required: true
+        type: string
+      downgrade_migrations:
+        description: "Downgrade the database to the target release's migration head before switching images"
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  validate:
+    name: Validate target release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      TARGET_TAG: ${{ inputs.tag }}
+      GHCR_OWNER: ${{ github.repository_owner }}
+    steps:
+      - name: Check tag format
+        run: |
+          if ! [[ "$TARGET_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$TARGET_TAG' is not a vMAJOR.MINOR.PATCH release tag"
+            exit 1
+          fi
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Check all images exist for the tag
+        run: |
+          missing=0
+          for image in backend frontend edge backup; do
+            ref="ghcr.io/${GHCR_OWNER}/woodpecker-${image}:${TARGET_TAG}"
+            if docker manifest inspect "$ref" > /dev/null 2>&1; then
+              echo "found   $ref"
+            else
+              echo "::error::missing $ref"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::$TARGET_TAG cannot be rolled back to with IMAGE_TAG alone. Releases before the edge image (#423) have no woodpecker-edge image."
+            exit 1
+          fi
+
+  rollback:
+    name: Roll back EC2 to ${{ inputs.tag }}
+    needs: validate
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://woodpeckerchess.com
+    steps:
+      - name: Switch images, optionally downgrade migrations
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_OWNER: ${{ github.repository_owner }}
+          TARGET_TAG: ${{ inputs.tag }}
+          DOWNGRADE_MIGRATIONS: ${{ inputs.downgrade_migrations }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: GHCR_TOKEN,GHCR_ACTOR,GHCR_OWNER,TARGET_TAG,DOWNGRADE_MIGRATIONS
+          script: |
+            set -euo pipefail
+            cd /opt/woodpecker
+            COMPOSE="docker compose -f docker-compose.yml -f docker-compose-prod.yml"
+
+            CURRENT_TAG=$(grep -E '^IMAGE_TAG=' .env | cut -d= -f2 || true)
+            echo "Current: ${CURRENT_TAG:-unknown}  Target: $TARGET_TAG  Downgrade migrations: $DOWNGRADE_MIGRATIONS"
+
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
+            IMAGE_TAG="$TARGET_TAG" $COMPOSE pull
+            docker pull "ghcr.io/${GHCR_OWNER}/woodpecker-backup:${TARGET_TAG}"
+
+            if [ "$DOWNGRADE_MIGRATIONS" = "true" ]; then
+              TARGET_REV=$(IMAGE_TAG="$TARGET_TAG" $COMPOSE run --rm --no-deps -T backend flask --app app db heads \
+                | grep -E '^[0-9a-z]+ \(head\)' | awk '{print $1}' || true)
+              if [ -z "$TARGET_REV" ] || [ "$(echo "$TARGET_REV" | wc -l)" -ne 1 ]; then
+                echo "Could not determine a single migration head for $TARGET_TAG (got: '$TARGET_REV'); aborting before any change"
+                exit 1
+              fi
+              echo "Downgrading database to $TARGET_REV using the currently running backend"
+              $COMPOSE exec -T backend flask --app app db downgrade "$TARGET_REV"
+            fi
+
+            if grep -qE '^IMAGE_TAG=' .env; then
+              sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${TARGET_TAG}/" .env
+            else
+              echo "IMAGE_TAG=${TARGET_TAG}" >> .env
+            fi
+
+            IMAGE_TAG="$TARGET_TAG" $COMPOSE up -d --remove-orphans
+            $COMPOSE restart nginx
+
+            echo "Waiting for backend..."
+            for _ in $(seq 1 30); do
+              $COMPOSE exec -T backend true 2>/dev/null && break
+              sleep 2
+            done
+            $COMPOSE ps --format '{{.Service}}: {{.Image}} — {{.Status}}'
+
+      - name: Smoke check
+        run: |
+          for path in / /app /api/auth/ping; do
+            code=000
+            for _ in $(seq 1 12); do
+              code=$(curl -s -o /dev/null -w "%{http_code}" "https://woodpeckerchess.com${path}" || true)
+              case "$code" in 2??) break ;; esac
+              sleep 5
+            done
+            echo "${path}: ${code}"
+            case "$code" in 2??) ;; *) echo "::error::${path} returned ${code} after 60 s"; exit 1 ;; esac
+          done
