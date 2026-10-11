@@ -115,17 +115,8 @@ def get_run_board(
                 SELECT
                     rp.run_id,
                     COUNT(*)                                              AS total_puzzles,
-                    COUNT(*) FILTER (WHERE EXISTS (
-                        SELECT 1 FROM training_attempts pa
-                        WHERE pa.run_training_item_id = rp.id
-                          AND pa.status = 'solved'
-                          AND pa.try_number = 1
-                    ))                                                    AS first_solved_count,
-                    COUNT(*) FILTER (WHERE EXISTS (
-                        SELECT 1 FROM training_attempts pa
-                        WHERE pa.run_training_item_id = rp.id
-                          AND pa.status != 'in_progress'
-                    ))                                                    AS resolved_count,
+                    COUNT(*) FILTER (WHERE att.first_solved)              AS first_solved_count,
+                    COUNT(*) FILTER (WHERE att.resolved)                  AS resolved_count,
                     AVG(
                         CASE ti.source_type::text
                             WHEN 'LICHESS_TACTIC'     THEN lt.rating
@@ -139,39 +130,28 @@ def get_run_board(
                             ELSE NULL
                         END
                     )                                                     AS avg_rating,
-                    AVG(la.time_spent_ms)                                AS avg_solve_time_ms,
-                    AVG(first_solve.time_spent_ms)                       AS avg_time_solved_ms,
-                    AVG(last_failed.time_spent_ms)                       AS avg_time_failed_ms
-                FROM run_training_items rp
+                    AVG(att.last_resolved_ms)                            AS avg_solve_time_ms,
+                    AVG(att.first_solve_ms)                              AS avg_time_solved_ms,
+                    AVG(att.last_failed_ms)                              AS avg_time_failed_ms
+                FROM target_run_ids tr
+                JOIN run_training_items rp ON rp.run_id = tr.id
                 JOIN training_items ti ON ti.id = rp.training_item_id
                 LEFT JOIN lichess_tactics lt  ON lt.training_item_id = rp.training_item_id
                 LEFT JOIN scraped_positional_puzzles spp ON spp.training_item_id = rp.training_item_id
                 LEFT JOIN scraped_positional_difficulties spd ON spd.id = spp.difficulty_id
                 LEFT JOIN LATERAL (
-                    SELECT pa.time_spent_ms
+                    SELECT
+                        bool_or(pa.status = 'solved' AND pa.try_number = 1) AS first_solved,
+                        bool_or(pa.status != 'in_progress')                 AS resolved,
+                        (array_agg(pa.time_spent_ms ORDER BY pa.try_number DESC)
+                            FILTER (WHERE pa.status != 'in_progress'))[1]   AS last_resolved_ms,
+                        (array_agg(pa.time_spent_ms)
+                            FILTER (WHERE pa.status = 'solved' AND pa.try_number = 1))[1] AS first_solve_ms,
+                        (array_agg(pa.time_spent_ms ORDER BY pa.try_number DESC)
+                            FILTER (WHERE pa.status = 'failed'))[1]         AS last_failed_ms
                     FROM training_attempts pa
                     WHERE pa.run_training_item_id = rp.id
-                      AND pa.status != 'in_progress'
-                    ORDER BY pa.try_number DESC
-                    LIMIT 1
-                ) la ON true
-                LEFT JOIN LATERAL (
-                    SELECT pa.time_spent_ms
-                    FROM training_attempts pa
-                    WHERE pa.run_training_item_id = rp.id
-                      AND pa.status = 'solved'
-                      AND pa.try_number = 1
-                    LIMIT 1
-                ) first_solve ON true
-                LEFT JOIN LATERAL (
-                    SELECT pa.time_spent_ms
-                    FROM training_attempts pa
-                    WHERE pa.run_training_item_id = rp.id
-                      AND pa.status = 'failed'
-                    ORDER BY pa.try_number DESC
-                    LIMIT 1
-                ) last_failed ON true
-                WHERE rp.run_id IN (SELECT id FROM target_run_ids)
+                ) att ON true
                 GROUP BY rp.run_id
             )
             SELECT
