@@ -4,6 +4,10 @@ on:
   release:
     types: [published]
 
+concurrency:
+  group: production
+  cancel-in-progress: false
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -141,6 +145,7 @@ jobs:
             SENTRY_DSN=${SENTRY_DSN}
             BACKUP_BUCKET=${BACKUP_BUCKET}
             GHCR_OWNER=${GHCR_OWNER}
+            IMAGE_TAG=${IMAGE_TAG}
             EOF
             chmod 600 /opt/woodpecker/.env.new
             mv /opt/woodpecker/.env.new /opt/woodpecker/.env
