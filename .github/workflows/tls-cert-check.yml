@@ -1,0 +1,27 @@
+name: tls-cert-check
+
+on:
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  tls-cert-expiry:
+    name: TLS certificate expiry
+    runs-on: ubuntu-latest
+    env:
+      DOMAIN: woodpeckerchess.com
+      MIN_DAYS_LEFT: "20"
+    steps:
+      - name: Check days until expiry
+        run: |
+          set -euo pipefail
+          for host in "$DOMAIN" "www.$DOMAIN"; do
+            not_after=$(echo | openssl s_client -connect "$host:443" -servername "$host" 2>/dev/null \
+              | openssl x509 -noout -enddate | cut -d= -f2)
+            days_left=$(( ( $(date -d "$not_after" +%s) - $(date +%s) ) / 86400 ))
+            echo "$host expires $not_after ($days_left days left)"
+            if [ "$days_left" -lt "$MIN_DAYS_LEFT" ]; then
+              echo "::error title=TLS certificate expiring::$host expires in $days_left days. Renewal starts 30 days before expiry, so it is failing. See deploy/README.md#tls."
+              exit 1
+            fi
+          done
