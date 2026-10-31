@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 import sqlalchemy as sa
@@ -77,8 +77,8 @@ def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
         source=SourceImportSource.LICHESS_TACTICS,
         operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
         status=SourceImportStatus.SUCCEEDED,
-        started_at=datetime.now(timezone.utc),
-        finished_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
+        finished_at=datetime.now(UTC),
     )
     session.add(source_run)
     session.flush()
@@ -111,7 +111,7 @@ def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
     user = User(
         lichess_username=f"testuser_{tactic.id}",
         display_name=f"testuser_{tactic.id}",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     session.add(user)
     session.flush()
@@ -120,7 +120,7 @@ def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
         user_id=user.id,
         name="Test subset",
         puzzle_count=1,
-        locked_at=datetime.now(timezone.utc),
+        locked_at=datetime.now(UTC),
         locked_puzzle_count=1,
     )
     session.add(subset)
@@ -139,7 +139,7 @@ def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
         subset_id=subset.id,
         name="Test schedule",
         config=schedule_config,
-        locked_at=datetime.now(timezone.utc),
+        locked_at=datetime.now(UTC),
     )
     session.add(schedule)
     session.flush()
@@ -147,7 +147,7 @@ def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
     participation = Training(
         user_id=user.id,
         schedule_id=schedule.id,
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
     )
     session.add(participation)
     session.flush()
@@ -155,7 +155,7 @@ def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
     run = Run(
         training_id=participation.id,
         run_index=0,
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
     )
     session.add(run)
     session.flush()
@@ -168,7 +168,7 @@ def _seed_world(session) -> dict[str, object]:  # type: ignore[misc]
         run_training_item_id=run_training_item.id,
         try_number=1,
         status="in_progress",
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
         moves=[],
     )
     session.add(attempt)

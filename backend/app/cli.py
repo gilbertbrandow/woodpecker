@@ -1,5 +1,6 @@
 import json
 import time
+from datetime import UTC
 from urllib.parse import urlsplit
 
 import chess
@@ -95,7 +96,7 @@ def register_commands(app: Flask) -> None:
           4. games still with moves IS NULL  → populate moves from --decoy-file JSONL (OTB games)
           5. decoy_puzzles with game_id IS NULL  → link via --decoy-file JSONL (tries API first, falls back to JSONL for OTB games)
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from app.extensions import db
         from app.models.game import SourceGame
@@ -150,7 +151,7 @@ def register_commands(app: Flask) -> None:
                     created_at = game.get("createdAt")
                     date_str: str | None = None
                     if created_at:
-                        date_str = datetime.fromtimestamp(created_at / 1000, tz=timezone.utc).strftime("%Y.%m.%d")
+                        date_str = datetime.fromtimestamp(created_at / 1000, tz=UTC).strftime("%Y.%m.%d")
                     result[gid] = {
                         "moves_uci": _san_to_uci(san_moves),
                         "opening": opening,
@@ -267,7 +268,7 @@ def register_commands(app: Flask) -> None:
                 source=SourceImportSource.SOURCE_GAME_BACKFILL,
                 operation=SourceImportOperation.SOURCE_GAME_BACKFILL,
                 status=SourceImportStatus.RUNNING,
-                started_at=datetime.now(tz=timezone.utc),
+                started_at=datetime.now(tz=UTC),
             )
             db.session.add(run)
             db.session.commit()
@@ -619,7 +620,7 @@ def register_commands(app: Flask) -> None:
         # --- Finalise run ---
         if not dry_run:
             run.status = SourceImportStatus.SUCCEEDED
-            run.finished_at = datetime.now(tz=timezone.utc)
+            run.finished_at = datetime.now(tz=UTC)
             run.summary_json = {
                 "moves_populated": total_moves_populated,
                 "jsonl_moves_populated": total_jsonl_populated,
@@ -701,7 +702,7 @@ def register_commands(app: Flask) -> None:
         click.echo(f"Done. Deleted {tactic_count:,} tactics and {result.rowcount:,} training_items.")  # type: ignore[attr-defined]
 
         # --- Recompute metadata for affected runs ---
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         click.echo("Recomputing metadata for affected runs...")
         runs = db.session.execute(
@@ -823,7 +824,7 @@ def register_commands(app: Flask) -> None:
                     "buckets": json.dumps({str(b): int(c) for b, c in rating_buckets}),
                     "theme_j": json.dumps({n: int(c) for n, c in theme_counts}),
                     "opening_j": json.dumps({n: int(c) for n, c in opening_counts}),
-                    "now": datetime.now(tz=timezone.utc),
+                    "now": datetime.now(tz=UTC),
                 },
             )
             db.session.commit()

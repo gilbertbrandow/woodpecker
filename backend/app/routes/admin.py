@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import requests as http
 import sqlalchemy as sa
@@ -236,7 +236,7 @@ def add_whitelist() -> tuple[Response, int]:
 
     entry = WhitelistEntry(
         lichess_username=normalized,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     db.session.add(entry)
     db.session.commit()

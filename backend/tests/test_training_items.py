@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from flask.testing import FlaskClient
@@ -27,8 +27,8 @@ def _seed_training_item_world(session) -> dict[str, object]:  # type: ignore[mis
         source=SourceImportSource.LICHESS_TACTICS,
         operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
         status=SourceImportStatus.SUCCEEDED,
-        started_at=datetime.now(timezone.utc),
-        finished_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
+        finished_at=datetime.now(UTC),
     )
     session.add(source_run)
     session.flush()
@@ -68,7 +68,7 @@ def _seed_training_item_world(session) -> dict[str, object]:  # type: ignore[mis
     user_a = User(
         lichess_username="user_a_ti_test",
         display_name="User A",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     session.add(user_a)
     session.flush()
@@ -77,7 +77,7 @@ def _seed_training_item_world(session) -> dict[str, object]:  # type: ignore[mis
         user_id=user_a.id,
         name="Subset A",
         puzzle_count=1,
-        locked_at=datetime.now(timezone.utc),
+        locked_at=datetime.now(UTC),
         locked_puzzle_count=1,
     )
     session.add(subset_a)
@@ -89,7 +89,7 @@ def _seed_training_item_world(session) -> dict[str, object]:  # type: ignore[mis
         subset_id=subset_a.id,
         name="Schedule A",
         config=schedule_config,
-        locked_at=datetime.now(timezone.utc),
+        locked_at=datetime.now(UTC),
     )
     session.add(schedule_a)
     session.flush()
@@ -97,12 +97,12 @@ def _seed_training_item_world(session) -> dict[str, object]:  # type: ignore[mis
     training_a = Training(
         user_id=user_a.id,
         schedule_id=schedule_a.id,
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
     )
     session.add(training_a)
     session.flush()
 
-    run_a = Run(training_id=training_a.id, run_index=0, started_at=datetime.now(timezone.utc))
+    run_a = Run(training_id=training_a.id, run_index=0, started_at=datetime.now(UTC))
     session.add(run_a)
     session.flush()
 
@@ -114,7 +114,7 @@ def _seed_training_item_world(session) -> dict[str, object]:  # type: ignore[mis
         run_training_item_id=rp_a.id,
         try_number=1,
         status="solved",
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
         moves=["a1a8"],
         time_spent_ms=3000,
     )
@@ -125,7 +125,7 @@ def _seed_training_item_world(session) -> dict[str, object]:  # type: ignore[mis
     user_b = User(
         lichess_username="user_b_ti_test",
         display_name="User B",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     session.add(user_b)
     session.flush()
@@ -214,7 +214,7 @@ class TestSpectateView:
             run_training_item_id=rp.id,
             try_number=2,
             status="in_progress",
-            started_at=datetime.now(timezone.utc),
+            started_at=datetime.now(UTC),
             moves=[],
         )
         db_session.add(in_progress)
@@ -253,8 +253,8 @@ class TestSpectateView:
             source=SourceImportSource.LICHESS_TACTICS,
             operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
             status=SourceImportStatus.SUCCEEDED,
-            started_at=datetime.now(timezone.utc),
-            finished_at=datetime.now(timezone.utc),
+            started_at=datetime.now(UTC),
+            finished_at=datetime.now(UTC),
         )
         db_session.add(source_run2)
         db_session.flush()
@@ -300,7 +300,7 @@ class TestSpectateView:
             run_training_item_id=rp_item2.id,
             try_number=1,
             status="solved",
-            started_at=datetime.now(timezone.utc),
+            started_at=datetime.now(UTC),
             moves=["a1a8"],
             time_spent_ms=1000,
         )
@@ -332,7 +332,7 @@ def _add_failed_attempt(session, world: dict) -> int:  # type: ignore[misc]
         run_training_item_id=rp.id,
         try_number=2,
         status="failed",
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
         moves=[],
         time_spent_ms=5000,
     )
@@ -358,7 +358,7 @@ def _add_user_with_attempt(session, world: dict, username: str, display_name: st
     user = User(
         lichess_username=username,
         display_name=display_name,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     session.add(user)
     session.flush()
@@ -367,7 +367,7 @@ def _add_user_with_attempt(session, world: dict, username: str, display_name: st
         user_id=user.id,
         name=f"Subset {display_name}",
         puzzle_count=1,
-        locked_at=datetime.now(timezone.utc),
+        locked_at=datetime.now(UTC),
         locked_puzzle_count=1,
     )
     session.add(subset)
@@ -385,7 +385,7 @@ def _add_user_with_attempt(session, world: dict, username: str, display_name: st
         subset_id=subset.id,
         name=f"Schedule {display_name}",
         config=schedule_config,
-        locked_at=datetime.now(timezone.utc),
+        locked_at=datetime.now(UTC),
     )
     session.add(schedule)
     session.flush()
@@ -393,12 +393,12 @@ def _add_user_with_attempt(session, world: dict, username: str, display_name: st
     training = Training(
         user_id=user.id,
         schedule_id=schedule.id,
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
     )
     session.add(training)
     session.flush()
 
-    run = Run(training_id=training.id, run_index=0, started_at=datetime.now(timezone.utc))
+    run = Run(training_id=training.id, run_index=0, started_at=datetime.now(UTC))
     session.add(run)
     session.flush()
 
@@ -410,7 +410,7 @@ def _add_user_with_attempt(session, world: dict, username: str, display_name: st
         run_training_item_id=rp.id,
         try_number=1,
         status="solved",
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
         moves=["a1a8"],
         time_spent_ms=2000,
     )

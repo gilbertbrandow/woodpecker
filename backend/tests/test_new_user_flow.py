@@ -1,6 +1,6 @@
 """Tests for the new user flow: cap, whitelist, waitlist, display name, onboarding."""
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -118,7 +118,7 @@ class TestCapBehavior:
             user = User(
                 lichess_username=f"capuser{i}",
                 display_name=f"Cap User {i}",
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             )
             db_session.add(user)
         db_session.commit()
@@ -144,12 +144,12 @@ class TestWhitelistBypass:
             user = User(
                 lichess_username=f"wlcapuser{i}",
                 display_name=f"WL Cap User {i}",
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             )
             db_session.add(user)
         entry = WhitelistEntry(
             lichess_username="wlspecial",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db_session.add(entry)
         db_session.commit()
@@ -164,7 +164,7 @@ class TestWhitelistBypass:
         # The whitelist check must still match.
         entry = WhitelistEntry(
             lichess_username="wlmixed",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db_session.add(entry)
         db_session.commit()
@@ -184,7 +184,7 @@ class TestExistingUserAlwaysActive:
             user = User(
                 lichess_username=f"existingcap{i}",
                 display_name=f"Existing Cap {i}",
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             )
             db_session.add(user)
         db_session.commit()
@@ -200,7 +200,7 @@ class TestExistingUserAlwaysActive:
         user = User(
             lichess_username="ChessUser",
             display_name="ChessUser",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db_session.add(user)
         db_session.commit()
@@ -221,7 +221,7 @@ class TestWaitlistIdempotency:
             user = User(
                 lichess_username=f"idempuser{i}",
                 display_name=f"Idemp User {i}",
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             )
             db_session.add(user)
         db_session.commit()
@@ -295,7 +295,7 @@ class TestOnboardingEndpoint:
         user = User(
             lichess_username="alreadyexists",
             display_name="Already Exists",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db_session.add(user)
         db_session.commit()
@@ -322,7 +322,7 @@ class TestApiResponsePrivacy:
         user = User(
             lichess_username="privlbuser",
             display_name="Priv LB User",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db_session.add(user)
         db_session.flush()
@@ -429,7 +429,7 @@ def _seed_participants(db_session) -> dict[str, object]:  # type: ignore[misc]
     user = User(
         lichess_username="participanttest",
         display_name="Participant Test",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     db_session.add(user)
     db_session.flush()
@@ -438,7 +438,7 @@ def _seed_participants(db_session) -> dict[str, object]:  # type: ignore[misc]
         user_id=user.id,
         name="Priv Subset",
         puzzle_count=1,
-        locked_at=datetime.now(timezone.utc),
+        locked_at=datetime.now(UTC),
         locked_puzzle_count=1,
     )
     db_session.add(subset)
@@ -449,7 +449,7 @@ def _seed_participants(db_session) -> dict[str, object]:  # type: ignore[misc]
         subset_id=subset.id,
         name="Priv Schedule",
         config={"runs": [], "puzzle_order": "fixed", "failed_repetition": {"mode": "none"}},
-        locked_at=datetime.now(timezone.utc),
+        locked_at=datetime.now(UTC),
     )
     db_session.add(schedule)
     db_session.flush()
@@ -457,7 +457,7 @@ def _seed_participants(db_session) -> dict[str, object]:  # type: ignore[misc]
     training = Training(
         user_id=user.id,
         schedule_id=schedule.id,
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
     )
     db_session.add(training)
     db_session.flush()

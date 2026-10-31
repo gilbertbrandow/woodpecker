@@ -1,5 +1,5 @@
 """Tests for admin routes and admin_required decorator."""
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -15,7 +15,7 @@ def _make_user(db_session, *, username: str, is_superadmin: bool = False) -> Use
         lichess_username=username,
         display_name=username,
         is_superadmin=is_superadmin,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     db_session.add(user)
     db_session.flush()
@@ -25,8 +25,8 @@ def _make_user(db_session, *, username: str, is_superadmin: bool = False) -> Use
 def _make_waitlist(db_session, *, username: str) -> WaitlistEntry:
     entry = WaitlistEntry(
         lichess_username=username,
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
     )
     db_session.add(entry)
     db_session.flush()
@@ -34,7 +34,7 @@ def _make_waitlist(db_session, *, username: str) -> WaitlistEntry:
 
 
 def _make_whitelist(db_session, *, username: str) -> WhitelistEntry:
-    entry = WhitelistEntry(lichess_username=username, created_at=datetime.now(timezone.utc))
+    entry = WhitelistEntry(lichess_username=username, created_at=datetime.now(UTC))
     db_session.add(entry)
     db_session.flush()
     return entry
@@ -508,7 +508,7 @@ class TestUpsertWaitlist:
     def test_updates_updated_at_on_re_attempt(self, app: Flask, db_session) -> None:  # type: ignore[misc]
         from app.services.auth_service import _upsert_waitlist
         # SQLite stores and returns naive datetimes; use UTC-naive for comparison
-        original_time = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=1)
+        original_time = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=1)
         entry = WaitlistEntry(
             lichess_username="retryuser",
             created_at=original_time,

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from flask.testing import FlaskClient
@@ -8,7 +8,7 @@ from flask.testing import FlaskClient
 def _make_user(session):  # type: ignore[misc]
     from app.models.user import User
 
-    user = User(lichess_username="sources_test_user", display_name="sources_test_user", created_at=datetime.now(timezone.utc))
+    user = User(lichess_username="sources_test_user", display_name="sources_test_user", created_at=datetime.now(UTC))
     session.add(user)
     session.flush()
     return user
@@ -31,8 +31,8 @@ def _make_source_run(session):  # type: ignore[misc]
         source=SourceImportSource.LICHESS_TACTICS,
         operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
         status=SourceImportStatus.SUCCEEDED,
-        started_at=datetime.now(timezone.utc),
-        finished_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
+        finished_at=datetime.now(UTC),
     )
     session.add(run)
     session.flush()
@@ -89,7 +89,7 @@ def _make_metadata_row(session, run, *, theme_counts_json=None, rating_bucket_co
         rating_bucket_counts_json=rating_bucket_counts_json or {"1500": 100},
         theme_counts_json=theme_counts_json or {"fork": 40, "pin": 30},
         opening_counts_json={"Sicilian_Defense": 20},
-        generated_at=datetime.now(timezone.utc),
+        generated_at=datetime.now(UTC),
     )
     session.add(row)
     session.flush()
@@ -152,8 +152,8 @@ class TestSourcesList:
         )
 
         _login(client, _make_user(db_session).id)
-        early = datetime(2024, 1, 1, tzinfo=timezone.utc)
-        late = datetime(2024, 6, 1, tzinfo=timezone.utc)
+        early = datetime(2024, 1, 1, tzinfo=UTC)
+        late = datetime(2024, 6, 1, tzinfo=UTC)
 
         for started_at in (late, early):
             run = SourceImportRun(
@@ -180,8 +180,8 @@ class TestSourcesList:
         )
 
         _login(client, _make_user(db_session).id)
-        succeeded_at = datetime(2024, 3, 1, tzinfo=timezone.utc)
-        failed_at = datetime(2024, 9, 1, tzinfo=timezone.utc)
+        succeeded_at = datetime(2024, 3, 1, tzinfo=UTC)
+        failed_at = datetime(2024, 9, 1, tzinfo=UTC)
 
         db_session.add(SourceImportRun(
             source=SourceImportSource.LICHESS_TACTICS,
@@ -217,8 +217,8 @@ class TestSourcesList:
             source=SourceImportSource.LICHESS_TACTICS,
             operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
             status=SourceImportStatus.FAILED,
-            started_at=datetime.now(timezone.utc),
-            finished_at=datetime.now(timezone.utc),
+            started_at=datetime.now(UTC),
+            finished_at=datetime.now(UTC),
         ))
         db_session.flush()
 
@@ -374,8 +374,8 @@ class TestLichessTacticsSourceRunMetadata:
             source=SourceImportSource.LICHESS_TACTICS,
             operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
             status=SourceImportStatus.FAILED,
-            started_at=datetime.now(timezone.utc),
-            finished_at=datetime.now(timezone.utc),
+            started_at=datetime.now(UTC),
+            finished_at=datetime.now(UTC),
         )
         db_session.add(failed_run)
         db_session.flush()

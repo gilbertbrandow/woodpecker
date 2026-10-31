@@ -1,5 +1,5 @@
 """Integration tests for GET /leaderboard and GET /leaderboard/weekly filter params."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from flask.testing import FlaskClient
@@ -16,7 +16,7 @@ def _make_user(session, username: str, display_name: str | None = None):  # type
     user = User(
         lichess_username=username,
         display_name=display_name or username,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     session.add(user)
     session.flush()
@@ -52,7 +52,7 @@ def _make_run(  # type: ignore[misc]
 ):
     from app.models.run import Run
     from app.models.training import Training
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     training = Training(user_id=user.id, schedule_id=schedule.id, started_at=now)
     session.add(training)
     session.flush()
@@ -301,7 +301,7 @@ class TestLeaderboardWeeklyFilters:
         sched_a = _make_schedule(db_session, alice)
         sched_b = _make_schedule(db_session, bob)
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Create a training item for both
         ti = TrainingItem(source_type=TrainingItemSource.LICHESS_TACTIC)
@@ -370,7 +370,7 @@ class TestLeaderboardWeeklyFilters:
 def _make_attempt(session, run, training_item_id: int, *, solved: bool = True):  # type: ignore[misc]
     """Create a RunTrainingItem + TrainingAttempt so accuracy can differ between runs."""
     from app.models.run import RunTrainingItem, TrainingAttempt
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     rp = RunTrainingItem(run_id=run.id, position=0, training_item_id=training_item_id)
     session.add(rp)
     session.flush()

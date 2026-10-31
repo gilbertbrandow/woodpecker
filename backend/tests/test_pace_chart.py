@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import patch
@@ -12,7 +12,7 @@ MS_PER_HOUR = 3_600_000
 MS_PER_DAY = 24 * MS_PER_HOUR
 MS_PER_WEEK = 7 * MS_PER_DAY
 
-START = datetime(2026, 1, 5, 14, 37, 0, tzinfo=timezone.utc)  # Monday 14:37 UTC
+START = datetime(2026, 1, 5, 14, 37, 0, tzinfo=UTC)  # Monday 14:37 UTC
 START_MS = int(START.timestamp() * 1000)
 
 TZ = "UTC"
@@ -40,7 +40,7 @@ def _make_schedule_cfg(target_hours: int, run_index: int = 0) -> ScheduleConfig:
 def _make_puzzles(solved_offsets_ms: list[int]) -> list[SimpleNamespace]:
     puzzles = []
     for offset in solved_offsets_ms:
-        completed_at = datetime.fromtimestamp((START_MS + offset) / 1000, tz=timezone.utc)
+        completed_at = datetime.fromtimestamp((START_MS + offset) / 1000, tz=UTC)
         attempt = SimpleNamespace(status="solved", try_number=1, completed_at=completed_at)
         puzzles.append(SimpleNamespace(attempts=[attempt]))
     return puzzles
@@ -61,12 +61,12 @@ def _call(
     run = _make_run(
         run_index=run_index,
         completed_at=(
-            datetime.fromtimestamp((START_MS + completed_offset_ms) / 1000, tz=timezone.utc)
+            datetime.fromtimestamp((START_MS + completed_offset_ms) / 1000, tz=UTC)
             if completed_offset_ms is not None
             else None
         ),
         aborted_at=(
-            datetime.fromtimestamp((START_MS + aborted_offset_ms) / 1000, tz=timezone.utc)
+            datetime.fromtimestamp((START_MS + aborted_offset_ms) / 1000, tz=UTC)
             if aborted_offset_ms is not None
             else None
         ),
@@ -77,7 +77,7 @@ def _call(
     for _ in range(extra_empty):
         puzzles.append(SimpleNamespace(attempts=[]))
     now_ms = START_MS + now_offset_ms
-    now_dt = datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc)
+    now_dt = datetime.fromtimestamp(now_ms / 1000, tz=UTC)
     terminal_timestamps = _compute_terminal_timestamps(puzzles, schedule_cfg.total_queue)  # type: ignore[arg-type]
     with patch("app.services.run.datetime") as mock_dt:
         mock_dt.now.return_value = now_dt

@@ -1,5 +1,5 @@
 """Integration tests for GET /training/all — subsetName response and date filters (#199)."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from flask.testing import FlaskClient
@@ -15,7 +15,7 @@ def _make_user(session, username: str):  # type: ignore[misc]
     user = User(
         lichess_username=username,
         display_name=username,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     session.add(user)
     session.flush()
@@ -71,7 +71,7 @@ class TestTrainingListFilters:
         _login(client, user.id)
         subset = _make_subset(db_session, user, name="My Subset")
         schedule = _make_schedule(db_session, user, subset)
-        _make_training(db_session, user, schedule, started_at=datetime.now(timezone.utc))
+        _make_training(db_session, user, schedule, started_at=datetime.now(UTC))
 
         resp = client.get("/training/all")
 
@@ -88,9 +88,9 @@ class TestTrainingListFilters:
         subset = _make_subset(db_session, user)
         schedule = _make_schedule(db_session, user, subset)
         old = _make_training(db_session, user, schedule,
-                             started_at=datetime(2023, 1, 1, tzinfo=timezone.utc))
+                             started_at=datetime(2023, 1, 1, tzinfo=UTC))
         recent = _make_training(db_session, user, schedule,
-                                started_at=datetime(2025, 6, 1, tzinfo=timezone.utc))
+                                started_at=datetime(2025, 6, 1, tzinfo=UTC))
 
         resp = client.get("/training/all?startedAt=after&startedAt=2025-01-01")
 
@@ -105,10 +105,10 @@ class TestTrainingListFilters:
         subset = _make_subset(db_session, user)
         schedule = _make_schedule(db_session, user, subset)
         done = _make_training(db_session, user, schedule,
-                              started_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
-                              completed_at=datetime(2025, 3, 1, tzinfo=timezone.utc))
+                              started_at=datetime(2025, 1, 1, tzinfo=UTC),
+                              completed_at=datetime(2025, 3, 1, tzinfo=UTC))
         in_progress = _make_training(db_session, user, schedule,
-                                     started_at=datetime(2025, 4, 1, tzinfo=timezone.utc))
+                                     started_at=datetime(2025, 4, 1, tzinfo=UTC))
 
         resp = client.get("/training/all?completedAt=set")
 
@@ -123,10 +123,10 @@ class TestTrainingListFilters:
         subset = _make_subset(db_session, user)
         schedule = _make_schedule(db_session, user, subset)
         done = _make_training(db_session, user, schedule,
-                              started_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
-                              completed_at=datetime(2025, 3, 1, tzinfo=timezone.utc))
+                              started_at=datetime(2025, 1, 1, tzinfo=UTC),
+                              completed_at=datetime(2025, 3, 1, tzinfo=UTC))
         in_progress = _make_training(db_session, user, schedule,
-                                     started_at=datetime(2025, 4, 1, tzinfo=timezone.utc))
+                                     started_at=datetime(2025, 4, 1, tzinfo=UTC))
 
         resp = client.get("/training/all?completedAt=not_set")
 

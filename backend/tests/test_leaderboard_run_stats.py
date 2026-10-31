@@ -1,11 +1,11 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
 from app.services import leaderboard as leaderboard_svc
 from app.table_query import FilterList
 
-_NOW = datetime.now(timezone.utc)
+_NOW = datetime.now(UTC)
 
 
 def _make_lichess_item(session, source_run_id: int, game_id: int, rating: int, n: int):  # type: ignore[misc]

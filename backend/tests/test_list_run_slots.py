@@ -4,11 +4,11 @@ Covers: not_started placeholders, scheduledStartAt computation, real runs
 in slots, and the priority rule (non-aborted beats aborted at the same index).
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
-BASE = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+BASE = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
 
 
 def _dt(hours: float) -> datetime:
