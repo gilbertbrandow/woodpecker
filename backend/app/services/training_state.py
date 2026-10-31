@@ -1,5 +1,5 @@
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import sqlalchemy as sa
@@ -15,10 +15,10 @@ def end_of_today_utc(tz_str: str) -> datetime:
     try:
         tz = ZoneInfo(tz_str)
     except ZoneInfoNotFoundError:
-        tz = timezone.utc
+        tz = UTC
     now_local = datetime.now(tz)
     eod_local = now_local.replace(hour=23, minute=59, second=59, microsecond=999999)
-    return eod_local.astimezone(timezone.utc)
+    return eod_local.astimezone(UTC)
 
 
 def compute_training_state(
@@ -119,7 +119,7 @@ def compute_training_state(
         return {"state": "completed"}
 
     if completed_runs:
-        last_run = max(completed_runs, key=lambda r: r.completed_at or datetime.min.replace(tzinfo=timezone.utc))
+        last_run = max(completed_runs, key=lambda r: r.completed_at or datetime.min.replace(tzinfo=UTC))
         assert last_run.completed_at is not None
         run_idx = last_run.run_index
         run_def = schedule_cfg.runs[run_idx] if run_idx < len(schedule_cfg.runs) else None

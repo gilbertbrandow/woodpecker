@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import sqlalchemy as sa
 from sqlalchemy import String
@@ -26,7 +26,7 @@ class User(Base):
     last_login_at: Mapped[datetime | None] = mapped_column(nullable=True, default=None)
     last_seen_at: Mapped[datetime | None] = mapped_column(nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(timezone.utc)
+        default=lambda: datetime.now(UTC)
     )
 
 
@@ -37,11 +37,11 @@ class WaitlistEntry(Base):
     lichess_username: Mapped[str] = mapped_column(unique=True, nullable=False)
     email: Mapped[str | None] = mapped_column(String(254), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(timezone.utc)
+        default=lambda: datetime.now(UTC)
     )
     updated_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
     )
 
 
@@ -51,5 +51,5 @@ class WhitelistEntry(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     lichess_username: Mapped[str] = mapped_column(unique=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(timezone.utc)
+        default=lambda: datetime.now(UTC)
     )

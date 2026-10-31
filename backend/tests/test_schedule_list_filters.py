@@ -3,7 +3,7 @@
 Covers: runCount (JSONB), puzzleCount (JOIN), subsetIds (FilterList),
 subsetPuzzleCount in response, and date filter.
 """
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from flask.testing import FlaskClient
@@ -20,7 +20,7 @@ def _make_user(session, username: str):  # type: ignore[misc]
     user = User(
         lichess_username=username,
         display_name=username,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     session.add(user)
     session.flush()
@@ -129,7 +129,7 @@ class TestListSchedulesFilters:
             user_id=user.id,
             name="locked subset",
             puzzle_count=10,
-            locked_at=datetime.now(timezone.utc),
+            locked_at=datetime.now(UTC),
             locked_puzzle_count=200,
         )
         db_session.add(subset)
@@ -178,7 +178,7 @@ class TestListSchedulesFilters:
             user_id=user.id,
             name="locked subset",
             puzzle_count=10,
-            locked_at=datetime.now(timezone.utc),
+            locked_at=datetime.now(UTC),
             locked_puzzle_count=99,
         )
         db_session.add(subset)
@@ -197,9 +197,9 @@ class TestListSchedulesFilters:
         _login(client, user.id)
         subset = _make_subset(db_session, user)
         old = _make_schedule(db_session, user, subset)
-        old.created_at = datetime(2024, 1, 15, tzinfo=timezone.utc)
+        old.created_at = datetime(2024, 1, 15, tzinfo=UTC)
         recent = _make_schedule(db_session, user, subset)
-        recent.created_at = datetime(2024, 3, 15, tzinfo=timezone.utc)
+        recent.created_at = datetime(2024, 3, 15, tzinfo=UTC)
         db_session.flush()
 
         resp = client.get("/schedules?date=after&date=2024-02-01")
@@ -215,8 +215,8 @@ class TestListSchedulesFilters:
         subset = _make_subset(db_session, user)
         sched = _make_schedule(db_session, user, subset)
         # Created Jan, locked Mar — effective date should be Mar
-        sched.created_at = datetime(2024, 1, 15, tzinfo=timezone.utc)
-        sched.locked_at = datetime(2024, 3, 15, tzinfo=timezone.utc)
+        sched.created_at = datetime(2024, 1, 15, tzinfo=UTC)
+        sched.locked_at = datetime(2024, 3, 15, tzinfo=UTC)
         db_session.flush()
 
         resp = client.get("/schedules?date=after&date=2024-02-01")

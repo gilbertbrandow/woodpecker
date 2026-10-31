@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import sentry_sdk
 import sqlalchemy as sa
@@ -84,10 +84,10 @@ def create_app() -> Flask:
                     User.id == user_id,
                     sa.or_(
                         User.last_seen_at.is_(None),
-                        User.last_seen_at < datetime.now(timezone.utc) - timedelta(minutes=1),
+                        User.last_seen_at < datetime.now(UTC) - timedelta(minutes=1),
                     ),
                 )
-                .values(last_seen_at=datetime.now(timezone.utc))
+                .values(last_seen_at=datetime.now(UTC))
                 .execution_options(synchronize_session=False)
             )
             db.session.commit()

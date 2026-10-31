@@ -1,5 +1,5 @@
 """Canonical serialization for the active-user API response shape."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.models.user import User
 from app.services.user_ref import PRESENCE_THRESHOLD
@@ -8,8 +8,8 @@ from app.services.user_ref import PRESENCE_THRESHOLD
 def user_to_dict(user: User) -> dict[str, object]:
     last_seen = user.last_seen_at
     if last_seen is not None and last_seen.tzinfo is None:
-        last_seen = last_seen.replace(tzinfo=timezone.utc)
-    is_present = last_seen is not None and (datetime.now(timezone.utc) - last_seen) < PRESENCE_THRESHOLD
+        last_seen = last_seen.replace(tzinfo=UTC)
+    is_present = last_seen is not None and (datetime.now(UTC) - last_seen) < PRESENCE_THRESHOLD
     return {
         "status": "active",
         "id": user.id,

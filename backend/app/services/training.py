@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import sqlalchemy as sa
 from sqlalchemy.orm import aliased
@@ -217,7 +217,7 @@ def list_my_trainings(user_id: int, tz_str: str = "UTC") -> list[dict[str, objec
         {"uid": user_id},
     ).all()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     result: list[dict[str, object]] = []
     for row in rows:
         schedule_cfg: ScheduleConfig | None = None
@@ -314,7 +314,7 @@ def abort_training(training_id: int, user_id: int) -> Training:
     training = _get_owned_training(training_id, user_id)
     if training.completed_at is not None or training.aborted_at is not None:
         raise ConflictError("Training already ended", "This training has already been completed or aborted.")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     training.aborted_at = now
     active_run = db.session.scalar(
         sa.select(Run).where(
@@ -472,7 +472,7 @@ def list_all_trainings(
             {k: v for k, v in params.items() if k not in ("page_limit", "page_offset")},
         ) or 0
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Batch-fetch all runs for the page in one query.
     training_ids = [row.id for row in rows]
@@ -792,7 +792,7 @@ def _get_active_run_resolved(active_run: Run) -> tuple[int, int]:
 def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
     training, schedule_cfg, puzzle_count = _load_training_context(training_id, user_id, require_owner=False)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     now_ms = _ms(now)
     terminal_ms: int | None = (
         _ms(training.completed_at) if training.completed_at is not None
@@ -961,7 +961,7 @@ def get_training_progress(training_id: int, user_id: int) -> dict[str, object]:
 def get_training_detail_status(training_id: int, user_id: int, tz_str: str = "UTC") -> dict[str, object]:
     training, schedule_cfg, puzzle_count = _load_training_context(training_id, user_id, require_owner=False)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     now_ms = _ms(now)
 
     all_runs = list(

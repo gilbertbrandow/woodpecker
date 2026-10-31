@@ -1,5 +1,5 @@
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import sqlalchemy as sa
 from sqlalchemy.exc import SQLAlchemyError
@@ -355,7 +355,7 @@ def get_dashboard(
     run_index: int | None,
     tz_str: str,
 ) -> dict:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     all_trainings = _load_user_trainings_sorted(user_id)
 

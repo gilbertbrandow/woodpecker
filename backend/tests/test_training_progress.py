@@ -7,18 +7,18 @@ _interpolate_anchors scans linearly and hit the stale flat-break pair first, ret
 the wrong value (100 instead of 101 in the scenario below).
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pytest
 
 MS_PER_HOUR = 3_600_000
-BASE = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+BASE = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
 BASE_MS = int(BASE.timestamp() * 1000)
 
 
 def _dt(hours_offset: float) -> datetime:
-    return datetime.fromtimestamp((BASE_MS + int(hours_offset * MS_PER_HOUR)) / 1000, tz=timezone.utc)
+    return datetime.fromtimestamp((BASE_MS + int(hours_offset * MS_PER_HOUR)) / 1000, tz=UTC)
 
 
 def _seed_world(session, puzzle_count: int = 100):

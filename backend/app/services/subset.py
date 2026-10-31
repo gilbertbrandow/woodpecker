@@ -1,6 +1,6 @@
 import json
 import random
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import sqlalchemy as sa
@@ -678,7 +678,7 @@ def lock_subset(subset_id: int, user_id: int) -> Subset:
     if active_count == 0:
         raise ValidationError("No puzzles", "A subset must have at least one puzzle before it can be locked.")
 
-    subset.locked_at = datetime.now(timezone.utc)
+    subset.locked_at = datetime.now(UTC)
     subset.locked_puzzle_count = active_count
     db.session.commit()
     return subset

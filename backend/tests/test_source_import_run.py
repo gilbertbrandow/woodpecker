@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from flask.testing import FlaskClient
@@ -16,7 +16,7 @@ def _make_source_run(session, status=None, finished_at=None):  # type: ignore[mi
 
     if status is None:
         status = SourceImportStatus.SUCCEEDED
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     run = SourceImportRun(
         source=SourceImportSource.LICHESS_TACTICS,
         operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
@@ -44,7 +44,7 @@ def _make_metadata(session, run):  # type: ignore[misc]
         rating_bucket_counts_json={"1500": 100, "1550": 120},
         theme_counts_json={"mateIn1": 500, "fork": 200},
         opening_counts_json={"Sicilian_Defense": 300, "French_Defense": 150},
-        generated_at=datetime.now(timezone.utc),
+        generated_at=datetime.now(UTC),
     )
     session.add(meta)
     session.flush()
@@ -54,7 +54,7 @@ def _make_metadata(session, run):  # type: ignore[misc]
 def _make_user(session):  # type: ignore[misc]
     from app.models.user import User
 
-    user = User(lichess_username="sir_meta_test", display_name="sir_meta_test", created_at=datetime.now(timezone.utc))
+    user = User(lichess_username="sir_meta_test", display_name="sir_meta_test", created_at=datetime.now(UTC))
     session.add(user)
     session.flush()
     return user
@@ -81,7 +81,7 @@ class TestSourceImportRunModel:
             source=SourceImportSource.LICHESS_TACTICS,
             operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
             status=SourceImportStatus.RUNNING,
-            started_at=datetime.now(timezone.utc),
+            started_at=datetime.now(UTC),
         )
         db_session.add(run)
         db_session.flush()
@@ -94,7 +94,7 @@ class TestSourceImportRunModel:
 
         run = _make_source_run(db_session, status=SourceImportStatus.RUNNING, finished_at=None)
         run.status = SourceImportStatus.SUCCEEDED
-        run.finished_at = datetime.now(timezone.utc)
+        run.finished_at = datetime.now(UTC)
         db_session.flush()
         assert run.status == SourceImportStatus.SUCCEEDED
         assert run.finished_at is not None
@@ -125,7 +125,7 @@ class TestSourceImportRunModel:
             rating_bucket_counts_json={},
             theme_counts_json={},
             opening_counts_json={},
-            generated_at=datetime.now(timezone.utc),
+            generated_at=datetime.now(UTC),
         )
         db_session.add(duplicate)
         with pytest.raises(IntegrityError):
@@ -190,13 +190,13 @@ class TestGetLatestSourceRunMetadata:
 
         older = _make_source_run(
             db_session,
-            finished_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+            finished_at=datetime(2025, 1, 1, tzinfo=UTC),
         )
         _make_metadata(db_session, older)
 
         newer = _make_source_run(
             db_session,
-            finished_at=datetime(2025, 6, 1, tzinfo=timezone.utc),
+            finished_at=datetime(2025, 6, 1, tzinfo=UTC),
         )
         _make_metadata(db_session, newer)
         db_session.commit()
@@ -209,7 +209,7 @@ class TestGetLatestSourceRunMetadata:
         from app.models.source_import_run import LichessTacticsSourceRunMetadata
         from app.services.lichess_tactics_source import get_latest_source_run_metadata
 
-        run1 = _make_source_run(db_session, finished_at=datetime(2025, 1, 1, tzinfo=timezone.utc))
+        run1 = _make_source_run(db_session, finished_at=datetime(2025, 1, 1, tzinfo=UTC))
         meta1 = LichessTacticsSourceRunMetadata(
             source_import_run_id=run1.id,
             imported_count=900,
@@ -222,12 +222,12 @@ class TestGetLatestSourceRunMetadata:
             rating_bucket_counts_json={"1500": 100, "1550": 200},
             theme_counts_json={"mateIn1": 500, "fork": 200},
             opening_counts_json={"Sicilian_Defense": 300},
-            generated_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+            generated_at=datetime(2025, 1, 1, tzinfo=UTC),
         )
         db_session.add(meta1)
 
         # A re-import run that found nothing new (all tactics already existed).
-        run2 = _make_source_run(db_session, finished_at=datetime(2025, 6, 1, tzinfo=timezone.utc))
+        run2 = _make_source_run(db_session, finished_at=datetime(2025, 6, 1, tzinfo=UTC))
         meta2 = LichessTacticsSourceRunMetadata(
             source_import_run_id=run2.id,
             imported_count=0,
@@ -240,7 +240,7 @@ class TestGetLatestSourceRunMetadata:
             rating_bucket_counts_json={},
             theme_counts_json={},
             opening_counts_json={},
-            generated_at=datetime(2025, 6, 1, tzinfo=timezone.utc),
+            generated_at=datetime(2025, 6, 1, tzinfo=UTC),
         )
         db_session.add(meta2)
         db_session.commit()

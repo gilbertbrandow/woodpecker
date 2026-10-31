@@ -3,7 +3,7 @@
 All whitelist operations normalise Lichess usernames to lowercase before
 any DB interaction. Callers should not pre-normalise.
 """
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.extensions import db
 from app.models.user import WhitelistEntry
@@ -28,7 +28,7 @@ def add(lichess_username: str) -> bool:
         return False
     db.session.add(WhitelistEntry(
         lichess_username=normalized,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     ))
     db.session.commit()
     return True

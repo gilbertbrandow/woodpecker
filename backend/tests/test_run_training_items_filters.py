@@ -1,5 +1,5 @@
 """Integration tests for GET /runs/<id>/training-items — pagination and filter params."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 import sqlalchemy as sa
@@ -19,7 +19,7 @@ def _make_user(session, username: str):  # type: ignore[misc]
     user = User(
         lichess_username=username,
         display_name=username,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     session.add(user)
     session.flush()
@@ -56,7 +56,7 @@ def _make_schedule(session, user, *, total_queue: int = 2):  # type: ignore[misc
 def _make_run(session, user, schedule):  # type: ignore[misc]
     from app.models.run import Run
     from app.models.training import Training
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     training = Training(user_id=user.id, schedule_id=schedule.id, started_at=now)
     session.add(training)
     session.flush()
@@ -80,8 +80,8 @@ def _make_lichess_tactic(session, *, rating: int = 1500):  # type: ignore[misc]
         source=SourceImportSource.LICHESS_TACTICS,
         operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
         status=SourceImportStatus.SUCCEEDED,
-        started_at=datetime.now(timezone.utc),
-        finished_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
+        finished_at=datetime.now(UTC),
     )
     session.add(source_run)
     session.flush()
@@ -143,8 +143,8 @@ def _make_scraped_positional(session, *, min_rating: int | None = 1600, max_rati
         source=SourceImportSource.LICHESS_TACTICS,
         operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
         status=SourceImportStatus.SUCCEEDED,
-        started_at=datetime.now(timezone.utc),
-        finished_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
+        finished_at=datetime.now(UTC),
     )
     session.add(source_run)
     session.flush()
@@ -188,7 +188,7 @@ def _add_attempt(  # type: ignore[misc]
     time_spent_ms: int | None = None,
 ):
     from app.models.run import TrainingAttempt
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     attempt = TrainingAttempt(
         run_training_item_id=run_training_item.id,
         try_number=try_number,

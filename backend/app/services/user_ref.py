@@ -1,5 +1,5 @@
 """Canonical UserRef serialiser — use wherever a user is referenced from another resource."""
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from app.models.user import User
 
@@ -9,8 +9,8 @@ PRESENCE_THRESHOLD = timedelta(minutes=5)
 def user_ref(user: User) -> dict[str, object]:
     last_seen = user.last_seen_at
     if last_seen is not None and last_seen.tzinfo is None:
-        last_seen = last_seen.replace(tzinfo=timezone.utc)
-    is_present = last_seen is not None and (datetime.now(timezone.utc) - last_seen) < PRESENCE_THRESHOLD
+        last_seen = last_seen.replace(tzinfo=UTC)
+    is_present = last_seen is not None and (datetime.now(UTC) - last_seen) < PRESENCE_THRESHOLD
     return {
         "id": user.id,
         "displayName": user.display_name,
@@ -29,8 +29,8 @@ def user_ref_from_row(
 ) -> dict[str, object]:
     """Build a UserRef from raw SQL row fields."""
     if last_seen_at is not None and last_seen_at.tzinfo is None:
-        last_seen_at = last_seen_at.replace(tzinfo=timezone.utc)
-    is_present = last_seen_at is not None and (datetime.now(timezone.utc) - last_seen_at) < PRESENCE_THRESHOLD
+        last_seen_at = last_seen_at.replace(tzinfo=UTC)
+    is_present = last_seen_at is not None and (datetime.now(UTC) - last_seen_at) < PRESENCE_THRESHOLD
     return {
         "id": user_id,
         "displayName": display_name,

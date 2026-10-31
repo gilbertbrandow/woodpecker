@@ -6,7 +6,7 @@ The TestDiscardByTrainingItemId and TestGetStatsPerSource classes test the
 *target* behavior of endpoints that have not been updated yet — they will
 be red until those endpoints are implemented.
 """
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 import sqlalchemy as sa
@@ -24,7 +24,7 @@ def _make_user(session, username: str = "subset_test_user"):  # type: ignore[mis
     user = User(
         lichess_username=username,
         display_name=username,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     session.add(user)
     session.flush()
@@ -73,8 +73,8 @@ def _make_tactic(session, puzzle_id: str, rating: int = 1500):  # type: ignore[m
         source=SourceImportSource.LICHESS_TACTICS,
         operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
         status=SourceImportStatus.SUCCEEDED,
-        started_at=datetime.now(timezone.utc),
-        finished_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
+        finished_at=datetime.now(UTC),
     )
     session.add(source_run)
     session.flush()
@@ -138,8 +138,8 @@ def _make_positional(  # type: ignore[misc]
         source=SourceImportSource.LICHESS_TACTICS,
         operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
         status=SourceImportStatus.SUCCEEDED,
-        started_at=datetime.now(timezone.utc),
-        finished_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
+        finished_at=datetime.now(UTC),
     )
     session.add(source_run)
     session.flush()
@@ -208,8 +208,8 @@ def _make_decoy(session, accepted_moves: list | None = None):  # type: ignore[mi
         source=SourceImportSource.LICHESS_TACTICS,
         operation=SourceImportOperation.LICHESS_TACTICS_IMPORT,
         status=SourceImportStatus.SUCCEEDED,
-        started_at=datetime.now(timezone.utc),
-        finished_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
+        finished_at=datetime.now(UTC),
     )
     session.add(source_run)
     session.flush()
@@ -239,7 +239,7 @@ def _make_decoy(session, accepted_moves: list | None = None):  # type: ignore[mi
 
 
 def _lock_subset(session, subset):  # type: ignore[misc]
-    subset.locked_at = datetime.now(timezone.utc)
+    subset.locked_at = datetime.now(UTC)
     subset.locked_puzzle_count = 0
     session.flush()
 
@@ -1441,8 +1441,8 @@ class TestListSubsetsFilters:
     def test_date_after_excludes_older(self, client: FlaskClient, db_session) -> None:
         user = _make_user(db_session, "lsf_date_after")
         _login(client, user.id)
-        jan = self._make_dated_subset(db_session, user, datetime(2024, 1, 15, tzinfo=timezone.utc))
-        mar = self._make_dated_subset(db_session, user, datetime(2024, 3, 15, tzinfo=timezone.utc))
+        jan = self._make_dated_subset(db_session, user, datetime(2024, 1, 15, tzinfo=UTC))
+        mar = self._make_dated_subset(db_session, user, datetime(2024, 3, 15, tzinfo=UTC))
 
         resp = client.get("/subsets?date=after&date=2024-02-01")
 
@@ -1454,8 +1454,8 @@ class TestListSubsetsFilters:
     def test_date_before_excludes_newer(self, client: FlaskClient, db_session) -> None:
         user = _make_user(db_session, "lsf_date_before")
         _login(client, user.id)
-        jan = self._make_dated_subset(db_session, user, datetime(2024, 1, 15, tzinfo=timezone.utc))
-        mar = self._make_dated_subset(db_session, user, datetime(2024, 3, 15, tzinfo=timezone.utc))
+        jan = self._make_dated_subset(db_session, user, datetime(2024, 1, 15, tzinfo=UTC))
+        mar = self._make_dated_subset(db_session, user, datetime(2024, 3, 15, tzinfo=UTC))
 
         resp = client.get("/subsets?date=before&date=2024-02-01")
 
@@ -1467,8 +1467,8 @@ class TestListSubsetsFilters:
     def test_date_between_filters_to_range(self, client: FlaskClient, db_session) -> None:
         user = _make_user(db_session, "lsf_date_between")
         _login(client, user.id)
-        jan = self._make_dated_subset(db_session, user, datetime(2024, 1, 15, tzinfo=timezone.utc))
-        mar = self._make_dated_subset(db_session, user, datetime(2024, 3, 15, tzinfo=timezone.utc))
+        jan = self._make_dated_subset(db_session, user, datetime(2024, 1, 15, tzinfo=UTC))
+        mar = self._make_dated_subset(db_session, user, datetime(2024, 3, 15, tzinfo=UTC))
 
         resp = client.get("/subsets?date=between&date=2024-01-01&date=2024-02-01")
 
@@ -1480,8 +1480,8 @@ class TestListSubsetsFilters:
     def test_date_not_between_excludes_range(self, client: FlaskClient, db_session) -> None:
         user = _make_user(db_session, "lsf_date_notbetween")
         _login(client, user.id)
-        jan = self._make_dated_subset(db_session, user, datetime(2024, 1, 15, tzinfo=timezone.utc))
-        mar = self._make_dated_subset(db_session, user, datetime(2024, 3, 15, tzinfo=timezone.utc))
+        jan = self._make_dated_subset(db_session, user, datetime(2024, 1, 15, tzinfo=UTC))
+        mar = self._make_dated_subset(db_session, user, datetime(2024, 3, 15, tzinfo=UTC))
 
         resp = client.get("/subsets?date=not_between&date=2024-01-01&date=2024-02-01")
 
@@ -1546,8 +1546,8 @@ class TestListSubsetsFilters:
         user = _make_user(db_session, "lsf_date_locked")
         _login(client, user.id)
         # Subset created Jan but locked Mar — the effective date should be Mar.
-        subset = self._make_dated_subset(db_session, user, datetime(2024, 1, 15, tzinfo=timezone.utc))
-        subset.locked_at = datetime(2024, 3, 15, tzinfo=timezone.utc)
+        subset = self._make_dated_subset(db_session, user, datetime(2024, 1, 15, tzinfo=UTC))
+        subset.locked_at = datetime(2024, 3, 15, tzinfo=UTC)
         subset.locked_puzzle_count = 0
         db_session.flush()
 
@@ -1562,7 +1562,7 @@ class TestListSubsetsFilters:
         _login(client, user.id)
         # Subset configured with puzzle_count=10 but locked with 100 active puzzles.
         subset = _make_subset(db_session, user, puzzle_count=10)
-        subset.locked_at = datetime.now(timezone.utc)
+        subset.locked_at = datetime.now(UTC)
         subset.locked_puzzle_count = 100
         db_session.flush()
 

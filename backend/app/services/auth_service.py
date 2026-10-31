@@ -2,7 +2,7 @@ import base64
 import hashlib
 import os
 import urllib.parse
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import berserk
 import requests as http
@@ -89,7 +89,7 @@ def get_or_create_user(access_token: str) -> dict[str, object]:
     ).scalar_one_or_none()
 
     if existing:
-        existing.last_login_at = datetime.now(timezone.utc)
+        existing.last_login_at = datetime.now(UTC)
         if country_code is not None:
             existing.country_code = country_code
         db.session.commit()
@@ -119,9 +119,9 @@ def _upsert_waitlist(lichess_username: str) -> None:
     ).scalar_one_or_none()
 
     if existing:
-        existing.updated_at = datetime.now(timezone.utc)
+        existing.updated_at = datetime.now(UTC)
     else:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         entry = WaitlistEntry(
             lichess_username=lichess_username,
             created_at=now,
@@ -142,7 +142,7 @@ def create_user_from_onboarding(lichess_username: str, display_name: str, avatar
         lichess_username=lichess_username,
         display_name=display_name,
         avatar_url=avatar_url,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     db.session.add(user)
     db.session.commit()
@@ -158,7 +158,7 @@ def update_waitlist_email(lichess_username: str, email: str) -> WaitlistEntry:
         raise NotFoundError("Not found", "Your waitlist entry could not be found.")
 
     entry.email = email
-    entry.updated_at = datetime.now(timezone.utc)
+    entry.updated_at = datetime.now(UTC)
     db.session.commit()
     return entry
 

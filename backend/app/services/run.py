@@ -1,6 +1,6 @@
 import bisect
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, NamedTuple, cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -329,7 +329,7 @@ def _create_attempt_for_puzzle(run_puzzle: RunTrainingItem) -> TrainingAttempt:
         run_training_item_id=run_puzzle.id,
         try_number=next_try_number,
         status="in_progress",
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
         moves=[],
     )
     db.session.add(attempt)
@@ -674,7 +674,7 @@ def _pace_chart_data(
     else:
         run_status = "active"
 
-    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    now_ms = int(datetime.now(UTC).timestamp() * 1000)
     as_of_ms = completed_at_ms if completed_at_ms is not None else (aborted_at_ms if aborted_at_ms is not None else now_ms)
 
     resolved_at_as_of = _resolved_count_at(terminal_timestamps, as_of_ms)
@@ -1737,7 +1737,7 @@ def complete_attempt(
 
     outcome = derive_attempt_outcome(payload.contract, uci_moves)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     attempt.status = outcome
     attempt.completed_at = now
     if client_time_spent_ms is not None:

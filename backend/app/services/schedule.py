@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import cast
 
 import sqlalchemy as sa
@@ -121,7 +121,7 @@ def lock_schedule(schedule_id: int, user_id: int) -> Schedule:
     if schedule.config is None:
         raise ValidationError("Configuration required", "A schedule must have a configuration set before it can be locked.")
     ScheduleConfig.from_dict(schedule.config)
-    schedule.locked_at = datetime.now(timezone.utc)
+    schedule.locked_at = datetime.now(UTC)
     db.session.commit()
     return schedule
 
@@ -169,7 +169,7 @@ def get_schedule_insights(schedule_id: int, user_id: int) -> list[dict[str, obje
 
     schedule_cfg = ScheduleConfig.from_dict(schedule.config)
     result: list[dict[str, object]] = []
-    current = datetime.now(tz=timezone.utc).date()
+    current = datetime.now(tz=UTC).date()
 
     for run_def in schedule_cfg.runs:
         run_days = max(1, round(run_def.target_hours / 24))
